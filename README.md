@@ -1,4 +1,4 @@
-# 苔芽农场 · 星露谷（moss-farm-xinglu）
+# 苔芽农场 · 星露谷
 
 原生 HTML / CSS / JavaScript 的像素风种田小游戏。**双击 `index.html` 就能玩**，
 不需要 npm、不需要起服务器、不访问任何 CDN（`file://` 直接可用）。
