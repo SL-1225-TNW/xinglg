@@ -20,14 +20,17 @@
 `node tests/single-file-smoke.mjs` 会真的用 `file://` 打开它、走几步、翻一块土，
 确认不是"看起来能打开"的空壳。
 
-**方式二：GitHub Pages（给一个网址，手机也能开）**
-
-在仓库页点 `Settings` → `Pages` → `Source` 选 `Deploy from a branch`、
-branch 选 `main`、目录选 `/ (root)` → `Save`，等一两分钟后即可访问：
+**方式二：直接给网址（手机上也能开，手机浏览器直接玩）**
 
 ```
 https://sl-1225-tnw.github.io/xinglg/
 ```
+
+站点由 `.github/workflows/pages.yml` 自动部署：**每次推送 `main` 都会重新发布**，
+不用手动操作。页面上还放了 `苔芽农场-单文件版.html`，朋友可以在网页里直接下载那个单文件。
+
+> Pages 站点需要在仓库设置里首次启用一次（`Settings` → `Pages` → `Source` 选
+> `GitHub Actions`）。之后全部由工作流接管，GitHub 的 token 没有权限做这第一次启用。
 
 **方式三：直接给仓库链接**
 
