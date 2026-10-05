@@ -8,6 +8,32 @@
 主角是橙色像素小螃蟹 **Clawd**。一天的动作循环是：早晨从家出门 → 看田浇水 →
 采集或钓鱼 → 回家整理 → 上床睡觉。
 
+## 怎么分享给别人玩
+
+**方式一：单文件（推荐给不熟悉 Git 的朋友）**
+
+仓库里的 [`苔芽农场-单文件版.html`](苔芽农场-单文件版.html) 是把 `styles.css` 与 `game.js`
+全部内联后的**单个 HTML 文件**，244KB、零外部依赖。把这个文件发过去（微信/QQ 文件传输、
+网盘、U 盘都行），对方**双击就能玩**，不用装任何东西、不用联网、解压都不需要。
+
+这个文件由 `node tests/build-single-file.mjs` 生成，改完游戏代码后重新跑一次即可；
+`node tests/single-file-smoke.mjs` 会真的用 `file://` 打开它、走几步、翻一块土，
+确认不是"看起来能打开"的空壳。
+
+**方式二：GitHub Pages（给一个网址，手机也能开）**
+
+在仓库页点 `Settings` → `Pages` → `Source` 选 `Deploy from a branch`、
+branch 选 `main`、目录选 `/ (root)` → `Save`，等一两分钟后即可访问：
+
+```
+https://sl-1225-tnw.github.io/xinglg/
+```
+
+**方式三：直接给仓库链接**
+
+让朋友打开 https://github.com/SL-1225-TNW/xinglg ，点 `Code` → `Download ZIP`，
+解压后双击 `index.html`。
+
 ## 怎么玩
 
 | 操作 | 按键 |
