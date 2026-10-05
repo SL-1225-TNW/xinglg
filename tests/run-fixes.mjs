@@ -1,7 +1,7 @@
 /* 修复回归：独立浏览器、明确的边界夹具，操作经真实键盘/按钮完成。 */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {launch, boot, GAME_URL, snap, lastToast} from './harness.mjs';
+import {launch, boot, GAME_URL, snap, lastToast, hud, winOpen, winTitle, winText, clickWin, closeWin} from './harness.mjs';
 
 const {browser, page, errors} = await launch();
 let passed = 0;
@@ -80,7 +80,7 @@ try {
   s = await snap(page);
   eq('收起设备后土地可再次耕种', [s.structures.length,s.inv.dev_chest,!!s.plots['9,9']], [0,1,true]);
 
-  await fixture({player:{x:9,y:10,face:'up'}, inventory:{dev_chest:1}, plots:{'9,9':mature}});
+  await fixture({player:{x:9,y:10,face:'up'}, inventory:{dev_chest:1}, plots:{'9,9':{tilled:true,water:true,crop:'potato',age:5,mature:true,harvested:false,regrow:0}}});
   await page.keyboard.press('8'); await page.keyboard.press('Space');
   s = await snap(page);
   eq('放设备不能覆盖作物', [s.structures.length,s.inv.dev_chest,s.plots['9,9'].crop], [0,1,'potato']);
@@ -117,6 +117,112 @@ try {
   await page.getByRole('button',{name:'继续游戏',exact:true}).click();
   s=await snap(page);
   eq('更换角色后存档坐标和资源恢复', [s.px,s.py,s.coins,s.inv,s.quests], [before.px,before.py,before.coins,before.inv,before.quests]);
+
+  /* ---------- 新增能力回归：小铲子 / 委托方向 / 分页结算 ---------- */
+  /* 新手引导已经走完的状态直接用 game.js 里的 TUTORIAL_DONE：它带 origin，
+     手写 {status:'done',flags:{}} 会因为缺 origin 让 tickTutorial 报错。 */
+  const noGuide = await page.evaluate(() => window.__MOSS__.TUTORIAL_DONE);
+  const sown = {tilled:true,water:true,crop:'radish',age:0,mature:false,harvested:false,regrow:0};
+  await fixture({player:{x:9,y:10,face:'up'}, inventory:{}, plots:{'9,9':sown}, tutorial:noGuide});
+  await page.keyboard.press('9'); await page.keyboard.press('Space');
+  s = await snap(page);
+  eq('铲掉刚播下的作物退回种子', [s.plots['9,9'].crop, s.inv.seed_radish || 0, 100 - s.energy],
+    [null, 1, 2]);
+  eq('铲除刚播下的作物有明确说明', /种子已收回/.test(await lastToast(page)), true);
+
+  const grown = {tilled:true,water:true,crop:'radish',age:1,mature:false,harvested:false,regrow:0};
+  await fixture({player:{x:9,y:10,face:'up'}, inventory:{}, plots:{'9,9':grown}, tutorial:noGuide});
+  await page.keyboard.press('9'); await page.keyboard.press('Space');
+  s = await snap(page);
+  eq('铲掉长过一天的作物不退种子', [s.plots['9,9'].crop, s.inv.seed_radish || 0], [null, 0]);
+  eq('不退种子时提示原因', /不退还/.test(await lastToast(page)), true);
+
+  await fixture({player:{x:9,y:10,face:'up'}, inventory:{}, plots:{}, tutorial:noGuide});
+  await page.keyboard.press('9'); await page.keyboard.press('Space');
+  eq('空地上铲不出作物', /没有作物可以铲除/.test(await lastToast(page)), true);
+
+  await fixture({player:{x:9,y:10,face:'up'}, inventory:{}, plots:{'9,9':sown},
+    tutorial:{status:'active', flags:{tilled:false,planted:false,watered:false,harvested:false,talked:false,gift:false,shipped:false,fished:false}}});
+  await page.keyboard.press('9'); await page.keyboard.press('Space');
+  s = await snap(page);
+  eq('新手引导期间不能铲除作物', [s.plots['9,9'].crop, s.inv.seed_radish || 0], ['radish', 0]);
+  eq('引导期间铲除给出理由', /先跟着新手引导/.test(await lastToast(page)), true);
+
+  /* 委托方向：当前委托交在镇上的任务板，人在农场 → 屏幕边缘应出现金色指示箭头 */
+  const questGold = () => page.evaluate(() => {
+    const c = document.getElementById('world');
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      if (Math.abs(d[i] - 239) < 10 && Math.abs(d[i + 1] - 209) < 10 && Math.abs(d[i + 2] - 139) < 10) n++;
+    }
+    return n;
+  });
+  await fixture({player:{x:9,y:10,face:'down'}, questProgress:{1:'unlocked',2:'locked',3:'locked',4:'locked'}, tutorial:noGuide});
+  await page.waitForTimeout(260);
+  const bandGold = await questGold();
+  eq('农场里显示通往任务板的方向指示', bandGold > 20, true);
+  eq('农场里委托条指向出口并说明去向', /→ 先去小镇$/.test((await hud(page)).quest), true);
+
+  /* 走进镇上：目标同场景应在目标格画标，条上写成具体的方位与距离 */
+  await fixture({sceneId:'town', player:{x:8,y:10,face:'right'},
+    questProgress:{1:'unlocked',2:'locked',3:'locked',4:'locked'}, tutorial:noGuide});
+  await page.waitForTimeout(260);
+  eq('镇上委托条给出交付点与方位', /→ 任务板 右上方 \d+ 格$/.test((await hud(page)).quest), true);
+  eq('投影函数算出待交付委托', (await page.evaluate(() =>
+    window.__MOSS__.questTargets().map(t => t.label + '@' + t.scene))).join(','),
+    '任务板@town,小桥施工点@town,出货箱@farm');
+  eq('地标只留不在本场景的那个', (await page.evaluate(() =>
+    window.__MOSS__.questTargets().filter(t => t.landmark).map(t => t.label))).join(','), '出货箱');
+  eq('距离文案口径正确', await page.evaluate(() => window.__MOSS__.questDistText(0, 0)), '就在脚下');
+
+  /* 分页结算：三株刚长到头的萝卜 + 出货箱 + 果酱罐，逐页看过去 */
+  const jam = {id:'j1',device:'jam_jar',x:9,y:9,input:1,startDay:1,ready:false};
+  await fixture({player:{x:9,y:10,face:'down'}, inventory:{radish:20,strawberry:5},
+    plots:{'9,7':{tilled:true,water:true,crop:'radish',age:2,mature:false,harvested:false,regrow:0},
+           '10,7':{tilled:true,water:true,crop:'radish',age:2,mature:false,harvested:false,regrow:0},
+           '11,7':{tilled:true,water:true,crop:'radish',age:2,mature:false,harvested:false,regrow:0}},
+    shipping:{radish:2}, structures:[jam], tutorial:noGuide});
+  const pages = await page.evaluate(() => {
+    const M = window.__MOSS__;
+    return M.settlementPages({sold:[{id:'radish',name:'萝卜',qty:2,value:24}], income:24, matured:3,
+      matureDetail:['萝卜','萝卜','萝卜'], jam:1, grew:[{name:'萝卜',stage:'嫩芽'}],
+      day:1, auto:false, newDay:2, weatherFrom:'sun', weatherTo:'sun', quests:[], jamWaiting:0, fallback:false});
+  });
+  eq('结算页覆盖收入/庄稼/果酱/天气', pages.map(p => p.kind), ['sold','crop','jam','weather']);
+  const titles = await page.evaluate(() => window.__MOSS__.settlementPages({
+    sold:[{id:'radish',name:'萝卜',qty:2,value:24}], income:24, matured:3, matureDetail:['萝卜','萝卜','萝卜'],
+    jam:1, grew:[{name:'萝卜',stage:'嫩芽'}], day:1, auto:false, newDay:2,
+    weatherFrom:'sun', weatherTo:'sun', quests:['完成委托 1「第一份收成」，交付 萝卜 ×3。'], jamWaiting:0, fallback:false
+  }).map(p => p.title));
+  eq('委托消息也进入结算页', titles.includes('委托进展'), true);
+
+  const preSettle = await snap(page);
+  const today = preSettle.day;
+  const income = await page.evaluate(() => window.__MOSS__.ITEMS.radish.sell * 2);
+  await page.evaluate(() => window.__MOSS__.performSettlement(false));
+  await page.waitForTimeout(300);
+  eq('结算窗标题写着第几天结束', /天结束/.test(await winTitle(page)), true);
+  eq('第一页标出出货收入', new RegExp(income + ' 金').test(await winText(page)), true);
+  await clickWin(page, '开始新的一天');
+  eq('点继续进入第二页', /田里的变化/.test(await winText(page)), true);
+  eq('第二页记下成熟了几株', /萝卜 今天长熟了/.test(await winText(page)), true);
+  eq('第二页不残留对象字面量', /\[object Object\]/.test(await winText(page)), false);
+  await clickWin(page, '开始新的一天');
+  eq('第三页报告果酱加工', /果酱罐/.test(await winText(page)), true);
+  await clickWin(page, '开始新的一天');
+  eq('最后一页讲天气与明天', /天气与明天/.test(await winText(page)), true);
+  await clickWin(page, '开始新的一天');
+  eq('看完最后一页窗口关闭', await winOpen(page), false);
+  s = await snap(page);
+  eq('结算把出货箱换成金币', [s.shipping, s.coins, s.day], [{}, preSettle.coins + income, today + 1]);
+  const hist = await page.evaluate(() => window.__MOSS__.state.settleHistory);
+  eq('收成记录留下当天一条', [hist.length, hist[0].day, hist[0].income], [1, today, income]);
+  await page.evaluate(() => window.__MOSS__.openSettleLog());
+  await page.waitForTimeout(150);
+  eq('收成记录页能回看当天', new RegExp('第 ' + today + ' 天').test(await winText(page)), true);
+  await closeWin(page);
+
   eq('回归全过程无控制台错误', errors, []);
   console.log(`\n修复回归 ${passed}/${passed} 通过。`);
 } finally { await browser.close(); }

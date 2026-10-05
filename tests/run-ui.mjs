@@ -21,7 +21,7 @@ rep.ok('桌面画布不小于 2 倍', deskScale >= 2, JSON.stringify(rect));
 rep.ok('桌面画布仍为最近邻（无平滑）', await page.evaluate(() =>
   ['pixelated', 'crisp-edges'].includes(getComputedStyle(document.getElementById('world')).imageRendering)));
 rep.eq('画布宽高比正确', Math.round(rect.w / rect.h * 100), Math.round(384 / 256 * 100));
-rep.eq('快捷栏 8 格', await page.locator('.hotbar .slot').count(), 8);
+rep.eq('快捷栏 9 格（第 9 格是小铲子）', await page.locator('.hotbar .slot').count(), 9);
 rep.ok('选中工具有边框与数字', await page.evaluate(() => {
   const s = document.querySelector('.slot.selected');
   return !!s && !!s.querySelector('.slot-num');
@@ -177,7 +177,7 @@ rep.ok('小屏无横向滚动', await noScrollX(page));
 rep.ok('触屏方向键可见', await page.evaluate(() => getComputedStyle(document.getElementById('touch')).display === 'flex'));
 const tb = await page.evaluate(() => { const r = document.getElementById('touchAct').getBoundingClientRect(); return [r.width, r.height]; });
 rep.ok('触控目标 ≥44px', tb[0] >= 44 && tb[1] >= 44, JSON.stringify(tb));
-rep.ok('快捷栏可点击且 8 格', await page.locator('.hotbar .slot').count() === 8);
+rep.ok('快捷栏可点击且 9 格', await page.locator('.hotbar .slot').count() === 9);
 // 触屏移动
 const p0 = await pos(page);
 const dpad = await page.locator('[data-dir="1,0"]').boundingBox();

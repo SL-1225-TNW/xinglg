@@ -1,7 +1,7 @@
 /* 新手引导验收：第一部分只用实际键鼠从新游戏走完教程；后半段显式使用存档夹具测边界。 */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {launch,boot,snap,walkTo,walkAdjacent,faceTowards,pickTool,clickTile,closeWin,sleepViaMenu,dismissSettlement,GAME_URL} from './harness.mjs';
+import {launch,boot,snap,pos,walkTo,walkAdjacent,faceTowards,pickTool,clickTile,closeWin,sleepViaMenu,dismissSettlement,GAME_URL} from './harness.mjs';
 fs.mkdirSync('output/playwright',{recursive:true});
 fs.writeFileSync('output/playwright/guide-results.log','');
 let passed=0;
@@ -16,12 +16,29 @@ async function tool(slot,x,y){assert.ok(await walkAdjacent(page,x,y));await pick
 async function enter(){await walk(3,5);await page.keyboard.press('e');await page.waitForFunction(()=>window.__MOSS__.state.sceneId==='house');await page.waitForTimeout(350);}
 async function leave(){await walk(7,11);await page.waitForFunction(()=>window.__MOSS__.state.sceneId==='farm');await page.waitForTimeout(350);}
 async function refresh(){await page.waitForTimeout(1000);await page.reload();await page.getByRole('button',{name:'继续游戏',exact:true}).click();await page.waitForTimeout(350);}
+/* 读真实画布，数"提示框虚线"本身的颜色像素：rgba(161,189,88,.8) 混在耕地上就是 (157,173,85)，
+   草地/泥土/角色本身都没有这个颜色，所以按精确颜色计数既不会误报，也不用管相机偏移。
+   画布后备尺寸固定 384×256，缩放只改 CSS 尺寸，所以直接按画布像素取样。 */
+const ringScore=()=>page.evaluate(()=>{const M=window.__MOSS__,c=document.getElementById('world');const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let n=0;for(let i=0;i<d.length;i+=4){if(Math.abs(d[i]-157)<8&&Math.abs(d[i+1]-173)<8&&Math.abs(d[i+2]-85)<8)n++;}return n;});
 try{
  await boot(page);await title('1/9');
  await page.keyboard.press('1');await page.waitForTimeout(250);eq('只选工具不算移动',(await guide()).flags.moved,undefined);
+ // 站在草地/道路上时，角色四周不能出现虚线提示框（否则框会一直跟着人挡视线）
+ eq('站在草地时角色周围没有提示框',await ringScore(),0);
+ ok('草地（第 1 步）不提示脚下四格',!(await page.locator('#tutorialText').innerText()).includes('脚下四格'));
  await page.keyboard.down('ArrowLeft');await page.waitForTimeout(330);await page.keyboard.up('ArrowLeft');await title('2/9');
- await pickTool(page,2);await clickTile(page,9,9);eq('未翻土/距离不足的播种不推进',(await guide()).flags.seeded,undefined);
+ // 站进田里（脚下那块可耕种）才标出角色四周可用格
+ await page.keyboard.down('ArrowUp');await page.waitForTimeout(700);await page.keyboard.up('ArrowUp');await page.waitForTimeout(300);
+ eq('走进田里后仍在第二步',(await page.locator('#tutorialTitle').innerText()).includes('2/9'),true);
+ assert.ok((await snap(page)).py<9,'从草地跨进田里：'+JSON.stringify(await pos(page)));
+ const fieldRing=await ringScore();
+ ok('站进田里才出现角色周围提示框',fieldRing>20,fieldRing);
+ ok('田里的引导文案点明脚下四格',await page.waitForFunction(()=>document.getElementById('tutorialText').textContent.includes('脚下四格'),null,{timeout:3000}).then(()=>true).catch(()=>false));
+ await page.screenshot({path:'output/playwright/guide-ring-in-field.png'});
+ await page.keyboard.down('ArrowDown');await page.waitForTimeout(700);await page.keyboard.up('ArrowDown');await page.waitForTimeout(250);
+ await walk(9,9);
  const plots=[[9,8],[10,8],[11,8]];
+ await pickTool(page,2);await clickTile(page,9,9);eq('未翻土/距离不足的播种不推进',(await guide()).flags.seeded,undefined);
  await tool(1,9,8);await title('3/9');
  await tool(2,9,8);await title('4/9');
  for(const [x,y] of plots.slice(1)){await tool(1,x,y);await tool(2,x,y);}

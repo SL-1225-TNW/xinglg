@@ -85,6 +85,10 @@ await walkTo(page, 7, 9);
 await pickTool(page, 3); await clickTile(page, 7, 8);
 await page.waitForTimeout(120);
 const wet = await tileHasPixels(page, 7, 8);
+/* 静置后再取样前先把角色挪回取样位：站在 (7,9) 时摄像机会把画面上移，
+   干土那格的取样区正好落在屏幕右缘的委托/地标文字条底下（深色底会拉低亮度），
+   湿土那格又紧贴着角色与选中框——不挪开这两个读数都不代表土色本身。 */
+await park(page, PARK[0], PARK[1]);
 await page.waitForTimeout(900);
 const wetSettled = await tileHasPixels(page, 7, 8);
 const dry = await tileHasPixels(page, 16, 8);
@@ -92,6 +96,8 @@ rep.ok('浇水后该格标记为已浇水', (await snap(page)).plots['7,8'].wate
 rep.ok('湿土比干土明显更暗', wetSettled.lum < dry.lum - 12, `湿亮度 ${wetSettled.lum} 干亮度 ${dry.lum}`);
 rep.ok('浇水时有水花高光（比静置后更亮）', wet.lum > wetSettled.lum - 2, `浇水瞬间 ${wet.lum} 静置 ${wetSettled.lum}`);
 const en0 = (await snap(page)).energy;
+/* 取样时人挪到了 (4,12)，重复浇水前得先走回田边，否则提示是"走近一点"而不是"已经浇过水"。 */
+await walkTo(page, 7, 9);
 await pickTool(page, 3); await clickTile(page, 7, 8);
 rep.eq('重复浇水不再扣体力', (await snap(page)).energy, en0);
 rep.ok('重复浇水有提示', /已经浇过水/.test(await lastToast(page)));
@@ -213,11 +219,17 @@ await page.evaluate(() => { window.__MOSS__.state.weather = { today: 'sun', tomo
 
 /* ================= B. 农舍室内 ================= */
 async function dismissSettle(page) {
-  if (await winOpen(page)) {
-    const t = await winTitle(page);
-    if (/天结束/.test(t)) { await clickWin(page, '开始新的一天'); return true; }
+  if (!(await winOpen(page))) return false;
+  if (!/天结束/.test(await winTitle(page))) return false;
+  for (let i = 0; i < 8; i++) {
+    if (!(await winOpen(page))) return true;
+    const b = page.locator('.win button', { hasText: '开始新的一天' });
+    if (!(await b.count())) break;
+    await b.first().click();
+    await page.waitForTimeout(140);
   }
-  return false;
+  if (await winOpen(page)) await closeWin(page);
+  return true;
 }
 
 console.log('【B1】门口进入与退出（连续进出 5 次）');

@@ -50,7 +50,7 @@ export async function launch(opts = {}) {
   page.setDefaultTimeout(9000);
   const errors = [];
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', e => errors.push('pageerror: ' + e.message));
+  page.on('pageerror', e => errors.push('pageerror: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]));
   return { browser, ctx, page, errors };
 }
 
@@ -272,12 +272,19 @@ export async function sleepViaMenu(page) {
   await page.waitForTimeout(500);
   return true;
 }
+/* 日结算是多页演出：一路点「开始新的一天」翻到最后一页，窗口自然会关。 */
 export async function dismissSettlement(page) {
-  if (await winOpen(page)) {
-    const t = await winTitle(page);
-    if (/天结束/.test(t)) { await clickWin(page, '开始新的一天'); return true; }
+  if (!(await winOpen(page))) return false;
+  if (!/天结束/.test(await winTitle(page))) return false;
+  for (let i = 0; i < 8; i++) {
+    if (!(await winOpen(page))) return true;
+    const b = page.locator('.win button', { hasText: '开始新的一天' });
+    if (!(await b.count())) break;
+    await b.first().click();
+    await page.waitForTimeout(140);
   }
-  return false;
+  if (await winOpen(page)) await closeWin(page);
+  return true;
 }
 
 /* 独立上下文：避免旧页面卸载时的自动保存覆盖我们预置的存档 */
