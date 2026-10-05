@@ -148,20 +148,18 @@ try {
   eq('新手引导期间不能铲除作物', [s.plots['9,9'].crop, s.inv.seed_radish || 0], ['radish', 0]);
   eq('引导期间铲除给出理由', /先跟着新手引导/.test(await lastToast(page)), true);
 
-  /* 委托方向：当前委托交在镇上的任务板，人在农场 → 屏幕边缘应出现金色指示箭头 */
-  const questGold = () => page.evaluate(() => {
-    const c = document.getElementById('world');
-    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-    let n = 0;
-    for (let i = 0; i < d.length; i += 4) {
-      if (Math.abs(d[i] - 239) < 10 && Math.abs(d[i + 1] - 209) < 10 && Math.abs(d[i + 2] - 139) < 10) n++;
-    }
-    return n;
+  /* 地点标记移除，但 HUD 的委托指引保留。直接记录绘制文字，避免把场景金色像素误认成标记。 */
+  await page.evaluate(() => {
+    window.reviewQuestTags = [];
+    const old = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (text, ...args) {
+      if (/（去.*）|(?:种子铺|小桥施工点|出货箱|任务板) .*方.*格/.test(text)) reviewQuestTags.push(text);
+      return old.call(this, text, ...args);
+    };
   });
   await fixture({player:{x:9,y:10,face:'down'}, questProgress:{1:'unlocked',2:'locked',3:'locked',4:'locked'}, tutorial:noGuide});
   await page.waitForTimeout(260);
-  const bandGold = await questGold();
-  eq('农场里显示通往任务板的方向指示', bandGold > 20, true);
+  eq('农场里不再显示地点方向标记', await page.evaluate(() => reviewQuestTags), []);
   eq('农场里委托条指向出口并说明去向', /→ 先去小镇$/.test((await hud(page)).quest), true);
 
   /* 走进镇上：目标同场景应在目标格画标，条上写成具体的方位与距离 */

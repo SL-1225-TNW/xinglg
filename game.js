@@ -1482,12 +1482,12 @@ function toolShovel(tx, ty) {
   return true;
 }
 
-/* 教程还没走完时不允许铲除作物：教程第 3 步要求田里有一株作物，
-   铲掉最后一株会让引导卡在"种下第一株菜"上没法自愈。 */
+/* 引导进行中保留作物，避免播种后铲空田地却仍要求浇水或收获。
+   暂停、跳过或完成引导后即可自由铲除。 */
 function isTutorialBlocking(what) {
   var t = state.tutorial;
-  if (t && t.status === 'active' && tutorialStep() < 3) {
-    toast('先跟着新手引导种下第一株菜，' + what + '稍后再说。');
+  if (t && t.status === 'active' && tutorialStep() < 9) {
+    toast('先跟着新手引导完成第一份收成，' + what + '稍后再说；也可以暂停或跳过引导后再操作。');
     Audio2.play('fail');
     return true;
   }
@@ -1850,6 +1850,7 @@ function performSettlement(auto) {
 
     /* 6. 恢复体力与位置：在床上睡则睡醒在床旁，其它情况回农场 */
     state.energy = CFG.maxEnergy;
+    state.timeMinutes = CFG.dayStart;
     if (state.sceneId === 'house') {
       state.player.x = HOUSE_BED_WAKE.x; state.player.y = HOUSE_BED_WAKE.y; state.player.face = 'right';
     } else {
@@ -2545,7 +2546,7 @@ function tutorialCopy(step) {
   var act = touch ? '站在旁边点「交互」' : '站在旁边按 E';
   var a = farmWork();
   var lines = [
-    (touch ? '按屏幕方向键' : '用方向键或 WASD') + '走到田边。金色角标指向当前目标，工具只能作用于脚下或上下左右相邻格。',
+    (touch ? '按屏幕方向键' : '用方向键或 WASD') + '走到田边。工具只能作用于脚下或上下左右相邻格。',
     '选快捷栏 1「锄头」，' + use + '，翻松一块空地。',
     '选快捷栏 2「种子」，选萝卜，再' + use + '。建议种下至少 3 颗萝卜，够交第一份委托。',
     isRaining() ? '今天下雨，田地会自动湿润，无需重复浇水。' : '选快捷栏 3「水壶」，' + use + '给幼苗浇水。湿土会变深；只换工具不算完成。',
@@ -2562,8 +2563,6 @@ function tutorialCopy(step) {
   if (step === 5 && state.sceneId !== 'house') text = '先从农舍门口进入小屋。' + text;
   if (step === 2 && invCount('seed_radish') + invCount('seed_potato') + invCount('seed_strawberry') === 0) text += '背包没有种子：从农场右侧去小镇种子铺购买，或从储物箱取回。';
   if (state.energy < 2 && (step === 1 || step === 3)) text += '体力不足，可先吃食物或睡觉恢复，再继续这一步。';
-  var target = tutorialTarget(step);
-  if (t.status === 'active' && target) text += ' ' + tutorialTargetHint(target);
   if (t.status === 'active' && CAN_FARM_STEPS.indexOf(step) >= 0) {
     text += farmRingVisible() ? '脚下四格已经标出浅绿虚线，就是工具能作用的位置。'
       : '走进田里（脚下这块能耕种）才会标出可以下工具的格子。';
@@ -2650,10 +2649,9 @@ function farmRingVisible() {
 function tileFrameVisible(x, y) {
   return state.sceneId === 'farm' && (inPlantArea(x, y) || !!state.plots[key2(x, y)]);
 }
-function drawTutorialTarget(g, ox, oy) {
+function drawToolRange(g, ox, oy) {
   if (tutorialState().status !== 'active' || UI.window) return;
   var step = tutorialStep();
-  var xy = tutorialTarget(step);
   // 种田步骤标出角色周围真正能耕种的格子。只有站在田里（脚下这块可耕种）时才画：
   // 在道路、草地、池塘边这些种不了的地方画框会一直跟着角色跑，挡住人和风景。
   if (CAN_FARM_STEPS.indexOf(step) >= 0 && farmRingVisible()) {
@@ -2668,11 +2666,6 @@ function drawTutorialTarget(g, ox, oy) {
       }
     });
   }
-  if (!xy) return;
-  var x = xy[0] * TILE - ox, y = xy[1] * TILE - oy;
-  g.fillStyle = '#FFE6A1';
-  [[0, 0], [12, 0], [0, 15], [12, 15]].forEach(function (v) { g.fillRect(x + v[0], y + v[1], 4, 1); });
-  [[0, 0], [15, 0], [0, 12], [15, 12]].forEach(function (v) { g.fillRect(x + v[0], y + v[1], 1, 4); });
 }
 
 /* ============================================================
@@ -2945,7 +2938,8 @@ function refreshHotbar() {
     b.setAttribute('aria-pressed', state.selectedTool === t.tool ? 'true' : 'false');
     var n = el('span', 'slot-num', String(t.slot));
     b.appendChild(n);
-    var ic = getIcon(t.tool === 'seed' ? ('seed_' + state.selectedSeed) : t.tool === 'place' ? state.selectedDevice : t.id);
+    var toolArt = { hoe: 'tool_hoe', water: 'tool_can', harvest: 'basket', axe: 'tool_axe', pickaxe: 'tool_pick', fish: 'tool_rod', shovel: 'tool_shovel' };
+    var ic = getIcon(t.tool === 'seed' ? ('seed_' + state.selectedSeed) : t.tool === 'place' ? state.selectedDevice : toolArt[t.tool]);
     if (ic) b.appendChild(ic);
     if (t.tool === 'seed') {
       var c = invCount('seed_' + state.selectedSeed);
@@ -3502,6 +3496,7 @@ function openPause() {
 
       var row = el('div', 'row');
       row.appendChild(mkBtn('帮助与操作', '', function () { openHelp(); }));
+      row.appendChild(mkBtn('全境地图（M）', '', function () { openWorldMap(); }));
       row.appendChild(mkBtn('睡觉（结束今天）', '', function () { setTimeout(function () { requestSleep(); }, 20); }));
       b.appendChild(row);
 
@@ -3530,6 +3525,63 @@ function openPause() {
   });
 }
 
+/* 全境地图只展示区域与规划路线，开放状态直接读取真实进度，不提供传送。 */
+var WORLD_REGIONS = [
+  {id:'farm',name:'苔芽农场',x:18,y:21,desc:'山谷西北角的家。农舍、田地与池塘，是旅途的起点。'},
+  {id:'town',name:'芽芽小镇',x:26,y:48,desc:'通往山谷各处的乡村集市。现有种子铺、任务板与村民就在这里。'},
+  {id:'riverside',name:'溪畔河湾',x:33,y:76,desc:'小桥另一侧的钓鱼河岸。完成修桥委托后开放。'},
+  {id:'vineyard',name:'金叶葡萄园',x:43,y:23,desc:'缓坡上的葡萄架、石墙与乡村庄园。未来探索路线的一站。'},
+  {id:'forest',name:'雾松森林',x:55,y:81,desc:'幽静的林间小径与古老遗迹。未来可沿河湾继续探索。'},
+  {id:'city',name:'白蔷薇城',x:57,y:47,desc:'山谷中央的石砌城堡城市。蓝灰色屋顶、蔷薇庭院与市集，作为逐步探索的远期目的地。'},
+  {id:'pass',name:'银峰山口',x:80,y:22,desc:'山谷东侧的高山关隘。未来通往矿洞和山地的路线。'},
+  {id:'mill',name:'风铃磨坊',x:81,y:67,desc:'河流穿过麦田与古老水磨坊，连接山谷东南部的乡野。'}
+];
+function worldRegionStatus(r) {
+  if (r.id === 'farm' || r.id === 'town') return '已开放';
+  if (r.id === 'riverside') return state.bridgeRepaired ? '已开放' : '未解锁 · 修复小桥';
+  return '待开放';
+}
+function drawWorldAtlas(c) {
+  var g=c.getContext('2d'); g.imageSmoothingEnabled=false;
+  g.fillStyle='#D8CBA2';g.fillRect(0,0,640,400);
+  g.fillStyle='#9EAF7C';g.beginPath();g.moveTo(38,68);g.lineTo(198,27);g.lineTo(406,34);g.lineTo(589,82);g.lineTo(608,285);g.lineTo(540,356);g.lineTo(225,378);g.lineTo(56,300);g.closePath();g.fill();
+  for(var i=0;i<150;i++){var x=40+(i*137%558),y=55+(i*73%292);g.fillStyle=i%3?'#A7B886':'#92A674';g.fillRect(x,y,4,3);}
+  // 山脉围成山谷，中央留给城堡与农田。
+  for(var j=0;j<21;j++){var mx=25+j*29,my=24+(j%3)*9;g.fillStyle='#8B9384';g.beginPath();g.moveTo(mx,my+42);g.lineTo(mx+18,my);g.lineTo(mx+37,my+42);g.fill();g.fillStyle='#E7E3CD';g.beginPath();g.moveTo(mx+12,my+14);g.lineTo(mx+18,my);g.lineTo(mx+25,my+14);g.fill();}
+  g.strokeStyle='#678F97';g.lineWidth=18;g.lineJoin='round';g.beginPath();g.moveTo(588,70);g.lineTo(565,140);g.lineTo(458,246);g.lineTo(309,276);g.lineTo(206,324);g.lineTo(137,387);g.stroke();
+  g.strokeStyle='#91B5B8';g.lineWidth=8;g.stroke();
+  var paths=[[0,1],[1,2],[1,3],[3,5],[2,4],[4,5],[5,6],[5,7]];
+  paths.forEach(function(p){var a=WORLD_REGIONS[p[0]],b=WORLD_REGIONS[p[1]];g.strokeStyle='#DCCD9B';g.lineWidth=5;g.setLineDash(p[0]===0?[]:[6,6]);g.beginPath();g.moveTo(a.x*6.4,a.y*4);g.lineTo(b.x*6.4,b.y*4);g.stroke();});g.setLineDash([]);
+  function house(x,y,w){g.fillStyle='#F0E5C8';g.fillRect(x-w/2,y-12,w,16);g.fillStyle='#86664D';g.fillRect(x-3,y-3,6,7);g.fillStyle='#5D7181';g.beginPath();g.moveTo(x-w/2-3,y-12);g.lineTo(x,y-24);g.lineTo(x+w/2+3,y-12);g.fill();}
+  WORLD_REGIONS.forEach(function(r){var x=r.x*6.4,y=r.y*4;
+    if(r.id==='city'){g.fillStyle='#6E8961';g.fillRect(x-36,y-17,72,35);house(x,y,42);house(x-29,y+2,15);house(x+29,y+2,15);house(x-14,y-16,12);house(x+14,y-16,12);g.fillStyle='#E8DCCA';g.fillRect(x-27,y+3,54,6);g.fillStyle='#A56D79';g.fillRect(x-37,y+12,8,4);g.fillRect(x+30,y+12,8,4);}
+    else if(r.id==='forest'){for(var k=0;k<6;k++){g.fillStyle='#476951';g.beginPath();g.moveTo(x-26+k*9,y+4);g.lineTo(x-20+k*9,y-20-(k%2)*6);g.lineTo(x-14+k*9,y+4);g.fill();}}
+    else if(r.id==='pass'){g.fillStyle='#7E887F';g.beginPath();g.moveTo(x-25,y+5);g.lineTo(x,y-29);g.lineTo(x+25,y+5);g.fill();}
+    else if(r.id==='riverside'){g.fillStyle='#B99B6A';g.fillRect(x-18,y-6,36,7);g.fillStyle='#647E5C';g.fillRect(x-12,y-20,7,13);}
+    else {house(x,y,r.id==='farm'?24:18);if(r.id==='town'){house(x-19,y+6,13);house(x+19,y+6,13);}if(r.id==='vineyard'){g.fillStyle='#637E4B';for(var v=0;v<4;v++)g.fillRect(x-25,y+9+v*4,50,2);}}
+  });
+  g.strokeStyle='#897E5C';g.lineWidth=2;g.strokeRect(8,8,624,384);
+  g.fillStyle='#665F48';g.font='12px serif';g.fillText('N',604,37);g.beginPath();g.moveTo(609,44);g.lineTo(604,56);g.lineTo(614,56);g.fill();
+}
+function openWorldMap() {
+  clearKeys();
+  var current=state.sceneId==='house'?'farm':state.sceneId;
+  var selected=current;
+  openWindow({id:'worldmap',kind:'custom',wide:true,title:'蔷薇谷 · 全境地图',build:function(b){
+    b.appendChild(el('p','muted','西北的家，中央的城。沿山谷逐步探索，前往白蔷薇城。'));
+    var wrap=el('div','world-atlas');var c=newCanvas(640,400);c.setAttribute('aria-hidden','true');drawWorldAtlas(c);wrap.appendChild(c);
+    WORLD_REGIONS.forEach(function(r){var status=worldRegionStatus(r),here=r.id===current;
+      var button=el('button','atlas-place'+(here?' here':'')+(status!=='已开放'?' planned':'')+(selected===r.id?' chosen':''),r.name+(here?' · 你在这里':''));
+      button.title=r.name+' · '+status;
+      button.type='button';button.style.left=r.x+'%';button.style.top=r.y+'%';button.setAttribute('aria-label',r.name+'，'+status+(here?'，当前位置':''));button.setAttribute('aria-pressed',selected===r.id?'true':'false');
+      button.onclick=function(){selected=r.id;renderWindow();};wrap.appendChild(button);
+    });b.appendChild(wrap);
+    var r=WORLD_REGIONS.filter(function(p){return p.id===selected;})[0]||WORLD_REGIONS[0];
+    var detail=el('div','panel-box atlas-detail');detail.setAttribute('aria-live','polite');detail.appendChild(el('div','section-title',r.name+' · '+worldRegionStatus(r)));detail.appendChild(el('p',null,r.desc));b.appendChild(detail);
+    b.appendChild(el('p','muted','虚线边框地点：未解锁或待开放，点击查看详情。实线路：现有农场与小镇连接；虚线路：探索路线示意。待开放区域尚未建造，解锁条件以后确定。M 或 Esc 关闭，地图不能传送。'));
+  },actions:[{label:'返回游戏',kind:'primary',close:true}]});
+}
+
 function openHelp() {
   openWindow({
     id: 'help', kind: 'help', wide: true, title: '帮助与操作',
@@ -3545,6 +3597,7 @@ function openHelp() {
         ['B', '背包'],
         ['C', '制作'],
         ['J', '委托日志'],
+        ['M', '全境地图'],
         ['Esc', '关闭窗口 / 暂停菜单']
       ].forEach(function (p) {
         var r = el('div', 'kbd-row');
@@ -4745,7 +4798,7 @@ function drawHouseShell(g) {
 }
 
 /* 门前 / 家具前的“E 进入…”提示 */
-function drawEnterHint(g) {
+function drawEnterHint(g, ox, oy) {
   var list = INTERACTABLES[state.sceneId] || [];
   var p = state.player;
   var f = facingTile();
@@ -4763,8 +4816,8 @@ function drawEnterHint(g) {
   if (!text) return;
   g.font = '10px ' + 'sans-serif';
   var wpx = Math.ceil(g.measureText(text).width) + 10;
-  var bx = Math.round(clamp(hit.x * TILE + 8 - wpx / 2, 2, VIEW_W - wpx - 2));
-  var by = Math.round(clamp(hit.y * TILE - 8, 2, VIEW_H - 18));
+  var bx = Math.round(clamp(hit.x * TILE + 8 - ox - wpx / 2, 2, VIEW_W - wpx - 2));
+  var by = Math.round(clamp(hit.y * TILE - oy - 8, 2, VIEW_H - 18));
   g.fillStyle = 'rgba(16,28,23,.86)';
   g.fillRect(bx, by, wpx, 14);
   g.fillStyle = '#EFD18B';
@@ -5217,7 +5270,7 @@ function drawScene(g, dt) {
     }
   }
   updateTileTip(hv || sv, ox, oy);
-  if (!UI.window) drawEnterHint(g);
+  if (!UI.window) drawEnterHint(g, ox, oy);
   // 洒水器覆盖预览
   if (state.selectedTool === 'place' && !UI.window && state.selectedDevice === 'dev_sprinkler' && hv) {
     g.fillStyle = 'rgba(150,220,140,.22)';
@@ -5266,8 +5319,7 @@ function drawScene(g, dt) {
     g.restore();
   }
   // 钓鱼
-  drawTutorialTarget(g, ox, oy);
-  drawQuestMarkers(g, ox, oy);
+  drawToolRange(g, ox, oy);
   drawFishingHud(g);
 }
 
@@ -5291,7 +5343,7 @@ function onKeyDown(e) {
   if (isTyping()) return;
   var k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   if (UI.window) {
-    if (k === 'Escape') { e.preventDefault(); closeWindow(); }
+    if (k === 'Escape' || (k === 'm' && UI.window.id === 'worldmap' && !e.repeat)) { e.preventDefault(); closeWindow(); }
     return;
   }
   var mv = { ArrowUp: 1, ArrowDown: 1, ArrowLeft: 1, ArrowRight: 1, w: 1, s: 1, a: 1, d: 1 };
@@ -5332,6 +5384,7 @@ function onKeyDown(e) {
   if (k === 'b' || k === 'B') { openBag(); return; }
   if (k === 'c' || k === 'C') { openCraft(); return; }
   if (k === 'j' || k === 'J') { openQuestLog(null); return; }
+  if (k === 'm' || k === 'M') { e.preventDefault(); openWorldMap(); return; }
   if (/^[1-9]$/.test(k)) {
     var t = TOOLS[+k - 1];
     if (t) { if (toolLocked(t)) { toast(t.name + '还没有解锁。'); Audio2.play('fail'); } else selectTool(t.tool); }
