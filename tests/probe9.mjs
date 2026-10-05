@@ -1,0 +1,12 @@
+﻿import { launch, boot, press, winOpen, winTitle, winText } from "./harness.mjs";
+const { browser, page, errors } = await launch();
+await boot(page, { fresh: true });
+await page.waitForTimeout(300);
+await page.evaluate(() => { const s = window.__MOSS__.state; s.inventory = { tool_hoe: 1, wood: 5 }; window.__MOSS__.saveNow(); });
+await press(page, "c");
+await page.waitForTimeout(300);
+console.log("winOpen", await winOpen(page), "title", await winTitle(page));
+console.log("TEXT:", (await winText(page)).replace(/\n/g," | "));
+console.log("items:", await page.evaluate(()=>[...document.querySelectorAll(".win .item")].map(n=>n.className+" >> "+n.innerText.replace(/\n/g,"|"))));
+console.log("errors", errors);
+await browser.close();

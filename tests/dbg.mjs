@@ -1,0 +1,15 @@
+import { launch, GAME_URL, snap, pos, winOpen } from './harness.mjs';
+const { browser, page, errors } = await launch();
+await page.goto(GAME_URL);
+await page.waitForFunction(() => !!window.__MOSS__);
+await page.evaluate(() => localStorage.clear());
+await page.reload();
+await page.waitForFunction(() => !!window.__MOSS__);
+page.on('console', m => console.log('[console:' + m.type() + ']', m.text()));
+await page.locator('.boot-actions button', { hasText: '开始新的游戏' }).click();
+await page.waitForTimeout(1500);
+console.log('state?', await page.evaluate(() => !!window.__MOSS__.state));
+console.log('boot hidden?', await page.evaluate(() => document.getElementById('boot').hidden));
+console.log('errors:', errors);
+if (errors.length) console.log('FULL:\n' + errors.join('\n---\n'));
+await browser.close();

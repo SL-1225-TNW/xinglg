@@ -1,0 +1,20 @@
+# 测试依赖：游戏本体不需要 node_modules
+tests/node_modules/
+
+# 试玩过程产生的日志与错误输出
+tests/*.log
+tests/*.err
+output/playwright/*.log
+output/playwright/*.err
+
+# 早期跑测试时误建在 tests/ 下的产物目录（内容与 output/playwright 重复）
+tests/output/
+
+# 发布到 GitHub 时生成的临时载荷与参数文件
+tests/_gh*
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

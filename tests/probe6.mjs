@@ -1,0 +1,13 @@
+﻿import { launch, boot, snap, pos, walkTo, winOpen, winTitle, clickWin, sleepViaMenu, dismissSettlement } from "./harness.mjs";
+const { browser, page, errors } = await launch();
+await boot(page, { fresh: true });
+await page.waitForTimeout(300);
+await walkTo(page, 3, 5);
+console.log("pos", await pos(page));
+await page.keyboard.press("e");
+await page.waitForTimeout(400);
+console.log("winOpen", await winOpen(page), "title", await winTitle(page));
+console.log("HTML:", await page.evaluate(()=>{const w=document.querySelector(".win"); return w? w.outerHTML.slice(0,1500):"NO WIN";}));
+console.log("buttons:", await page.evaluate(()=>[...document.querySelectorAll(".win button")].map(b=>b.textContent)));
+console.log("errors", errors);
+await browser.close();

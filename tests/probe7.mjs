@@ -1,0 +1,17 @@
+﻿import { launch, boot, snap, pos, walkTo, clickTile, pickTool, press, winOpen, winTitle, winText } from "./harness.mjs";
+const { browser, page, errors } = await launch();
+await boot(page, { fresh: true });
+await page.waitForTimeout(300);
+await walkTo(page, 7, 9);
+await page.evaluate(() => { const s = window.__MOSS__.state; s.energy = 20; s.inventory.radish = 1; });
+await pickTool(page, 1); await clickTile(page, 7, 8);
+await pickTool(page, 2); await clickTile(page, 7, 8);
+await page.evaluate(() => { const s = window.__MOSS__.state; s.energy = 1; s.plots['7,8'].mature = true; s.inventory.radish = 1; });
+console.log("inv", (await snap(page)).inv);
+await press(page, "b");
+await page.waitForTimeout(300);
+console.log("winOpen", await winOpen(page), "title", await winTitle(page));
+console.log("items:", await page.evaluate(()=>[...document.querySelectorAll(".win .item")].map(n=>n.innerText.replace(/\n/g,"|"))));
+console.log("buttons in items:", await page.evaluate(()=>[...document.querySelectorAll(".win .item button")].map(n=>n.textContent)));
+console.log("errors", errors);
+await browser.close();

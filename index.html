@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#182d28">
+<title>苔芽农场</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+
+  <header id="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-text">苔芽农场</span>
+    </div>
+    <div class="hud" id="hud">
+      <div class="hud-cell" id="hudDate"><span class="hud-label">日期</span><span class="hud-value">—</span></div>
+      <div class="hud-cell" id="hudTime"><span class="hud-label">时间</span><span class="hud-value">—</span></div>
+      <div class="hud-cell" id="hudWeather"><span class="hud-label">天气</span><span class="hud-value">—</span></div>
+      <div class="hud-cell" id="hudCoins"><span class="hud-label">金币</span><span class="hud-value">—</span></div>
+      <div class="hud-cell" id="hudEnergy"><span class="hud-label">体力</span><span class="hud-value">—</span></div>
+    </div>
+    <div class="topbar-actions">
+      <span id="saveState" class="save-state" role="status" aria-live="polite">已保存</span>
+      <button type="button" class="icon-btn" id="btnMenu" aria-label="暂停菜单" title="暂停菜单 (Esc)">☰</button>
+    </div>
+  </header>
+
+  <aside id="farmAssist" class="farm-assist" hidden aria-label="农场助手">
+    <div id="dailyTasks" class="daily-tasks" role="status" aria-live="polite"></div>
+    <section id="tutorialCard" class="tutorial-card" hidden aria-label="新手引导">
+      <div class="tutorial-copy" aria-live="polite">
+        <div id="tutorialTitle" class="tutorial-title"></div>
+        <p id="tutorialText"></p>
+      </div>
+      <div class="tutorial-actions">
+        <button id="tutorialPause" class="btn sm" type="button">稍后再学</button>
+        <button id="tutorialSkip" class="btn sm ghost" type="button">跳过教程</button>
+        <button id="tutorialResume" class="btn sm" type="button" hidden>继续引导</button>
+      </div>
+    </section>
+  </aside>
+  <main id="stage">
+    <div id="viewport">
+      <canvas id="world" width="384" height="256" aria-label="苔芽农场游戏画面，操控 Clawd 像素小螃蟹，使用方向键移动，空格使用工具"></canvas>
+      <div id="questStrip" class="quest-strip" aria-label="当前委托">
+        <span class="quest-tag">委托</span>
+        <span id="questStripText">—</span>
+      </div>
+      <div id="tileTip" class="tile-tip" hidden aria-live="polite"></div>
+      <div id="sceneTag" class="scene-tag" aria-hidden="true">农场</div>
+      <div id="fade" class="fade" aria-hidden="true"></div>
+    </div>
+  </main>
+
+  <div id="dock">
+    <div id="hotbar" class="hotbar" role="toolbar" aria-label="工具快捷栏"></div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </div>
+
+  <div id="touch" class="touch" aria-hidden="false">
+    <div class="dpad">
+      <button type="button" class="tbtn tdir" data-dir="0,-1" aria-label="向上移动">▲</button>
+      <button type="button" class="tbtn tdir" data-dir="-1,0" aria-label="向左移动">◀</button>
+      <button type="button" class="tbtn tdir" data-dir="1,0" aria-label="向右移动">▶</button>
+      <button type="button" class="tbtn tdir" data-dir="0,1" aria-label="向下移动">▼</button>
+    </div>
+    <div class="tact">
+      <button type="button" class="tbtn tact-use" id="touchUse" aria-label="使用工具">使用工具</button>
+      <button type="button" class="tbtn tact-act" id="touchAct" aria-label="交互">交互</button>
+      <button type="button" class="tbtn tact-sm" id="touchBag" aria-label="背包 (B)">背包</button>
+      <button type="button" class="tbtn tact-sm" id="touchCraft" aria-label="制作 (C)">制作</button>
+      <button type="button" class="tbtn tact-sm" id="touchQuest" aria-label="任务 (J)">任务</button>
+    </div>
+  </div>
+
+  <div id="reel" class="reel" aria-hidden="true">
+    <button type="button" class="tbtn reel-btn" id="reelBtn" aria-label="收线">收线</button>
+  </div>
+
+  <div id="windowLayer" class="window-layer" hidden></div>
+
+  <div id="boot" class="boot">
+    <div class="boot-card">
+      <h1>苔芽农场</h1>
+      <p class="boot-sub">春日 · Clawd 的小农场</p>
+      <div id="bootActions" class="boot-actions"></div>
+      <p class="boot-note" id="bootNote">正在读取存档…</p>
+    </div>
+  </div>
+
+</div>
+<script src="game.js"></script>
+</body>
+</html>
