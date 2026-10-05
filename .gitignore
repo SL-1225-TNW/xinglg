@@ -7,6 +7,9 @@ tests/*.err
 output/playwright/*.log
 output/playwright/*.err
 
+# 只在用例失败时才写出的排查截图，不是验收证据
+output/playwright/guide-failed.png
+
 # 早期跑测试时误建在 tests/ 下的产物目录（内容与 output/playwright 重复）
 tests/output/
 
