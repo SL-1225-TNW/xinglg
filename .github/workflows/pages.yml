@@ -24,10 +24,13 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      # 这一步会在仓库上启用 Pages（原本没开也能开）
+      # enablement: true 让这一步在仓库上自动启用 Pages，
+      # 否则仓库没开过 Pages 时会直接报 "Get Pages site failed / Not Found"
       - name: Configure Pages
         id: pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: Checkout
         uses: actions/checkout@v4
