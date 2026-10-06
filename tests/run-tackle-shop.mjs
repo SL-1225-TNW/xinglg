@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import {launch,boot,closeWin} from './harness.mjs';
+const {browser,page,errors}=await launch();
+try {
+ await boot(page);
+ await page.evaluate(()=>{let m=__MOSS__;m.state.sceneId='riverside';m.state.player={x:3,y:8,face:'up'};m.state.inventory.tool_rod=1;m.state.coins=1000;m.startGame(m.state);m.interact();});
+ assert.equal(await page.locator('.win-title').count(),0,'shop locked before encounter');
+ await page.evaluate(()=>__MOSS__.openDsEncounter());
+ while(await page.getByRole('button',{name:'继续',exact:true}).count()) await page.getByRole('button',{name:'继续',exact:true}).click();
+ await page.getByRole('button',{name:'把她放下',exact:true}).click();
+ await page.evaluate(()=>__MOSS__.interact());
+ await page.getByRole('button',{name:'升级为精工钓竿 · 250 金',exact:true}).click();
+ assert.deepEqual(await page.evaluate(()=>[__MOSS__.state.rodLevel,__MOSS__.state.coins]),[2,750]);
+ await page.getByRole('button',{name:'升级为大师钓竿 · 750 金',exact:true}).click();
+ assert.deepEqual(await page.evaluate(()=>[__MOSS__.state.rodLevel,__MOSS__.state.coins]),[3,0]);
+ assert.equal(await page.evaluate(()=>__MOSS__.upgradeRod()),false,'max level blocks repeated charge');
+ await page.evaluate(()=>{__MOSS__.state.inventory.fish_king=2;__MOSS__.state.inventory.wood=10;__MOSS__.refreshWindow();});
+ await page.getByRole('button',{name:'卖全部 · 960 金',exact:true}).click();
+ assert.deepEqual(await page.evaluate(()=>[__MOSS__.state.coins,__MOSS__.state.inventory.wood,__MOSS__.state.inventory.fish_king||0]),[960,10,0]);
+ const pools=await page.evaluate(()=>[1,2,3].map(level=>{__MOSS__.state.rodLevel=level;return __MOSS__.fishPool().map(p=>p.fish.tier||1);}));
+ assert.deepEqual(pools,[[1,1,1],[1,1,1,2,2],[1,1,1,2,2,3,3]]);
+ await page.evaluate(()=>{__MOSS__.state.rodLevel=3;__MOSS__.saveNow();});
+ await page.reload();await page.locator('.boot-actions button').first().click();
+ assert.equal(await page.evaluate(()=>__MOSS__.state.rodLevel),3,'saved upgrade survives reload');
+ await page.evaluate(()=>{let m=__MOSS__;m.state.sceneId='riverside';m.state.player={x:3,y:8,face:'up'};m.startGame(m.state);});
+ await page.screenshot({path:'/tmp/tackle-world.png'});
+ await page.evaluate(()=>__MOSS__.interact());
+ await page.screenshot({path:'/tmp/tackle-shop.png'});
+ assert.equal(errors.length,0,errors.join('\n'));
+ console.log('PASS: locked shop, encounter unlock, 2 upgrades, max-level guard, fish sale, tier pools, save/reload, rendering');
+}finally{await browser.close();}

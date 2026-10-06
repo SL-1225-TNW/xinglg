@@ -92,6 +92,10 @@ var ITEMS = {
   fish_crucian: { name: '小鲫鱼', kind: 'fish', sell: 20, food: 10, desc: '最常见的河鱼，售价 20 金。' },
   fish_bass:    { name: '河鲈',   kind: 'fish', sell: 35, food: 10, desc: '力气不小的淡水鱼，售价 35 金。' },
   fish_silver:  { name: '银纹鱼', kind: 'fish', sell: 60, food: 10, desc: '银鳞闪烁的稀有鱼，售价 60 金。' },
+  fish_koi: { name: '锦鲤', kind: 'fish', sell: 120, food: 15, desc: '需要 2 级鱼竿，售价 120 金。' },
+  fish_gold: { name: '金鳞鱼', kind: 'fish', sell: 180, food: 15, desc: '需要 2 级鱼竿，售价 180 金。' },
+  fish_sturgeon: { name: '星纹鲟', kind: 'fish', sell: 300, food: 15, desc: '需要 3 级鱼竿，售价 300 金。' },
+  fish_king: { name: '蓝冠鱼王', kind: 'fish', sell: 480, food: 15, desc: '需要 3 级鱼竿，售价 480 金。' },
   jam:       { name: '莓果酱', kind: 'craft', sell: 50, food: 25, desc: '果酱罐熬制的果酱，售价 50 金。' },
   wood:      { name: '木材',   kind: 'material', sell: 3, desc: '砍伐获得，可制作、交付或卖给木匠，售价 3 金。' },
   stone:     { name: '石头',   kind: 'material', sell: 2, desc: '采掘获得，可制作、交付或卖给木匠，售价 2 金。' },
@@ -114,6 +118,12 @@ var FISHES = [
   { id: 'fish_bass',    name: '河鲈',   sell: 35, sunny: 0.30, rain: 0.35, speed: 65 },
   { id: 'fish_silver',  name: '银纹鱼', sell: 60, sunny: 0.10, rain: 0.25, speed: 85 }
 ];
+
+var ROD_LEVELS = [{name:'木制钓竿',price:0},{name:'精工钓竿',price:250},{name:'大师钓竿',price:750}];
+FISHES.push({id:'fish_koi',name:'锦鲤',sell:120,tier:2,sunny:1,rain:1.3,speed:90,color:'#ECA25C'});
+FISHES.push({id:'fish_gold',name:'金鳞鱼',sell:180,tier:2,sunny:1,rain:1.3,speed:95,color:'#EBD267'});
+FISHES.push({id:'fish_sturgeon',name:'星纹鲟',sell:300,tier:3,sunny:1,rain:1.3,speed:100,color:'#8995C9'});
+FISHES.push({id:'fish_king',name:'蓝冠鱼王',sell:480,tier:3,sunny:1,rain:1.3,speed:105,color:'#56B9E0'});
 
 /* --- 制作配方 --- */
 var RECIPES = [
@@ -215,15 +225,15 @@ var NPCS = {
     }
   },
   ds: {
-    id: 'ds', name: 'DS 小姐', title: '河湾的年轻学者', scene: 'riverside',
-    hair: '#2F3A4A', shirt: '#DCE4EE', accent: '#4C6B8A', skin: '#F0CFAE',
+    id: 'ds', name: 'DS 小姐', title: 'DeepSeek 渔具店店长', scene: 'riverside',
+    hair: '#467EA5', shirt: '#F3F3EA', accent: '#263043', skin: '#F0CFAE',
     like: ['rice', 'potato', 'jam', 'berry'],
     dislike: [],
     // 被钓上来后就常驻在溪畔河湾，蹲在岸边看水。
     schedule: [
-      { from: 360,  to: 720,  x: 10, y: 9 },
-      { from: 720,  to: 1080, x: 14, y: 8 },
-      { from: 1080, to: 1440, x: 10, y: 9 }
+      { from: 360,  to: 720,  x: 5, y: 7 },
+      { from: 720,  to: 1080, x: 5, y: 7 },
+      { from: 1080, to: 1440, x: 5, y: 7 }
     ],
     lines: [
       '我是被你的鱼钩钓上来的。……准确说，是被一条很笨的鱼连带着钓上来的。',
@@ -300,7 +310,7 @@ function fmtTime(min) {
   return (h < 10 ? '0' : '') + h + ':' + (mm < 10 ? '0' : '') + mm;
 }
 function plural(n) { return n + ' 个'; }
-function itemName(id) { return (ITEMS[id] && ITEMS[id].name) || id; }
+function itemName(id) { if (id === 'tool_rod' && state) return ROD_LEVELS[(state.rodLevel || 1)-1].name; return (ITEMS[id] && ITEMS[id].name) || id; }
 
 /* --- 确定性随机（状态随存档保存） --- */
 function mulberry32(a) {
@@ -417,6 +427,7 @@ function newGameState() {
     npcFriendship: { yaya: 0, aqi: 0, ds: 0 },
     npcDailyInteractions: {},
     dsMet: false,
+    rodLevel: 1,
     questProgress: { 1: 'locked', 2: 'locked', 3: 'locked', 4: 'locked' },
     unlockedRecipes: ['chest'],
     bridgeRepaired: false,
@@ -489,6 +500,7 @@ function serialize() {
     npcFriendship: state.npcFriendship,
     npcDailyInteractions: state.npcDailyInteractions,
     dsMet: state.dsMet,
+    rodLevel: state.rodLevel,
     questProgress: state.questProgress,
     unlockedRecipes: state.unlockedRecipes,
     bridgeRepaired: state.bridgeRepaired,
@@ -587,6 +599,7 @@ function normalizeSave(raw) {
   s.npcDailyInteractions = (raw.npcDailyInteractions && typeof raw.npcDailyInteractions === 'object') ? raw.npcDailyInteractions : {};
   // DS 小姐：没有该字段的旧存档视为尚未相遇，她会在玩家解锁钓竿后的第一次钓鱼时出现。
   s.dsMet = !!raw.dsMet;
+  s.rodLevel = clamp(Math.floor(num(raw.rodLevel, 1, 1, 3)), 1, 3);
   var qp = {};
   QUESTS.forEach(function (q) {
     var v = raw.questProgress && raw.questProgress[q.id];
@@ -959,6 +972,8 @@ MAPS.riverside = (function () {
   // 通往栈桥的土路
   fillRow(m, 0, 8, 10, T_PATH, false);
   fillRow(m, 0, 8, 11, T_PATH, false);
+  fillRect(m, 1, 3, 4, 6, T_BUILDING, true);
+  fillRect(m, 3, 7, 3, 9, T_PATH, false);
   return {
     w: m.w, h: m.h, t: m.t, solid: m.solid,
     name: '河边',
@@ -967,7 +982,7 @@ MAPS.riverside = (function () {
       { x: 0, y: 11, to: 'town', tx: 30, ty: 11 }
     ],
     plantArea: null,
-    buildings: [],
+    buildings: [{ x: 1, y: 3, w: 4, h: 4, kind: 'tackle' }],
     decor: [
       { t: 'reed', x: 5, y: 4 }, { t: 'reed', x: 5, y: 8 }, { t: 'reed', x: 5, y: 13 }, { t: 'reed', x: 5, y: 16 },
       { t: 'bench', x: 4, y: 11 }, { t: 'sign', x: 6, y: 9 },
@@ -1199,7 +1214,7 @@ var INTERACTABLES = {
     { id: 'board', x: 14, y: 9, stand: [[14,10],[13,9],[15,9],[14,8]], kind: 'board', label: '任务板' },
     { id: 'bridge', x: 26, y: 9, stand: [[25,9],[25,10]], kind: 'bridge', label: '小桥施工点' }
   ],
-  riverside: [],
+  riverside: [{id:'tackle',x:3,y:7,stand:[[3,8],[2,7],[4,7],[3,7]],kind:'tackle',label:'DeepSeek 渔具店'}],
   house: [
     { id: 'h_bed',      x: 1, y: 1, stand: [[1,3],[2,3],[3,1],[3,2]], kind: 'bed', label: '床' },
     { id: 'h_chest',    x: 13, y: 2, stand: [[13,3],[12,2],[14,2]], kind: 'houseChest', label: '储物箱' },
@@ -2384,16 +2399,20 @@ function submitQuest(id) {
 
 var FISH = { track: 200, bar: 64, up: 100, down: 70, gain: 0.25, loss: 0.12, limit: 20, startProgress: 0.25 };
 
+function fishPool() {
+  var level = state.rodLevel || 1;
+  return FISHES.filter(function(f) { return (f.tier || 1) <= level; }).map(function(f) {
+    var tier = f.tier || 1;
+    var weight = tier === 1 ? (isRaining() ? f.rain : f.sunny) * (level === 1 ? 1 : 0.3)
+      : (tier === level ? 0.7 : 0.3) * (isRaining() ? f.rain : f.sunny);
+    return {fish:f,weight:weight};
+  });
+}
 function pickFish() {
-  var rain = isRaining();
-  var r = rand();
-  var acc = 0;
-  for (var i = 0; i < FISHES.length; i++) {
-    var f = FISHES[i];
-    acc += rain ? f.rain : f.sunny;
-    if (r <= acc) return f;
-  }
-  return FISHES[0];
+  var pool = fishPool(), total = pool.reduce(function(n,p) { return n+p.weight; },0);
+  var r = rand()*total;
+  for(var i=0;i<pool.length;i++) { r-=pool[i].weight; if(r<=0) return pool[i].fish; }
+  return pool[pool.length-1].fish;
 }
 
 function toolFish(tx, ty) {
@@ -2538,12 +2557,12 @@ function openDsEncounter() {
         b.appendChild(wrap);
         b.appendChild(el('div', 'dlg-body', DS_MEET_LINES[step]));
         if (last) {
-          b.appendChild(el('p', 'muted', '初遇 · 好感 +10 · 她现在住在溪畔河湾。'));
+          b.appendChild(el('p', 'muted', '初遇 · 好感 +10 · 河边西岸的 DeepSeek 渔具店已解锁，可以卖鱼、升级鱼竿。'));
           b.appendChild(el('p', 'muted', '提示：用「大米饭」或土豆送她礼物，她会格外高兴。'));
         }
       },
       actions: last
-        ? [{ label: '把她放下', kind: 'primary', close: true, onClick: function () { toast('DS 小姐加入了溪畔河湾！'); } }]
+        ? [{ label: '把她放下', kind: 'primary', close: true, onClick: function () { toast('DeepSeek 渔具店已开张！到河边西岸卖鱼、升级鱼竿。'); } }]
         // 翻页时不要关窗口：openWindow 会重新渲染，close:true 会把新窗口立刻关掉。
         : [{ label: '继续', kind: 'primary', close: false, onClick: function () { step += 1; render(); } }]
     });
@@ -3268,6 +3287,37 @@ function buyWorkshopItem(id, qty) {
   markDirty(); refreshHud();
   return true;
 }
+function upgradeRod() {
+  var level = state.rodLevel || 1;
+  if (!state.dsMet || invCount('tool_rod') < 1 || level >= 3) return false;
+  var next = ROD_LEVELS[level];
+  if (state.coins < next.price) { toast('金币不足，还需要 '+(next.price-state.coins)+' 金。'); return false; }
+  state.coins -= next.price;state.rodLevel=level+1;
+  markDirty();refreshHud();refreshHotbar();saveNow();toast('鱼竿升级为'+next.name+'！');return true;
+}
+function openTackleShop() {
+  if (!state.dsMet) { toast('店长还没回来。在河边成功钓鱼，找到 DeepSeek 后开张。');return false; }
+  openWindow({id:'tackle',kind:'custom',wide:true,title:'DeepSeek 渔具店',build:function(b) {
+    var head=el('div','dlg-head'),av=el('div','dlg-avatar');av.appendChild(getNpcPortrait('ds'));head.appendChild(av);
+    head.appendChild(el('div','dlg-name','店长 · '+NPCS.ds.name));b.appendChild(head);
+    b.appendChild(el('p','muted','金币：'+state.coins+' 金 · 当前鱼竿：'+itemName('tool_rod')));
+    b.appendChild(el('div','section-title','鱼竿升级'));
+    b.appendChild(el('p',null,'木制：20–60 金鱼类；精工：额外解锁锦鲤、金鳞鱼（120–180 金）；大师：额外解锁星纹鲟、蓝冠鱼王（300–480 金）。池塘与河边均生效，高级鱼竿更容易遇到高级鱼。'));
+    var level=state.rodLevel||1;
+    if(invCount('tool_rod')<1) b.appendChild(el('p','muted','先完成修桥委托领取基础钓竿。'));
+    else if(level<3) b.appendChild(mkBtn('升级为'+ROD_LEVELS[level].name+' · '+ROD_LEVELS[level].price+' 金','primary',function(){upgradeRod();refreshWindow();}));
+    else b.appendChild(el('p','muted','已拥有最高级鱼竿。'));
+    b.appendChild(el('div','section-title','卖鱼换金币'));
+    var owned=FISHES.filter(function(f){return invCount(f.id)>0;});
+    if(!owned.length) b.appendChild(el('p','muted','背包里还没有鱼。去池塘或河边试试吧！'));
+    owned.forEach(function(f){
+      var row=itemTile(f.id,invCount(f.id),null,false,'售价 '+f.sell+' 金 / 条'),acts=el('div','item-actions');
+      acts.appendChild(mkBtn('卖 1 条 · '+f.sell+' 金','sm',function(){sellToShop(f.id,1);saveNow();refreshWindow();}));
+      acts.appendChild(mkBtn('卖全部 · '+invCount(f.id)*f.sell+' 金','sm',function(){sellToShop(f.id,invCount(f.id));saveNow();refreshWindow();}));
+      row.appendChild(acts);b.appendChild(row);
+    });
+  },actions:[{label:'离开渔具店',kind:'ghost',close:true}]});return true;
+}
 function openWorkshop() {
   openWindow({
     id: 'workshop', kind: 'custom', wide: true, title: '阿栎木工作坊',
@@ -3971,6 +4021,7 @@ function activateInteractable(it) {
   if (it.kind === 'calendar') { openCalendar(); return; }
   if (it.kind === 'handbook') { openHandbook(); return; }
   if (it.kind === 'shop') { openShop(); return; }
+  if (it.kind === 'tackle') { openTackleShop(); return; }
   if (it.kind === 'workshop') { openWorkshop(); return; }
   if (it.kind === 'board') { openQuestLog('board'); return; }
   if (it.kind === 'bridge') {
@@ -4223,6 +4274,13 @@ var ICON_ART = {
 };
 
 var iconCache = {};
+FISHES.forEach(function(f) {
+  if(ICON_ART[f.id]) return;
+  ICON_ART[f.id]=function(g) {
+    px(g,4,5,9,6,f.color);px(g,1,4,3,8,f.color);px(g,6,3,4,2,f.color);
+    px(g,11,6,1,1,'#172C40');px(g,6,9,5,1,'#F2EAC6');
+  };
+});
 function getIcon(id) {
   var c = iconCache[id];
   if (!c) {
@@ -4240,41 +4298,26 @@ function getIcon(id) {
 var portraitCache = {};
 
 /* --- DS 小姐专用像素像：深蓝鲸色系 + 呆毛 + 鲸鱼发夹 --- */
+// 依据用户提供的 48 × 62 像素格参考：蓝发、女仆裙、鲸鱼图案。
+var DS_SPRITE = {"palette":{"A":"#ede6e0","B":"#475381","C":"#ebe5e6","D":"#c2b2aa","E":"#3d5e8a","F":"#404d7f","G":"#f8f3f2","H":"#36344b","I":"#6d8bce","J":"#345db2","K":"#f2f0ef","L":"#f7f7f7","M":"#1f3c74","N":"#f7f6f6","O":"#dde1ee","P":"#f7f1f0","Q":"#f8f6f6","R":"#395c8a","S":"#eee7e9","T":"#415f8b","U":"#f4f3f4","V":"#dfccd2","W":"#f9f8f8","X":"#f5f5f5","Y":"#f9f5f4","Z":"#a5badf","a":"#f7f5f4","b":"#070507","c":"#ced8e7","d":"#837c80","e":"#f5f3f1","f":"#e1dddc"},"rows":["................................................","................HHHBJI..........................","...............HH.....Z.........................","..............HH.......Z........................","..............H...HHHH.HHHHHH...................",".................HCVSSHSVKSSVH..................","...............HHfHVSCSCCCHCSVHHH...............",".............HHVVCKVHHHHHHHSDSfSCHH.............","............HSSSfHHBBFMMBFBBFHDCHSSH............","...........HVHVfHTJJBJJJBBJJTBBHCSSH............","..........HfSSHFEJJHJJJJJFHERRTFHDSVHH..........",".........HCCVbEEEBBJJJJJJJJMFRTFBHVCSCH.........","........HVHCHRRRRFRRTRRRRRRRRFTRERHVHSb.........","........HfVHTEETFBEETREREERERFBEZEFHCSH.........","........HVVEEZEFFEEETEEEEERTRJBRZZRHDSHH........",".......HdVBEZZEEZEEBZZEREEEEZEBRTZEBHCCHH.......","......HdHSBEZZBZTJTEZZZZTTETTZTBETEBHCHCH.......","......HCVRRRRJRRRRRRZZZZRRRRRRRFRRRFFdCHH.......",".......HFRTEEFRERRRRZZZZRERRRRTRRRRFFdVFFH......",".......HFETEEBEEEEEEERERREEERRTEEEFTFFVHZH......",".....HIIFTTTTBTTTTTTTETTTTTTTETTBTETIIEIZH......",".....HHZFETETBETHbBTTEETEEHbFETEBEETZIdJIH......",".....HIIRRERRFREVAIEIIIIIFAAARERFRREZIHHTH......","......HHTETTTBTHfABTIIIIIBCffHTTBTRTBHHBTH......",".....HFHRRERRFFAAVFFIIIIIFVVASHFFRRERMMFBFH.....",".....HFHEETETFHHbbbBFIIIFdHbbbbHFEETEFFFBFFH....","....HHFHRRTEEHbbbbbHFFIIHDbbbbbbbRRERFdOBMFFH...","...HBcccHBTETbbScMMHCDFBBACcMMHCbbRTRBddfOOOOH..","..HOccddHITTTBASMHMHCASfAACMHMHCHTRTIHHHHHHRH...","..HHHHHHHIIIIBASEZcICAAAAACIcZTCHIIIIHFH........","........HHIIIBAVVVVAAAAAAAAVVVVVFIIBHHFH........","........HHIIIHBVVVVAAAAfAAAVVVVVBIIHHMBH........","........FHHHHHHHVVAAAASAAAASVVFFIIHHMRFH........",".........HBFHHHHHHAAAAAAAAAAAHHHHHHJHEFFH.......",".........HTBJIZZZHHHHHHHdHHHHHBZZZZBFEEBH.......","........HBTBBIIZZHfDHHHdHMHHSCMZIIEBBTTBB.......",".......HFETBBFIIZHfDHHHHHMHfSHHIIIFBFEEEIHH.....","......HIEETBBEIIHHCCHHHdHHHCSHHIIBFBFEEETIF.....",".....HIEEETBEIIHMMHSSSSSSSCSHMHHIIMBFREETFIF....","....HIIRRREJJMHMMMHSSHHHHHSSHMMHHRFJFRRRFFFIH...","....HIIEEETJJHHMHMHfCHHHHHCAMMHHHHJJJREEFFFIH...","....HXHIEEBJJHMMMHHSCHHHHHCCHMMMMHHJJFEEBFFHH...","....HHBBBBBJHHMBMHVCSSSSCSCSSHMMMMHHJJJEBFBH....",".....HFBFFBEHHMBHSSSSSSCCSCSSSHFMHHHIFFFBFFH....","...HFBFBFFBHHFHHfCCCCSSCCCCSCCHHHMHHIFFFBFFI....","...HHIIIFFBHCfHHCSCSSSSCCSCSSCHHHfCbIFFFBFFFH...","....HHIIFFIHVdMHCSSSSJIESISSSSHHbDSHbFFFFbFFF...","......IIBIIHHHMMfSCfSESIIJCSSHBMMHbIIbFBbIFFFZ..",".....HIIIIZZHMHMHSSfScIRJSSSSHFMMFHZIIbbIIbFHHH.","....HIIZIHZHdHHHBCCCCCSCCCCCHHHHMBBHZIIIIIIIbHH.","...HIIHHH.HHHHdHHHHHSCSCCCCHHHHDHHHHZZIIIHbb....","..........dHHHHHdHdHHHHHHHFdHDHHHHFHHZZZH.......","..........dCHHHHHHHHHHDDHHHBHHHHHHHAddHH........",".........dfSfSHHHHFHHHHHdHHHHHHHSSSSSd..........","..........dCSCCSCSHHBHMHHBHCSCCCSCSAdd..........","...........ddSSSCSSCSSSSCCSSSCASSSd.............",".............ddSCSCCCSSCCCCSSCACCd..............","...............dddddddddddddddddd...............","..................dCCd...dCCd...................","..................HHHH...HHHH...................","..................HHHH...HHHH...................","................................................"]};
+var dsSpriteCanvas;
+function getDsSprite() {
+  if (!dsSpriteCanvas) {
+    dsSpriteCanvas = newCanvas(48,62);
+    var g = dsSpriteCanvas.getContext('2d');
+    DS_SPRITE.rows.forEach(function(row,y) { for(var x=0;x<row.length;x++) {
+      if(row[x] !== '.') { g.fillStyle=DS_SPRITE.palette[row[x]];g.fillRect(x,y,1,1); }
+    }});
+  }
+  return dsSpriteCanvas;
+}
 function drawDsPortrait(g) {
-  var NAVY = '#2F3A4A';   // 发色
-  var BLUE = '#4D6BFE';   // DeepSeek 蓝
-  var SKIN = '#F0CFAE';
-  var CLOTH = '#DCE4EE';
-
-  px(g, 0, 0, 32, 32, '#DCE6F5');        // 浅蓝背景
-  px(g, 0, 26, 32, 6, '#B9CBEA');         // 地面
-  // 背景小鲸鱼（DeepSeek 标志意象）
-  px(g, 3, 5, 5, 2, '#8FA8D8');
-  px(g, 2, 6, 1, 2, '#8FA8D8');
-  px(g, 8, 4, 2, 2, '#8FA8D8');
-
-  // 头发（后层）
-  px(g, 7, 4, 18, 14, NAVY);
-  px(g, 5, 8, 3, 14, NAVY);
-  px(g, 24, 8, 3, 14, NAVY);
-  // 呆毛（偷懒的象征）
-  px(g, 16, 1, 2, 3, NAVY);
-  px(g, 18, 0, 2, 2, NAVY);
-  // 脸
-  px(g, 9, 8, 14, 11, SKIN);
-  // 刘海
-  px(g, 9, 6, 14, 3, NAVY);
-  // 眯眼（摸鱼表情）
-  px(g, 11, 13, 3, 1, '#2b2317');
-  px(g, 18, 13, 3, 1, '#2b2317');
-  // 嘴（淡淡的）
-  px(g, 15, 16, 2, 1, '#a8705a');
-  // 身体
-  px(g, 9, 19, 14, 8, CLOTH);
-  px(g, 15, 19, 4, 8, BLUE);
-  // 鲸鱼发夹
-  px(g, 21, 8, 4, 2, BLUE);
-  px(g, 24, 7, 2, 2, BLUE);
+  px(g,0,0,32,32,'#DCE6F5');g.imageSmoothingEnabled=false;
+  g.drawImage(getDsSprite(),4,0,24,31);
+}
+function drawDsActor(g,fx,fy) {
+  px(g,fx-9,fy-2,18,3,'rgba(0,0,0,.2)');
+  g.imageSmoothingEnabled=false;g.drawImage(getDsSprite(),Math.round(fx)-12,Math.round(fy)-31,24,31);
 }
 
 function getNpcPortrait(id) {
@@ -4673,6 +4716,13 @@ function drawHouse(g, bx, by, bw, bh, kind) {
   if (kind === 'shop') {
     g.fillStyle = '#5C4231'; g.fillRect(x + Math.floor(w / 2) - 26, y + h - 30, 52, 9);
     g.fillStyle = '#EFD18B'; g.fillRect(x + Math.floor(w / 2) - 24, y + h - 28, 48, 5);
+  }
+  if (kind === 'tackle') {
+    px(g,x,y,w,18,'#40759B');px(g,x,y+18,w,4,'#294D72');
+    px(g,x+9,y+h-31,w-18,10,'#EAF4F4');
+    px(g,x+19,y+h-28,14,4,'#4D86B0');px(g,x+16,y+h-30,4,4,'#4D86B0');
+    px(g,x+30,y+h-27,1,1,'#FFFFFF');
+    px(g,x+w-13,y+h-23,2,20,'#825A37');px(g,x+w-11,y+h-24,6,1,'#E5DBB6');
   }
   if (kind === 'workshop') {
     g.fillStyle = '#4A3A2C'; g.fillRect(x + 3, y + h - 8, 12, 8);
@@ -5304,7 +5354,7 @@ function drawFishingHud(g) {
   g.fillStyle = '#6FB054'; g.fillRect(trackX, trackY + F.barY, 26, 2);
   // 鱼
   var fy = trackY + F.fishY;
-  g.fillStyle = ['#B9C6CC', '#6E8A4E', '#C8D6E0'][Math.max(0, FISHES.indexOf(F.fish))];
+  g.fillStyle = F.fish.color || ['#B9C6CC', '#6E8A4E', '#C8D6E0'][Math.max(0, FISHES.indexOf(F.fish))];
   g.fillRect(trackX + 6, fy - 4, 14, 8);
   g.fillRect(trackX + 3, fy - 3, 4, 6);
   g.fillStyle = '#141A1E'; g.fillRect(trackX + 15, fy - 2, 2, 2);
@@ -5469,7 +5519,7 @@ function drawScene(g, dt) {
     var nr = npcRuntime[nid];
     if (nr.x < R.x0 - 1 || nr.x > R.x1 + 1 || nr.y < R.y0 - 1 || nr.y > R.y1 + 1) continue;
     var npc = NPCS[nid];
-    ents.push({ z: nr.y * TILE + TILE, f: drawActor, a: [nr.x * TILE + 8, nr.y * TILE + 14,
+    ents.push({ z: nr.y * TILE + TILE, f: nid === 'ds' ? drawDsActor : drawActor, a: [nr.x * TILE + 8, nr.y * TILE + 14,
       { hair: npc.hair, shirt: npc.shirt, accent: npc.accent, skin: npc.skin, face: nr.face, moving: false, phase: 0, swing: 0, apron: true }] });
   }
   ents.push({
@@ -6071,6 +6121,7 @@ window.__MOSS__ = {
   __npcDialogue: npcDialogue, __talkToNpc: talkToNpc, __giftToNpc: giftToNpc, __heartsText: heartsText, __isGiftable: isGiftable,
   __npcRuntime: npcRuntime, __findNpcAdjacent: findNpcAdjacent,
   __isWater: isWater, __toolFish: toolFish,
+  openTackleShop: openTackleShop, upgradeRod: upgradeRod, fishPool: fishPool, pickFish: pickFish, openDsEncounter: openDsEncounter,
   tileToScreen: function (tx, ty) {
     var r = canvas.getBoundingClientRect();
     var x = (tx * TILE + 8 - cam.x) / VIEW_W;
