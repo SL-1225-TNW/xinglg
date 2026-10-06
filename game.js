@@ -1334,59 +1334,413 @@ var CITY_DISTRICTS = [
   {name:'西侧住宅区',x:24,y:54}, {name:'工匠街',x:101,y:65},
   {name:'学院河岸',x:100,y:31}, {name:'城堡与蔷薇园',x:64,y:16}
 ];
-var CITY_BUILDINGS = [];
-MAPS.city=(function(){
-  var m=mkMap(128,96,T_GRASS),decor=[];
-  fillRect(m,0,0,127,0,T_BUILDING,true);fillRect(m,0,95,127,95,T_BUILDING,true);
-  fillCol(m,0,0,95,T_BUILDING,true);fillCol(m,127,0,95,T_BUILDING,true);
-  [28,52,76,90].forEach(function(y){fillRect(m,3,y-1,124,y+1,T_PATH,false);});
-  [12,40,64,88,116].forEach(function(x){fillRect(m,x-1,3,x+1,95,T_PATH,false);});
-  fillRect(m,53,44,75,60,T_PATH,false);
-  // 一条有多座桥的城市河道，桥和主道路相交。
-  fillRect(m,80,2,83,94,T_WATER,true);
-  [28,52,76,90].forEach(function(y){fillRect(m,79,y-1,84,y+1,T_PATH,false);});
-  function building(id,label,x,y,w,h,theme){
-    fillRect(m,x,y,x+w-1,y+h-1,T_BUILDING,true);
-    var door={x:x+Math.floor(w/2),y:y+h};fillRect(m,door.x,door.y,door.x,Math.min(94,door.y+2),T_PATH,false);
-    CITY_BUILDINGS.push({id:id,label:label,x:x,y:y,w:w,h:h,kind:theme||'home',door:door});
-    var roomId='city_'+id,r=mkMap(id==='castle'?32:22,id==='castle'?22:16,T_PATH);
-    fillRect(r,0,0,r.w-1,0,T_BUILDING,true);fillRect(r,0,r.h-1,r.w-1,r.h-1,T_BUILDING,true);
-    fillCol(r,0,0,r.h-1,T_BUILDING,true);fillCol(r,r.w-1,0,r.h-1,T_BUILDING,true);
-    var rx=Math.floor(r.w/2);r.solid[rx][r.h-1]=0;r.t[rx][r.h-1]=T_PATH;
-    fillRect(r,2,2,5,3,T_BUILDING,true);fillRect(r,r.w-6,2,r.w-3,3,T_BUILDING,true);
-    fillRect(r,4,6,6,7,T_BUILDING,true);fillRect(r,r.w-7,6,r.w-5,7,T_BUILDING,true);
-    fillRect(r,rx-1,3,rx+1,4,T_BUILDING,true);
-    MAPS[roomId]={w:r.w,h:r.h,t:r.t,solid:r.solid,name:label,indoor:true,roomTheme:theme||'home',
-      exits:[{x:rx,y:r.h-1,to:'city',tx:door.x,ty:door.y+1}],buildings:[],decor:[]};
-    SCENE_ORDER.push(roomId);
-    INTERACTABLES[roomId]=[{id:id+'_desk',x:rx,y:4,stand:[[rx,5],[rx-2,4],[rx+2,4]],kind:'cityService',label:label+'服务台',service:id}];
-    INTERACTABLES.city.push({id:id,x:door.x,y:door.y,stand:[[door.x,door.y+1],[door.x-1,door.y],[door.x+1,door.y]],kind:'cityDoor',label:label,to:roomId});
+/* ============================================================
+   白蔷薇城室内定义
+   每栋建筑按用途单独设计布局：谁在工作、放着什么、玩家能做什么。
+   flat:true 的家具是地面装饰，不阻挡通行。
+   ============================================================ */
+var CITY_ROOMS = {
+  /* 烤炉、揉面台、售卖柜、面包架、面粉袋、后仓——紧凑而温暖 */
+  bakery: {
+    w: 28, h: 20, floor: 'tile',
+    props: [
+      { t: 'oven', x: 2, y: 2, w: 5, h: 4 },
+      { t: 'kneadTable', x: 9, y: 2, w: 6, h: 3 },
+      { t: 'flourSacks', x: 18, y: 2, w: 3, h: 3 },
+      { t: 'backDoor', x: 24, y: 2, w: 3, h: 4 },
+      { t: 'breadShelf', x: 2, y: 10, w: 4, h: 4 },
+      { t: 'counterFront', x: 9, y: 10, w: 8, h: 2 },
+      { t: 'baskets', x: 19, y: 10, w: 4, h: 2 },
+      { t: 'genericShelf', x: 24, y: 11, w: 3, h: 3 }
+    ],
+    spots: [{ x: 12, y: 11, kind: 'cityService', service: 'bakery', label: '售卖柜', stand: [[12, 12], [8, 11], [17, 11]] }],
+    staff: ['baker']
+  },
+  /* 玻璃拱顶下的种植床、育苗台与水槽 */
+  greenhouse: {
+    w: 26, h: 20, floor: 'stone',
+    props: [
+      { t: 'glassRoof', x: 2, y: 2, w: 22, h: 6, flat: true },
+      { t: 'planter', x: 2, y: 10, w: 7, h: 3 },
+      { t: 'planter', x: 17, y: 10, w: 7, h: 3 },
+      { t: 'seedBench', x: 10, y: 8, w: 6, h: 3 },
+      { t: 'trough', x: 10, y: 14, w: 6, h: 2 },
+      { t: 'toolRack', x: 2, y: 15, w: 5, h: 2 },
+      { t: 'potPlant', x: 22, y: 14, w: 2, h: 2 }
+    ],
+    spots: [{ x: 12, y: 10, kind: 'cityService', service: 'greenhouse', label: '育苗台', stand: [[12, 11], [12, 7], [9, 10], [16, 10]] }],
+    staff: ['flora']
+  },
+  /* 庄重而忙碌：接待处、订单板、账本桌、货箱与档案柜 */
+  market: {
+    w: 30, h: 20, floor: 'plank',
+    props: [
+      { t: 'orderBoard', x: 2, y: 2, w: 6, h: 5 },
+      { t: 'receptionDesk', x: 12, y: 2, w: 7, h: 2 },
+      { t: 'archiveShelf', x: 23, y: 2, w: 5, h: 6 },
+      { t: 'ledgerDesk', x: 3, y: 10, w: 6, h: 3 },
+      { t: 'crates', x: 21, y: 10, w: 6, h: 3 },
+      { t: 'desk', x: 12, y: 12, w: 6, h: 2 },
+      { t: 'longTable', x: 3, y: 16, w: 8, h: 2 },
+      { t: 'barrel', x: 21, y: 16, w: 2, h: 2 },
+      { t: 'barrel', x: 24, y: 16, w: 2, h: 2 }
+    ],
+    spots: [{ x: 15, y: 3, kind: 'cityService', service: 'market', label: '接待处', stand: [[15, 4], [11, 3], [19, 3]] }],
+    staff: ['merchant']
+  },
+  /* 适合停留：壁炉、圆桌、沙发、茶具柜与糕点柜 */
+  cafe: {
+    w: 26, h: 18, floor: 'plank',
+    props: [
+      { t: 'fireplace', x: 10, y: 2, w: 6, h: 3 },
+      { t: 'kitchen', x: 19, y: 2, w: 6, h: 3 },
+      { t: 'teaCabinet', x: 2, y: 3, w: 5, h: 3 },
+      { t: 'pastryCase', x: 2, y: 8, w: 6, h: 2 },
+      { t: 'roundTable', x: 10, y: 8, w: 4, h: 3 },
+      { t: 'sofa', x: 16, y: 8, w: 6, h: 2 },
+      { t: 'roundTable', x: 18, y: 13, w: 4, h: 3 },
+      { t: 'chair', x: 10, y: 13, w: 2, h: 2 },
+      { t: 'chair', x: 14, y: 13, w: 2, h: 2 }
+    ],
+    spots: [{ x: 4, y: 9, kind: 'cityService', service: 'cafe', label: '糕点柜', stand: [[4, 10], [4, 7], [1, 9], [8, 9]] }],
+    staff: ['waiter']
+  },
+  /* 书架成排、阅读桌、梯子与地图柜 */
+  library: {
+    w: 30, h: 20, floor: 'wood',
+    props: [
+      { t: 'bookshelf', x: 2, y: 2, w: 4, h: 8 },
+      { t: 'bookshelf', x: 9, y: 2, w: 4, h: 8 },
+      { t: 'bookshelf', x: 19, y: 2, w: 4, h: 8 },
+      { t: 'bookshelf', x: 25, y: 2, w: 4, h: 8 },
+      { t: 'ladder', x: 8, y: 11, w: 2, h: 3 },
+      { t: 'readingTable', x: 11, y: 12, w: 8, h: 3 },
+      { t: 'desk', x: 4, y: 13, w: 7, h: 2 },
+      { t: 'mapCabinet', x: 20, y: 12, w: 6, h: 2 },
+      { t: 'archiveShelf', x: 20, y: 16, w: 7, h: 3 }
+    ],
+    spots: [{ x: 7, y: 14, kind: 'cityService', service: 'library', label: '查阅台', stand: [[7, 15], [7, 12], [3, 14], [11, 14]] }],
+    staff: ['archivist']
+  },
+  /* 熔炉、铁砧、工具墙、冷却槽与材料箱 */
+  smith: {
+    w: 26, h: 18, floor: 'earth',
+    props: [
+      { t: 'forge', x: 2, y: 2, w: 6, h: 4 },
+      { t: 'chest', x: 20, y: 2, w: 5, h: 2 },
+      { t: 'toolWall', x: 2, y: 7, w: 8, h: 2 },
+      { t: 'anvil', x: 12, y: 7, w: 4, h: 3 },
+      { t: 'trough', x: 19, y: 9, w: 5, h: 2 },
+      { t: 'barrel', x: 11, y: 13, w: 2, h: 2 },
+      { t: 'barrel', x: 14, y: 13, w: 2, h: 2 }
+    ],
+    spots: [{ x: 13, y: 8, kind: 'cityService', service: 'smith', label: '铁砧', stand: [[13, 10], [13, 6], [11, 8], [16, 8]] }],
+    staff: ['blacksmith']
+  },
+  /* 布卷、裁剪桌、衣架与试衣镜 */
+  tailor: {
+    w: 24, h: 18, floor: 'plank',
+    props: [
+      { t: 'fabricRolls', x: 2, y: 2, w: 5, h: 3 },
+      { t: 'cuttingTable', x: 10, y: 2, w: 7, h: 3 },
+      { t: 'dressRack', x: 2, y: 7, w: 7, h: 2 },
+      { t: 'mirror', x: 19, y: 3, w: 4, h: 5 },
+      { t: 'genericShelf', x: 19, y: 11, w: 4, h: 3 }
+    ],
+    spots: [{ x: 13, y: 3, kind: 'cityService', service: 'tailor', label: '裁剪台', stand: [[13, 5], [13, 1], [9, 3], [17, 3]] }],
+    staff: ['seamstress']
+  },
+  /* 接待处、餐厅长桌、厨房、楼梯与各具特点的客房 */
+  inn: {
+    w: 30, h: 20, floor: 'plank',
+    props: [
+      { t: 'fireplace', x: 2, y: 2, w: 5, h: 3 },
+      { t: 'receptionDesk', x: 12, y: 2, w: 7, h: 2 },
+      { t: 'stairs', x: 22, y: 2, w: 5, h: 4 },
+      { t: 'sofa', x: 2, y: 7, w: 3, h: 2 },
+      { t: 'longTable', x: 6, y: 10, w: 9, h: 3 },
+      { t: 'kitchen', x: 22, y: 9, w: 6, h: 3 },
+      { t: 'bed', x: 2, y: 14, w: 4, h: 4 },
+      { t: 'bed', x: 9, y: 14, w: 4, h: 4 },
+      { t: 'wardrobe', x: 22, y: 14, w: 5, h: 4 }
+    ],
+    spots: [{ x: 15, y: 3, kind: 'cityService', service: 'inn', label: '接待处', stand: [[11, 3], [19, 3], [15, 5]] }],
+    staff: ['innkeeper']
+  },
+  /* 分信柜、邮袋、柜台、公告板与装卸处 */
+  post: {
+    w: 26, h: 18, floor: 'plank',
+    props: [
+      { t: 'pigeonholes', x: 2, y: 2, w: 8, h: 5 },
+      { t: 'mailbag', x: 20, y: 2, w: 4, h: 3 },
+      { t: 'noticeBoard', x: 2, y: 9, w: 6, h: 4 },
+      { t: 'counter', x: 12, y: 8, w: 7, h: 2 },
+      { t: 'genericShelf', x: 20, y: 8, w: 4, h: 4 },
+      { t: 'dock', x: 2, y: 14, w: 8, h: 3, flat: true }
+    ],
+    spots: [{ x: 15, y: 9, kind: 'cityService', service: 'post', label: '柜台', stand: [[15, 10], [15, 7], [11, 9], [19, 9]] }],
+    staff: ['clerk']
+  },
+  /* 城堡主厅：大理石地面、长毯与挂毯 */
+  castle: {
+    w: 34, h: 24, floor: 'marble',
+    props: [
+      { t: 'carpet', x: 12, y: 8, w: 10, h: 12, flat: true },
+      { t: 'chandelier', x: 13, y: 2, w: 4, h: 2, flat: true },
+      { t: 'chandelier', x: 18, y: 2, w: 4, h: 2, flat: true },
+      { t: 'throne', x: 14, y: 3, w: 6, h: 3 },
+      { t: 'banner', x: 4, y: 2, w: 2, h: 6 },
+      { t: 'banner', x: 28, y: 2, w: 2, h: 6 },
+      { t: 'banner', x: 4, y: 12, w: 2, h: 6 },
+      { t: 'banner', x: 28, y: 12, w: 2, h: 6 },
+      { t: 'statue', x: 6, y: 9, w: 3, h: 4 },
+      { t: 'statue', x: 25, y: 9, w: 3, h: 4 },
+      { t: 'longTable', x: 8, y: 21, w: 8, h: 2 },
+      { t: 'longTable', x: 18, y: 21, w: 8, h: 2 },
+      { t: 'sofa', x: 9, y: 16, w: 4, h: 2 },
+      { t: 'sofa', x: 21, y: 16, w: 4, h: 2 }
+    ],
+    spots: [{ x: 17, y: 5, kind: 'cityService', service: 'castle', label: '王座厅', stand: [[17, 6], [13, 5], [21, 5]] }],
+    staff: ['steward']
+  },
+  /* 马车站：装卸台、售票柜台与待发的货车 */
+  carriage: {
+    w: 24, h: 16, floor: 'earth',
+    props: [
+      { t: 'dock', x: 2, y: 2, w: 9, h: 3, flat: true },
+      { t: 'crates', x: 13, y: 2, w: 7, h: 3 },
+      { t: 'counter', x: 9, y: 8, w: 7, h: 2 },
+      { t: 'barrel', x: 2, y: 9, w: 2, h: 2 },
+      { t: 'barrel', x: 5, y: 9, w: 2, h: 2 },
+      { t: 'genericShelf', x: 18, y: 9, w: 4, h: 3 }
+    ],
+    spots: [{ x: 12, y: 9, kind: 'cityService', service: 'carriage', label: '售票处', stand: [[12, 10], [12, 7], [8, 9], [16, 9]] }],
+    staff: []
+  },
+  /* 普通住宅：床、衣柜、桌椅，各户略有差别 */
+  home: {
+    w: 16, h: 13, floor: 'wood',
+    props: [
+      { t: 'bed', x: 2, y: 2, w: 4, h: 4 },
+      { t: 'wardrobe', x: 11, y: 2, w: 4, h: 3 },
+      { t: 'table', x: 6, y: 8, w: 4, h: 2 },
+      { t: 'genericShelf', x: 2, y: 8, w: 3, h: 3 },
+      { t: 'fireplace', x: 12, y: 7, w: 3, h: 3 }
+    ],
+    spots: [{ x: 8, y: 9, kind: 'cityService', service: 'home', label: '起居处', stand: [[8, 10], [8, 7], [5, 9], [11, 9]] }],
+    staff: []
   }
-  INTERACTABLES.city=[];
-  building('castle','白蔷薇城堡',54,6,21,10,'castle');
-  building('library','蔷薇图书馆',94,16,11,7,'library');
-  building('academy','河岸学院',108,16,10,7,'library');
-  building('bakery','暖炉面包房',44,37,7,5,'shop');
-  building('market','城市商会',68,37,9,5,'shop');
-  building('inn','南门旅馆',68,81,9,5,'home');
-  building('post','驿站邮局',47,81,9,5,'shop');
-  building('smith','白蔷薇铁匠铺',93,61,9,6,'workshop');
-  building('tailor','丝带裁缝铺',106,61,8,6,'shop');
-  building('greenhouse','蔷薇温室',44,18,7,6,'shop');
-  building('cafe','河岸茶室',92,37,8,6,'shop');
-  building('hall','居民议事厅',18,37,9,6,'home');
-  var n=0;
-  [[5,5],[19,5],[31,5],[5,18],[19,18],[31,18],[5,37],[30,37],[5,61],[19,61],[30,61],[44,61],[67,61],[5,81],[19,81],[30,81],[92,81],[106,81],[93,5],[108,5]].forEach(function(p){n++;building('home'+n,'蔷薇街 '+n+' 号',p[0],p[1],6,5,'home');});
-  for(var y=19;y<26;y+=2)for(var x=55;x<=74;x+=3)decor.push({t:'flower',x:x,y:y});
-  [12,40,64,88,116].forEach(function(x){[30,54,78,91].forEach(function(y){decor.push({t:'bench',x:x+3,y:y});decor.push({t:'flower',x:x-3,y:y});});});
-  m.t[64][95]=T_PATH;m.solid[64][95]=0;
-  return {w:m.w,h:m.h,t:m.t,solid:m.solid,name:'白蔷薇城',exits:[{x:64,y:95,to:'town',tx:14,ty:22}],buildings:CITY_BUILDINGS,decor:decor};
+};
+/* 白蔷薇城：640×480 格，环绕古老城堡生长起来的中叶山谷城市。
+   西侧贴山坡，东侧沿河湾展开，南侧向码头与城门延伸。
+   道路分三个年代：旧城绕地形，商业区沿运输路线，学院与花园区更宽更整齐。 */
+var CITY_DISTRICTS = [
+  { id: 'castle', name: '城堡高台', x: 330, y: 100, era: 'old' },
+  { id: 'oldtown', name: '西侧旧城', x: 140, y: 215, era: 'old' },
+  { id: 'garden', name: '花园住宅区', x: 155, y: 88, era: 'new' },
+  { id: 'market', name: '南部老市集', x: 320, y: 325, era: 'mid' },
+  { id: 'artisan', name: '西南工匠区', x: 165, y: 395, era: 'mid' },
+  { id: 'river', name: '东侧河岸', x: 540, y: 265, era: 'mid' },
+  { id: 'academy', name: '东北学院区', x: 520, y: 108, era: 'new' },
+  { id: 'gate', name: '南门驿站区', x: 320, y: 432, era: 'mid' }
+];
+var CITY_BUILDINGS = [];
+MAPS.city = (function () {
+  var W = 640, H = 480, m = mkMap(W, H, T_GRASS), decor = [], facades = [];
+
+  /* 城墙 */
+  fillRect(m, 0, 0, W - 1, 0, T_BUILDING, true);
+  fillRect(m, 0, H - 1, W - 1, H - 1, T_BUILDING, true);
+  fillCol(m, 0, 0, H - 1, T_BUILDING, true);
+  fillCol(m, W - 1, 0, H - 1, T_BUILDING, true);
+  /* 西侧山坡：城市贴着山长出来，这一侧是边界 */
+  fillRect(m, 48, 2, 54, H - 3, T_BUILDING, true);
+  for (var hy = 4; hy < H - 4; hy += 7) for (var hx = 20; hx < 48; hx += 6) if (hash2(2, hx, hy) > .45) { m.t[hx][hy] = T_BUILDING; m.solid[hx][hy] = 1; }
+
+  /* 河道：从东北进来，绕过河湾向南，在城南码头出海 */
+  var RIVER = [[468, 0], [492, 120], [478, 240], [442, 330], [424, H - 1]];
+  function seg(x0, y0, x1, y1, w, code, solid) {
+    var steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1), h = Math.floor(w / 2);
+    for (var i = 0; i <= steps; i++) {
+      var x = Math.round(x0 + (x1 - x0) * i / steps), y = Math.round(y0 + (y1 - y0) * i / steps);
+      fillRect(m, x - h, y - h, x + h, y + h, code, solid);
+    }
+  }
+  for (var ri = 0; ri < RIVER.length - 1; ri++) seg(RIVER[ri][0], RIVER[ri][1], RIVER[ri + 1][0], RIVER[ri + 1][1], 8, T_WATER, true);
+
+  /* 道路：主干道宽，街巷窄，旧城故意弯曲 */
+  function road(x0, y0, x1, y1, w) { seg(x0, y0, x1, y1, w, T_PATH, false); }
+  // 主干
+  road(320, H - 6, 320, 150, 7);        // 南北主街：城门直通城堡
+  road(70, 300, 624, 300, 7);          // 东西主街
+  road(250, 152, 400, 152, 6);         // 城堡环路
+  road(200, 152, 250, 152, 5);
+  // 花园区：更宽、笔直的林荫道
+  road(95, 90, 244, 90, 5); road(95, 62, 95, 140, 4); road(168, 62, 168, 140, 4);
+  // 旧城：窄而弯，贴着地形走
+  road(88, 178, 214, 178, 4); road(96, 214, 150, 246, 3); road(150, 246, 152, 278, 3); road(96, 214, 96, 272, 3);
+  // 市集：多条街汇入不规则广场
+  road(232, 300, 262, 344, 5); road(408, 300, 380, 344, 5); road(300, 268, 300, 344, 5); road(352, 268, 352, 344, 5);
+  // 工匠区
+  road(96, 360, 246, 360, 4); road(96, 404, 236, 414, 4); road(168, 344, 168, 452, 4);
+  // 河岸
+  road(450, 200, 606, 200, 5); road(492, 246, 606, 258, 4); road(452, 330, 610, 330, 5);
+  // 学院区
+  road(440, 108, 606, 108, 5); road(444, 62, 606, 62, 4); road(440, 152, 600, 158, 4);
+  // 南门
+  road(248, 432, 402, 432, 5); road(300, 392, 300, 466, 4); road(352, 392, 352, 466, 4);
+  // 广场：形状刻意不规则，免得看起来像停车场
+  fillRect(m, 286, 308, 356, 346, T_PATH, false);       // 市集广场
+  fillRect(m, 274, 318, 286, 336, T_PATH, false);
+  fillRect(m, 356, 312, 368, 330, T_PATH, false);
+  fillRect(m, 292, 158, 364, 184, T_PATH, false);       // 城堡前庭
+  fillRect(m, 302, 150, 354, 158, T_PATH, false);
+  fillRect(m, 294, 422, 358, 450, T_PATH, false);       // 城门内广场
+  fillRect(m, 358, 430, 370, 442, T_PATH, false);
+
+  /* 桥：道路穿过河道的地方 */
+  [[490, 108], [472, 300], [430, 424]].forEach(function (b) {
+    fillRect(m, b[0] - 7, b[1] - 3, b[0] + 7, b[1] + 3, T_BRIDGE, false);
+  });
+
+  /* 可进入建筑：每栋按用途有自己的室内 */
+  function building(id, label, x, y, w, h, theme) {
+    fillRect(m, x, y, x + w - 1, y + h - 1, T_BUILDING, true);
+    var door = { x: x + Math.floor(w / 2), y: y + h };
+    fillRect(m, door.x, door.y, door.x, Math.min(H - 2, door.y + 2), T_PATH, false);
+    CITY_BUILDINGS.push({ id: id, label: label, x: x, y: y, w: w, h: h, kind: theme || 'home', door: door, district: zoneOf(x, y) });
+    var def = CITY_ROOMS[id] || CITY_ROOMS[theme] || CITY_ROOMS.home;
+    var roomId = 'city_' + id, r = mkMap(def.w, def.h, T_PATH);
+    fillRect(r, 0, 0, r.w - 1, 0, T_BUILDING, true); fillRect(r, 0, r.h - 1, r.w - 1, r.h - 1, T_BUILDING, true);
+    fillCol(r, 0, 0, r.h - 1, T_BUILDING, true); fillCol(r, r.w - 1, 0, r.h - 1, T_BUILDING, true);
+    var rx = Math.floor(r.w / 2); r.solid[rx][r.h - 1] = 0; r.t[rx][r.h - 1] = T_PATH;
+    (def.props || []).forEach(function (p) { if (!p.flat) fillRect(r, p.x, p.y, p.x + p.w - 1, p.y + p.h - 1, T_BUILDING, true); });
+    fillCol(r, rx, r.h - 2, r.h - 1, T_PATH, false);     // 家具不能堵死大门
+    MAPS[roomId] = { w: r.w, h: r.h, t: r.t, solid: r.solid, name: label, indoor: true, roomTheme: theme || 'home', roomDef: def, exits: [{ x: rx, y: r.h - 1, to: 'city', tx: door.x, ty: door.y + 1 }], buildings: [], decor: [] };
+    SCENE_ORDER.push(roomId);
+    INTERACTABLES[roomId] = (def.spots || []).map(function (s, i) {
+      return { id: id + '_' + i, x: s.x, y: s.y, stand: s.stand, kind: s.kind, label: s.label, service: s.service };
+    });
+    INTERACTABLES.city.push({ id: id, x: door.x, y: door.y, stand: [[door.x, door.y + 1], [door.x - 1, door.y], [door.x + 1, door.y]], kind: 'cityDoor', label: label, to: roomId });
+  }
+  function zoneOf(x, y) {
+    var best = CITY_DISTRICTS[0], bd = 1e9;
+    CITY_DISTRICTS.forEach(function (d) {
+      var dist = Math.abs(d.x - x) + Math.abs(d.y - y);
+      if (dist < bd) { bd = dist; best = d; }
+    });
+    return best.id;
+  }
+  /* 只做街景的房屋：给出街道密度，不生成室内 */
+  function facade(x, y, w, h, kind, label) {
+    if (!spotFree(x, y, w, h)) return;
+    fillRect(m, x, y, x + w - 1, y + h - 1, T_BUILDING, true);
+    fillRect(m, x + Math.floor(w / 2), y + h, x + Math.floor(w / 2), Math.min(H - 2, y + h + 1), T_PATH, false);
+    facades.push({ id: 'f' + facades.length, label: label, x: x, y: y, w: w, h: h, kind: kind, noEnter: true, door: { x: x + Math.floor(w / 2), y: y + h } });
+  }
+
+  INTERACTABLES.city = [];
+  /* 城堡高台 */
+  building('castle', '白蔷薇城堡', 296, 58, 68, 44, 'castle');
+  /* 东北学院区 */
+  building('library', '蔷薇图书馆', 440, 70, 26, 18, 'library');
+  building('academy', '河岸学院', 560, 58, 34, 22, 'library');
+  building('greenhouse', '蔷薇温室', 446, 130, 22, 15, 'shop');
+  /* 南部老市集 */
+  building('bakery', '暖炉面包房', 292, 316, 16, 11, 'shop');
+  building('market', '城市商会', 350, 296, 20, 13, 'shop');
+  building('tailor', '丝带裁缝铺', 238, 252, 17, 12, 'shop');
+  /* 东侧河岸 */
+  building('cafe', '河岸茶室', 542, 208, 17, 12, 'shop');
+  building('smith', '白蔷薇铁匠铺', 600, 266, 19, 13, 'workshop');
+  /* 西侧旧城 */
+  building('hall', '居民议事厅', 104, 152, 19, 13, 'home');
+  /* 南门驿站区 */
+  building('inn', '南门旅馆', 348, 428, 20, 13, 'home');
+  building('post', '驿站邮局', 268, 428, 19, 13, 'shop');
+  building('carriage', '南门马车站', 236, 396, 16, 11, 'shop');
+
+  /* 住宅：主要沿街区街道成排，少数可以进去 */
+  var homeIdx = 0, ENTERABLE_HOMES = 24, FACADE_HOMES = 150;
+  /* 一块地能不能盖：主体不能压路、压水、压已有建筑；门前那一格可以是街道，
+     这样房子就自然朝着街面开门。 */
+  function spotFree(x, y, w, h) {
+    if (x < 58 || y < 3 || x + w > W - 3 || y + h > H - 3) return false;
+    for (var yy = y; yy < y + h; yy++)
+      for (var xx = x; xx < x + w; xx++) {
+        if (xx < 0 || yy < 0 || xx >= W || yy >= H) return false;
+        if (m.solid[xx][yy]) return false;
+        if (m.t[xx][yy] === T_PATH) return false;
+      }
+    return true;
+  }
+  function placeHome(x, y, w, h) {
+    if (homeIdx >= ENTERABLE_HOMES + FACADE_HOMES) return false;
+    if (!spotFree(x, y, w, h)) return false;
+    homeIdx++;
+    if (homeIdx <= ENTERABLE_HOMES) building('home' + homeIdx, '蔷薇街 ' + homeIdx + ' 号', x, y, w, h, 'home');
+    else facade(x, y, w, h, 'home', '蔷薇街 ' + homeIdx + ' 号');
+    return true;
+  }
+  /* 按街区网格找空地建房：街道和河道会把不规则的地块让出来，
+     剩下的自然形成成排住宅与院落。 */
+  [
+    { x0: 98, y0: 56, x1: 252, y1: 152 },    // 花园住宅区
+    { x0: 80, y0: 160, x1: 222, y1: 292 },   // 西侧旧城
+    { x0: 80, y0: 332, x1: 252, y1: 462 },   // 西南工匠区
+    { x0: 234, y0: 258, x1: 424, y1: 374 },  // 老市集周边
+    { x0: 438, y0: 168, x1: 624, y1: 362 },  // 东侧河岸
+    { x0: 432, y0: 40, x1: 624, y1: 174 },   // 东北学院区
+    { x0: 238, y0: 386, x1: 424, y1: 468 }   // 南门驿站
+  ].forEach(function (box) {
+    for (var y = box.y0; y + 22 <= box.y1; y += 26)
+      for (var x = box.x0; x + 10 <= box.x1; x += 14)
+        placeHome(x, y, 10, 22);
+  });
+
+  /* 街边设施：让每个街区有自己的样子 */
+  function fixture(t, x, y, v) {
+    if (x < 2 || y < 2 || x >= W - 2 || y >= H - 2) return;
+    if (m.solid[x][y]) return;
+    m.solid[x][y] = 1;
+    decor.push({ t: t, x: x, y: y, v: v || 0 });
+  }
+  /* 老市集：摊位围着喷泉 */
+  [[318, 324], [330, 324]].forEach(function (p) { fixture('fountain', p[0], p[1]); });
+  [[294, 312], [294, 338], [352, 314], [352, 340], [312, 310], [338, 344], [276, 326]].forEach(function (p, i) { fixture('stall', p[0], p[1], i); });
+  [[300, 322], [300, 332], [348, 322], [348, 332], [320, 312], [320, 342]].forEach(function (p) { fixture('lamp', p[0], p[1]); });
+  /* 城堡前庭：花箱与灯柱围着高台 */
+  [[296, 164], [296, 178], [358, 164], [358, 178], [306, 154], [348, 154], [326, 180]].forEach(function (p) { fixture('planter', p[0], p[1]); });
+  [[320, 160], [336, 160], [320, 182], [336, 182]].forEach(function (p) { fixture('lamp', p[0], p[1]); });
+  /* 南门驿站：货车、告示与长凳 */
+  [[300, 428], [300, 444], [352, 428], [352, 444]].forEach(function (p) { fixture('cart', p[0], p[1]); });
+  [[326, 424], [326, 448], [308, 436], [344, 436]].forEach(function (p) { fixture('lamp', p[0], p[1]); });
+  [[316, 430], [336, 430]].forEach(function (p) { fixture('planter', p[0], p[1]); });
+  /* 河岸与码头：货箱与系缆桩 */
+  [[440, 430], [448, 430], [456, 430], [444, 442], [452, 442]].forEach(function (p) { fixture('cart', p[0], p[1]); });
+
+  /* 花园、树木与街边装饰 */
+  for (var fx = 70; fx < 250; fx += 11) for (var fy = 66; fy < 140; fy += 11) if (hash2(4, fx, fy) > .55) decor.push({ t: 'flower', x: fx, y: fy });
+  for (var ty2 = 200; ty2 < 470; ty2 += 9) [[312], [328]].forEach(function (o) { if (hash2(5, o[0], ty2) > .6) decor.push({ t: 'tuft', x: o[0], y: ty2 }); });
+  for (var bx = 96; bx < 606; bx += 62) decor.push({ t: 'bench', x: bx, y: 306 });
+  for (var by2 = 110; by2 < 470; by2 += 66) decor.push({ t: 'bench', x: 246, y: by2 });
+  /* 码头：城南河边 */
+  for (var dx = 434; dx < 470; dx += 6) decor.push({ t: 'reed', x: dx, y: 448 });
+  fillRect(m, 404, 424, 420, 440, T_PATH, false);
+
+  /* 南门：通往芽芽小镇 */
+  m.t[320][H - 1] = T_PATH; m.solid[320][H - 1] = 0;
+  return {
+    w: W, h: H, t: m.t, solid: m.solid, name: '白蔷薇城',
+    exits: [{ x: 320, y: H - 1, to: 'town', tx: 14, ty: 22 }],
+    buildings: CITY_BUILDINGS.concat(facades), decor: decor
+  };
 })();
 SCENE_ORDER.push('city');
 /* 南口驿路：从广场直通南缘的城市出口。此前这里只有孤立的一格地砖，路上没有任何指引。 */
 fillRect(MAPS.town, 13, 17, 15, 23, T_PATH, false);
 MAPS.town.t[14][23]=T_PATH;MAPS.town.solid[14][23]=0;
-MAPS.town.exits.push({x:14,y:23,to:'city',tx:64,ty:92});
+MAPS.town.exits.push({x:14,y:23,to:'city',tx:320,ty:470});
 INTERACTABLES.town.push({id:'city_gate',x:14,y:21,stand:[[14,22],[13,21],[15,21]],kind:'cityGate',label:'白蔷薇城驿路'});
 
 var LIVING_JOBS = {
@@ -1411,18 +1765,40 @@ addResident('ranger','松岚','护林员','forest',23,12,'ranger',['#635340','#5
 addResident('engineer','铜钉','营地铁匠','mine1',11,21,'engineer',['#6B5C57','#675B51','#B4BBC4'],['矿洞每三天恢复矿脉，记得带上吃的。','我在营地维护工具，你可以帮我带些铜矿和石头。']);
 NPCS.engineer.schedule[2].y=22;
 [
- ['archivist','艾琳','图书管理员',96,26,'scholar'],['gardener','萝莎','城堡园丁',58,24,'ranger'],
- ['merchant','路易','市集采购员',70,55,'merchant'],['innkeeper','贝尔','旅馆老板',73,88,'baker'],
- ['tailor','莉丝','裁缝',110,69,'scholar'],['teacher','诺尔','学院教师',110,26,'scholar'],
- ['porter','阿诺','城门守卫',67,92,'engineer'],['florist','芙洛','花商',47,45,'ranger'],
- ['cook','米勒','茶室厨师',96,45,'baker'],['musician','莱恩','街头琴师',60,57,'postie'],
- ['steward','塞琳','城堡管家',66,19,'merchant'],['resident','露米','住宅区居民',24,55,'scholar']
+ ['archivist','艾琳','图书管理员',486,96,'scholar'],['gardener','萝莎','城堡园丁',300,120,'ranger'],
+ ['merchant','路易','市集采购员',320,312,'merchant'],['innkeeper','贝尔','旅馆老板',320,452,'baker'],
+ ['tailor','莉丝','裁缝',254,268,'scholar'],['teacher','诺尔','学院教师',520,96,'scholar'],
+ ['porter','阿诺','城门守卫',320,462,'engineer'],['florist','芙洛','花商',462,152,'ranger'],
+ ['cook','米勒','茶室厨师',556,218,'baker'],['musician','莱恩','街头琴师',336,330,'postie'],
+ ['steward','塞琳','城堡管家',330,140,'merchant'],['resident','露米','住宅区居民',140,178,'scholar']
 ].forEach(function(p,i){addResident(p[0],p[1],p[2],'city',p[3],p[4],p[5],['#'+['835438','4A444F','B89262'][i%3],'#'+['6686A0','976D76','6E9169'][i%3],'#E2D0A4'],[
-  p[2]+'的一天，通常从这条街开始。','城门在南边，市集在中央，城堡在北边；按 M 可以查看城区地图。'
+  p[2]+'的一天，通常从这条街开始。','城门在南边，市集在中央，城堡在北边；按 M 可以查看城区图。'
 ]);});
 
+/* 店员固定在自己的铺子里：他们本来就在工作，而不是沿街循环。
+   麦穗烤面包、贝尔看柜台、塞琳核对城堡清单——从门外就能看出店里有人。 */
+function postResident(id, scene, x, y) {
+  var n = NPCS[id];
+  if (!n) return;
+  n.scene = scene;
+  n.schedule = [{ from: 0, to: 1440, x: x, y: y }, { from: 0, to: 1440, x: x, y: y }, { from: 0, to: 1440, x: x, y: y }];
+  if (npcRuntime && npcRuntime[id]) { npcRuntime[id].x = x; npcRuntime[id].y = y; npcRuntime[id].path = []; }
+}
+addResident('blacksmith','霍尔','白蔷薇铁匠','city',96,63,'engineer',['#4A3E38','#6B5C57','#B4BBC4'],
+  ['炉子整晚不熄，想要好工具就得肯等。','铁在火里说了算，不在锤子上。']);
+postResident('baker','city_bakery',12,9);
+postResident('postie','city_post',15,7);
+postResident('florist','city_greenhouse',12,7);
+postResident('merchant','city_market',15,1);
+postResident('cook','city_cafe',9,6);
+postResident('archivist','city_library',7,12);
+postResident('blacksmith','city_smith',13,6);
+postResident('tailor','city_tailor',13,5);
+postResident('innkeeper','city_inn',15,4);
+postResident('steward','city_castle',17,7);
+
 function openCityGate(){
-  if(exploreState().city){doSwitchScene('city',64,92);return;}
+  if(exploreState().city){doSwitchScene('city',320,470);return;}
   openWindow({id:'city_gate',kind:'custom',title:'白蔷薇城 · 城市通行证',build:function(b){
     b.appendChild(el('p',null,'城门、市集、住宅、工匠街、学院与蔷薇城堡。办好通行证后可沿南方驿路自由往返。'));
     b.appendChild(el('p','muted','先修好小镇桥梁，再交纳 150 金办证。'));},actions:[
@@ -1445,18 +1821,161 @@ function openResidentJob(id){
       state.coins+=job.coins;e.jobs[id]=state.totalDay;markDirty();refreshHud();saveNow();toast('帮助了'+NPCS[id].name+'，获得 '+job.coins+' 金。');refreshWindow();}},
     {label:'离开',close:true}]});
 }
-function openCityService(it){
-  if(it.service==='bakery'){openWindow({id:'bread_shop',kind:'custom',title:'暖炉面包房',build:function(b){b.appendChild(el('p',null,'乡村面包 · 30 金一个，食用恢复 25 点体力。'));},actions:[{label:'买一个面包 · 30 金',close:false,onClick:function(){if(!bagAccepts('bread',1)){toast('背包满了。');return;}if(payExplore({coins:30})){invAdd('bread',1);markDirty();refreshHud();toast('买到了一个热面包。');}}},{label:'离开',close:true}]});return;}
-  if(it.service==='smith'){openExploreSite('tools');return;}
-  var texts={castle:'这里是白蔷薇城堡议事厅。城门、市集和公共街区已经开放，城堡侧翼与大型庆典将在后续更新中加入。',library:'蔷薇谷地方志：小镇北面是雾杉森林，矿山藏在东北。城市环河而建，学院守着旧桥。',market:'城市采购员路易每天在广场收购农产品，可以找他接补货委托。',inn:'南门旅馆提供旅人休息的公共大厅。结束今天仍可从暂停菜单睡觉。',post:'这里的信件会送往芽芽小镇，邮递员小翎就在镇里。',greenhouse:'温室里收藏着蔷薇谷的植物。稀有花卉与栽培系统将在后续开放。'};
-  openWindow({id:'city_service',kind:'custom',title:it.label,build:function(b){b.appendChild(el('p',null,texts[it.service]||'这是居民使用的房间。可以四处走走，街区中的居民会随时间活动。'));},actions:[{label:'继续参观',close:true}]});
+/* 城市建筑各自提供的服务。有真实扣料/发奖的才做成按钮，
+   纯介绍的只讲清楚这间屋子是干什么的、谁在里面工作。 */
+var CITY_INFO = {
+  bakery: { name: '暖炉面包房', who: '面包师麦穗在售卖柜后面', desc: '砖砌烤炉整晚不熄，售卖柜里摆着刚出炉的面包，揉面台上还留着面粉。' },
+  greenhouse: { name: '蔷薇温室', who: '花商芙洛在育苗台边', desc: '玻璃拱顶下排着种植床，盆栽和水槽沿着过道，种子在育苗盘里刚发芽。' },
+  market: { name: '城市商会', who: '采购员路易在接待处核对订单', desc: '订单板钉满契约，账本摊在侧桌上，仓库的箱子等着发往各区。' },
+  cafe: { name: '河岸茶室', who: '厨师米勒在后面的厨房', desc: '壁炉烧着，圆桌旁常坐着喝茶的居民，糕点柜里摆着当天的点心。' },
+  library: { name: '蔷薇图书馆', who: '图书管理员艾琳在查阅台', desc: '书架顶到屋顶，梯子靠在架边，地图柜里卷着整个山谷的旧图。' },
+  smith: { name: '白蔷薇铁匠铺', who: '铁匠霍尔守着铁砧', desc: '熔炉的火烧得通红，工具墙挂满钳锤，冷却槽里还冒着白气。' },
+  tailor: { name: '丝带裁缝铺', who: '裁缝莉丝在裁剪台前', desc: '布卷靠墙立着，裁剪台上摊着剪到一半的衣料，衣架上挂着改好的长裙。' },
+  inn: { name: '南门旅馆', who: '老板贝尔守着接待处', desc: '接待处后面是餐厅和厨房，楼梯通向几间风格各异的客房。' },
+  post: { name: '驿站邮局', who: '邮递员小翎在分信柜前', desc: '整面墙的分信柜塞满信件，邮袋堆在柜台边，公告板上贴着今日告示。' },
+  carriage: { name: '南门马车站', who: '马车夫守着售票处', desc: '装卸台上堆着待发的货，售票处可以直达各街区。' },
+  castle: { name: '白蔷薇城堡 · 王座厅', who: '管家塞琳在核对清单', desc: '大理石地面通向王座，四壁挂着旧挂毯，长毯一直铺到大门。' },
+  home: { name: '住处', who: '这里住着一位城市居民', desc: '一张床、一个衣柜和一张餐桌——城里大多数人的家就是这样。' }
+};
+function openCityService(it) {
+  var s = it.service, info = CITY_INFO[s] || CITY_INFO.home;
+  if (s === 'bakery') { openWindow({ id: 'bread_shop', kind: 'custom', title: info.name, build: function (b) { b.appendChild(el('p', null, '乡村面包 · 30 金一个，食用恢复 25 点体力。')); b.appendChild(el('p', 'muted', info.desc)); }, actions: [{ label: '买一个面包 · 30 金', close: false, onClick: function () { if (!bagAccepts('bread', 1)) { toast('背包满了。'); return; } if (payExplore({ coins: 30 })) { invAdd('bread', 1); markDirty(); refreshHud(); toast('买到了一个热面包。'); } } }, { label: '离开', close: true }] }); return; }
+  if (s === 'smith') { openExploreSite('tools'); return; }
+  /* 茶室：付钱坐下喝茶，回体力并花掉一点时间 */
+  if (s === 'cafe') {
+    openWindow({ id: 'city_cafe', kind: 'custom', title: info.name, build: function (b) {
+      b.appendChild(el('p', null, info.desc));
+      b.appendChild(el('p', 'muted', info.who + '。坐下喝一杯：20 金，恢复 30 点体力，午前半个钟头。'));
+    }, actions: [
+      { label: '喝一杯茶 · 20 金', close: false, onClick: function () {
+        if (state.energy >= CFG.maxEnergy) { toast('现在并不累，先四处走走吧。'); return; }
+        if (!payExplore({ coins: 20 })) return;
+        var got = Math.min(30, CFG.maxEnergy - state.energy);
+        state.energy += got;
+        state.timeMinutes = Math.min(CFG.dayEnd, state.timeMinutes + 30);
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('喝了一杯热茶，恢复 ' + got + ' 点体力。');
+      } },
+      { label: '离开', close: true }] });
+    return;
+  }
+  /* 商会：按高于镇价的价格收购农场收成 */
+  if (s === 'market') {
+    var goods = ['radish', 'potato', 'strawberry', 'berry'];
+    openWindow({ id: 'city_market', kind: 'custom', title: info.name, build: function (b) {
+      b.appendChild(el('p', null, info.desc));
+      var row = el('div', 'row'), any = false;
+      goods.forEach(function (id) {
+        if (!invCount(id)) return;
+        var price = Math.round((ITEMS[id].sell || 0) * 1.3);
+        any = true;
+        row.appendChild(mkBtn('卖出 ' + itemName(id) + ' ×1 · ' + price + ' 金', '', function () {
+          invRemove(id, 1); state.coins += price; markDirty(); refreshHud(); saveNow(); refreshWindow();
+          toast('商会按 ' + price + ' 金收下了' + itemName(id) + '。');
+        }));
+      });
+      if (any) b.appendChild(row);
+      b.appendChild(el('p', 'muted', any ? '商会按高于镇上收购价的价格结算。' : '背包里没有可以卖给商会的农产品。'));
+    }, actions: [{ label: '离开', close: true }] });
+    return;
+  }
+  /* 温室：把收成育成分发袋里的种子 */
+  if (s === 'greenhouse') {
+    var swaps = [['radish', 'seed_radish'], ['potato', 'seed_potato'], ['strawberry', 'seed_strawberry']];
+    openWindow({ id: 'city_greenhouse', kind: 'custom', title: info.name, build: function (b) {
+      b.appendChild(el('p', null, info.desc));
+      var row = el('div', 'row'), any = false;
+      swaps.forEach(function (pair) {
+        if (!invCount(pair[0])) return;
+        if (!bagAccepts(pair[1], 2)) return;
+        any = true;
+        row.appendChild(mkBtn(itemName(pair[0]) + ' ×1 → ' + itemName(pair[1]) + ' ×2', '', function () {
+          invRemove(pair[0], 1); invAdd(pair[1], 2); markDirty(); refreshHud(); saveNow(); refreshWindow();
+          toast('芙洛把' + itemName(pair[0]) + '育成了两袋种子。');
+        }));
+      });
+      if (any) b.appendChild(row);
+      b.appendChild(el('p', 'muted', any ? '温室代为育苗，收成可以换成分发袋里的种子。' : '背包里没有可以育苗的收成。'));
+    }, actions: [{ label: '离开', close: true }] });
+    return;
+  }
+  /* 邮局：寄信给学院教师 */
+  if (s === 'post') {
+    openWindow({ id: 'city_post', kind: 'custom', title: info.name, build: function (b) {
+      b.appendChild(el('p', null, info.desc));
+      b.appendChild(el('p', 'muted', '寄一封给学院教师诺尔的信：15 金。诺尔会记得你写了信。'));
+    }, actions: [
+      { label: '寄信给诺尔 · 15 金', close: false, onClick: function () {
+        if (!payExplore({ coins: 15 })) return;
+        state.npcFriendship = state.npcFriendship || {};
+        state.npcFriendship.teacher = (state.npcFriendship.teacher || 0) + 5;
+        state.timeMinutes = Math.min(CFG.dayEnd, state.timeMinutes + 20);
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('信已经交给小翎，诺尔会收到。');
+      } },
+      { label: '离开', close: true }] });
+    return;
+  }
+  /* 裁缝铺：修补委托 */
+  if (s === 'tailor') {
+    openWindow({ id: 'city_tailor', kind: 'custom', title: info.name, build: function (b) {
+      b.appendChild(el('p', null, info.desc));
+      b.appendChild(el('p', 'muted', '莉丝接修补委托：2 木材换 110 金。'));
+    }, actions: [
+      { label: '交付木材 · 换 110 金', close: false, onClick: function () {
+        if (!payExplore({ wood: 2 })) return;
+        state.coins += 110; markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('莉丝把衣料补好，付了 110 金。');
+      } },
+      { label: '离开', close: true }] });
+    return;
+  }
+  /* 马车站：花点钱和时间，直接到另一个街区——城市大了以后全靠走不现实 */
+  if (s === 'carriage') {
+    var stops = [
+      { id: 'gate', name: '南门驿站', x: 320, y: 450, fare: 20, mins: 15 },
+      { id: 'market', name: '中央市集', x: 320, y: 330, fare: 30, mins: 25 },
+      { id: 'academy', name: '东北学院', x: 500, y: 108, fare: 45, mins: 45 },
+      { id: 'river', name: '东岸桥头', x: 546, y: 300, fare: 35, mins: 35 },
+      { id: 'castle', name: '城堡前庭', x: 320, y: 168, fare: 40, mins: 40 }
+    ];
+    openWindow({ id: 'city_carriage', kind: 'custom', title: '南门马车站', build: function (b) {
+      b.appendChild(el('p', null, '马车夫把车厢擦得干净，装卸台上堆着待发的货。售票处可以直达各街区。'));
+      var row = el('div', 'row');
+      stops.forEach(function (st) {
+        if (Math.abs(st.x - state.player.x) + Math.abs(st.y - state.player.y) < 6) return;
+        row.appendChild(mkBtn(st.name + ' · ' + st.fare + ' 金 / ' + st.mins + ' 分钟', '', function () {
+          if (!payExplore({ coins: st.fare })) return;
+          state.timeMinutes = Math.min(CFG.dayEnd, state.timeMinutes + st.mins);
+          markDirty(); refreshHud(); saveNow();
+          closeWindow();
+          doSwitchScene('city', st.x, st.y);
+          toast('马车到了' + st.name + '。');
+        }));
+      });
+      if (row.children.length) b.appendChild(row);
+      b.appendChild(el('p', 'muted', row.children.length ? '乘车会花掉一点时间和车费。' : '你已经在这一片了。'));
+    }, actions: [{ label: '离开', close: true }] });
+    return;
+  }
+  /* 以下只做介绍：讲清楚屋里在做什么，而不是一句“继续参观”。 */
+  var extra = {
+    library: '翻开地方志：山谷北面是雾杉森林，旧矿山藏在东北；白蔷薇城建在更早的城堡旧址上。',
+    inn: '贝尔打听到的消息：今天' + (isRaining() ? '下雨，街上的人都带着伞。' : '天晴，适合往河岸那边走。') + '明天' + ((state.weather && state.weather.tomorrow === 'rain') ? '有雨。' : '放晴。'),
+    castle: '城堡的事务在文书办公室办理：通行证、城堡委托与声望都在那里登记。侧翼与舞厅尚未开放。'
+  };
+  openWindow({ id: 'city_service', kind: 'custom', title: info.name, build: function (b) {
+    b.appendChild(el('p', null, info.desc));
+    b.appendChild(el('p', 'muted', info.who + '。'));
+    if (extra[s]) b.appendChild(el('p', null, extra[s]));
+  }, actions: [{ label: '继续参观', close: true }] });
 }
 var ANIMAL_HOMES={
   farm:[['cat',3,6],['bird',15,12],['bird',18,13],['butterfly',7,11],['duck',27,19],['duck',29,20]],
   town:[['dog',6,13],['bird',15,15],['bird',17,15],['butterfly',12,17]],
   riverside:[['duck',15,8],['duck',17,9],['bird',7,12]],
   forest:[['rabbit',17,16],['squirrel',11,16],['butterfly',16,14],['duck',6,7]],
-  city:[['dog',63,88],['cat',24,54],['bird',60,54],['bird',62,56],['bird',67,55],['butterfly',56,24]]
+  city:[['dog',320,450],['cat',336,340],['bird',300,312],['bird',330,306],['bird',352,322],['butterfly',168,120]]
 };
 var ambientAnimals={},animalClock=0;
 function sceneAnimals(){var sc=state.sceneId;if(!ambientAnimals[sc])ambientAnimals[sc]=(ANIMAL_HOMES[sc]||[]).map(function(a,i){return {kind:a[0],x:a[1],y:a[2],homeX:a[1],homeY:a[2],targetX:a[1],targetY:a[2],timer:1+i*.3,phase:i,mode:'停留',face:1};});return ambientAnimals[sc];}
@@ -1505,27 +2024,699 @@ function drawCityBuilding(g,bx,by,b){
   var dx=b.door.x*TILE;px(g,dx+2,(b.door.y-1)*TILE,12,16,'#665449');px(g,dx+4,(b.door.y-1)*TILE+2,8,12,'#8B6B4C');
   g.font='9px sans-serif';g.textAlign='center';var tw=Math.ceil(g.measureText(b.label).width)+8;px(g,x+w/2-tw/2,y+h-35,tw,13,'#405247');g.fillStyle='#EBDDAD';g.fillText(b.label,x+w/2,y+h-25);g.textAlign='left';
 }
-function drawCityInterior(g,map){
-  var wood=map.roomTheme==='library'?'#776552':'#8E6E4B';
-  [[2,2,4,2],[map.w-6,2,4,2],[4,6,3,2],[map.w-7,6,3,2]].forEach(function(r){px(g,r[0]*TILE,r[1]*TILE,r[2]*TILE,r[3]*TILE,wood);px(g,r[0]*TILE+2,r[1]*TILE+2,r[2]*TILE-4,4,'#B59A74');});
-  var cx=Math.floor(map.w/2)*TILE;px(g,cx-16,3*TILE,48,22,'#8B6B4C');px(g,cx-14,3*TILE+2,44,4,'#C5A277');
-  if(map.roomTheme==='library')for(var i=0;i<7;i++)px(g,2*TILE+5+i*7,2*TILE+8,4,14,['#8A6268','#668596','#9AA678'][i%3]);
-  if(map.roomTheme==='castle'){px(g,cx-12,6*TILE,40,10*TILE,'#9A6473');px(g,cx-10,6*TILE+3,36,2,'#E2C181');}
-  g.font='10px sans-serif';g.fillStyle='#E6D4A1';g.textAlign='center';g.fillText(map.name,cx+8,24);g.textAlign='left';
+/* ============================================================
+   白蔷薇城室内系统
+   每栋建筑按用途单独设计：谁在这里工作、放着什么、玩家能做什么。
+   家具不再共用同一套模板——推门进去要能一眼认出这是面包房还是图书馆。
+   ============================================================ */
+function pb(g, r, dx, dy, w, h, c) { px(g, r.x * TILE + dx, r.y * TILE + dy, w, h, c); }
+/* 统一落地阴影，保证家具和角色站在同一层。 */
+function pshadow(g, r, inset) {
+  var i = inset == null ? 2 : inset;
+  pb(g, r, i, r.h * TILE - 3, r.w * TILE - i * 2, 3, 'rgba(0,0,0,.18)');
+}
+/* 砖纹填充，给炉体和壁炉一点材质。 */
+function pbrick(g, r, x0, y0, w, h, base, line) {
+  pb(g, r, x0, y0, w, h, base);
+  for (var y = 0; y < h; y += 6) for (var x = ((y / 6) % 2) * 4; x < w; x += 8) pb(g, r, x0 + x, y0 + y, 7, 1, line);
+}
+var CITY_PROPS = {
+  /* ---------- 面包房 ---------- */
+  oven: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE - 4;
+    pbrick(g, r, 0, 2, W, H, '#9A6B52', '#83553F');
+    /* 拱形炉口 */
+    var mx = Math.floor(W / 2) - 11, my = H - 26;
+    pb(g, r, mx, my + 10, 22, 16, '#3A2A22');
+    pb(g, r, mx, my + 10, 22, 5, '#3A2A22');
+    pb(g, r, mx + 2, my + 12, 18, 13, '#E08A3C');
+    pb(g, r, mx + 5, my + 8, 12, 7, '#E08A3C');
+    pb(g, r, mx + 4, my + 18, 14, 7, '#F2C25A');
+    pb(g, r, mx + 7, my + 14, 8, 9, '#FFDE8C');
+    /* 炉膛里的面包 */
+    pb(g, r, mx + 4, my + 15, 5, 4, '#E3B26A'); pb(g, r, mx + 13, my + 15, 5, 4, '#D79C55');
+    /* 烟囱与炉顶 */
+    pb(g, r, W - 22, 0, 10, 6, '#83553F');
+    pb(g, r, 2, 0, W - 28, 4, '#B98A6C');
+  },
+  kneadTable: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE;
+    pb(g, r, 0, 6, W, 6, '#B08A5E'); pb(g, r, 0, 6, W, 2, '#D2B183');
+    pb(g, r, 2, 12, 5, r.h * TILE - 15, '#8A6B4C'); pb(g, r, W - 7, 12, 5, r.h * TILE - 15, '#8A6B4C');
+    /* 面粉与面团 */
+    pb(g, r, 8, 4, 16, 4, '#F2E9D6');
+    pb(g, r, 12, 2, 9, 6, '#E8D6AE'); pb(g, r, 13, 1, 7, 5, '#F6EEDD');
+    pb(g, r, W - 20, 3, 4, 4, '#C9A97A');
+  },
+  flourSacks: function (g, r) {
+    pshadow(g, r);
+    [[2, 8], [14, 10], [26, 6]].forEach(function (o) {
+      pb(g, r, o[0], o[1], 13, 14, '#D8CBA6');
+      pb(g, r, o[0] + 2, o[1] - 3, 9, 5, '#C4B489');
+      pb(g, r, o[0] + 3, o[1] + 5, 7, 2, '#B8A87C');
+    });
+  },
+  /* 售卖柜：玻璃面里能看见面包 */
+  counterFront: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 10, W, H - 10, '#8A6B4C');
+    pb(g, r, 0, 8, W, 5, '#B08A5E');
+    pb(g, r, 2, 13, W - 4, H - 24, '#BFE0E4');          /* 玻璃 */
+    pb(g, r, 3, 14, W - 6, H - 26, '#9FC6CC');
+    pb(g, r, 4, 15, 3, H - 28, '#E4F4F5');
+    pb(g, r, 0, H - 12, W, 4, '#6E5238');
+    for (var i = 0; i < Math.floor(W / 18); i++) {       /* 柜里的面包 */
+      var bx = 6 + i * 18;
+      pb(g, r, bx, H - 22, 12, 8, '#E3B26A'); pb(g, r, bx + 2, H - 24, 8, 5, '#EFCE94');
+      pb(g, r, bx + 4, H - 19, 4, 2, '#C08A44');
+    }
+  },
+  breadShelf: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, 4, H, '#7E5C40'); pb(g, r, W - 4, 0, 4, H, '#7E5C40');
+    for (var s = 0; s < 3; s++) {
+      var y = 4 + s * Math.floor((H - 6) / 3);
+      pb(g, r, 2, y + 10, W - 4, 4, '#A9855C');
+      for (var i = 0; i < Math.floor((W - 10) / 14); i++) {
+        pb(g, r, 5 + i * 14, y + 4, 10, 7, ['#E3B26A', '#D9A45E', '#EFCF96'][i % 3]);
+        pb(g, r, 7 + i * 14, y + 2, 6, 3, '#F3DCA8');
+      }
+    }
+  },
+  baskets: function (g, r) {
+    pshadow(g, r);
+    [[1, 6], [16, 8]].forEach(function (o) {
+      pb(g, r, o[0], o[1], 15, 11, '#B08A5E');
+      pb(g, r, o[0] + 1, o[1] + 2, 13, 2, '#8A6B4C');
+      pb(g, r, o[0] + 3, o[1] - 3, 9, 4, '#E3B26A');
+      pb(g, r, o[0] + 5, o[1] - 5, 5, 3, '#EFCE94');
+    });
+  },
+  backDoor: function (g, r) {
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, W, H, '#6E5238');
+    pb(g, r, 3, 2, W - 6, H - 2, '#8A6B4C');
+    pb(g, r, 5, 4, W - 10, H - 6, '#A9855C');
+    pb(g, r, W - 9, H / 2, 3, 3, '#E0C073');
+  },
+  /* ---------- 温室 ---------- */
+  glassRoof: function (g, r) {
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, W, H, 'rgba(190,226,226,.20)');
+    for (var i = 0; i <= W; i += 12) { pb(g, r, i, 0, 2, H, '#6E8E8C'); pb(g, r, i + 2, 0, 1, H, 'rgba(230,248,248,.35)'); }
+    for (var j = 0; j <= H; j += 14) pb(g, r, 0, j, W, 2, '#5F7F7D');
+    pb(g, r, 0, 0, W, 4, '#4F6D6B'); pb(g, r, 0, H - 4, W, 4, '#4F6D6B');
+  },
+  planter: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 6, W, H - 6, '#8A6B4C'); pb(g, r, 0, 6, W, 3, '#A9855C');
+    pb(g, r, 2, 9, W - 4, H - 14, '#6B5236');
+    for (var i = 0; i < Math.floor(W / 10); i++) {
+      var x = 4 + i * 10, top = 6 + (i % 2) * 2;
+      pb(g, r, x, top, 3, 6, '#5E8341'); pb(g, r, x - 1, top - 3, 5, 4, '#A1BD58');
+      if (i % 3 === 0) { pb(g, r, x - 1, top - 6, 5, 4, '#D98BA6'); pb(g, r, x, top - 5, 3, 2, '#F2C6D6'); }
+    }
+  },
+  potPlant: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, W / 2 - 7, H - 14, 14, 12, '#B0705A');
+    pb(g, r, W / 2 - 8, H - 15, 16, 3, '#C48870');
+    pb(g, r, W / 2 - 5, H - 22, 3, 9, '#5E8341'); pb(g, r, W / 2 - 10, H - 25, 8, 5, '#A1BD58');
+    pb(g, r, W / 2 + 1, H - 24, 8, 5, '#8FAE6C');
+    if (r.w > 2) { pb(g, r, W / 2 - 3, H - 28, 6, 6, '#E8A0C0'); pb(g, r, W / 2 - 1, H - 27, 3, 3, '#F6D2DF'); }
+  },
+  seedBench: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE;
+    pb(g, r, 0, 6, W, 6, '#B08A5E'); pb(g, r, 0, 6, W, 2, '#D2B183');
+    pb(g, r, 2, 12, 5, r.h * TILE - 15, '#8A6B4C'); pb(g, r, W - 7, 12, 5, r.h * TILE - 15, '#8A6B4C');
+    for (var i = 0; i < Math.floor(W / 16); i++) {
+      pb(g, r, 5 + i * 16, 2, 12, 6, '#7E5C40'); pb(g, r, 6 + i * 16, 3, 10, 4, '#6B5236');
+      pb(g, r, 8 + i * 16, 1, 3, 3, '#A1BD58');
+    }
+  },
+  trough: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 4, W, H - 4, '#8E9498'); pb(g, r, 0, 4, W, 3, '#A9AFB3');
+    pb(g, r, 2, 7, W - 4, H - 11, '#5C8B86');
+    pb(g, r, 4, 9, W - 10, 3, '#96C2B8');
+  },
+  toolRack: function (g, r) {
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 4, W, 4, '#8A6B4C');
+    pb(g, r, 3, 8, 3, H - 10, '#A9855C'); pb(g, r, W - 6, 8, 3, H - 10, '#A9855C');
+    [[0, 6, '#9AA0A6'], [1, 5, '#B0743C'], [2, 7, '#8E9498'], [3, 4, '#C0A15E']].forEach(function (o) {
+      var x = 7 + o[0] * Math.floor((W - 14) / 4);
+      pb(g, r, x, 9, 2, H - 14, '#7E5C40'); pb(g, r, x - 2, 9, 6, 5, o[2]);
+    });
+  },
+  /* ---------- 图书馆 / 档案 ---------- */
+  bookshelf: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, W, H, '#6E5238'); pb(g, r, 1, 1, W - 2, H - 2, '#7E5C40');
+    var rows = 3, rh = Math.floor((H - 6) / rows);
+    for (var s = 0; s < rows; s++) {
+      var y = 3 + s * rh;
+      pb(g, r, 3, y + rh - 4, W - 6, 3, '#A9855C');
+      var x = 4, seed = s * 7;
+      while (x < W - 8) {
+        var bw = 3 + ((seed + x) % 3), col = ['#8A6268', '#668596', '#9AA678', '#A87B4E', '#7C6B8E'][((seed + x) % 5)];
+        pb(g, r, x, y + rh - 4 - (6 + (x % 3)), bw, 6 + (x % 3), col);
+        x += bw + 1;
+      }
+    }
+  },
+  readingTable: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE;
+    pb(g, r, 0, 8, W, 7, '#8A6B4C'); pb(g, r, 0, 8, W, 2, '#B08A5E');
+    pb(g, r, 3, 15, 6, r.h * TILE - 17, '#6E5238'); pb(g, r, W - 9, 15, 6, r.h * TILE - 17, '#6E5238');
+    pb(g, r, W / 2 - 11, 3, 11, 6, '#F4EED7'); pb(g, r, W / 2, 3, 11, 6, '#EFE4C8');
+    pb(g, r, W / 2 - 1, 2, 2, 8, '#C4B489');
+    pb(g, r, W - 14, 2, 3, 6, '#7EA0A8');   /* 烛台 */
+  },
+  ladder: function (g, r) {
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, 3, H, '#A9855C'); pb(g, r, W - 3, 0, 3, H, '#A9855C');
+    for (var i = 0; i < H; i += 9) pb(g, r, 0, i, W, 3, '#C4A57C');
+  },
+  mapCabinet: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 6, W, H - 6, '#8A6B4C'); pb(g, r, 0, 4, W, 5, '#B08A5E');
+    pb(g, r, 0, 6, W, 3, '#6E5238');
+    var cols = ['#C7B48A', '#D8CBA6', '#B9A87C'];
+    for (var i = 0; i < Math.max(2, Math.floor(W / 14)); i++)
+      pb(g, r, 4 + i * 14, 1, 11, 4, cols[i % 3]);
+  },
+  archiveShelf: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, W, H, '#5F4A38');
+    for (var s = 0; s < 2; s++) {
+      var y = 5 + s * Math.floor((H - 8) / 2);
+      pb(g, r, 2, y, W - 4, 3, '#8A6B4C');
+      for (var i = 0; i < Math.floor((W - 8) / 9); i++)
+        pb(g, r, 4 + i * 9, y - 9, 7, 9, ['#9A8B6E', '#B0A084', '#87795E'][i % 3]);
+    }
+  },
+  /* ---------- 商会 ---------- */
+  receptionDesk: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 10, W, H - 10, '#7E5C40'); pb(g, r, 0, 10, W, 3, '#A9855C');
+    pb(g, r, 0, H - 9, W, 3, '#5F4A38');
+    pb(g, r, 3, 13, W - 6, H - 26, '#6E5238');
+    pb(g, r, W / 2 - 5, 4, 10, 6, '#C0A15E'); pb(g, r, W / 2 - 3, 2, 6, 3, '#E0C073');
+    pb(g, r, 6, 15, 10, 7, '#F4EED7'); pb(g, r, W - 16, 15, 10, 7, '#EFE4C8');
+  },
+  orderBoard: function (g, r) {
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, W, H, '#8A6B4C'); pb(g, r, 1, 1, W - 2, H - 2, '#9C8256');
+    var papers = [[3, 3], [16, 4], [7, 13], [20, 12], [4, 22], [15, 21]];
+    papers.forEach(function (p, i) {
+      if (p[1] + 10 > H) return;
+      pb(g, r, p[0], p[1], 11, 13, '#F4EED7');
+      pb(g, r, p[0] + 1, p[1] + 2, 9, 1, '#B0A084');
+      pb(g, r, p[0] + 1, p[1] + 5, 7, 1, '#B0A084');
+      pb(g, r, p[0] + (i % 2 ? 8 : 1), p[1] + 8, 3, 3, '#C0392B');
+    });
+  },
+  ledgerDesk: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE;
+    pb(g, r, 0, 8, W, 7, '#7E5C40'); pb(g, r, 0, 8, W, 2, '#A9855C');
+    pb(g, r, 3, 15, 6, r.h * TILE - 17, '#6E5238'); pb(g, r, W - 9, 15, 6, r.h * TILE - 17, '#6E5238');
+    pb(g, r, W / 2 - 12, 4, 13, 6, '#F4EED7'); pb(g, r, W / 2, 4, 2, 6, '#C4B489');
+    for (var i = 0; i < 3; i++) pb(g, r, W / 2 - 10, 6 + i * 1, 9, 1, '#B0A084');
+    pb(g, r, W / 2 + 8, 2, 3, 8, '#7EA0A8');
+  },
+  crates: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 1, H - 16, 18, 16, '#A9855C'); pb(g, r, 1, H - 16, 18, 2, '#C4A57C');
+    pb(g, r, 3, H - 11, 14, 1, '#7E5C40');
+    pb(g, r, 21, H - 12, 15, 12, '#B08A5E'); pb(g, r, 21, H - 12, 15, 2, '#C4A57C');
+    pb(g, r, 23, H - 8, 11, 1, '#7E5C40');
+    if (W > 40) { pb(g, r, 38, H - 20, 16, 20, '#9C8256'); pb(g, r, 38, H - 20, 16, 2, '#B08A5E'); }
+  },
+  /* ---------- 茶室 ---------- */
+  roundTable: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, W / 2 - 4, H - 16, 8, 13, '#6E5238');
+    pb(g, r, W / 2 - 2, H - 4, 4, 3, '#5F4A38');
+    pb(g, r, 2, 2, W - 4, H - 20, '#D8CBA6');
+    pb(g, r, 2, 2, W - 4, 3, '#E8DCC0');
+    pb(g, r, W / 2 - 7, H - 22, 14, 4, '#C0392B'); pb(g, r, W / 2 - 2, H - 25, 4, 4, '#8E9B6E');
+    pb(g, r, W - 12, H - 20, 5, 5, '#BFE0E4');
+  },
+  sofa: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, W, H - 8, '#7A4E58'); pb(g, r, 0, 0, W, 5, '#93606C');
+    pb(g, r, 2, H - 20, W - 4, 12, '#9B6570');
+    pb(g, r, 0, 4, 4, H - 12, '#8E5864'); pb(g, r, W - 4, 4, 4, H - 12, '#8E5864');
+    pb(g, r, 2, H - 4, W - 4, 4, '#5F4A38');
+  },
+  teaCabinet: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 4, W, H - 4, '#6E5238'); pb(g, r, 0, 2, W, 4, '#A9855C');
+    pb(g, r, 2, 6, W - 4, H - 18, '#BFE0E4');
+    pb(g, r, 3, 7, W - 6, H - 20, '#9FC6CC');
+    pb(g, r, 4, 8, 2, H - 22, '#E4F4F5');
+    /* 茶壶与杯 */
+    pb(g, r, W / 2 - 6, H - 16, 12, 9, '#E8E2CE'); pb(g, r, W / 2 - 3, H - 19, 6, 4, '#D4CDB4');
+    pb(g, r, W / 2 + 6, H - 15, 4, 4, '#C9BFA4'); pb(g, r, W / 2 - 11, H - 15, 4, 4, '#C9BFA4');
+  },
+  fireplace: function (g, r) {
+    var W = r.w * TILE, H = r.h * TILE;
+    pbrick(g, r, 0, 0, W, H, '#8E7A66', '#7A6858');
+    var mx = Math.floor(W / 2) - 10, my = H - 28;
+    pb(g, r, mx, my, 20, 28, '#2E2620');
+    pb(g, r, mx + 2, my + 12, 16, 16, '#D9803A');
+    pb(g, r, mx + 5, my + 17, 10, 11, '#F2C25A');
+    pb(g, r, mx + 7, my + 13, 6, 8, '#FFDE8C');
+    pb(g, r, mx - 4, my + 24, 28, 4, '#A89880');
+    pb(g, r, 2, 0, W - 4, 4, '#A89880');
+  },
+  pastryCase: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 10, W, H - 10, '#7E5C40'); pb(g, r, 0, 8, W, 4, '#B08A5E');
+    pb(g, r, 2, 12, W - 4, H - 24, '#D5E8EA');
+    pb(g, r, 0, H - 12, W, 4, '#5F4A38');
+    var t = 0;
+    for (var i = 0; i < Math.floor(W / 11); i++) {
+      pb(g, r, 4 + i * 11, H - 21, 8, 6, ['#E8C9A0', '#D9A45E', '#F0DCC0'][i % 3]);
+      pb(g, r, 5 + i * 11, H - 22, 6, 3, ['#C08A44', '#A9743C', '#C99A62'][i % 3]); t++;
+    }
+    pb(g, r, 2, 13, W - 4, 2, '#EAF6F7');
+  },
+  /* ---------- 铁匠铺 ---------- */
+  forge: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE - 4;
+    pbrick(g, r, 0, 2, W, H, '#7A5A50', '#63463E');
+    pb(g, r, W - 20, 0, 9, 8, '#63463E');
+    var mx = Math.floor(W / 2) - 9;
+    pb(g, r, mx, H - 24, 18, 24, '#2A201C');
+    pb(g, r, mx + 2, H - 18, 14, 18, '#E0642E');
+    pb(g, r, mx + 4, H - 12, 10, 12, '#F2A23A');
+    pb(g, r, mx + 6, H - 8, 6, 8, '#FFD97A');
+    pb(g, r, mx - 6, H - 6, 30, 5, '#9A9490');
+  },
+  anvil: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, W / 2 - 6, H - 6, 12, 5, '#5A5048');
+    pb(g, r, W / 2 - 3, H - 14, 6, 9, '#4A423C');
+    pb(g, r, W / 2 - 11, H - 20, 22, 7, '#6E645C');
+    pb(g, r, W / 2 - 13, H - 18, 4, 3, '#6E645C');
+    pb(g, r, W / 2 - 11, H - 19, 22, 2, '#8E847A');
+  },
+  toolWall: function (g, r) {
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, W, H, '#6E5238');
+    for (var i = 0; i < Math.floor((W - 10) / 13); i++) {
+      var x = 5 + i * 13;
+      pb(g, r, x, 4, 2, H - 10, '#8A6B4C');
+      pb(g, r, x - 2, 4, 6, 7, '#9AA0A6');
+      pb(g, r, x - 1, 11, 4, H - 20, ['#B0743C', '#8E9498', '#C0A15E'][(i) % 3]);
+    }
+  },
+  chest: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 6, W, H - 6, '#8A6B4C'); pb(g, r, 0, 4, W, 4, '#A9855C');
+    pb(g, r, 1, H - 7, W - 2, 4, '#6E5238');
+    pb(g, r, W / 2 - 3, 6, 6, 8, '#C0A15E'); pb(g, r, W / 2 - 1, 9, 2, 3, '#5F4A38');
+  },
+  barrel: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 2, 2, W - 4, H - 2, '#9C8256');
+    pb(g, r, 2, 2, 3, H - 2, '#B08A5E'); pb(g, r, W - 5, 2, 3, H - 2, '#B08A5E');
+    pb(g, r, 2, 5, W - 4, 2, '#6E5238'); pb(g, r, 2, H - 8, W - 4, 2, '#6E5238');
+    pb(g, r, W / 2 - 3, H - 6, 6, 5, '#7E5C40');
+  },
+  /* ---------- 裁缝铺 ---------- */
+  fabricRolls: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    var cols = ['#A6553F', '#4E6B7E', '#7C6B8E', '#C9A24E', '#6E8A5E', '#B06A80'];
+    for (var i = 0; i < Math.floor((W - 4) / 9); i++) {
+      var x = 3 + i * 9, y = 2 + (i % 2) * 3;
+      pb(g, r, x, y, 7, H - y - 2, cols[i % 6]);
+      pb(g, r, x + 1, y, 2, H - y - 2, 'rgba(255,255,255,.18)');
+      pb(g, r, x, y, 7, 3, 'rgba(0,0,0,.20)');
+    }
+  },
+  cuttingTable: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE;
+    pb(g, r, 0, 8, W, 7, '#B08A5E'); pb(g, r, 0, 8, W, 2, '#D2B183');
+    pb(g, r, 3, 15, 6, r.h * TILE - 17, '#8A6B4C'); pb(g, r, W - 9, 15, 6, r.h * TILE - 17, '#8A6B4C');
+    pb(g, r, 6, 2, W - 12, 6, '#8FA8B4'); pb(g, r, 6, 2, W - 12, 2, '#B4C8D2');
+    pb(g, r, W / 2 - 4, 4, 3, 5, '#C9C2B0'); pb(g, r, W / 2 - 1, 3, 2, 2, '#8E9498'); pb(g, r, W / 2 + 1, 3, 2, 2, '#8E9498');
+    pb(g, r, 2, 3, 2, 5, '#C0392B');
+  },
+  dressRack: function (g, r) {
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 2, 2, 3, H - 2, '#8A6B4C'); pb(g, r, W - 5, 2, 3, H - 2, '#8A6B4C');
+    pb(g, r, 0, 2, W, 3, '#A9855C');
+    var cols = ['#A6553F', '#4E6B7E', '#7C6B8E', '#B06A80'];
+    for (var i = 0; i < Math.floor((W - 14) / 12); i++) {
+      var x = 6 + i * 12;
+      pb(g, r, x + 2, 5, 2, 4, '#C0C7CE');
+      pb(g, r, x, 9, 10, H - 14, cols[i % 4]);
+      pb(g, r, x, 9, 10, 3, 'rgba(255,255,255,.16)');
+    }
+  },
+  mirror: function (g, r) {
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, W / 2 - 3, 0, 6, H - 4, '#A9855C');
+    pb(g, r, W / 2 - 12, 4, 24, H - 12, '#C4A57C');
+    pb(g, r, W / 2 - 9, 7, 18, H - 18, '#BFD8DE');
+    pb(g, r, W / 2 - 7, 9, 14, H - 22, '#A8C8D2');
+    pb(g, r, W / 2 - 7, 9, 4, H - 22, '#E0F0F2');
+  },
+  /* ---------- 旅馆 ---------- */
+  longTable: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE;
+    pb(g, r, 0, 8, W, 7, '#8A6B4C'); pb(g, r, 0, 8, W, 2, '#B08A5E');
+    pb(g, r, 4, 15, 7, r.h * TILE - 17, '#6E5238'); pb(g, r, W - 11, 15, 7, r.h * TILE - 17, '#6E5238');
+    for (var i = 0; i < Math.floor(W / 26); i++) {
+      pb(g, r, 8 + i * 26, 3, 4, 5, '#E8E2CE'); pb(g, r, 9 + i * 26, 2, 2, 2, '#C9C2B0');
+    }
+  },
+  chair: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 1, 0, W - 2, 3, '#A9855C');
+    pb(g, r, 1, 3, W - 2, H - 8, '#8A6B4C');
+    pb(g, r, 1, 3, W - 2, 3, '#B08A5E');
+    pb(g, r, 2, H - 5, 3, 4, '#6E5238'); pb(g, r, W - 5, H - 5, 3, 4, '#6E5238');
+  },
+  bed: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, W, 4, '#A9855C');
+    pb(g, r, 1, 4, W - 2, H - 5, '#C4B489');
+    pb(g, r, 1, 4, W - 2, H - 9, '#F4EED7'); pb(g, r, 3, 6, W - 6, 6, '#EFE4C8');
+    pb(g, r, 1, H - 10, W - 2, 9, ['#8E5864', '#4E6B7E', '#7C6B8E', '#6E8A5E'][hash2(3, r.x, r.y) % 4]);
+    pb(g, r, 1, H - 10, W - 2, 2, 'rgba(255,255,255,.18)');
+  },
+  wardrobe: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 2, W, H - 2, '#7E5C40'); pb(g, r, 0, 0, W, 4, '#A9855C');
+    pb(g, r, 1, 4, W / 2 - 2, H - 7, '#8A6B4C'); pb(g, r, W / 2 + 1, 4, W / 2 - 2, H - 7, '#8A6B4C');
+    pb(g, r, W / 2 - 4, H / 2, 2, 4, '#E0C073'); pb(g, r, W / 2 + 2, H / 2, 2, 4, '#E0C073');
+  },
+  stairs: function (g, r) {
+    var W = r.w * TILE, H = r.h * TILE;
+    for (var i = 0; i < 6; i++) {
+      var w = W - i * Math.floor(W / 7);
+      pb(g, r, 0, H - 4 - i * 4, w, 4, i % 2 ? '#A9855C' : '#B08A5E');
+      pb(g, r, 0, H - 4 - i * 4, w, 1, '#D2B183');
+    }
+  },
+  kitchen: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 6, W, H - 6, '#9A9490'); pb(g, r, 0, 4, W, 5, '#B4AFAA');
+    for (var i = 0; i < Math.floor(W / 14); i++) pb(g, r, 4 + i * 14, 1, 10, 4, '#8E9498');
+    pb(g, r, 6, H - 18, 16, 12, '#6E5238'); pb(g, r, 6, H - 18, 16, 2, '#A9855C');
+    pb(g, r, W - 24, H - 14, 8, 8, '#B8B2AA');
+    if (W > 46) pb(g, r, W / 2 - 5, H - 16, 10, 10, '#7A5A50');
+  },
+  /* ---------- 邮局 ---------- */
+  pigeonholes: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, W, H, '#7E5C40'); pb(g, r, 0, 0, W, 3, '#A9855C');
+    var cols = Math.max(2, Math.floor(W / 12)), rows = Math.max(2, Math.floor((H - 6) / 12));
+    for (var cx = 0; cx < cols; cx++) for (var cy = 0; cy < rows; cy++) {
+      var x = 3 + cx * 12, y = 5 + cy * 12;
+      pb(g, r, x, y, 10, 10, '#5F4A38');
+      pb(g, r, x + 1, y + 1, 8, 8, '#6E5238');
+      if ((cx * 7 + cy * 3) % 4 === 0) pb(g, r, x + 2, y + 3, 6, 4, '#F4EED7');
+    }
+  },
+  mailbag: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 2, 6, W - 4, H - 8, '#4E6B7E');
+    pb(g, r, 2, 6, W - 4, 3, '#5F7F94');
+    pb(g, r, W / 2 - 4, 2, 8, 5, '#3E5A6E');
+    pb(g, r, 3, H - 12, W - 6, 4, '#C4A57C');
+    pb(g, r, 4, H - 10, 5, 3, '#F4EED7');
+  },
+  noticeBoard: function (g, r) {
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, W, H, '#7E5C40'); pb(g, r, 1, 1, W - 2, H - 2, '#6E5238');
+    [[4, 3], [18, 4], [8, 14], [22, 13], [5, 23], [19, 22]].forEach(function (p, i) {
+      if (p[1] + 10 > H) return;
+      pb(g, r, p[0], p[1], 12, 10, '#F4EED7');
+      pb(g, r, p[0] + 1, p[1] + 2, 9, 1, '#B0A084');
+      pb(g, r, p[0] + 1, p[1] + 5, 7, 1, '#B0A084');
+      pb(g, r, p[0] + 4, p[1] - 1, 3, 2, '#C0392B');
+    });
+  },
+  dock: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 4, W, H - 4, '#9C8256');
+    for (var i = 0; i < W; i += 8) pb(g, r, i, 4, 1, H - 4, '#8A6B4C');
+    pb(g, r, 4, 1, 12, 12, '#A9855C'); pb(g, r, 4, 1, 12, 2, '#C4A57C');
+    pb(g, r, W - 18, 0, 14, 14, '#B08A5E'); pb(g, r, W - 17, 1, 12, 4, '#D2B183');
+    pb(g, r, W - 14, 6, 8, 7, '#8FA8B4');
+  },
+  /* ---------- 城堡 ---------- */
+  carpet: function (g, r) {
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, W, H, '#8E3F4E');
+    pb(g, r, 3, 3, W - 6, H - 6, '#A6553F');
+    pb(g, r, 6, 6, W - 12, H - 12, '#8E3F4E');
+    pb(g, r, 0, 0, W, 2, '#E2C181'); pb(g, r, 0, H - 2, W, 2, '#E2C181');
+    pb(g, r, 0, 0, 2, H, '#E2C181'); pb(g, r, W - 2, 0, 2, H, '#E2C181');
+  },
+  chandelier: function (g, r) {
+    var W = r.w * TILE;
+    pb(g, r, W / 2 - 1, 0, 2, 6, '#C0A15E');
+    pb(g, r, W / 2 - 12, 5, 24, 3, '#D8B45E');
+    for (var i = 0; i < 5; i++) {
+      pb(g, r, W / 2 - 12 + i * 6, 8, 3, 5, '#F2E3A0');
+      pb(g, r, W / 2 - 12 + i * 6, 12, 3, 2, '#E0C073');
+    }
+  },
+  throne: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, W / 2 - 14, 0, 28, H - 10, '#7E5C40');
+    pb(g, r, W / 2 - 12, 2, 24, H - 14, '#9B6570');
+    pb(g, r, W / 2 - 12, 2, 24, 4, '#B47C88');
+    pb(g, r, W / 2 - 12, H - 24, 24, 6, '#8E5864');
+    pb(g, r, W / 2 - 2, H - 30, 4, 12, '#E2C181');
+    pb(g, r, W / 2 - 6, H - 34, 12, 5, '#E2C181');
+    pb(g, r, 1, H - 8, W - 2, 6, '#5F4A38');
+  },
+  statue: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, W / 2 - 8, H - 10, 16, 9, '#9A9490');
+    pb(g, r, W / 2 - 10, H - 14, 20, 5, '#B4AFAA');
+    pb(g, r, W / 2 - 5, H - 30, 10, 17, '#C4C0B8');
+    pb(g, r, W / 2 - 4, H - 38, 8, 9, '#D4D0C8');
+    pb(g, r, W / 2 - 9, H - 32, 4, 14, '#C4C0B8');
+  },
+  fountain: function (g, r) {
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 1, 3, W - 2, H - 4, '#9A9490');
+    pb(g, r, 3, 5, W - 6, H - 8, '#5C8B86');
+    pb(g, r, 4, 6, W - 8, 3, '#96C2B8');
+    pb(g, r, W / 2 - 5, 6, 10, H - 14, '#B4AFAA');
+    pb(g, r, W / 2 - 8, 3, 16, 5, '#C4C0B8');
+    pb(g, r, W / 2 - 2, 8, 4, 5, '#BFE0E4');
+  },
+  banner: function (g, r) {
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, W, 3, '#C0A15E');
+    pb(g, r, 2, 3, W - 4, H - 3, ['#A6553F', '#4E6B7E', '#7C6B8E'][hash2(5, r.x, r.y) % 3]);
+    pb(g, r, 2, 3, W - 4, 2, 'rgba(255,255,255,.18)');
+    pb(g, r, W / 2 - 5, H / 2, 10, 10, '#E2C181');
+    pb(g, r, W / 2 - 3, H / 2 + 2, 6, 6, '#8E3F4E');
+    pb(g, r, W - 5, H - 6, 3, 6, '#E2C181');
+  },
+  desk: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 8, W, 6, '#7E5C40'); pb(g, r, 0, 8, W, 2, '#A9855C');
+    pb(g, r, 2, 14, W - 4, H - 16, '#6E5238');
+    pb(g, r, W / 2 - 7, 4, 14, 5, '#F4EED7');
+    pb(g, r, W / 2 - 9, 1, 3, 6, '#7EA0A8');
+  },
+  genericShelf: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, 4, H, '#7E5C40'); pb(g, r, W - 4, 0, 4, H, '#7E5C40');
+    for (var s = 0; s < 2; s++) {
+      var y = 3 + s * Math.floor((H - 6) / 2);
+      pb(g, r, 2, y + 8, W - 4, 3, '#A9855C');
+      for (var i = 0; i < Math.floor((W - 8) / 12); i++)
+        pb(g, r, 4 + i * 12, y, 9, 8, ['#9A8B6E', '#B0705A', '#7E9498', '#8FA46E'][i % 4]);
+    }
+  },
+  /* 普通木桌 */
+  table: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE;
+    pb(g, r, 0, 6, W, 6, '#A9855C'); pb(g, r, 0, 6, W, 2, '#C4A57C');
+    pb(g, r, 2, 12, 5, r.h * TILE - 14, '#7E5C40'); pb(g, r, W - 7, 12, 5, r.h * TILE - 14, '#7E5C40');
+    pb(g, r, W / 2 - 4, 2, 8, 5, '#E8E2CE');
+  },
+  /* 齐胸高木柜台 */
+  counter: function (g, r) {
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 6, W, H - 6, '#8A6B4C');
+    pb(g, r, 0, 5, W, 4, '#B08A5E'); pb(g, r, 0, 5, W, 1, '#D2B183');
+    pb(g, r, 2, 9, W - 4, H - 16, '#6E5238');
+    pb(g, r, 2, 10, W - 4, 2, '#7E5C40');
+    pb(g, r, 1, H - 6, W - 2, 5, '#5F4A38');
+  }
+};
+
+/* ---------- 地面材质 ---------- */
+var CITY_FLOORS = {
+  /* 面包房：擦得发亮的方砖 */
+  tile: function (g, m) {
+    var w = m.w * TILE, h = m.h * TILE;
+    px(g, 0, 0, w, h, '#B5AA8C');
+    for (var ty = 0; ty < m.h; ty++) for (var tx = 0; tx < m.w; tx++) {
+      if ((tx + ty) % 2 === 0) px(g, tx * TILE, ty * TILE, TILE, TILE, '#C2B79A');
+      if ((tx * 5 + ty * 3) % 7 === 0) px(g, tx * TILE + 3, ty * TILE + 6, 5, 3, '#D2C7AA');
+    }
+  },
+  /* 商会 / 旅馆：拼接木地板 */
+  plank: function (g, m) {
+    var w = m.w * TILE, h = m.h * TILE;
+    px(g, 0, 0, w, h, '#9C7A52');
+    for (var ty = 0; ty < m.h; ty++) {
+      px(g, 0, ty * TILE, w, 1, '#84633F');
+      for (var tx = 0; tx < m.w; tx++) {
+        px(g, tx * TILE, ty * TILE + 1, TILE - 1, 4, '#A9855C');
+        if ((tx + ty) % 3 === 0) px(g, tx * TILE + 2, ty * TILE + 6, TILE - 4, 1, '#8A6B4C');
+      }
+    }
+  },
+  /* 图书馆 / 学院：深色硬木 */
+  wood: function (g, m) {
+    var w = m.w * TILE, h = m.h * TILE;
+    px(g, 0, 0, w, h, '#6E5238');
+    for (var ty = 0; ty < m.h; ty++) {
+      for (var tx = 0; tx < m.w; tx++) {
+        px(g, tx * TILE, ty * TILE, TILE, TILE, ((tx + ty) % 2) ? '#7E5C40' : '#87643F');
+        px(g, tx * TILE, ty * TILE, TILE, 1, '#5F4A38');
+        if ((tx * 3 + ty) % 5 === 0) px(g, tx * TILE + 3, ty * TILE + 8, TILE - 8, 1, '#6B5236');
+      }
+    }
+  },
+  /* 铁匠 / 工匠：夯土地面 */
+  earth: function (g, m) {
+    var w = m.w * TILE, h = m.h * TILE;
+    px(g, 0, 0, w, h, '#8E7A5E');
+    for (var i = 0; i < m.w * m.h; i++) {
+      var r = hash2(3, i % m.w, (i / m.w) | 0);
+      px(g, (r * 13 % (w - 3)) | 0, ((r * 7919) % (h - 3)) | 0, 3, 2, r > .5 ? '#7E6B52' : '#9C886A');
+    }
+  },
+  /* 城堡：大块大理石 */
+  marble: function (g, m) {
+    var w = m.w * TILE, h = m.h * TILE;
+    px(g, 0, 0, w, h, '#B7B2A4');
+    for (var ty = 0; ty < m.h; ty++) for (var tx = 0; tx < m.w; tx++) {
+      if ((tx + ty) % 2 === 0) px(g, tx * TILE, ty * TILE, TILE, TILE, '#C2BDB0');
+      px(g, tx * TILE, ty * TILE, TILE, 1, '#A29D90');
+      px(g, tx * TILE, ty * TILE, 1, TILE, '#A29D90');
+      var r = hash2(7, tx, ty);
+      if (r > .72) px(g, tx * TILE + 4, ty * TILE + 5, 7, 1, '#AAA598');
+      if (r < .2) px(g, tx * TILE + 8, ty * TILE + 10, 5, 1, '#AAA598');
+    }
+  },
+  /* 温室 / 庭院：石板与泥土 */
+  stone: function (g, m) {
+    var w = m.w * TILE, h = m.h * TILE;
+    px(g, 0, 0, w, h, '#9A9490');
+    for (var ty = 0; ty < m.h; ty++) for (var tx = 0; tx < m.w; tx++) {
+      var r = hash2(11, tx, ty);
+      px(g, tx * TILE, ty * TILE, TILE - 1, TILE - 1, r > .5 ? '#A8A29C' : '#9E9892');
+      px(g, tx * TILE, ty * TILE, TILE - 1, 1, '#B4AEA8');
+      if (r < .18) px(g, tx * TILE + 5, ty * TILE + 9, 6, 4, '#7E6B52');
+    }
+  }
+};
+var CITY_WALL = { tile: '#A08A6E', plank: '#8A6B4C', wood: '#6E5238', earth: '#7E6A52', marble: '#9A9488', stone: '#8A8478' };
+
+/* 室内地面与家具烘焙成离屏画布：房间大、帧率高，逐帧重画会直接拖垮手机。 */
+function cityRoomCanvas(map) {
+  if (map._roomCanvas) return map._roomCanvas;
+  var c = newCanvas(map.w * TILE, map.h * TILE);
+  var g = c.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  var def = map.roomDef;
+  var fl = CITY_FLOORS[def.floor] || CITY_FLOORS.wood;
+  fl(g, map);
+  /* 踢脚与墙裙，让室内有墙 */
+  var wall = CITY_WALL[def.floor] || CITY_WALL.wood;
+  px(g, 0, 0, map.w * TILE, 4, wall);
+  px(g, 0, map.h * TILE - 6, map.w * TILE, 6, wall);
+  px(g, 0, 0, 4, map.h * TILE, wall);
+  px(g, map.w * TILE - 4, 0, 4, map.h * TILE, wall);
+  px(g, 0, 4, map.w * TILE, 2, 'rgba(255,255,255,.10)');
+  (def.props || []).forEach(function (p) {
+    var f = CITY_PROPS[p.t];
+    if (f) f(g, p);
+  });
+  map._roomCanvas = c;
+  return c;
+}
+/* g 已带相机变换，这里按地图原点直接贴整张烘焙画布。 */
+function drawCityInterior(g, map) {
+  g.drawImage(cityRoomCanvas(map), 0, 0);
 }
 function drawCityPlan(c){
   var g=c.getContext('2d'),map=MAPS.city;g.fillStyle='#99AC80';g.fillRect(0,0,c.width,c.height);
-  for(var x=0;x<map.w;x++)for(var y=0;y<map.h;y++){if(map.t[x][y]===T_PATH){g.fillStyle='#D9CEAE';g.fillRect(x*4,y*4,4,4);}else if(map.t[x][y]===T_WATER){g.fillStyle='#719DA6';g.fillRect(x*4,y*4,4,4);}}
-  CITY_BUILDINGS.forEach(function(b){g.fillStyle=b.id==='castle'?'#687C94':'#837A74';g.fillRect(b.x*4,b.y*4,b.w*4,b.h*4);});
-  CITY_DISTRICTS.forEach(function(d){g.font='12px sans-serif';g.textAlign='center';var w=g.measureText(d.name).width+10;g.fillStyle='rgba(30,48,37,.9)';g.fillRect(d.x*4-w/2,d.y*4-7,w,17);g.fillStyle='#EEDDB0';g.fillText(d.name,d.x*4,d.y*4+6);});g.textAlign='left';
+  var S=Math.max(1,Math.min(c.width/map.w,c.height/map.h));
+  var ox=Math.round((c.width-map.w*S)/2),oy=Math.round((c.height-map.h*S)/2);
+  for(var x=0;x<map.w;x++)for(var y=0;y<map.h;y++){var t=map.t[x][y];
+    if(t===T_PATH){g.fillStyle='#D9CEAE';g.fillRect(ox+x*S,oy+y*S,S,S);}
+    else if(t===T_WATER){g.fillStyle='#719DA6';g.fillRect(ox+x*S,oy+y*S,S,S);}
+    else if(t===T_BUILDING){g.fillStyle='#9AA08A';g.fillRect(ox+x*S,oy+y*S,S,S);}}
+  CITY_BUILDINGS.forEach(function(b){g.fillStyle=b.id==='castle'?'#687C94':'#837A74';g.fillRect(ox+b.x*S,oy+b.y*S,b.w*S,b.h*S);});
+  CITY_DISTRICTS.forEach(function(d){g.font='12px sans-serif';g.textAlign='center';var w=g.measureText(d.name).width+10;var dx=clamp(ox+d.x*S,w/2+2,c.width-w/2-2),dy=clamp(oy+d.y*S,12,c.height-4);g.fillStyle='rgba(30,48,37,.9)';g.fillRect(dx-w/2,dy-7,w,17);g.fillStyle='#EEDDB0';g.fillText(d.name,dx,dy+6);});g.textAlign='left';
   var p=null;if(state.sceneId==='city')p=state.player;else if(state.sceneId.indexOf('city_')===0){var id=state.sceneId.slice(5),b=CITY_BUILDINGS.filter(function(b){return b.id===id;})[0];if(b)p=b.door;}
-  if(p){g.fillStyle='#FFF3D6';g.fillRect(p.x*4-5,p.y*4-5,10,10);g.fillStyle='#B24B4C';g.fillRect(p.x*4-3,p.y*4-3,6,6);}
+  if(p){g.fillStyle='#FFF3D6';g.fillRect(ox+p.x*S-S*2,oy+p.y*S-S*2,S*4+2,S*4+2);g.fillStyle='#B24B4C';g.fillRect(ox+p.x*S-S,oy+p.y*S-S,S*2,S*2);}
 }
+/* 街头行人沿主干道来回，不在住宅区里原地打转。 */
 function drawCityCrowd(ents,R){
   for(var i=0;i<16;i++){
-    var row=[28,52,76,90][i%4],x=8+((animalClock*.7+i*7)%109),y=row+(i%2?1:0);
-    if(x>79&&x<84)y=row;
+    var onMain=i%2===0,span=onMain?540:300,x,y;
+    if(onMain){x=Math.round(70+((animalClock*2.2+i*61)%span));y=300+(i%2);}
+    else{x=320+(i%2?4:-4);y=Math.round(150+((animalClock*2.2+i*61)%span));}
     if(x<R.x0-1||x>R.x1+1||y<R.y0-1||y>R.y1+1)continue;
+    if(isSolid('city',x,y))continue;
     ents.push({z:y*TILE+TILE,f:drawResident,a:[x*TILE+8,y*TILE+14,{hair:['#615149','#B59669','#886451'][i%3],shirt:['#A58187','#7895A8','#8F9E74','#D7BD91'][i%4],accent:'#D8C6A3',skin:'#E6C29E',face:'right',moving:!timePaused(),phase:animalClock,apron:false,style:['postie','scholar','merchant','baker'][i%4]}]});
   }
 }
@@ -4076,7 +5267,7 @@ var WORLD_REGIONS = [
   {id:'riverside',name:'溪畔河湾',x:33,y:76,desc:'小桥另一侧的钓鱼河岸。完成修桥委托后开放。'},
   {id:'vineyard',name:'金叶葡萄园',x:43,y:23,desc:'缓坡上的葡萄架、石墙与乡村庄园。未来探索路线的一站。'},
   {id:'forest',name:'雾杉森林',x:55,y:81,desc:'从小镇北口进入。硬木、蘑菇、林间湖、伐木屋与隐藏宝箱；东北通往旧矿山。'},
-  {id:'city',name:'白蔷薇城',x:57,y:47,desc:'从小镇南口办理通行证后进入。128×96 格城市：城堡、市集、住宅、工匠街、学院和驿站，32 栋可进入建筑。'},
+  {id:'city',name:'白蔷薇城',x:57,y:47,desc:'从小镇南口办理通行证后进入。640×480 格城市：城堡高台、西侧旧城、花园住宅区、老市集、工匠区、河岸、学院区与南门驿站。'},
   {id:'pass',name:'旧矿山',x:80,y:22,desc:'从森林东北进入，共三层：铜矿、铁矿、紫晶。修复轨道逐层深入，原路返回森林。'},
   {id:'mill',name:'风铃磨坊',x:81,y:67,desc:'河流穿过麦田与古老水磨坊，连接山谷东南部的乡野。'}
 ];
@@ -4863,7 +6054,7 @@ function drawPondSurfaceFx(g) {
 
 
 var canvas, ctx, cam = { x: 0, y: 0, init: false };
-var groundCache = {};
+var groundChunks = {}, groundChunkOrder = {};
 var clock = 0;
 
 function hash2(a, b, c) {
@@ -4969,15 +6160,20 @@ function drawFallow(g, sx, sy, tx, ty) {
   if ((tx + ty) % 2 === 0) { g.fillStyle = '#7C6244'; g.fillRect(sx, sy + 7, 1, 2); g.fillRect(sx + TILE - 1, sy + 7, 1, 2); }
 }
 
-function buildGround(sceneId) {
-  if (groundCache[sceneId]) return groundCache[sceneId];
+/* 地面按 GROUND_CHUNK 格分块烘焙。
+   640×480 的整张地面画布是 10240×7680 像素（约 300MB），浏览器根本开不出来，
+   所以改成按需只烘焙和绘制视野内的块，并限制同时驻留的块数。 */
+var GROUND_CHUNK = 48;
+var GROUND_CHUNK_CAP = 40;
+
+function paintGroundRegion(g, sceneId, rx, ry, rw, rh) {
   var map = MAPS[sceneId];
-  var c = newCanvas(map.w * TILE, map.h * TILE);
-  var g = c.getContext('2d');
   var sceneIdx = SCENE_ORDER.indexOf(sceneId) + 1;
-  var pa = MAPS[sceneId].plantArea;
-  for (var y = 0; y < map.h; y++) {
-    for (var x = 0; x < map.w; x++) {
+  var pa = map.plantArea;
+  g.save();
+  g.translate(-rx * TILE, -ry * TILE);   // 之后一律用世界坐标，越界部分由画布自动裁掉
+  for (var y = ry; y < ry + rh; y++) {
+    for (var x = rx; x < rx + rw; x++) {
       if (pa && x >= pa.x0 && x <= pa.x1 && y >= pa.y0 && y <= pa.y1) drawFallow(g, x * TILE, y * TILE, x, y);
       else drawGroundTile(g, map.t[x][y], x * TILE, y * TILE, sceneIdx, x, y);
     }
@@ -5002,9 +6198,19 @@ function buildGround(sceneId) {
     g.fillStyle = '#8FC0B4';
     for (var bxi = 0; bxi < pw; bxi += 16) g.fillRect(px0 + bxi + 2, py0 + ph - 6, 8, 3);
   }
-  if(sceneId.indexOf('mine')===0){for(var mx=0;mx<map.w;mx++)for(var my=0;my<map.h;my++){px(g,mx*TILE,my*TILE,TILE,TILE,map.solid[mx][my]?'#343C48':(mx+my)%2?'#66707A':'#626B75');if(map.solid[mx][my])px(g,mx*TILE+1,my*TILE+1,14,3,'#4B5563');}for(var ry=3;ry<23;ry++){px(g,13*TILE+3,ry*TILE,1,16,'#BDC0AD');px(g,13*TILE+12,ry*TILE,1,16,'#BDC0AD');px(g,13*TILE+2,ry*TILE+8,12,2,'#87735D');}}
-  // 装饰
+  if (sceneId.indexOf('mine') === 0) {
+    for (var mx = rx; mx < rx + rw; mx++) for (var my = ry; my < ry + rh; my++) {
+      px(g, mx * TILE, my * TILE, TILE, TILE, map.solid[mx][my] ? '#343C48' : (mx + my) % 2 ? '#66707A' : '#626B75');
+      if (map.solid[mx][my]) px(g, mx * TILE + 1, my * TILE + 1, 14, 3, '#4B5563');
+    }
+    for (var ry2 = 3; ry2 < 23; ry2++) { px(g, 13 * TILE + 3, ry2 * TILE, 1, 16, '#BDC0AD'); px(g, 13 * TILE + 12, ry2 * TILE, 1, 16, '#BDC0AD'); px(g, 13 * TILE + 2, ry2 * TILE + 8, 12, 2, '#87735D'); }
+  }
+  // 装饰与出口提示只画落在本块里的
+  var inBox = function (x, y, pad) {
+    return x >= rx - pad && x < rx + rw + pad && y >= ry - pad && y < ry + rh + pad;
+  };
   getDecor(sceneId).forEach(function (d) {
+    if (!inBox(d.x, d.y, 2)) return;
     var sx = d.x * TILE, sy = d.y * TILE;
     if (d.t === 'tuft') {
       g.fillStyle = PAL.grassDark;
@@ -5023,14 +6229,40 @@ function buildGround(sceneId) {
       g.fillStyle = '#6B4A2C'; g.fillRect(sx + 1, sy + 10, 2, 4); g.fillRect(sx + 13, sy + 10, 2, 4);
       g.fillRect(sx + 1, sy + 3, 14, 2);
     } else if (d.t === 'sign') {
-      g.fillStyle = '#8A6B48'; g.fillRect(sx + 7, sy + 8, 2, 7);
+      g.fillStyle = '#8A6B4C'; g.fillRect(sx + 7, sy + 8, 2, 7);
       g.fillStyle = '#A67C4E'; g.fillRect(sx + 3, sy + 4, 10, 6);
       g.fillStyle = '#6B4A2C'; g.fillRect(sx + 5, sy + 6, 6, 1); g.fillRect(sx + 5, sy + 8, 4, 1);
+    } else if (d.t === 'fountain') {              // 市集广场的喷泉
+      g.fillStyle = '#9A9490'; g.fillRect(sx + 1, sy + 5, 14, 8);
+      g.fillStyle = '#5C8B86'; g.fillRect(sx + 2, sy + 6, 12, 6);
+      g.fillStyle = '#96C2B8'; g.fillRect(sx + 3, sy + 7, 10, 2);
+      g.fillStyle = '#B4AFAA'; g.fillRect(sx + 6, sy + 2, 4, 4);
+      g.fillStyle = '#BFE0E4'; g.fillRect(sx + 7, sy + 6, 2, 4);
+    } else if (d.t === 'stall') {                 // 集市摊位：条纹棚顶
+      var sc = ['#A6553F', '#4E6B7E', '#7C6B8E', '#6E8A5E'];
+      g.fillStyle = '#8A6B4C'; g.fillRect(sx + 1, sy + 9, 14, 5);
+      g.fillStyle = '#6E5238'; g.fillRect(sx + 1, sy + 13, 14, 2);
+      for (var q = 0; q < 4; q++) { g.fillStyle = sc[(d.v || 0) % 4]; g.fillRect(sx + 1 + q * 4, sy + 5, 4, 5); }
+      g.fillStyle = '#D8CBA6'; g.fillRect(sx + 2, sy + 10, 4, 3); g.fillRect(sx + 9, sy + 10, 4, 3);
+      g.fillStyle = '#8A6B4C'; g.fillRect(sx + 1, sy + 5, 1, 9); g.fillRect(sx + 14, sy + 5, 1, 9);
+    } else if (d.t === 'lamp') {
+      g.fillStyle = '#5A5048'; g.fillRect(sx + 7, sy + 4, 2, 11);
+      g.fillStyle = '#E0C073'; g.fillRect(sx + 5, sy + 1, 6, 4);
+      g.fillStyle = '#F2E3A0'; g.fillRect(sx + 6, sy + 2, 4, 2);
+    } else if (d.t === 'planter') {
+      g.fillStyle = '#8A6B4C'; g.fillRect(sx + 1, sy + 9, 14, 5);
+      g.fillStyle = '#6B5236'; g.fillRect(sx + 2, sy + 10, 12, 3);
+      for (var fl = 0; fl < 5; fl++) { g.fillStyle = fl % 2 ? '#E8A0C0' : '#A1BD58'; g.fillRect(sx + 2 + fl * 3, sy + 6, 2, 4); }
+    } else if (d.t === 'cart') {                 // 码头与驿站边的货车
+      g.fillStyle = '#8A6B4C'; g.fillRect(sx + 1, sy + 6, 14, 6);
+      g.fillStyle = '#6E5238'; g.fillRect(sx + 2, sy + 5, 12, 2);
+      g.fillStyle = '#5A5048'; g.fillRect(sx + 2, sy + 11, 3, 3); g.fillRect(sx + 11, sy + 11, 3, 3);
+      g.fillStyle = '#D8CBA6'; g.fillRect(sx + 4, sy + 3, 8, 3);
     }
   });
-  // 出口提示
   var allExits = (map.exits || []).concat(map.eastExits || []);
   allExits.forEach(function (e) {
+    if (!inBox(e.x, e.y, 1)) return;
     var sx = e.x * TILE, sy = e.y * TILE;
     var right = e.x > map.w / 2;
     g.fillStyle = '#EFD18B';
@@ -5040,8 +6272,39 @@ function buildGround(sceneId) {
     }
     g.fillRect(right ? sx + 4 : sx + 10, sy + 7, 2, 2);
   });
-  groundCache[sceneId] = c;
+  g.restore();
+}
+function groundChunk(sceneId, cx, cy) {
+  var map = MAPS[sceneId];
+  var store = groundChunks[sceneId] || (groundChunks[sceneId] = {});
+  var order = groundChunkOrder[sceneId] || (groundChunkOrder[sceneId] = []);
+  var key = cx + ',' + cy;
+  if (store[key]) {
+    var i = order.indexOf(key);
+    if (i >= 0) { order.splice(i, 1); order.push(key); }
+    return store[key];
+  }
+  var rx = cx * GROUND_CHUNK, ry = cy * GROUND_CHUNK;
+  var w = Math.min(GROUND_CHUNK, map.w - rx), h = Math.min(GROUND_CHUNK, map.h - ry);
+  if (w <= 0 || h <= 0) return null;
+  var c = newCanvas(w * TILE, h * TILE);
+  var g = c.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  paintGroundRegion(g, sceneId, rx, ry, w, h);
+  store[key] = c;
+  order.push(key);
+  while (order.length > GROUND_CHUNK_CAP) delete store[order.shift()];
   return c;
+}
+function drawGround(g, sceneId, R) {
+  var c0 = Math.max(0, Math.floor(R.x0 / GROUND_CHUNK)), c1 = Math.max(0, Math.floor(R.x1 / GROUND_CHUNK));
+  var r0 = Math.max(0, Math.floor(R.y0 / GROUND_CHUNK)), r1 = Math.max(0, Math.floor(R.y1 / GROUND_CHUNK));
+  for (var cy = r0; cy <= r1; cy++) {
+    for (var cx = c0; cx <= c1; cx++) {
+      var ch = groundChunk(sceneId, cx, cy);
+      if (ch) g.drawImage(ch, cx * GROUND_CHUNK * TILE, cy * GROUND_CHUNK * TILE);
+    }
+  }
 }
 
 /* --- 实体绘制 --- */
@@ -5834,8 +7097,8 @@ function drawScene(g, dt) {
   // 世界实体和土地统一使用世界坐标；屏幕叠层在 restore 后绘制。
   g.save();
   g.translate(-ox, -oy);
-  // 地面整张贴图，同样使用世界坐标（室内小地图会自然居中）
-  g.drawImage(buildGround(state.sceneId), 0, 0);
+  // 地面按块烘焙、只贴视野内的块（大城市整张画布开不出来）
+  drawGround(g, state.sceneId, R);
   // 池塘：水下鱼 → 水面波纹反光冒泡（只出现在农场池塘）
   if (state.sceneId === 'farm') {
     if (R.x1 >= POND_AREA.x0 && R.x0 <= POND_AREA.x1 && R.y1 >= POND_AREA.y0 && R.y0 <= POND_AREA.y1) {

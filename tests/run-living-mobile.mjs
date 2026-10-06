@@ -18,7 +18,7 @@ try{
  await page.evaluate(()=>{const m=__MOSS__,s=m.state;const b=m.livingInfo().city.buildings.find(b=>b.id==='bakery');s.player={x:b.door.x,y:b.door.y+1,face:'up'};m.startGame(s);});
  await page.locator('#touchAct').tap();await page.waitForFunction(()=>__MOSS__.state.sceneId==='city_bakery');await page.waitForTimeout(300);
  check('手机进入面包房',await page.evaluate(()=>__MOSS__.state.sceneId),'city_bakery');
- await page.evaluate(()=>{const m=__MOSS__;m.state.player={x:11,y:5,face:'up'};m.startGame(m.state);});
+ await page.evaluate(()=>{const m=__MOSS__;m.state.player={x:12,y:12,face:'up'};m.startGame(m.state);});
  await page.waitForTimeout(400);await page.locator('#touchAct').tap();
  await page.getByRole('button',{name:'买一个面包 · 30 金',exact:true}).tap();
  check('手机服务台交易有效',await page.evaluate(()=>[__MOSS__.state.coins,__MOSS__.state.inventory.bread]),[320,1]);
