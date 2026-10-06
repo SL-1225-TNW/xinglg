@@ -16,11 +16,6 @@ for (const file of ['index.html', '苔芽农场-单文件版.html']) {
     try {
       await page.addInitScript(() => { Element.prototype.requestFullscreen = async () => { throw new Error('emulated fullscreen unavailable'); }; });
       await boot(page);
-      if (touch && height > width) {
-        assert(await page.locator('#rotatePrompt').isVisible(), '触屏竖屏应提示旋转');
-        await page.setViewportSize({width:height,height:width});
-        await page.waitForTimeout(100);
-      }
       // 新存档教程显示时与跳过后均检查，避免只对空页面算占比。
       for (const tutorial of [true,false]) {
         if (!tutorial) await page.locator('#tutorialSkip').click();

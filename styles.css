@@ -822,7 +822,7 @@ html.immersive .quest-strip{top:auto;bottom:80px;left:6px}
 }
 
 /* 开始界面的设备选择，以及安卓横屏提示。 */
-.device-picker[hidden],.boot-actions[hidden],.boot-note[hidden],.rotate-prompt[hidden]{display:none}
+.device-picker[hidden],.boot-actions[hidden],.boot-note[hidden]{display:none}
 .device-picker h2{margin:4px 0;color:var(--hint)}
 .device-picker p{font-size:12px;color:var(--text-dim)}
 .device-options{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
@@ -831,12 +831,6 @@ html.immersive .quest-strip{top:auto;bottom:80px;left:6px}
 .device-options [aria-pressed="true"]{border-color:var(--focus);background:#3f4f2b}
 .boot{overflow-y:auto}
 .boot-card{max-height:100%;overflow-y:auto}
-.rotate-prompt{
-  position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
-  padding:20px;background:#15241ff5;
-}
-.rotate-symbol{font-size:64px;line-height:1;color:var(--hint)}
-.rotate-prompt h2{color:var(--hint)}
 html[data-device="phone"] .touch,html[data-device="tablet"] .touch{display:flex}
 html[data-device="computer"] .touch{display:none}
 html[data-device="phone"] .tbtn{min-width:44px;min-height:44px}
@@ -859,3 +853,55 @@ html[data-device="tablet"] .tact-sm{width:52px;height:48px}
 
 /* 横屏窗口高度不足时地图随窗口滚动，禁止 flex 把地图压成细条。 */
 .world-atlas{flex:0 0 auto}
+
+/* 手机/平板始终以横向游戏坐标运行，不依赖操作系统自动旋转。 */
+#app{width:var(--play-w,100vw);height:var(--play-h,100dvh)}
+html.immersive #app{height:var(--play-h,100dvh)}
+html.rotated-play #app{
+  position:fixed;top:0;left:100vw;min-height:0;
+  transform:rotate(90deg);transform-origin:0 0;
+  padding:env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left) env(safe-area-inset-top);
+}
+html.rotated-play #topbar{top:env(safe-area-inset-right);left:env(safe-area-inset-top);right:env(safe-area-inset-bottom)}
+html.rotated-play #dock{bottom:env(safe-area-inset-left);left:env(safe-area-inset-top);right:env(safe-area-inset-bottom)}
+html.rotated-play .touch{
+  left:env(safe-area-inset-top);right:env(safe-area-inset-bottom);
+  bottom:calc(var(--dock-h) + env(safe-area-inset-left) + 6px);
+}
+html.rotated-play .win{max-height:calc(var(--play-h) - 16px)}
+html.rotated-play .win-body{padding:10px}
+html.rotated-play #topbar{flex-wrap:nowrap}
+html.rotated-play .hud{order:initial;width:auto;flex-wrap:nowrap}
+html.rotated-play .hud-cell{min-width:0;flex:1 1 auto}
+html.rotated-play .hotbar{width:auto;max-width:calc(100% - 16px)}
+html.rotated-play .scene-tag{display:block}
+html.rotated-play .quest-strip{bottom:80px}
+html.compact-play #topbar{min-height:36px;padding:2px 8px;gap:6px}
+html.compact-play .hud-label{display:none}
+html.compact-play .hud-value{font-size:11px}
+html.compact-play .hud-cell{padding:2px 4px}
+html.compact-play .brand-text{font-size:12px}
+html.compact-play .icon-btn{min-height:36px;height:36px}
+html.compact-play #dock{flex-direction:row;justify-content:center;padding:3px 6px}
+html.compact-play .hotbar{padding:3px;gap:3px}
+html.compact-play .slot{width:36px;height:36px}
+html.compact-play .slot canvas{width:24px;height:24px}
+html.compact-play .farm-assist{width:min(560px,calc(100% - 300px));max-width:calc(100% - 300px)}
+html.compact-play .tutorial-card{flex-wrap:wrap;padding:3px 6px;gap:4px}
+html.compact-play .tutorial-copy{flex-basis:auto}
+html.compact-play #tutorialText{font-size:11px;line-height:1.35}
+html.compact-play .tutorial-actions .btn{min-height:30px;padding:2px 9px;font-size:11px}
+html.compact-play .daily-tasks,html.compact-play .quest-strip{display:none}
+html.compact-play .toast{position:absolute;left:50%;transform:translateX(-50%);bottom:56px;min-height:18px}
+html.compact-play .boot{padding:8px}
+html.compact-play .boot-card{padding:12px 18px}
+html.compact-play .boot-card h1{font-size:24px}
+html.compact-play .boot-sub{margin:2px 0 8px}
+html.compact-play .boot-actions{gap:5px}
+html.compact-play .boot-note{margin-top:7px}
+html.compact-play .reel{bottom:calc(46% - 40px)}
+html.compact-play[data-device="tablet"] .dpad{grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px)}
+html.compact-play[data-device="tablet"] .tact{grid-template-columns:repeat(3,44px)}
+html.compact-play[data-device="tablet"] .tact-use,html.compact-play[data-device="tablet"] .tact-act{width:140px;height:44px}
+html.compact-play[data-device="tablet"] .tact-sm{width:44px;height:44px}

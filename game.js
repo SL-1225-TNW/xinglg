@@ -5023,10 +5023,10 @@ function updateTileTip(t, ox, oy) {
   tip.classList.toggle('ripe', !!(p.crop && p.mature));
   // 锚定在目标格正上方，贴边时收进画面内
   var vw = $('#viewport');
-  var rect = vw.getBoundingClientRect();
+  var rect = { width: vw.clientWidth, height: vw.clientHeight };
   var cx = t[0] * TILE - ox + TILE / 2;
   var top = t[1] * TILE - oy - 4;
-  var box = tip.getBoundingClientRect();
+  var box = { width: tip.offsetWidth, height: tip.offsetHeight };
   var scale = rect.width / VIEW_W;
   var left = clamp(cx * scale - box.width / 2, 4, Math.max(4, rect.width - box.width - 4));
   if (top - box.height < 0) top = (t[1] * TILE - oy + TILE + 4) * scale;
@@ -5518,7 +5518,6 @@ function isTyping() {
 }
 
 function onKeyDown(e) {
-  if (needsLandscape() && $('#boot').hidden) return;
   if (!state || !$('#boot').hidden) return;
   Audio2.unlock();
   if (isTyping()) return;
@@ -5636,13 +5635,18 @@ var deviceMode = 'computer';
 var landscapeRequest = null;
 var deviceLabels = { phone: '手机', tablet: '平板', computer: '电脑' };
 function touchDevice() { return deviceMode !== 'computer'; }
-function needsLandscape() {
+function rotatedPlay() {
   return touchDevice() && window.innerHeight > window.innerWidth;
 }
-function updateRotatePrompt() {
-  var show = !!state && $('#boot').hidden && needsLandscape();
-  $('#rotatePrompt').hidden = !show;
-  if (show) clearKeys();
+function updatePlayLayout() {
+  var root = document.documentElement;
+  var rotated = rotatedPlay();
+  var width = rotated ? window.innerHeight : window.innerWidth;
+  var height = rotated ? window.innerWidth : window.innerHeight;
+  root.classList.toggle('rotated-play', rotated);
+  root.classList.toggle('compact-play', height <= 560 && width > height);
+  root.style.setProperty('--play-w', width + 'px');
+  root.style.setProperty('--play-h', height + 'px');
 }
 function applyDevice(mode) {
   deviceMode = deviceLabels[mode] ? mode : 'computer';
@@ -5650,7 +5654,7 @@ function applyDevice(mode) {
   try { localStorage.setItem('moss-device-mode', deviceMode); } catch (e) {}
   var button = $('#deviceSelect');
   if (button) button.textContent = '设备选择 · ' + deviceLabels[deviceMode];
-  updateRotatePrompt();
+  updatePlayLayout();
   resizeCanvas();
 }
 async function requestLandscape() {
@@ -5669,9 +5673,9 @@ async function requestLandscape() {
         await screen.orientation.lock('landscape');
       }
     } catch (e) {
-      $('#rotateText').textContent = '浏览器未能自动切换横屏，请将设备横过来；必要时开启系统自动旋转。';
+      // 系统竖屏锁定或浏览器拒绝方向锁时，由页面自身保持横向布局。
     } finally {
-      updateRotatePrompt();
+      updatePlayLayout();
       resizeCanvas();
     }
   })();
@@ -5707,8 +5711,7 @@ function initDevicePicker() {
       requestLandscape();
     };
   });
-  $('#retryLandscape').onclick = requestLandscape;
-  document.addEventListener('fullscreenchange', function () { updateRotatePrompt(); resizeCanvas(); });
+  document.addEventListener('fullscreenchange', function () { updatePlayLayout(); resizeCanvas(); });
 }
 
 /* --- 画布缩放 --- */
@@ -5716,24 +5719,23 @@ function resizeCanvas() {
   if (!canvas) return;
   var stage = $('#stage');
   var root = document.documentElement;
-  // 横屏统一使用浮层；竖屏由 flex 布局给状态栏、教程和工具栏留空间。
-  var immersive = window.innerWidth > window.innerHeight;
+  updatePlayLayout();
+  // 按游戏坐标系的宽高布局，系统锁竖屏时也使用完整横向画面。
+  var app = $('#app');
+  var immersive = app.clientWidth > app.clientHeight;
   root.classList.toggle('immersive', immersive);
-  var stageRect = stage.getBoundingClientRect();
-  var topRect = $('#topbar').getBoundingClientRect();
-  root.style.setProperty('--assist-top', Math.ceil(topRect.bottom + 4) + 'px');
-  root.style.setProperty('--dock-h', Math.ceil($('#dock').getBoundingClientRect().height) + 'px');
+  root.style.setProperty('--assist-top', ($('#topbar').offsetTop + $('#topbar').offsetHeight + 4) + 'px');
+  root.style.setProperty('--dock-h', $('#dock').offsetHeight + 'px');
   var stageStyle = getComputedStyle(stage);
   var viewportStyle = getComputedStyle($('#viewport'));
-  var availW = Math.max(1, stageRect.width - parseFloat(stageStyle.paddingLeft)
+  var availW = Math.max(1, stage.clientWidth - parseFloat(stageStyle.paddingLeft)
     - parseFloat(stageStyle.paddingRight) - parseFloat(viewportStyle.borderLeftWidth)
     - parseFloat(viewportStyle.borderRightWidth));
-  var availH = Math.max(1, stageRect.height - parseFloat(stageStyle.paddingTop)
+  var availH = Math.max(1, stage.clientHeight - parseFloat(stageStyle.paddingTop)
     - parseFloat(stageStyle.paddingBottom) - parseFloat(viewportStyle.borderTopWidth)
     - parseFloat(viewportStyle.borderBottomWidth));
   var dpr = clamp(window.devicePixelRatio || 1, 1, 3);
   var coarse = touchDevice();
-  updateRotatePrompt();
   // 先保持角色可读，再扩展取景范围。窄屏允许小于 1 倍，避免最小视野撑破页面。
   // 倍率按设备像素对齐，剩余空间按逻辑像素使用，不再丢掉一整行/列瓦片。
   var fit = Math.min(availW / (TILE * MIN_TILES_W), availH / (TILE * MIN_TILES_H));
@@ -5770,7 +5772,6 @@ var lastT = 0;
 function frame(ts) {
   requestAnimationFrame(frame);
   if (!state) return;
-  if (needsLandscape()) { lastT = ts; return; }
   var dt = lastT ? Math.min(0.1, (ts - lastT) / 1000) : 0;
   lastT = ts;
   clock += dt;
@@ -5911,10 +5912,7 @@ function bindInput() {
   canvas.addEventListener('mouseleave', function () { Game.hoverTile = null; });
   canvas.addEventListener('touchstart', function (e) {
     if (!e.touches || !e.touches.length) return;
-    var r = canvas.getBoundingClientRect();
-    var mx = (e.touches[0].clientX - r.left) / r.width * VIEW_W + cam.x;
-    var my = (e.touches[0].clientY - r.top) / r.height * VIEW_H + cam.y;
-    Game.selectTile = [Math.floor(mx / TILE), Math.floor(my / TILE)];
+    Game.selectTile = mouseToTile(e.touches[0]);
   }, { passive: true });
   canvas.addEventListener('mousedown', function (e) {
     if (e.button !== 0) return;
@@ -5978,9 +5976,10 @@ function bindInput() {
 
 function mouseToTile(ev) {
   var r = canvas.getBoundingClientRect();
-  var mx = (ev.clientX - r.left) / r.width * VIEW_W + cam.x;
-  var my = (ev.clientY - r.top) / r.height * VIEW_H + cam.y;
-  return [Math.floor(mx / TILE), Math.floor(my / TILE)];
+  // 页面顺时针旋转 90 度时，将屏幕触点逆变换回游戏坐标。
+  var x = rotatedPlay() ? (ev.clientY - r.top) / r.height : (ev.clientX - r.left) / r.width;
+  var y = rotatedPlay() ? (r.right - ev.clientX) / r.width : (ev.clientY - r.top) / r.height;
+  return [Math.floor((x * VIEW_W + cam.x) / TILE), Math.floor((y * VIEW_H + cam.y) / TILE)];
 }
 
 UI.refreshReel = function () {
@@ -6021,10 +6020,10 @@ window.__MOSS__ = {
   __isWater: isWater, __toolFish: toolFish,
   tileToScreen: function (tx, ty) {
     var r = canvas.getBoundingClientRect();
-    return [
-      r.left + (tx * TILE + 8 - cam.x) / VIEW_W * r.width,
-      r.top + (ty * TILE + 8 - cam.y) / VIEW_H * r.height
-    ];
+    var x = (tx * TILE + 8 - cam.x) / VIEW_W;
+    var y = (ty * TILE + 8 - cam.y) / VIEW_H;
+    return rotatedPlay() ? [r.right - y * r.width, r.top + x * r.height]
+      : [r.left + x * r.width, r.top + y * r.height];
   },
   tileOfPixel: function (tx, ty) { return [Math.floor(tx * TILE + 8), Math.floor(ty * TILE + 12)]; },
   canFarmSteps: CAN_FARM_STEPS, farmRing: farmRingVisible, inPlantArea: inPlantArea, tileFrameVisible: tileFrameVisible,
