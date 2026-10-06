@@ -12,10 +12,11 @@ permissions:
   pages: write
   id-token: write
 
-# 同一时间只跑一次，避免并发发布互相覆盖
+# 同一时间只跑一次；用 true 让新推送取消排队中的旧部署，
+# 否则一次失败会一直占着锁，后续推送全部堆在队列里永远发不出去
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
