@@ -5285,8 +5285,19 @@ function drawScene(g, dt) {
   var ox = Math.round(cam.x), oy = Math.round(cam.y);
   var R = visibleRange(ox, oy, map);
 
-  g.fillStyle = '#141A17';
+  // 小地图外围延续苔绿/木色底纹，而不是留下突兀的黑边。
+  g.fillStyle = map.indoor ? '#302d25' : '#304f3a';
   g.fillRect(0, 0, VIEW_W, VIEW_H);
+  g.fillStyle = map.indoor ? '#39372c' : '#38583e';
+  for (var edgeY = -((oy % TILE + TILE) % TILE); edgeY < VIEW_H; edgeY += TILE) {
+    for (var edgeX = -((ox % TILE + TILE) % TILE); edgeX < VIEW_W; edgeX += TILE) {
+      // 只画地图以外的装饰，既无碰撞也不误导成可行走区域。
+      var worldX = edgeX + ox, worldY = edgeY + oy;
+      if (worldX >= 0 && worldX < map.w * TILE && worldY >= 0 && worldY < map.h * TILE) continue;
+      g.fillRect(edgeX + 3, edgeY + 9, 3, 1);
+      g.fillRect(edgeX + 10, edgeY + 4, 1, 2);
+    }
+  }
 
   // 水面波纹
   if (isRaining() || state.sceneId === 'riverside') {
@@ -5624,73 +5635,30 @@ function resizeCanvas() {
   if (!canvas) return;
   var stage = $('#stage');
   var root = document.documentElement;
-  // 大屏沉浸式：顶栏、引导条、快捷栏都浮在画面上，画布几乎占满屏幕。
-  // 门槛取 1400×760：这是常见笔记本的实际可用区。旧门槛 2000×1100 只让
-  // 2K 以上受益，MacBook 13/14 寸与 1080p 都被排除，可用高度白白少掉两三百像素。
-  var immersive = window.innerWidth >= 1400 && window.innerHeight >= 760;
+  // 横屏统一使用浮层；竖屏由 flex 布局给状态栏、教程和工具栏留空间。
+  var immersive = window.innerWidth > window.innerHeight;
   root.classList.toggle('immersive', immersive);
-  var topH = Math.round($('#topbar').getBoundingClientRect().height);
-  var stageTop = Math.round(stage.getBoundingClientRect().top);
-  // 引导卡是浮层（横屏与大屏两种情况），锚点取"舞台顶边与顶栏底边较大值"，
-  // 保证它贴着顶栏下沿而不是压住顶栏。
-  var assistTop = Math.max(stageTop, topH);
-  root.style.setProperty('--assist-top', assistTop + 'px');
-  var compact = immersive || (window.innerHeight <= 560 && window.innerWidth > window.innerHeight);
-  var availW = stage.clientWidth - 8;
-  var availH = compact
-    // 浮层模式：底栏与触屏键本来就压在画面上，只按顶栏下沿留边
-    ? Math.max(160, window.innerHeight - assistTop - 8)
-    : Math.max(160, window.innerHeight - topH - $('#dock').offsetHeight - $('#farmAssist').offsetHeight - 26);
-  var s = Math.min(availW / VIEW_W, availH / VIEW_H);
-  var coarse = false;
-  try { coarse = window.matchMedia('(pointer: coarse)').matches; } catch (e) { coarse = false; }
-  if (coarse) {
-    // 触屏设备按可用空间连续缩放，尽量填满视野并保持最近邻
-    s = clamp(s, 0.45, 3);
-  } else if (s > 1) {
-    // 鼠标端按 0.5 步进取整：倍率只落在 1/1.5/2/2.5/3… 上，像素不会被插值糊掉，
-    // 也不会像连续缩放那样出现更细的粗细不均；同时不再被锁死在 1x/2x/3x
-    //——16 寸大屏上 2x 只有 768×512，画面会小得离谱。
-    s = Math.min(immersive ? 6 : 5, Math.floor(s * 2) / 2);
-  } else {
-    s = Math.max(0.45, s);
-  }
-  // ---- 核心思路：不再"把固定视口拉大"，而是"让视口随屏幕变大" ----
-  // 以前 VIEW_W/VIEW_H 恒为 384×256，s 只能在 0.45~5 之间取，画面永远是一小块。
-  // 现在用瓦片整数倍（整数缩放，���素永远锐利）决定可见格数，
-  // 再把画布缓冲区和 CSS 尺寸都设成"格数 × TILE × zoom"，
-  // 缓冲区按 dpr 对齐，高分屏上不会再被浏览器插值糊掉。
+  var stageRect = stage.getBoundingClientRect();
+  var topRect = $('#topbar').getBoundingClientRect();
+  root.style.setProperty('--assist-top', Math.ceil(topRect.bottom + 4) + 'px');
+  root.style.setProperty('--dock-h', Math.ceil($('#dock').getBoundingClientRect().height) + 'px');
+  var stageStyle = getComputedStyle(stage);
+  var viewportStyle = getComputedStyle($('#viewport'));
+  var availW = Math.max(1, stageRect.width - parseFloat(stageStyle.paddingLeft)
+    - parseFloat(stageStyle.paddingRight) - parseFloat(viewportStyle.borderLeftWidth)
+    - parseFloat(viewportStyle.borderRightWidth));
+  var availH = Math.max(1, stageRect.height - parseFloat(stageStyle.paddingTop)
+    - parseFloat(stageStyle.paddingBottom) - parseFloat(viewportStyle.borderTopWidth)
+    - parseFloat(viewportStyle.borderBottomWidth));
   var dpr = clamp(window.devicePixelRatio || 1, 1, 3);
-  var coarse2 = false;
-  try { coarse2 = window.matchMedia('(pointer: coarse)').matches; } catch (e) { coarse2 = false; }
-
-  // zoom 是"每格占多少物理像素"，取整数保证像素锐利；上限放宽以便填满大屏。
-  // 像素艺术的关键取舍：倍率必须是整数，倍率越高同一块屏幕上能看到的地图越少。
-  // 这里先按"看得清"定倍率上限（大屏也只到 4x），再让可见格数去填满剩余空间。
-  var maxZoom = coarse2 ? 3 : 4;
-  var zoom = Math.max(1, Math.min(maxZoom, Math.floor(Math.min(availW / (TILE * MIN_TILES_W), availH / (TILE * MIN_TILES_H)))));
-
-  // 可见格数 = 可用空间能放下的格数，至少 MIN_TILES 保证小屏也看得清角色周围
-  var tilesW = Math.max(MIN_TILES_W, Math.floor(availW / (TILE * zoom)));
-  var tilesH = Math.max(MIN_TILES_H, Math.floor(availH / (TILE * zoom)));
-
-  // 地图只有 16~32 格宽，视野太宽就会看到大片地图外的纯色留边。
-  // ��宽怪屏幕上可用空间远超地图尺寸，硬撑满只会得到"中间一张小图两边空"。
-  // 上游的做法是给视野设上限：超出部分居中留边，宁可留边也不拉伸地图。
-  // 地图只有 16~32 格宽，视野太宽就会看到大片地图外的纯色留边。
-  // 做法是"只在视口确实超过地图时把画面居中留边"，而不是砍掉视口：
-  // 砍视口会让屏幕大片留白（实测带鱼屏从 92% 掉到 66%），
-  // 而居中留边只在地图装不下时才出现，边距最多也就一两格。
-  // 真正的处理交给 drawScene：视口大于地图时它会把地图居中并填背景色。
-  // 这里只做一个温和的限制：不让单屏超过 64 格宽，避免极端宽屏看到太多空白。
-  var MAX_TILES_W = 64;
-  tilesW = Math.min(tilesW, MAX_TILES_W);
-
-  var bufW = tilesW * TILE;             // 逻辑像素（绘制坐标系）
-  var bufH = tilesH * TILE;
-  // 缓冲区要覆盖 CSS 盒子在物理像素下的全部范围：CSS 宽高 = bufW×zoom，
-  // 再乘 dpr 才是真正的设备像素。之前只按 dpr 放大缓冲区，在 dpr=1 的
-  // 普通屏上缓冲区比 CSS 盒子小，浏览器只能插值放大，于是整张画面发虚。
+  var coarse = window.matchMedia('(pointer: coarse)').matches;
+  // 先保持角色可读，再扩展取景范围。窄屏允许小于 1 倍，避免最小视野撑破页面。
+  // 倍率按设备像素对齐，剩余空间按逻辑像素使用，不再丢掉一整行/列瓦片。
+  var fit = Math.min(availW / (TILE * MIN_TILES_W), availH / (TILE * MIN_TILES_H));
+  var zoom = Math.max(1 / dpr, Math.floor(Math.min(coarse ? 3 : 4, fit) * dpr) / dpr);
+  zoom = Math.min(zoom, fit);
+  var bufW = Math.max(1, Math.floor(availW / zoom));
+  var bufH = Math.max(1, Math.floor(availH / zoom));
   var physW = Math.round(bufW * zoom * dpr);
   var physH = Math.round(bufH * zoom * dpr);
 
@@ -5836,6 +5804,16 @@ function bindInput() {
   window.addEventListener('pagehide', function () { if (state) saveNow(); });
   window.addEventListener('beforeunload', function () { if (state) saveNow(); });
   window.addEventListener('resize', resizeCanvas);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', resizeCanvas);
+  // 教程展开、提示换行、工具栏填充都会改变剩余空间，不必等用户旋转屏幕。
+  if (window.ResizeObserver) {
+    var layoutFrame = 0;
+    var layoutObserver = new ResizeObserver(function () {
+      if (layoutFrame) return;
+      layoutFrame = requestAnimationFrame(function () { layoutFrame = 0; resizeCanvas(); });
+    });
+    ['stage', 'topbar', 'dock', 'farmAssist'].forEach(function (id) { layoutObserver.observe($('#' + id)); });
+  }
 
   canvas.addEventListener('mousemove', function (e) {
     var t = mouseToTile(e);
