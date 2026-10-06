@@ -160,7 +160,7 @@ var QUEST_SITES = {
 var NPCS = {
   yaya: {
     id: 'yaya', name: '芽芽', title: '种子铺店主', scene: 'town',
-    hair: '#8A5A3C', shirt: '#E8DCC0', accent: '#A9C98A', skin: '#EBC49A',
+    hair: '#835438', shirt: '#FFF3DB', accent: '#9CBF78', skin: '#F2CCA9',
     like: ['radish', 'strawberry', 'jam'],
     dislike: ['stone'],
     schedule: [
@@ -4320,6 +4320,56 @@ function drawDsActor(g,fx,fy) {
   g.imageSmoothingEnabled=false;g.drawImage(getDsSprite(),Math.round(fx)-12,Math.round(fy)-31,24,31);
 }
 
+// 芽芽专用像素像：栗色双辫、嫩芽发饰、奶油色衬衫与绿裙围裙。
+var YAYA_PALETTE={h:'#65432F',H:'#94613E',l:'#BD8953',s:'#F2CCA9',b:'#E8998C',e:'#364D36',w:'#FFF3DB',g:'#71965D',G:'#A4C580',a:'#E6EAC7',r:'#DDBD77',k:'#594634'};
+var YAYA_ROWS=[
+'........hhhhh.......',
+'......hhHHHHHhh.....',
+'.....hHHHHHHHHHh....',
+'....hHHllllHHHHHh...',
+'....hHHHHHHHHgGHh...',
+'....hHHHHHHHGGGHHh..',
+'....hHHHHHHHHHHHHh..',
+'....hHHssssssHHHHh..',
+'....hHssssssssHHHh..',
+'....hHsweessweHsHh..',
+'....hHseessseessHh..',
+'....hHsbbsssbbssHh..',
+'....hHssssssssssHh..',
+'....hHssssrrssssHh..',
+'....hHHssssssssHHh..',
+'....hHHHwwsswwHHHh..',
+'....hHHwwwGGwwwHHh..',
+'....hHwwwwGGwwwwHh..',
+'....hrwwggaaggwwrh..',
+'....hswwgaaaagwwsh..',
+'.....ssggaaaaggss...',
+'.....ssggaaaaggss...',
+'......ggaaaaaagg....',
+'.....gGgaaaaaagGg...',
+'.....gGgaaaaaagGg...',
+'....gGGGaaaaaGGGGg..',
+'....gggggggggggggg..',
+'.......ss..ss.......',
+'.......kk..kk.......',
+'......kkk..kkk......'
+];
+var yayaSpriteCanvas;
+function getYayaSprite(){
+  if(!yayaSpriteCanvas){yayaSpriteCanvas=newCanvas(20,30);var g=yayaSpriteCanvas.getContext('2d');
+    YAYA_ROWS.forEach(function(row,y){for(var x=0;x<row.length;x++)if(row[x]!=='.'){g.fillStyle=YAYA_PALETTE[row[x]];g.fillRect(x,y,1,1);}});
+  }return yayaSpriteCanvas;
+}
+function drawYayaActor(g,fx,fy,opt){
+  px(g,fx-7,fy-1,14,3,'rgba(0,0,0,.2)');g.imageSmoothingEnabled=false;
+  g.drawImage(getYayaSprite(),Math.round(fx)-10,Math.round(fy)-30);
+}
+function drawYayaPortrait(g){
+  px(g,0,0,32,32,'#33513F');px(g,2,2,28,28,'#C8DDB0');g.imageSmoothingEnabled=false;
+  g.drawImage(getYayaSprite(),2,1,18,19,4,3,24,25);
+  px(g,9,27,14,3,'#FFF3DB');px(g,14,27,4,3,'#A4C580');
+}
+
 function getNpcPortrait(id) {
   if (portraitCache[id]) {
     var o = newCanvas(32, 32);
@@ -4331,6 +4381,8 @@ function getNpcPortrait(id) {
   var g = c.getContext('2d');
   if (id === 'ds') {
     drawDsPortrait(g);
+  } else if (id === 'yaya') {
+    drawYayaPortrait(g);
   } else {
     px(g, 0, 0, 32, 32, '#33513F');
     px(g, 2, 2, 28, 28, npc.accent);
@@ -5519,7 +5571,7 @@ function drawScene(g, dt) {
     var nr = npcRuntime[nid];
     if (nr.x < R.x0 - 1 || nr.x > R.x1 + 1 || nr.y < R.y0 - 1 || nr.y > R.y1 + 1) continue;
     var npc = NPCS[nid];
-    ents.push({ z: nr.y * TILE + TILE, f: nid === 'ds' ? drawDsActor : drawActor, a: [nr.x * TILE + 8, nr.y * TILE + 14,
+    ents.push({ z: nr.y * TILE + TILE, f: nid === 'ds' ? drawDsActor : nid === 'yaya' ? drawYayaActor : drawActor, a: [nr.x * TILE + 8, nr.y * TILE + 14,
       { hair: npc.hair, shirt: npc.shirt, accent: npc.accent, skin: npc.skin, face: nr.face, moving: false, phase: 0, swing: 0, apron: true }] });
   }
   ents.push({
