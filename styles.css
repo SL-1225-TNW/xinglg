@@ -49,6 +49,108 @@ body{
   overscroll-behavior:none;
   touch-action:manipulation;
 }
+/* ============================================================
+   装饰花边层 — 4 边装饰覆盖,中央挖空给游戏区
+   固定定位不滚动,装饰永远在最外圈
+   ============================================================ */
+#frame{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:9999;
+  overflow:hidden;
+}
+/* 樱花小图案打底:整屏,中央挖空矩形 200+200像素相,显示游戏 */
+#frame::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background-color:#faf4e6;
+  /* 中央矩形挖空 — 形成 4 边 L 形白底 */
+  clip-path:polygon(
+    0 0, 100% 0, 100% 200px,
+    calc(100% - 240px) 200px, calc(100% - 240px) calc(100% - 200px),
+    100% calc(100% - 200px), 100% 100%, 0 100%,
+    0 calc(100% - 200px), 240px calc(100% - 200px),
+    240px 200px, 0 200px
+  );
+  background-image:
+    radial-gradient(circle 7px at 30px 40px, rgba(244,182,201,.85) 2px, transparent 3px),
+    radial-gradient(circle 6px at 95px 110px, rgba(255,221,231,.9) 1.7px, transparent 2.6px),
+    radial-gradient(circle 8px at 160px 60px, rgba(247,200,181,.82) 2.2px, transparent 3.2px),
+    radial-gradient(circle 6px at 220px 160px, rgba(244,182,201,.78) 1.7px, transparent 2.6px),
+    radial-gradient(circle 7px at 50px 220px, rgba(255,221,231,.85) 2px, transparent 3px),
+    radial-gradient(circle 5px at 130px 280px, rgba(247,200,181,.75) 1.5px, transparent 2.4px),
+    radial-gradient(circle 7px at 240px 260px, rgba(244,182,201,.82) 2px, transparent 3px),
+    radial-gradient(circle 6px at 80px 180px, rgba(255,221,231,.78) 1.7px, transparent 2.6px),
+    radial-gradient(circle 8px at 200px 320px, rgba(247,200,181,.85) 2.2px, transparent 3.2px),
+    radial-gradient(circle 5px at 270px 100px, rgba(244,182,201,.7) 1.5px, transparent 2.4px);
+  background-repeat:repeat;
+  background-size:300px 360px;
+  opacity:1;
+}
+/* 顶部+底部花边(横条)— 装饰层遮住游戏顶端和底端 */
+#frame::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+    url("assets/border-frame.svg") center top / 100% 200px no-repeat,
+    url("assets/border-frame.svg") center bottom / 100% 200px no-repeat;
+  /* 中央矩形挖空 */
+  clip-path:polygon(
+    0 0, 100% 0, 100% 200px,
+    calc(100% - 240px) 200px, calc(100% - 240px) calc(100% - 200px),
+    100% calc(100% - 200px), 100% 100%, 0 100%,
+    0 calc(100% - 200px), 240px calc(100% - 200px),
+    240px 200px, 0 200px
+  );
+}
+/* 左右藤条 */
+.frame-left, .frame-right{
+  position:absolute;
+  top:0; bottom:0;
+  width:240px;
+  pointer-events:none;
+  /* 顶部 200px 和底部 200px 让给顶部/底部花边条 */
+  clip-path:polygon(
+    0 200px, 100% 200px,
+    100% calc(100% - 200px), 0 calc(100% - 200px)
+  );
+}
+.frame-left{
+  left:0;
+  background:url("assets/vine-left.svg") no-repeat left top;
+  background-size:auto 100%;
+}
+.frame-right{
+  right:0;
+  background:url("assets/vine-right.svg") no-repeat right top;
+  background-size:auto 100%;
+}
+/* 顶部和底部 */
+.frame-top, .frame-bottom{
+  position:absolute;
+  left:0; right:0;
+  height:200px;
+  pointer-events:none;
+  /* 左右 240px 让给左右藤条 */
+  clip-path:polygon(
+    240px 0, calc(100% - 240px) 0,
+    calc(100% - 240px) 100%, 240px 100%
+  );
+}
+.frame-top{top:0}
+.frame-bottom{
+  bottom:0;
+  transform:scaleY(-1);
+}
+/* 窄屏(<820px)隐藏侧边藤条 */
+@media (max-width:820px){
+  .frame-left, .frame-right{display:none}
+  .frame-top, .frame-bottom{height:140px}
+}
+
 button{font-family:inherit}
 
 #app{

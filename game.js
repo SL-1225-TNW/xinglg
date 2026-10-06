@@ -26,8 +26,13 @@
    ============================================================ */
 
 var TILE = 16;
+// 视口（取景框）不再是固定像素，而是按瓦片整数倍随屏幕缩放：
+// 业界通行做法是"可见世界尺寸"跟着窗口走，这样 4K 上能看到更多地图，
+// 而不是把同一小块画面拉大发虚。初始值只是首帧兜底，resizeCanvas 会立刻改写。
 var VIEW_W = 384;
 var VIEW_H = 256;
+var MIN_TILES_W = 24;   // 视野最少 24×16 格，保证手机上也看得清角色周围
+var MIN_TILES_H = 16;
 var SAVE_KEY = 'moss-farm-v2';
 var SAVE_KEY_V1 = 'moss-farm-v1';
 var CORRUPT_KEY = 'moss-farm-v2-corrupt';
@@ -5620,9 +5625,9 @@ function resizeCanvas() {
   var stage = $('#stage');
   var root = document.documentElement;
   // 大屏沉浸式：顶栏、引导条、快捷栏都浮在画面上，画布几乎占满屏幕。
-  // 门槛取 2000×1100——再小的屏浮起来并不会让画布变大（可用高度不够跨过 0.5 步进），
-  // 反而让快捷栏压住世界，所以只在大屏上启用。
-  var immersive = window.innerWidth >= 2000 && window.innerHeight >= 1100;
+  // 门槛取 1400×760：这是常见笔记本的实际可用区。旧门槛 2000×1100 只让
+  // 2K 以上受益，MacBook 13/14 寸与 1080p 都被排除，可用高度白白少掉两三百像素。
+  var immersive = window.innerWidth >= 1400 && window.innerHeight >= 760;
   root.classList.toggle('immersive', immersive);
   var topH = Math.round($('#topbar').getBoundingClientRect().height);
   var stageTop = Math.round(stage.getBoundingClientRect().top);
@@ -5650,8 +5655,64 @@ function resizeCanvas() {
   } else {
     s = Math.max(0.45, s);
   }
-  canvas.style.width = Math.floor(VIEW_W * s) + 'px';
-  canvas.style.height = Math.floor(VIEW_H * s) + 'px';
+  // ---- 核心思路：不再"把固定视口拉大"，而是"让视口随屏幕变大" ----
+  // 以前 VIEW_W/VIEW_H 恒为 384×256，s 只能在 0.45~5 之间取，画面永远是一小块。
+  // 现在用瓦片整数倍（整数缩放，���素永远锐利）决定可见格数，
+  // 再把画布缓冲区和 CSS 尺寸都设成"格数 × TILE × zoom"，
+  // 缓冲区按 dpr 对齐，高分屏上不会再被浏览器插值糊掉。
+  var dpr = clamp(window.devicePixelRatio || 1, 1, 3);
+  var coarse2 = false;
+  try { coarse2 = window.matchMedia('(pointer: coarse)').matches; } catch (e) { coarse2 = false; }
+
+  // zoom 是"每格占多少物理像素"，取整数保证像素锐利；上限放宽以便填满大屏。
+  // 像素艺术的关键取舍：倍率必须是整数，倍率越高同一块屏幕上能看到的地图越少。
+  // 这里先按"看得清"定倍率上限（大屏也只到 4x），再让可见格数去填满剩余空间。
+  var maxZoom = coarse2 ? 3 : 4;
+  var zoom = Math.max(1, Math.min(maxZoom, Math.floor(Math.min(availW / (TILE * MIN_TILES_W), availH / (TILE * MIN_TILES_H)))));
+
+  // 可见格数 = 可用空间能放下的格数，至少 MIN_TILES 保证小屏也看得清角色周围
+  var tilesW = Math.max(MIN_TILES_W, Math.floor(availW / (TILE * zoom)));
+  var tilesH = Math.max(MIN_TILES_H, Math.floor(availH / (TILE * zoom)));
+
+  // 地图只有 16~32 格宽，视野太宽就会看到大片地图外的纯色留边。
+  // ��宽怪屏幕上可用空间远超地图尺寸，硬撑满只会得到"中间一张小图两边空"。
+  // 上游的做法是给视野设上限：超出部分居中留边，宁可留边也不拉伸地图。
+  // 地图只有 16~32 格宽，视野太宽就会看到大片地图外的纯色留边。
+  // 做法是"只在视口确实超过地图时把画面居中留边"，而不是砍掉视口：
+  // 砍视口会让屏幕大片留白（实测带鱼屏从 92% 掉到 66%），
+  // 而居中留边只在地图装不下时才出现，边距最多也就一两格。
+  // 真正的处理交给 drawScene：视口大于地图时它会把地图居中并填背景色。
+  // 这里只做一个温和的限制：不让单屏超过 64 格宽，避免极端宽屏看到太多空白。
+  var MAX_TILES_W = 64;
+  tilesW = Math.min(tilesW, MAX_TILES_W);
+
+  var bufW = tilesW * TILE;             // 逻辑像素（绘制坐标系）
+  var bufH = tilesH * TILE;
+  // 缓冲区要覆盖 CSS 盒子在物理像素下的全部范围：CSS 宽高 = bufW×zoom，
+  // 再乘 dpr 才是真正的设备像素。之前只按 dpr 放大缓冲区，在 dpr=1 的
+  // 普通屏上缓冲区比 CSS 盒子小，浏览器只能插值放大，于是整张画面发虚。
+  var physW = Math.round(bufW * zoom * dpr);
+  var physH = Math.round(bufH * zoom * dpr);
+
+  // 视口按瓦片对齐，保证移动时不产生半个像素的抖动
+  VIEW_W = bufW;
+  VIEW_H = bufH;
+  Game.zoom = zoom;
+
+  // 只要目标尺寸和当前不一致就重建缓冲区。这里用 canvas.width/height 与
+  // 目标值直接比较，避免"高度已变但没重建"导致画面被拉伸。
+  if (canvas.width !== physW || canvas.height !== physH) {
+    canvas.width = physW;
+    canvas.height = physH;
+    // 缓冲区被改写后 context 状态会重置，必须重新关掉平滑
+    ctx.imageSmoothingEnabled = false;
+  }
+  canvas.style.width = bufW * zoom + 'px';
+  canvas.style.height = bufH * zoom + 'px';
+  // 绘制按 dpr*zoom 放大逻辑坐标：每格实际占 TILE*zoom*dpr 个设备像素。
+  // 每帧都重设，避免被别处遗留的 transform 影响。
+  ctx.setTransform(zoom * dpr, 0, 0, zoom * dpr, 0, 0);
+  root.style.setProperty('--zoom', String(zoom));
 }
 
 /* --- 主循环 --- */
