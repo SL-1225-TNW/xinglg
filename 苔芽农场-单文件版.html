@@ -1111,6 +1111,11 @@ var ITEMS = {
   fish_gold: { name: '金鳞鱼', kind: 'fish', sell: 180, food: 15, desc: '需要 2 级鱼竿，售价 180 金。' },
   fish_sturgeon: { name: '星纹鲟', kind: 'fish', sell: 300, food: 15, desc: '需要 3 级鱼竿，售价 300 金。' },
   fish_king: { name: '蓝冠鱼王', kind: 'fish', sell: 480, food: 15, desc: '需要 3 级鱼竿，售价 480 金。' },
+  hardwood: {name:'硬木',kind:'material',sell:12,food:0,desc:'探索获得，可出售，售价 12 金。'},
+  mushroom: {name:'林间蘑菇',kind:'forage',sell:12,food:15,desc:'探索获得，可出售，售价 12 金。'},
+  copper_ore: {name:'铜矿石',kind:'material',sell:16,food:0,desc:'探索获得，可出售，售价 16 金。'},
+  iron_ore: {name:'铁矿石',kind:'material',sell:30,food:0,desc:'探索获得，可出售，售价 30 金。'},
+  gem: {name:'紫晶',kind:'material',sell:100,food:0,desc:'探索获得，可出售，售价 100 金。'},
   jam:       { name: '莓果酱', kind: 'craft', sell: 50, food: 25, desc: '果酱罐熬制的果酱，售价 50 金。' },
   wood:      { name: '木材',   kind: 'material', sell: 3, desc: '砍伐获得，可制作、交付或卖给木匠，售价 3 金。' },
   stone:     { name: '石头',   kind: 'material', sell: 2, desc: '采掘获得，可制作、交付或卖给木匠，售价 2 金。' },
@@ -1325,7 +1330,7 @@ function fmtTime(min) {
   return (h < 10 ? '0' : '') + h + ':' + (mm < 10 ? '0' : '') + mm;
 }
 function plural(n) { return n + ' 个'; }
-function itemName(id) { if (id === 'tool_rod' && state) return ROD_LEVELS[(state.rodLevel || 1)-1].name; return (ITEMS[id] && ITEMS[id].name) || id; }
+function itemName(id) { if (state && state.exploration && state.exploration.tools && (id === 'tool_axe' || id === 'tool_pick')) return id === 'tool_axe' ? '钢制斧头' : '钢制镐子'; if (id === 'tool_rod' && state) return ROD_LEVELS[(state.rodLevel || 1)-1].name; return (ITEMS[id] && ITEMS[id].name) || id; }
 
 /* --- 确定性随机（状态随存档保存） --- */
 function mulberry32(a) {
@@ -1443,6 +1448,7 @@ function newGameState() {
     npcDailyInteractions: {},
     dsMet: false,
     rodLevel: 1,
+    exploration: {forest:false,mine:false,depth:1,hut:false,tools:false,nodes:{},treasures:{},requestDay:-1},
     questProgress: { 1: 'locked', 2: 'locked', 3: 'locked', 4: 'locked' },
     unlockedRecipes: ['chest'],
     bridgeRepaired: false,
@@ -1516,6 +1522,7 @@ function serialize() {
     npcDailyInteractions: state.npcDailyInteractions,
     dsMet: state.dsMet,
     rodLevel: state.rodLevel,
+    exploration: state.exploration,
     questProgress: state.questProgress,
     unlockedRecipes: state.unlockedRecipes,
     bridgeRepaired: state.bridgeRepaired,
@@ -1577,7 +1584,7 @@ function normalizeSave(raw) {
   s.timeMinutes = num(raw.timeMinutes, CFG.dayStart, CFG.dayStart, CFG.dayEnd);
   s.coins = Math.max(0, Math.floor(num(raw.coins, 0, 0, 1e9)));
   s.energy = clamp(Math.floor(num(raw.energy, CFG.maxEnergy, 0, CFG.maxEnergy)), 0, CFG.maxEnergy);
-  s.sceneId = (raw.sceneId === 'town' || raw.sceneId === 'riverside' || raw.sceneId === 'house') ? raw.sceneId : 'farm';
+  s.sceneId = (['town','riverside','house','forest','mine1','mine2','mine3'].indexOf(raw.sceneId)>=0) ? raw.sceneId : 'farm';
   if (raw.player && typeof raw.player === 'object') {
     s.player = {
       x: Math.floor(num(raw.player.x, 9, 0, 63)),
@@ -1614,6 +1621,8 @@ function normalizeSave(raw) {
   s.npcDailyInteractions = (raw.npcDailyInteractions && typeof raw.npcDailyInteractions === 'object') ? raw.npcDailyInteractions : {};
   // DS 小姐：没有该字段的旧存档视为尚未相遇，她会在玩家解锁钓竿后的第一次钓鱼时出现。
   s.dsMet = !!raw.dsMet;
+  s.exploration = normalizeExploration(raw.exploration);
+  if ((s.sceneId === 'forest' && !s.exploration.forest) || (s.sceneId.indexOf('mine') === 0 && (!s.exploration.mine || +s.sceneId.slice(4)>s.exploration.depth))) { s.sceneId='town';s.player={x:14,y:2,face:'down'}; }
   s.rodLevel = clamp(Math.floor(num(raw.rodLevel, 1, 1, 3)), 1, 3);
   var qp = {};
   QUESTS.forEach(function (q) {
@@ -2006,7 +2015,85 @@ MAPS.riverside = (function () {
   };
 })();
 
-var SCENE_ORDER = ['farm', 'town', 'riverside', 'house'];
+// 森林连接小镇北口，矿山由森林东北的营地进入。
+MAPS.forest=(function(){
+  var m=mkMap(40,28,T_GRASS);
+  fillRect(m,13,1,15,27,T_PATH,false);fillRect(m,14,12,33,14,T_PATH,false);
+  fillRect(m,29,4,31,13,T_PATH,false);fillRect(m,4,5,10,9,T_POND,true);
+  fillRect(m,21,6,25,9,T_BUILDING,true);
+  var trees=[];for(var x=1;x<39;x+=3)for(var y=1;y<27;y+=3){
+    if((x===37&&y===25)||(x>=12&&x<=16)||(y>=11&&y<=15)||(x>=28&&x<=33&&y<=14)||(x>=3&&x<=11&&y>=4&&y<=10)||(x>=20&&x<=26&&y>=5&&y<=11))continue;
+    trees.push([x,y]);m.solid[x][y]=1;
+  }
+  return {w:m.w,h:m.h,t:m.t,solid:m.solid,name:'雾杉森林',pond:{x0:4,y0:5,x1:10,y1:9},exits:[{x:14,y:27,to:'town',tx:14,ty:1}],trees:trees,buildings:[{x:21,y:6,w:5,h:4,kind:'workshop'}],decor:[{t:'sign',x:14,y:24},{t:'bench',x:11,y:7},{t:'sign',x:30,y:4}]};
+})();
+for(var floor=1;floor<=3;floor++){
+  (function(level){var m=mkMap(28,24,T_PATH);
+    for(var x=0;x<28;x++)for(var y=0;y<24;y++)if(x===0||y===0||x===27||y===23){m.t[x][y]=T_BUILDING;m.solid[x][y]=1;}
+    for(var y=5;y<20;y+=6)for(var x=3;x<25;x++)if(x!==7&&x!==13&&x!==18&&x!==19){m.t[x][y]=T_BUILDING;m.solid[x][y]=1;}
+    m.t[13][23]=T_PATH;m.solid[13][23]=0;
+    MAPS['mine'+level]={w:m.w,h:m.h,t:m.t,solid:m.solid,name:'旧矿山 · 第 '+level+' 层',exits:[{x:13,y:23,to:level===1?'forest':'mine'+(level-1),tx:level===1?30:22,ty:level===1?6:4}],buildings:[],decor:[{t:'sign',x:22,y:3},{t:'bench',x:12,y:21}]};
+  })(floor);
+}
+MAPS.town.exits.push({x:14,y:0,to:'forest',tx:14,ty:26});
+var SCENE_ORDER = ['farm', 'town', 'riverside', 'house','forest','mine1','mine2','mine3'];
+var EXPLORE_NODES={forest:{},mine1:{},mine2:{},mine3:{}};
+[[6,12],[9,16],[18,18],[24,20],[33,18],[36,23],[8,22],[20,3]].forEach(function(p){EXPLORE_NODES.forest[key2(p[0],p[1])]={type:'tree',item:'hardwood',qty:4,hp:4};});
+[[11,9],[5,16],[17,8],[25,16],[31,19],[35,9],[6,24],[22,23]].forEach(function(p){EXPLORE_NODES.forest[key2(p[0],p[1])]={type:'forage',item:'mushroom',qty:2,hp:1};});
+for(var depth=1;depth<=3;depth++)[[4,3],[9,8],[15,10],[23,8],[5,14],[11,18],[23,19],[18,21]].forEach(function(p,i){EXPLORE_NODES['mine'+depth][key2(p[0],p[1])]={type:'stone',item:depth===1?'copper_ore':depth===2?'iron_ore':i%3===0?'gem':'iron_ore',qty:depth===3&&i%3===0?1:3,hp:3};});
+function normalizeExploration(raw){
+ function num(v,d,min,max){return typeof v==='number'&&isFinite(v)?clamp(v,min,max):d;}
+ raw=raw&&typeof raw==='object'?raw:{};
+ var e={forest:!!raw.forest,mine:!!raw.mine,depth:clamp(Math.floor(num(raw.depth,1,1,3)),1,3),hut:!!raw.hut,tools:!!raw.tools,nodes:{},treasures:{},requestDay:Math.floor(num(raw.requestDay,-1,-1,1e6))};
+ if(!e.forest){e.mine=false;e.hut=false;}if(!e.mine)e.depth=1;
+ ['forest_cache','mine_cache'].forEach(function(k){e.treasures[k]=!!(raw.treasures&&raw.treasures[k]);});
+ Object.keys(EXPLORE_NODES).forEach(function(sc){Object.keys(EXPLORE_NODES[sc]).forEach(function(k){var n=EXPLORE_NODES[sc][k],key=sc+':'+k,v=raw.nodes&&raw.nodes[key];if(v&&typeof v==='object')e.nodes[key]={hp:clamp(Math.floor(num(v.hp,n.hp,0,n.hp)),0,n.hp),day:Math.floor(num(v.day,0,0,1e6))};});});return e;
+}
+function exploreState(){if(!state.exploration)state.exploration=normalizeExploration();return state.exploration;}
+function exploreNode(sc,x,y){var def=EXPLORE_NODES[sc]&&EXPLORE_NODES[sc][key2(x,y)];if(!def)return null;
+ var e=exploreState(),key=sc+':'+key2(x,y),saved=e.nodes[key];
+ if(!saved){saved=e.nodes[key]={hp:def.hp,day:state.totalDay};}
+ var delay=def.type==='forage'?1:3;
+ if(saved.hp<=0&&state.totalDay-saved.day>=delay){saved.hp=def.hp;}
+ return {def:def,saved:saved};
+}
+function gatherExplore(tool,x,y){
+ var n=exploreNode(state.sceneId,x,y);if(!n){toast('这里没有可采集的资源。');return false;}
+ var expected=n.def.type==='tree'?'axe':n.def.type==='stone'?'pickaxe':'harvest';
+ if(tool!==expected){toast('请用'+(expected==='axe'?'斧头':expected==='pickaxe'?'镐子':'收获篮')+'采集'+itemName(n.def.item)+'。');return false;}
+ if(n.saved.hp<=0){toast('这里的资源尚未恢复，蘑菇隔天、硬木和矿石每 3 天恢复。');return false;}
+ var cost=expected==='harvest'?2:CFG.energyCost[expected],damage=exploreState().tools&&expected!=='harvest'?2:1;
+ if(!hasEnergy(cost))return false;
+ if(n.saved.hp<=damage&&!bagAccepts(n.def.item,n.def.qty)){toast('背包满了，先整理一下。');return false;}
+ state.energy-=cost;n.saved.hp=Math.max(0,n.saved.hp-damage);
+ if(n.saved.hp===0){invAdd(n.def.item,n.def.qty);n.saved.day=state.totalDay;toast('获得'+itemName(n.def.item)+' ×'+n.def.qty+'。');}
+ else toast(itemName(n.def.item)+'：还需 '+Math.ceil(n.saved.hp/damage)+' 次。');
+ addParticle(x,y,expected==='axe'?'wood':'stone');Audio2.play(expected==='axe'?'chop':'breakrock');markDirty();refreshHud();refreshHotbar();return true;
+}
+function payExplore(cost){
+ for(var k in cost)if((k==='coins'?state.coins:invCount(k))<cost[k]){toast('材料不足，需要 '+Object.keys(cost).map(function(id){return(id==='coins'?'金币':itemName(id))+' ×'+cost[id];}).join('、'));return false;}
+ for(var k in cost)if(k==='coins')state.coins-=cost[k];else invRemove(k,cost[k]);return true;
+}
+function openExploreSite(kind){
+ var e=exploreState(),configs={forest:{title:'清理森林入口',desc:'小镇北口通往雾杉森林。清理倒木后可采蘑菇、硬木，在林间湖钓鱼，并探索东北的旧矿山。',cost:{wood:15,coins:80}},mine:{title:'修复矿山入口',desc:'修复支撑梁与轨道，开放第一层铜矿区。更深处有铁矿和紫晶。',cost:{wood:20,stone:10}},hut:{title:'修复伐木屋',desc:'修复后可领取每日森林委托：交付 5 个蘑菇和 10 份木材，收入 100 金。',cost:{hardwood:12,stone:10,coins:100}},tools:{title:'钢制工具升级',desc:'斧头与镐子的采集力度翻倍，农场、森林和矿山均生效。',cost:{iron_ore:10,coins:200}}};
+ if(kind==='forest'&&e.forest){doSwitchScene('forest',14,26);return;}
+ if(kind==='mine'&&e.mine){doSwitchScene('mine1',13,21);return;}
+ if(kind==='hut'&&e.hut){openWindow({id:'forest_request',kind:'custom',title:'伐木屋 · 每日委托',build:function(b){b.appendChild(el('p',null,'森林补给：蘑菇 ×5、木材 ×10，奖励 100 金。每天可交付一次。'));b.appendChild(el('p','muted',e.requestDay===state.totalDay?'今天已完成，明天再来。':'今天尚未交付。'));},actions:[{label:'交付补给',kind:'primary',onClick:function(){if(e.requestDay===state.totalDay){toast('今天已经交付过了。');return;}if(payExplore({mushroom:5,wood:10})){e.requestDay=state.totalDay;state.coins+=100;markDirty();refreshHud();saveNow();toast('森林委托完成，获得 100 金。');refreshWindow();}},close:false},{label:'离开',close:true}]});return;}
+ if(kind==='tools'&&e.tools){toast('已拥有钢制斧头和镐子。');return;}
+ var cfg=configs[kind];openWindow({id:'explore_repair',kind:'custom',title:cfg.title,build:function(b){b.appendChild(el('p',null,cfg.desc));b.appendChild(el('p','muted','需要：'+Object.keys(cfg.cost).map(function(k){return(k==='coins'?'金币':itemName(k))+' ×'+cfg.cost[k];}).join('、')));},actions:[{label:'确认修复 / 升级',kind:'primary',close:false,onClick:function(){if(kind==='forest'&&!state.bridgeRepaired){toast('先完成小镇修桥委托，再开始远行。');return;}if(payExplore(cfg.cost)){e[kind]=true;markDirty();refreshHud();refreshHotbar();saveNow();closeWindow();toast(cfg.title+'完成！');}}},{label:'稍后再来',close:true}]});
+}
+function exploreStairs(next){
+ var e=exploreState();if(next<=e.depth){doSwitchScene('mine'+next,13,21);return;}
+ var cost=next===2?{hardwood:8,copper_ore:8}:{iron_ore:8,coins:250};
+ openWindow({id:'mine_stairs',kind:'custom',title:'修复通往第 '+next+' 层的轨道',build:function(b){b.appendChild(el('p',null,'需要：'+Object.keys(cost).map(function(k){return(k==='coins'?'金币':itemName(k))+' ×'+cost[k];}).join('、')+'。修复后永久开放。'));},actions:[{label:'修复轨道',kind:'primary',close:false,onClick:function(){if(payExplore(cost)){e.depth=next;markDirty();saveNow();closeWindow();doSwitchScene('mine'+next,13,21);}}},{label:'返回',close:true}]});
+}
+function exploreTreasure(id){var e=exploreState();if(e.treasures[id]){toast('这个宝箱已经打开了。');return;}var amount=id==='forest_cache'?120:200;e.treasures[id]=true;state.coins+=amount;markDirty();refreshHud();saveNow();toast('发现隐藏宝箱，获得 '+amount+' 金！');}
+function drawExploreNode(g,x,y,n){
+ if(n.type==='tree'){drawTree(g,x,y);px(g,x*TILE+6,y*TILE-3,4,12,'#765438');}
+ else if(n.type==='stone'){drawRock(g,x,y);var color=n.item==='copper_ore'?'#D48F58':n.item==='iron_ore'?'#94B5CA':'#C59EEA';px(g,x*TILE+5,y*TILE+6,3,3,color);px(g,x*TILE+10,y*TILE+9,2,3,color);}
+ else{px(g,x*TILE+4,y*TILE+9,3,5,'#F1DFC4');px(g,x*TILE+1,y*TILE+6,9,4,'#B87759');px(g,x*TILE+3,y*TILE+5,5,2,'#DDA27B');px(g,x*TILE+12,y*TILE+10,2,4,'#EADBBE');px(g,x*TILE+10,y*TILE+8,5,3,'#9E6952');}
+}
+
 
 /* --- 农舍室内：16×12，家具各自占格并参与碰撞 --- */
 var HOUSE_FURNITURE = [
@@ -2100,6 +2187,7 @@ function isSolid(sceneId, x, y) {
     if (sceneId === 'town' && state.bridgeRepaired && x >= 26 && x <= 29 && y >= 10 && y <= 11) return false;
     return true;
   }
+  var en=exploreNode(sceneId,x,y);if(en&&en.saved.hp>0&&en.def.type!=='forage')return true;
   if (sceneId === 'house' && houseFurnitureAt(x, y)) return true;
   if (sceneId === 'farm') {
     var n = state.resourceNodes[key2(x, y)];
@@ -2157,7 +2245,7 @@ function checkExit() {
   var e;
   for (e = 0; e < (map.exits || []).length; e++) {
     var ex = map.exits[e];
-    if (ex.x === px && ex.y === py) { doSwitchScene(ex.to, ex.tx, ex.ty); return true; }
+    if (ex.x === px && ex.y === py) { if(ex.to === 'forest' && !exploreState().forest){toast('森林入口尚未清理。到小镇北口路牌按 E 修复。');return false;} doSwitchScene(ex.to, ex.tx, ex.ty); return true; }
   }
   if (map.eastExits) {
     for (e = 0; e < map.eastExits.length; e++) {
@@ -2224,12 +2312,17 @@ var INTERACTABLES = {
     { id: 'farmhouse', x: 3, y: 4, stand: [[3,5],[2,4],[4,4],[3,3]], kind: 'enterHouse', label: '农舍' }
   ],
   town: [
+    {id:'forest_gate',x:14,y:1,stand:[[14,2],[13,1],[15,1],[14,1]],kind:'forestGate',label:'雾杉森林入口'},
     { id: 'shop', x: 8, y: 7, stand: [[8,8],[7,7],[9,7],[8,6]], kind: 'shop', label: '种子铺' },
     { id: 'workshop', x: 20, y: 7, stand: [[20,8],[19,7],[21,7],[20,6]], kind: 'workshop', label: '阿栎木工作坊' },
     { id: 'board', x: 14, y: 9, stand: [[14,10],[13,9],[15,9],[14,8]], kind: 'board', label: '任务板' },
     { id: 'bridge', x: 26, y: 9, stand: [[25,9],[25,10]], kind: 'bridge', label: '小桥施工点' }
   ],
   riverside: [{id:'tackle',x:3,y:7,stand:[[3,8],[2,7],[4,7],[3,7]],kind:'tackle',label:'DeepSeek 渔具店'}],
+  forest: [{id:'mine_gate',x:30,y:4,stand:[[30,5],[29,4],[31,4]],kind:'mineGate',label:'旧矿山入口'},{id:'lumber_hut',x:23,y:10,stand:[[23,11],[22,10],[24,10]],kind:'lumberHut',label:'伐木屋'},{id:'forest_cache',x:37,y:25,stand:[[37,24],[36,25],[38,25]],kind:'treasure',label:'林间宝箱'}],
+  mine1: [{id:'stairs2',x:22,y:3,stand:[[22,4],[21,3],[23,3]],kind:'mineStairs',next:2,label:'二层轨道'}],
+  mine2: [{id:'stairs3',x:22,y:3,stand:[[22,4],[21,3],[23,3]],kind:'mineStairs',next:3,label:'三层轨道'}],
+  mine3: [{id:'mine_cache',x:24,y:20,stand:[[24,21],[23,20],[25,20]],kind:'treasure',label:'矿山宝箱'}],
   house: [
     { id: 'h_bed',      x: 1, y: 1, stand: [[1,3],[2,3],[3,1],[3,2]], kind: 'bed', label: '床' },
     { id: 'h_chest',    x: 13, y: 2, stand: [[13,3],[12,2],[14,2]], kind: 'houseChest', label: '储物箱' },
@@ -2494,6 +2587,7 @@ function useTool(tool, tx, ty, opts) {
     toast('这里没有可以耕种的土地。');
     return false;
   }
+  if(EXPLORE_NODES[state.sceneId] && ['axe','pickaxe','harvest'].indexOf(tool)>=0) return gatherExplore(tool,tx,ty);
   switch (tool) {
     case 'hoe': return toolHoe(tx, ty);
     case 'seed': return toolSeed(tx, ty);
@@ -2654,7 +2748,7 @@ function toolNode(tx, ty, type) {
   if (!node.active) { toast(type === 'tree' ? '这棵树已经被砍掉了。' : '这块石头已经敲碎了。'); return false; }
   if (!hasEnergy(CFG.energyCost[type === 'tree' ? 'axe' : 'pickaxe'])) return false;
   state.energy -= CFG.energyCost[type === 'tree' ? 'axe' : 'pickaxe'];
-  node.hp -= 1;
+  node.hp -= exploreState().tools ? 2 : 1;
   addParticle(tx, ty, type === 'tree' ? 'wood' : 'stone');
   addShake(tx, ty, type);
   Audio2.play(type === 'tree' ? 'chop' : 'breakrock');
@@ -3432,7 +3526,7 @@ function pickFish() {
 
 function toolFish(tx, ty) {
   if (invCount('tool_rod') < 1) { toast('先完成修桥委托，获得钓竿。'); return false; }
-  if (state.sceneId !== 'riverside' && state.sceneId !== 'farm') { toast('可以在农场池塘或河边钓鱼。'); return false; }
+  if (state.sceneId !== 'riverside' && state.sceneId !== 'farm' && state.sceneId !== 'forest') { toast('可以在农场池塘、河边或森林湖钓鱼。'); return false; }
   var p = state.player;
   var atBank = [[0,-1],[0,1],[-1,0],[1,0]].some(function (d) { return isWater(state.sceneId, p.x+d[0], p.y+d[1]); });
   if (!atBank || Math.abs(tx-p.x)+Math.abs(ty-p.y) > 3) { toast('站在岸边，点击 3 格以内的水面抛竿。'); return false; }
@@ -4289,7 +4383,7 @@ function openBag() {
 }
 
 /* --- 商店 --- */
-var WORKSHOP_GOODS = { wood: 6, stone: 4, dev_chest: 70 };
+var WORKSHOP_GOODS = { wood: 6, stone: 4, hardwood:24, copper_ore:32, iron_ore:60, gem:200, dev_chest: 70 };
 function buyWorkshopItem(id, qty) {
   if (!Object.prototype.hasOwnProperty.call(WORKSHOP_GOODS, id) || !Number.isInteger(qty) || qty <= 0) return false;
   var price = WORKSHOP_GOODS[id] * qty;
@@ -4338,6 +4432,7 @@ function openWorkshop() {
     id: 'workshop', kind: 'custom', wide: true, title: '阿栎木工作坊',
     build: function (b) {
       b.appendChild(el('p', 'muted', '金币：' + state.coins + ' 金。材料可用于制作和委托，也可在这里买卖。'));
+      b.appendChild(mkBtn(exploreState().tools?'钢制工具 · 已升级':'升级钢制斧头与镐子','',function(){openExploreSite('tools');}));
       b.appendChild(el('div', 'section-title', '材料与木箱'));
       Object.keys(WORKSHOP_GOODS).forEach(function (id) {
         var row = itemTile(id, invCount(id), null, false,
@@ -4772,14 +4867,16 @@ var WORLD_REGIONS = [
   {id:'town',name:'芽芽小镇',x:26,y:48,desc:'通往山谷各处的乡村集市。现有种子铺、任务板与村民就在这里。'},
   {id:'riverside',name:'溪畔河湾',x:33,y:76,desc:'小桥另一侧的钓鱼河岸。完成修桥委托后开放。'},
   {id:'vineyard',name:'金叶葡萄园',x:43,y:23,desc:'缓坡上的葡萄架、石墙与乡村庄园。未来探索路线的一站。'},
-  {id:'forest',name:'雾松森林',x:55,y:81,desc:'幽静的林间小径与古老遗迹。未来可沿河湾继续探索。'},
+  {id:'forest',name:'雾杉森林',x:55,y:81,desc:'从小镇北口进入。硬木、蘑菇、林间湖、伐木屋与隐藏宝箱；东北通往旧矿山。'},
   {id:'city',name:'白蔷薇城',x:57,y:47,desc:'山谷中央的石砌城堡城市。蓝灰色屋顶、蔷薇庭院与市集，作为逐步探索的远期目的地。'},
-  {id:'pass',name:'银峰山口',x:80,y:22,desc:'山谷东侧的高山关隘。未来通往矿洞和山地的路线。'},
+  {id:'pass',name:'旧矿山',x:80,y:22,desc:'从森林东北进入，共三层：铜矿、铁矿、紫晶。修复轨道逐层深入，原路返回森林。'},
   {id:'mill',name:'风铃磨坊',x:81,y:67,desc:'河流穿过麦田与古老水磨坊，连接山谷东南部的乡野。'}
 ];
 function worldRegionStatus(r) {
   if (r.id === 'farm' || r.id === 'town') return '已开放';
   if (r.id === 'riverside') return state.bridgeRepaired ? '已开放' : '未解锁 · 修复小桥';
+  if(r.id==='forest')return exploreState().forest?'已开放':'未解锁 · 小镇北口清理倒木';
+  if(r.id==='pass')return exploreState().mine?'已开放':'未解锁 · 森林东北修复矿山';
   return '待开放';
 }
 function drawWorldAtlas(c) {
@@ -4791,7 +4888,7 @@ function drawWorldAtlas(c) {
   for(var j=0;j<21;j++){var mx=25+j*29,my=24+(j%3)*9;g.fillStyle='#8B9384';g.beginPath();g.moveTo(mx,my+42);g.lineTo(mx+18,my);g.lineTo(mx+37,my+42);g.fill();g.fillStyle='#E7E3CD';g.beginPath();g.moveTo(mx+12,my+14);g.lineTo(mx+18,my);g.lineTo(mx+25,my+14);g.fill();}
   g.strokeStyle='#678F97';g.lineWidth=18;g.lineJoin='round';g.beginPath();g.moveTo(588,70);g.lineTo(565,140);g.lineTo(458,246);g.lineTo(309,276);g.lineTo(206,324);g.lineTo(137,387);g.stroke();
   g.strokeStyle='#91B5B8';g.lineWidth=8;g.stroke();
-  var paths=[[0,1],[1,2],[1,3],[3,5],[2,4],[4,5],[5,6],[5,7]];
+  var paths=[[0,1],[1,2],[1,3],[3,5],[1,4],[4,6],[4,5],[5,6],[5,7]];
   paths.forEach(function(p){var a=WORLD_REGIONS[p[0]],b=WORLD_REGIONS[p[1]];g.strokeStyle='#DCCD9B';g.lineWidth=5;g.setLineDash(p[0]===0?[]:[6,6]);g.beginPath();g.moveTo(a.x*6.4,a.y*4);g.lineTo(b.x*6.4,b.y*4);g.stroke();});g.setLineDash([]);
   function house(x,y,w){g.fillStyle='#F0E5C8';g.fillRect(x-w/2,y-12,w,16);g.fillStyle='#86664D';g.fillRect(x-3,y-3,6,7);g.fillStyle='#5D7181';g.beginPath();g.moveTo(x-w/2-3,y-12);g.lineTo(x,y-24);g.lineTo(x+w/2+3,y-12);g.fill();}
   WORLD_REGIONS.forEach(function(r){var x=r.x*6.4,y=r.y*4;
@@ -4806,7 +4903,7 @@ function drawWorldAtlas(c) {
 }
 function openWorldMap() {
   clearKeys();
-  var current=state.sceneId==='house'?'farm':state.sceneId;
+  var current=state.sceneId==='house'?'farm':state.sceneId.indexOf('mine')===0?'pass':state.sceneId;
   var selected=current;
   openWindow({id:'worldmap',kind:'custom',wide:true,title:'蔷薇谷 · 全境地图',build:function(b){
     b.appendChild(el('p','muted','西北的家，中央的城。沿山谷逐步探索，前往白蔷薇城。'));
@@ -4819,7 +4916,7 @@ function openWorldMap() {
     });b.appendChild(wrap);
     var r=WORLD_REGIONS.filter(function(p){return p.id===selected;})[0]||WORLD_REGIONS[0];
     var detail=el('div','panel-box atlas-detail');detail.setAttribute('aria-live','polite');detail.appendChild(el('div','section-title',r.name+' · '+worldRegionStatus(r)));detail.appendChild(el('p',null,r.desc));b.appendChild(detail);
-    b.appendChild(el('p','muted','虚线边框地点：未解锁或待开放，点击查看详情。实线路：现有农场与小镇连接；虚线路：探索路线示意。待开放区域尚未建造，解锁条件以后确定。M 或 Esc 关闭，地图不能传送。'));
+    b.appendChild(el('p','muted','虚线边框地点：未解锁或待开放，点击查看详情。实线路：现有农场与小镇连接；虚线路：探索路线示意。森林由小镇北口进入，矿山由森林东北进入；其余待开放区域仍在规划中。M 或 Esc 关闭，地图不能传送。'));
   },actions:[{label:'返回游戏',kind:'primary',close:true}]});
 }
 
@@ -5036,6 +5133,11 @@ function activateInteractable(it) {
   if (it.kind === 'calendar') { openCalendar(); return; }
   if (it.kind === 'handbook') { openHandbook(); return; }
   if (it.kind === 'shop') { openShop(); return; }
+  if(it.kind==='forestGate'){openExploreSite('forest');return;}
+  if(it.kind==='mineGate'){openExploreSite('mine');return;}
+  if(it.kind==='lumberHut'){openExploreSite('hut');return;}
+  if(it.kind==='mineStairs'){exploreStairs(it.next);return;}
+  if(it.kind==='treasure'){exploreTreasure(it.id);return;}
   if (it.kind === 'tackle') { openTackleShop(); return; }
   if (it.kind === 'workshop') { openWorkshop(); return; }
   if (it.kind === 'board') { openQuestLog('board'); return; }
@@ -5289,6 +5391,9 @@ var ICON_ART = {
 };
 
 var iconCache = {};
+ICON_ART.hardwood=function(g){px(g,3,3,4,11,'#69472F');px(g,8,4,5,10,'#97704A');px(g,4,3,2,2,'#D8B47E');px(g,9,4,3,2,'#D8B47E');};
+ICON_ART.mushroom=function(g){px(g,6,8,4,6,'#F1DFC4');px(g,2,5,12,5,'#B87759');px(g,4,3,8,3,'#DDA27B');px(g,5,5,2,2,'#F3D6AA');};
+['copper_ore','iron_ore','gem'].forEach(function(id){ICON_ART[id]=function(g){px(g,2,6,12,8,'#505D6A');px(g,4,3,8,8,id==='copper_ore'?'#D48F58':id==='iron_ore'?'#94B5CA':'#C59EEA');px(g,5,4,3,2,'#E1E1D4');};});
 FISHES.forEach(function(f) {
   if(ICON_ART[f.id]) return;
   ICON_ART[f.id]=function(g) {
@@ -5656,8 +5761,8 @@ function buildGround(sceneId) {
     }
   }
   // 池塘：连续水面 + 只在外轮廓描一圈岸线，避免看起来像方砖
-  if (sceneId === 'farm' && MAPS.farm.pond) {
-    var pr = MAPS.farm.pond;
+  if ((sceneId === 'farm' || sceneId === 'forest') && MAPS[sceneId].pond) {
+    var pr = MAPS[sceneId].pond;
     var px0 = pr.x0 * TILE, py0 = pr.y0 * TILE, pw = (pr.x1 - pr.x0 + 1) * TILE, ph = (pr.y1 - pr.y0 + 1) * TILE;
     g.fillStyle = PAL.water; g.fillRect(px0, py0, pw, ph);
     g.fillStyle = '#6FA39A'; g.fillRect(px0, py0, pw, ph / 3);
@@ -5675,6 +5780,7 @@ function buildGround(sceneId) {
     g.fillStyle = '#8FC0B4';
     for (var bxi = 0; bxi < pw; bxi += 16) g.fillRect(px0 + bxi + 2, py0 + ph - 6, 8, 3);
   }
+  if(sceneId.indexOf('mine')===0){for(var mx=0;mx<map.w;mx++)for(var my=0;my<map.h;my++){px(g,mx*TILE,my*TILE,TILE,TILE,map.solid[mx][my]?'#343C48':(mx+my)%2?'#66707A':'#626B75');if(map.solid[mx][my])px(g,mx*TILE+1,my*TILE+1,14,3,'#4B5563');}for(var ry=3;ry<23;ry++){px(g,13*TILE+3,ry*TILE,1,16,'#BDC0AD');px(g,13*TILE+12,ry*TILE,1,16,'#BDC0AD');px(g,13*TILE+2,ry*TILE+8,12,2,'#87735D');}}
   // 装饰
   getDecor(sceneId).forEach(function (d) {
     var sx = d.x * TILE, sy = d.y * TILE;
@@ -6150,7 +6256,7 @@ function drawEnterHint(g, ox, oy) {
   else if (hit.kind === 'shop') text = 'E 进店';
   else if (hit.kind === 'board') text = 'E 看委托';
   else if (hit.kind === 'bridge') text = state.bridgeRepaired ? '小桥已修好' : 'E 看施工点';
-  if (!text) return;
+  if (!text) text = 'E ' + hit.label;
   g.font = '10px ' + 'sans-serif';
   var wpx = Math.ceil(g.measureText(text).width) + 10;
   var bx = Math.round(clamp(hit.x * TILE + 8 - ox - wpx / 2, 2, VIEW_W - wpx - 2));
@@ -6523,6 +6629,7 @@ function drawScene(g, dt) {
       }
     }
   }
+  if(EXPLORE_NODES[state.sceneId]) Object.keys(EXPLORE_NODES[state.sceneId]).forEach(function(k){var xy=k.split(',').map(Number),n=exploreNode(state.sceneId,xy[0],xy[1]);if(n.saved.hp>0)ents.push({z:xy[1]*TILE+TILE,f:drawExploreNode,a:[xy[0],xy[1],n.def]});});
   var nodeKeys = state.sceneId === 'farm' ? Object.keys(state.resourceNodes) : [];
   if (state.sceneId !== 'farm') {
     (map.trees || []).forEach(function (xy) {
@@ -6548,6 +6655,8 @@ function drawScene(g, dt) {
     if (it.kind === 'bridge') {
       if (state.bridgeRepaired) return;
       ents.push({ z: it.y * TILE + TILE, f: drawBridgeSite, a: [it.x, it.y] });
+    } else if(it.kind==='treasure'){ents.push({z:it.y*TILE+TILE,f:function(g,x,y){px(g,x*TILE+2,y*TILE+5,12,9,'#895F38');px(g,x*TILE+2,y*TILE+5,12,3,'#BD9257');px(g,x*TILE+7,y*TILE+7,2,4,'#E5C775');},a:[it.x,it.y]});
+    } else if(it.kind==='mineStairs'||it.kind==='mineGate'||it.kind==='forestGate'){ents.push({z:it.y*TILE+TILE,f:function(g,x,y){px(g,x*TILE,y*TILE,16,16,'#544A3D');px(g,x*TILE+3,y*TILE+2,10,14,'#272C32');for(var i=0;i<4;i++)px(g,x*TILE+4,y*TILE+5+i*3,8,1,'#A8A18C');},a:[it.x,it.y]});
     } else if (it.kind === 'board') {
       ents.push({ z: it.y * TILE + TILE, f: drawBoard, a: [it.x, it.y] });
     }
@@ -7188,6 +7297,7 @@ window.__MOSS__ = {
   __npcDialogue: npcDialogue, __talkToNpc: talkToNpc, __giftToNpc: giftToNpc, __heartsText: heartsText, __isGiftable: isGiftable,
   __npcRuntime: npcRuntime, __findNpcAdjacent: findNpcAdjacent,
   __isWater: isWater, __toolFish: toolFish,
+  exploreState:exploreState, exploreNode:exploreNode, openExploreSite:openExploreSite, exploreStairs:exploreStairs, exploreTreasure:exploreTreasure, doSwitchScene:doSwitchScene,
   openTackleShop: openTackleShop, upgradeRod: upgradeRod, fishPool: fishPool, pickFish: pickFish, openDsEncounter: openDsEncounter,
   tileToScreen: function (tx, ty) {
     var r = canvas.getBoundingClientRect();
