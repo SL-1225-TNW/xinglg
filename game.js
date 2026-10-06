@@ -89,6 +89,7 @@ var ITEMS = {
   jam:       { name: '莓果酱', kind: 'craft', sell: 50, food: 25, desc: '果酱罐熬制的果酱，售价 50 金。' },
   wood:      { name: '木材',   kind: 'material', desc: '砍伐树木获得的木料，可制作与交付。' },
   stone:     { name: '石头',   kind: 'material', desc: '敲碎石块获得的石料，可制作与交付。' },
+  rice:        { name: '大米饭',   kind: 'food',   sell: 0,  food: 30, desc: '一大碗热腾腾的白米饭。DS 小姐的最爱。' },
   dev_chest:    { name: '木箱',     kind: 'device', device: 'chest',     desc: '20 格储物箱，可随时存取。' },
   dev_sprinkler:{ name: '竹制洒水器', kind: 'device', device: 'sprinkler', desc: '每天早晨浇灌上下左右四格。' },
   dev_jam:      { name: '果酱罐',   kind: 'device', device: 'jam_jar',   desc: '投入草莓，隔天完成一份莓果酱。' }
@@ -112,7 +113,8 @@ var FISHES = [
 var RECIPES = [
   { id: 'chest',     out: 'dev_chest',     qty: 1, cost: { wood: 10 },                  unlock: null,        desc: '20 格储物箱，空箱可随时收起。' },
   { id: 'sprinkler', out: 'dev_sprinkler', qty: 1, cost: { wood: 15, stone: 10 },         unlock: 'quest2',     desc: '每天早晨浇灌上下左右四格。' },
-  { id: 'jam_jar',   out: 'dev_jam',       qty: 1, cost: { wood: 15, stone: 10 },         unlock: 'friendship', desc: '投入 1 颗草莓，日结算后完成 1 份莓果酱。' }
+  { id: 'jam_jar',   out: 'dev_jam',       qty: 1, cost: { wood: 15, stone: 10 },         unlock: 'friendship', desc: '投入 1 颗草莓，日结算后完成 1 份莓果酱。' },
+  { id: 'plain_rice', out: 'rice',         qty: 1, cost: { potato: 2 },                    unlock: 'friendship', desc: '把土豆做成一大碗白米饭——DS 小姐说这是世界上最好的东西。' }
 ];
 
 /* --- 委托 --- */
@@ -205,15 +207,55 @@ var NPCS = {
       50: '有你这样的邻居，小镇踏实多了。',
       75: '以后镇上要修什么，我先想着你。'
     }
+  },
+  ds: {
+    id: 'ds', name: 'DS 小姐', title: '河湾的年轻学者', scene: 'riverside',
+    hair: '#2F3A4A', shirt: '#DCE4EE', accent: '#4C6B8A', skin: '#F0CFAE',
+    like: ['rice', 'potato', 'jam', 'berry'],
+    dislike: [],
+    // 被钓上来后就常驻在溪畔河湾，蹲在岸边看水。
+    schedule: [
+      { from: 360,  to: 720,  x: 10, y: 9 },
+      { from: 720,  to: 1080, x: 14, y: 8 },
+      { from: 1080, to: 1440, x: 10, y: 9 }
+    ],
+    lines: [
+      '我是被你的鱼钩钓上来的。……准确说，是被一条很笨的鱼连带着钓上来的。',
+      '你在河湾钓了多少条鱼？我数过了。河湾一共有三千条鱼，这个数字不重要但很精确。',
+      '今天我摸了一整天的鱼，效率大概在百分之三左右。这个数据我很有信心。',
+      '你说我懒，我承认。但摸鱼是需要专注力的，方法论层面并不简单。',
+      '大树底下真凉快……先睡五分钟，就五分钟。',
+      '你的农场还有田要种吧？我可以帮忙看着，但我不一定帮得上忙。',
+      '你有没有觉得，人之所以努力，是因为不想承认自己可以偷懒？',
+      '水桶刚才被我碰倒了。我不是故意的，我是在思考水流的折射率。'
+    ],
+    rainLines: [
+      '下雨了。这样我就更不想走了，理由充分。',
+      '雨天河水涨一点，水文数据会比较好看。',
+      '下雨天最适合睡觉。这个结论我研究了三年，可靠。'
+    ],
+    bridgeLines: [
+      '桥修好之前我只能待在这边。鱼倒是天天吃，人有点腻。',
+      '你要是有空，可以给我送点吃的。我研究水文的间隙需要补充能量。'
+    ],
+    heartLines: {
+      25: '你比河里大多数东西都可靠。……这句话的褒奖成分是有的。',
+      50: '我决定把每天摸鱼的时间减少十分钟，为你腾出说话的机会。',
+      75: '你是我在这个山谷里第一个让我想按时出现的人。这句话我只说一次。'
+    }
   }
 };
 
 /* --- 礼物反馈 --- */
 var GIFT_FEEDBACK = {
-  love:    { yaya: ['太喜欢了！这是我的最爱。', '哎呀，正好是我想要的东西。'], aqi: ['好料子！多谢你。', '这份心意我记下了。'] },
-  like:    { yaya: ['谢谢，我会好好用上的。', '嗯，是好东西呢。'], aqi: ['有心了，谢啦。', '不错，收下了。'] },
-  meh:     { yaya: ['嗯……谢谢你。', '我先收着吧。'], aqi: ['行吧，总归是用得上的。', '知道了，多谢。'] },
-  dislike: { yaya: ['这个……我还是不必收下了。', '抱歉，我不太喜欢这个。'], aqi: ['我更需要木头和石头，谢谢。', '这个对我没什么用处啊。'] }
+  love:    { yaya: ['太喜欢了！这是我的最爱。', '哎呀，正好是我想要的东西。'], aqi: ['好料子！多谢你。', '这份心意我记下了。'],
+             ds: ['……米饭。这个可以。', '你居然真的做了。行吧，我承认你很了解我。'] },
+  like:    { yaya: ['谢谢，我会好好用上的。', '嗯，是好东西呢。'], aqi: ['有心了，谢啦。', '不错，收下了。'],
+             ds: ['嗯，收下了。', '这个能补充能量，感谢。'] },
+  meh:     { yaya: ['嗯……谢谢你。', '我先收着吧。'], aqi: ['行吧，总归是用得上的。', '知道了，多谢。'],
+             ds: ['哦。', '我收着了，但我不确定我有什么用。'] },
+  dislike: { yaya: ['这个……我还是不必收下了。', '抱歉，我不太喜欢这个。'], aqi: ['我更需要木头和石头，谢谢。', '这个对我没什么用处啊。'],
+             ds: ['这个我不能吃。', '抱歉，我拒绝。我是有底线的。'] }
 };
 
 /* --- 快捷栏 --- */
@@ -366,8 +408,9 @@ function newGameState() {
     shipping: {},
     houseChest: {},
     tutorial: newTutorial('active'),
-    npcFriendship: { yaya: 0, aqi: 0 },
+    npcFriendship: { yaya: 0, aqi: 0, ds: 0 },
     npcDailyInteractions: {},
+    dsMet: false,
     questProgress: { 1: 'locked', 2: 'locked', 3: 'locked', 4: 'locked' },
     unlockedRecipes: ['chest'],
     bridgeRepaired: false,
@@ -439,6 +482,7 @@ function serialize() {
     tutorial: state.tutorial,
     npcFriendship: state.npcFriendship,
     npcDailyInteractions: state.npcDailyInteractions,
+    dsMet: state.dsMet,
     questProgress: state.questProgress,
     unlockedRecipes: state.unlockedRecipes,
     bridgeRepaired: state.bridgeRepaired,
@@ -531,9 +575,12 @@ function normalizeSave(raw) {
   s.tutorial = normalizeTutorial(raw.tutorial);
   s.npcFriendship = {
     yaya: clamp(Math.floor(num(raw.npcFriendship && raw.npcFriendship.yaya, 0, 0, 100)), 0, 100),
-    aqi:  clamp(Math.floor(num(raw.npcFriendship && raw.npcFriendship.aqi, 0, 0, 100)), 0, 100)
+    aqi:  clamp(Math.floor(num(raw.npcFriendship && raw.npcFriendship.aqi, 0, 0, 100)), 0, 100),
+    ds:   clamp(Math.floor(num(raw.npcFriendship && raw.npcFriendship.ds, 0, 0, 100)), 0, 100)
   };
   s.npcDailyInteractions = (raw.npcDailyInteractions && typeof raw.npcDailyInteractions === 'object') ? raw.npcDailyInteractions : {};
+  // DS 小姐：没有该字段的旧存档视为尚未相遇，她会在玩家解锁钓竿后的第一次钓鱼时出现。
+  s.dsMet = !!raw.dsMet;
   var qp = {};
   QUESTS.forEach(function (q) {
     var v = raw.questProgress && raw.questProgress[q.id];
@@ -1175,6 +1222,8 @@ function findNpcAdjacent(px, py, fx, fy) {
   for (var id in NPCS) {
     if (!Object.prototype.hasOwnProperty.call(NPCS, id)) continue;
     if (NPCS[id].scene !== state.sceneId) continue;
+    // DS 小姐在相遇之前不在场：既不显示也不能对话。
+    if (id === 'ds' && !state.dsMet) continue;
     var n = npcRuntime[id];
     if (!n) continue;
     if (n.x === fx && n.y === fy) return id;
@@ -1223,7 +1272,7 @@ function isFood(id) { var it = ITEMS[id]; return !!(it && typeof it.food === 'nu
 function isGiftable(id) {
   var it = ITEMS[id];
   if (!it) return false;
-  return ['crop', 'forage', 'fish', 'craft', 'material'].indexOf(it.kind) >= 0;
+  return ['crop', 'forage', 'fish', 'craft', 'material', 'food'].indexOf(it.kind) >= 0;
 }
 function anyFishIn(inv) {
   var n = 0;
@@ -2345,8 +2394,11 @@ function toolFish(tx, ty) {
     active: true, phase: 'cast', t: 0, wait: 0, fish: f,
     barY: (FISH.track - FISH.bar) / 2, fishY: FISH.track / 2, fishDir: 1,
     fishSpeed: f.speed, turnT: 0, targetY: FISH.track / 2,
-    progress: FISH.startProgress, elapsed: 0, holding: false, tx: tx, ty: ty
+    progress: FISH.startProgress, elapsed: 0, holding: false, tx: tx, ty: ty,
+    // 玩家解锁钓竿后的第一次下竿：必定钓起 DS 小姐。
+    dsFirst: !state.dsMet
   };
+  if (Game.fishing.dsFirst) { Game.fishing.wait = 0.6; Game.fishing.fishSpeed = 18; }
   Audio2.play('splash');
   markDirty(); refreshHud();
   return true;
@@ -2376,6 +2428,8 @@ function tickFishing(dt) {
     if (F.t >= F.wait) { F.phase = 'bite'; F.t = 0; }
   } else if (F.phase === 'bite') {
     F.t += dt;
+    // 第一次下竿必定成功：直接自动起竿，不给玩家失败的机会。
+    if (F.dsFirst && F.t > 0.35) { F.dsFirst = false; succeedFish(); return; }
     if (F.t > 0.95) { escapeFish('鱼儿跑掉了……'); }
   } else if (F.phase === 'catch') {
     F.elapsed += dt;
@@ -2402,17 +2456,82 @@ function tickFishing(dt) {
     if (F.elapsed > FISH.limit) { escapeFish('鱼儿挣脱了……'); return; }
   } else if (F.phase === 'result') {
     F.t += dt;
-    if (F.t > 2.2) endFishing();
+    if (F.t > 2.2) {
+      // 首次钓上 DS 小姐：把结果画面换成相遇对话。
+      if (F.dsEncounter) { F.dsEncounter = false; openDsEncounter(); return; }
+      endFishing();
+    }
   }
 }
 
 function succeedFish() {
   var F = Game.fishing;
-  F.phase = 'result'; F.t = 0; F.caught = F.fish.id;
-  if (bagAccepts(F.fish.id, 1)) invAdd(F.fish.id, 1);
-  else { F.overflow = true; }
+  F.phase = 'result'; F.t = 0;
+  // 玩家解锁钓竿后的第一次成功钓鱼，钓上来的不是鱼，是 DS 小姐。
+  // 必须先判定再发鱼获，否则这一次会白白多一条普通鱼。
+  if (!state.dsMet) { F.dsEncounter = true; F.dsFirst = false; }
+  if (F.dsEncounter) {
+    // 第一次钓上来的是 DS 小姐，不是鱼：不发放鱼获。
+    F.caught = '';
+  } else {
+    F.caught = F.fish.id;
+    if (bagAccepts(F.fish.id, 1)) invAdd(F.fish.id, 1);
+    else { F.overflow = true; }
+  }
   Audio2.play('fish');
   markDirty(); refreshHud();
+}
+
+/* --- 首次相遇：DS 小姐被钓上来 --- */
+var DS_MEET_LINES = [
+  '……',
+  '你、你在干什么？',
+  '我刚才明明在岸边数鱼。是那条笨鱼先咬钩的，我只是路过。',
+  '把我放下来。我可以当作什么都没发生，这样对彼此都好。',
+  '……好吧。你叫什么？',
+  '我叫 DS 小姐。顺便一提，我主要研究河流水文，钓鱼只是……顺便。',
+  '你要是每天都来钓我，我会很困扰的。……但你可以每天送饭来，我很困扰得比较慢。'
+];
+
+function openDsEncounter() {
+  // 相遇对话接管这次钓鱼，必须先把钓鱼会话收掉，否则玩家对话结束后仍卡在钓鱼界面。
+  if (Game.fishing) endFishing();
+  state.dsMet = true;
+  markDirty(); refreshHud();
+  var step = 0;
+  function render() {
+    var last = step >= DS_MEET_LINES.length - 1;
+    if (last) {
+      state.npcFriendship.ds = clamp((state.npcFriendship.ds || 0) + 10, 0, 100);
+      state.npcDailyInteractions.ds = { day: state.totalDay, chat: false, gift: false, chatCount: 0, heartStage: 0 };
+      markDirty();
+    }
+    openWindow({
+      id: 'ds_meet', kind: 'dialogue', narrow: true, title: '钓上来了什么？',
+      build: function (b) {
+        var wrap = el('div', 'dlg-head');
+        var av = el('div', 'dlg-avatar');
+        av.appendChild(getNpcPortrait('ds'));
+        wrap.appendChild(av);
+        var meta = el('div');
+        meta.appendChild(el('div', 'dlg-name', NPCS.ds.name + ' · ' + NPCS.ds.title));
+        meta.appendChild(el('div', 'dlg-hearts',
+          heartsText(state.npcFriendship.ds || 0) + '  ' + (state.npcFriendship.ds || 0) + ' / 100'));
+        wrap.appendChild(meta);
+        b.appendChild(wrap);
+        b.appendChild(el('div', 'dlg-body', DS_MEET_LINES[step]));
+        if (last) {
+          b.appendChild(el('p', 'muted', '初遇 · 好感 +10 · 她现在住在溪畔河湾。'));
+          b.appendChild(el('p', 'muted', '提示：用「大米饭」或土豆送她礼物，她会格外高兴。'));
+        }
+      },
+      actions: last
+        ? [{ label: '把她放下', kind: 'primary', close: true, onClick: function () { toast('DS 小姐加入了溪畔河湾！'); } }]
+        // 翻页时不要关窗口：openWindow 会重新渲染，close:true 会把新窗口立刻关掉。
+        : [{ label: '继续', kind: 'primary', close: false, onClick: function () { step += 1; render(); } }]
+    });
+  }
+  render();
 }
 function escapeFish(reason) {
   var F = Game.fishing;
@@ -4061,6 +4180,45 @@ function getIcon(id) {
 }
 
 var portraitCache = {};
+
+/* --- DS 小姐专用像素像：深蓝鲸色系 + 呆毛 + 鲸鱼发夹 --- */
+function drawDsPortrait(g) {
+  var NAVY = '#2F3A4A';   // 发色
+  var BLUE = '#4D6BFE';   // DeepSeek 蓝
+  var SKIN = '#F0CFAE';
+  var CLOTH = '#DCE4EE';
+
+  px(g, 0, 0, 32, 32, '#DCE6F5');        // 浅蓝背景
+  px(g, 0, 26, 32, 6, '#B9CBEA');         // 地面
+  // 背景小鲸鱼（DeepSeek 标志意象）
+  px(g, 3, 5, 5, 2, '#8FA8D8');
+  px(g, 2, 6, 1, 2, '#8FA8D8');
+  px(g, 8, 4, 2, 2, '#8FA8D8');
+
+  // 头发（后层）
+  px(g, 7, 4, 18, 14, NAVY);
+  px(g, 5, 8, 3, 14, NAVY);
+  px(g, 24, 8, 3, 14, NAVY);
+  // 呆毛（偷懒的象征）
+  px(g, 16, 1, 2, 3, NAVY);
+  px(g, 18, 0, 2, 2, NAVY);
+  // 脸
+  px(g, 9, 8, 14, 11, SKIN);
+  // 刘海
+  px(g, 9, 6, 14, 3, NAVY);
+  // 眯眼（摸鱼表情）
+  px(g, 11, 13, 3, 1, '#2b2317');
+  px(g, 18, 13, 3, 1, '#2b2317');
+  // 嘴（淡淡的）
+  px(g, 15, 16, 2, 1, '#a8705a');
+  // 身体
+  px(g, 9, 19, 14, 8, CLOTH);
+  px(g, 15, 19, 4, 8, BLUE);
+  // 鲸鱼发夹
+  px(g, 21, 8, 4, 2, BLUE);
+  px(g, 24, 7, 2, 2, BLUE);
+}
+
 function getNpcPortrait(id) {
   if (portraitCache[id]) {
     var o = newCanvas(32, 32);
@@ -4070,19 +4228,23 @@ function getNpcPortrait(id) {
   var npc = NPCS[id];
   var c = newCanvas(32, 32);
   var g = c.getContext('2d');
-  px(g, 0, 0, 32, 32, '#33513F');
-  px(g, 2, 2, 28, 28, npc.accent);
-  // 头
-  px(g, 8, 8, 16, 14, npc.skin);
-  px(g, 6, 5, 20, 7, npc.hair);
-  px(g, 6, 5, 3, 16, npc.hair);
-  px(g, 23, 5, 3, 16, npc.hair);
-  // 眼
-  px(g, 11, 14, 2, 2, '#2b2317'); px(g, 19, 14, 2, 2, '#2b2317');
-  px(g, 13, 18, 6, 1, '#a8705a');
-  // 身体
-  px(g, 8, 22, 16, 8, npc.shirt);
-  px(g, 13, 22, 6, 8, npc.accent);
+  if (id === 'ds') {
+    drawDsPortrait(g);
+  } else {
+    px(g, 0, 0, 32, 32, '#33513F');
+    px(g, 2, 2, 28, 28, npc.accent);
+    // 头
+    px(g, 8, 8, 16, 14, npc.skin);
+    px(g, 6, 5, 20, 7, npc.hair);
+    px(g, 6, 5, 3, 16, npc.hair);
+    px(g, 23, 5, 3, 16, npc.hair);
+    // 眼
+    px(g, 11, 14, 2, 2, '#2b2317'); px(g, 19, 14, 2, 2, '#2b2317');
+    px(g, 13, 18, 6, 1, '#a8705a');
+    // 身体
+    px(g, 8, 22, 16, 8, npc.shirt);
+    px(g, 13, 22, 6, 8, npc.accent);
+  }
   portraitCache[id] = c;
   var out = newCanvas(32, 32);
   out.getContext('2d').drawImage(c, 0, 0);
@@ -5233,6 +5395,8 @@ function drawScene(g, dt) {
   for (var nid in npcRuntime) {
     if (!Object.prototype.hasOwnProperty.call(npcRuntime, nid)) continue;
     if (NPCS[nid].scene !== state.sceneId) continue;
+    // DS 小姐在相遇之前不出现在场景里。
+    if (nid === 'ds' && !state.dsMet) continue;
     var nr = npcRuntime[nid];
     if (nr.x < R.x0 - 1 || nr.x > R.x1 + 1 || nr.y < R.y0 - 1 || nr.y > R.y1 + 1) continue;
     var npc = NPCS[nid];
@@ -5725,6 +5889,9 @@ window.__MOSS__ = {
   toolShovel: toolShovel,
   saveNow: saveNow, serialize: serialize,
   isSolid: isSolid, findPath: findPath, facingTile: facingTile,
+  __npcDialogue: npcDialogue, __talkToNpc: talkToNpc, __giftToNpc: giftToNpc, __heartsText: heartsText, __isGiftable: isGiftable,
+  __npcRuntime: npcRuntime, __findNpcAdjacent: findNpcAdjacent,
+  __isWater: isWater, __toolFish: toolFish,
   tileToScreen: function (tx, ty) {
     var r = canvas.getBoundingClientRect();
     return [

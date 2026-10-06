@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const GAME_URL = pathToFileURL(path.resolve(__dirname, '..', 'index.html')).href;
+export let GAME_URL = pathToFileURL(path.resolve(__dirname, '..', 'index.html')).href;
 
 export const T = { TILE: 16 };
 
@@ -40,6 +40,8 @@ export class Report {
 /* ---------- 页面夹具 ---------- */
 export async function launch(opts = {}) {
   const browser = await chromium.launch({ headless: true });
+  // 冒烟测试要跑打包产物：给 url 就能覆盖默认的开发页地址
+  if (opts.url) GAME_URL = opts.url;
   const ctx = await browser.newContext({
     viewport: opts.viewport || { width: 1280, height: 860 },
     deviceScaleFactor: 1,
@@ -228,7 +230,8 @@ export async function clickWin(page, text, nth = 0) {
   await page.waitForTimeout(120);
 }
 export async function clickItemByName(page, name, nth = 0) {
-  const b = page.locator('.win .item', { hasText: name }).nth(nth);
+  // 背包里工具组排在物品组前面，必须限定在物品分组内，否则会点到同名工具说明。
+  const b = page.locator('.win .grid.two .item', { hasText: name }).nth(nth);
   await b.waitFor({ state: 'visible', timeout: 4000 });
   await b.click();
   await page.waitForTimeout(120);
@@ -307,4 +310,30 @@ export async function isolatedPage(browser, setup, viewport) {
 export async function fastForward(page) {
   await page.evaluate(() => { window.__MOSS__.state.timeMinutes = 22 * 60 - 0.5; });
   await page.waitForFunction(() => window.__MOSS__.state.totalDay > 0 && !!window.__MOSS__.ui.window, null, { timeout: 6000 }).catch(() => {});
+}
+
+
+/* 跨场景移动：按 SCENE_ROUTE 里的出口坐标逐段走，比每个测试各写一套稳 */
+const SCENE_ROUTE = {
+  farm:      { exit: [31, 10], to: 'town' },
+  town:      { exit: [31, 10], to: 'riverside' },
+  riverside: { exit: [1, 10],  to: 'town' }
+};
+
+export async function gotoScene(page, target, budgetMs = 45000) {
+  const deadline = Date.now() + budgetMs;
+  let hops = 0;
+  while (Date.now() < deadline && hops++ < 6) {
+    const cur = await page.evaluate(() => window.__MOSS__.state.sceneId);
+    if (cur === target) return true;
+    const leg = SCENE_ROUTE[cur];
+    if (!leg) return false;
+    const ok = await walkTo(page, leg.exit[0], leg.exit[1], 16000);
+    if (!ok) return false;
+    const arrived = await page
+      .waitForFunction((want) => window.__MOSS__.state.sceneId === want, leg.to, { timeout: 6000 })
+      .then(() => true).catch(() => false);
+    if (!arrived) return false;
+  }
+  return (await page.evaluate(() => window.__MOSS__.state.sceneId)) === target;
 }

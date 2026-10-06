@@ -452,7 +452,7 @@ await page.waitForTimeout(300);
 s = await snap(page);
 rep.eq('合法存档导入成功', s.coins, 1234);
 rep.eq('导入恢复库存', s.inv.radish, 7);
-rep.eq('导入恢复好感', s.friend, { yaya: 33, aqi: 12 });
+rep.eq('导入恢复好感', s.friend, { yaya: 33, aqi: 12, ds: 0 });
 rep.eq('导入恢复配方', s.recipes, ['chest', 'sprinkler']);
 
 /* ================= 12. 损坏存档 ================= */
