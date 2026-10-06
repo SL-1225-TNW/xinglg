@@ -87,10 +87,28 @@
       <h1>苔芽农场</h1>
       <p class="boot-sub">春日 · Clawd 的小农场</p>
       <div id="bootActions" class="boot-actions"></div>
+      <section id="devicePicker" class="device-picker" hidden aria-label="设备选择">
+        <h2>设备选择</h2>
+        <p>手机和平板以横屏游玩，电脑使用键盘与鼠标。</p>
+        <div class="device-options">
+          <button type="button" class="btn" data-device="phone">手机<span>安卓 · 横屏触控</span></button>
+          <button type="button" class="btn" data-device="tablet">平板<span>安卓 · 横屏触控</span></button>
+          <button type="button" class="btn" data-device="computer">电脑<span>键盘与鼠标</span></button>
+        </div>
+        <button type="button" class="btn ghost" id="deviceBack">返回</button>
+      </section>
       <p class="boot-note" id="bootNote">正在读取存档…</p>
     </div>
   </div>
 
+  <div id="rotatePrompt" class="rotate-prompt" hidden role="dialog" aria-modal="true" aria-labelledby="rotateTitle">
+    <div class="boot-card">
+      <div class="rotate-symbol" aria-hidden="true">↻</div>
+      <h2 id="rotateTitle">请横屏游玩</h2>
+      <p id="rotateText">将设备横过来，获得完整游戏画面。</p>
+      <button type="button" class="btn primary" id="retryLandscape">全屏并切换横屏</button>
+    </div>
+  </div>
 </div>
 <script src="game.js"></script>
 <!-- 装饰花边层 -->

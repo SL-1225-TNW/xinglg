@@ -14,7 +14,13 @@ for (const file of ['index.html', '苔芽农场-单文件版.html']) {
     const {browser,page,errors} = await launch({viewport:{width,height},touch,
       url:pathToFileURL(path.resolve(file)).href});
     try {
+      await page.addInitScript(() => { Element.prototype.requestFullscreen = async () => { throw new Error('emulated fullscreen unavailable'); }; });
       await boot(page);
+      if (touch && height > width) {
+        assert(await page.locator('#rotatePrompt').isVisible(), '触屏竖屏应提示旋转');
+        await page.setViewportSize({width:height,height:width});
+        await page.waitForTimeout(100);
+      }
       // 新存档教程显示时与跳过后均检查，避免只对空页面算占比。
       for (const tutorial of [true,false]) {
         if (!tutorial) await page.locator('#tutorialSkip').click();
@@ -24,7 +30,7 @@ for (const file of ['index.html', '苔芽农场-单文件版.html']) {
             const r=document.getElementById(id).getBoundingClientRect();
             return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right,bottom:r.bottom};
           };
-          const controls=['btnMenu',...(matchMedia('(pointer:coarse)').matches
+          const controls=['btnMenu',...(document.documentElement.dataset.device !== 'computer'
             ? ['touchUse','touchAct','touchBag','touchCraft','touchQuest'] : [])];
           return {world:rect('world'),stage:rect('stage'),width:innerWidth,height:innerHeight,
             scrollW:document.documentElement.scrollWidth,scrollH:document.documentElement.scrollHeight,

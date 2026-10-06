@@ -27,9 +27,9 @@ try{
  check('修桥后河湾开放状态正确',await p.getByRole('button',{name:'溪畔河湾，已开放',exact:true}).count(),1);
  check('桌面无报错',desktop.errors,[]);
 }finally{await desktop.browser.close();}
-const mobile=await launch({viewport:{width:390,height:844},touch:true});
+const mobile=await launch({viewport:{width:844,height:390},touch:true});
 try{
- const p=mobile.page;await boot(p);await p.keyboard.press('Escape');await p.getByRole('button',{name:'全境地图（M）',exact:true}).click();
+ const p=mobile.page;await p.addInitScript(()=>{Element.prototype.requestFullscreen=async()=>{throw new Error('emulated fullscreen unavailable');};});await boot(p);await p.keyboard.press('Escape');await p.getByRole('button',{name:'全境地图（M）',exact:true}).click();
  check('手机可从菜单打开地图',await p.locator('.world-atlas').isVisible(),true);
  check('所有地点按钮没有超出地图',await p.evaluate(()=>{const r=document.querySelector('.world-atlas').getBoundingClientRect();return [...document.querySelectorAll('.atlas-place')].every(b=>{const q=b.getBoundingClientRect();return q.left>=r.left&&q.right<=r.right&&q.bottom<=r.bottom;});}),true);
  await p.getByRole('button',{name:'白蔷薇城，待开放',exact:true}).click();

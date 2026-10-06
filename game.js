@@ -2665,7 +2665,7 @@ function tutorialTarget(step) {
 }
 function tutorialCopy(step) {
   var t = tutorialState();
-  var touch = window.matchMedia('(pointer: coarse)').matches;
+  var touch = touchDevice();
   var use = touch ? '点角色上下左右一格的地面，或朝向它点「使用工具」' : '鼠标点角色上下左右一格的地面，或朝向它按空格';
   var act = touch ? '站在旁边点「交互」' : '站在旁边按 E';
   var a = farmWork();
@@ -5518,6 +5518,7 @@ function isTyping() {
 }
 
 function onKeyDown(e) {
+  if (needsLandscape() && $('#boot').hidden) return;
   if (!state || !$('#boot').hidden) return;
   Audio2.unlock();
   if (isTyping()) return;
@@ -5630,6 +5631,86 @@ function tickPlayer(dt) {
   checkExit();
 }
 
+/* --- 设备选择：独立保存偏好，不影响游戏存档 --- */
+var deviceMode = 'computer';
+var landscapeRequest = null;
+var deviceLabels = { phone: '手机', tablet: '平板', computer: '电脑' };
+function touchDevice() { return deviceMode !== 'computer'; }
+function needsLandscape() {
+  return touchDevice() && window.innerHeight > window.innerWidth;
+}
+function updateRotatePrompt() {
+  var show = !!state && $('#boot').hidden && needsLandscape();
+  $('#rotatePrompt').hidden = !show;
+  if (show) clearKeys();
+}
+function applyDevice(mode) {
+  deviceMode = deviceLabels[mode] ? mode : 'computer';
+  document.documentElement.dataset.device = deviceMode;
+  try { localStorage.setItem('moss-device-mode', deviceMode); } catch (e) {}
+  var button = $('#deviceSelect');
+  if (button) button.textContent = '设备选择 · ' + deviceLabels[deviceMode];
+  updateRotatePrompt();
+  resizeCanvas();
+}
+async function requestLandscape() {
+  if (!touchDevice()) {
+    if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
+    return;
+  }
+  if (landscapeRequest) return landscapeRequest;
+  // 必须从选择设备/开始游戏/重试按钮的真实点击中调用，保持用户激活权限。
+  landscapeRequest = (async function () {
+    try {
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+      }
+      if (touchDevice() && screen.orientation && screen.orientation.lock) {
+        await screen.orientation.lock('landscape');
+      }
+    } catch (e) {
+      $('#rotateText').textContent = '浏览器未能自动切换横屏，请将设备横过来；必要时开启系统自动旋转。';
+    } finally {
+      updateRotatePrompt();
+      resizeCanvas();
+    }
+  })();
+  try { await landscapeRequest; } finally { landscapeRequest = null; }
+}
+function initDevicePicker() {
+  var saved = null;
+  try { saved = localStorage.getItem('moss-device-mode'); } catch (e) {}
+  var coarse = window.matchMedia('(pointer: coarse)').matches;
+  applyDevice(deviceLabels[saved] ? saved : coarse ?
+    (Math.min(screen.width, screen.height) >= 600 ? 'tablet' : 'phone') : 'computer');
+  $('#deviceSelect').onclick = function () {
+    $('#bootActions').hidden = true;
+    $('#bootNote').hidden = true;
+    $('#devicePicker').hidden = false;
+    $('#devicePicker button[data-device="' + deviceMode + '"]').focus();
+  };
+  function closePicker() {
+    $('#devicePicker').hidden = true;
+    $('#bootActions').hidden = false;
+    $('#bootNote').hidden = false;
+    $('#deviceSelect').focus();
+  }
+  $('#deviceBack').onclick = closePicker;
+  $('#devicePicker').querySelectorAll('[data-device]').forEach(function (button) {
+    button.setAttribute('aria-pressed', String(button.dataset.device === deviceMode));
+    button.onclick = function () {
+      applyDevice(button.dataset.device);
+      $('#devicePicker').querySelectorAll('[data-device]').forEach(function (b) {
+        b.setAttribute('aria-pressed', String(b.dataset.device === deviceMode));
+      });
+      closePicker();
+      requestLandscape();
+    };
+  });
+  $('#retryLandscape').onclick = requestLandscape;
+  document.addEventListener('fullscreenchange', function () { updateRotatePrompt(); resizeCanvas(); });
+}
+
 /* --- 画布缩放 --- */
 function resizeCanvas() {
   if (!canvas) return;
@@ -5651,7 +5732,8 @@ function resizeCanvas() {
     - parseFloat(stageStyle.paddingBottom) - parseFloat(viewportStyle.borderTopWidth)
     - parseFloat(viewportStyle.borderBottomWidth));
   var dpr = clamp(window.devicePixelRatio || 1, 1, 3);
-  var coarse = window.matchMedia('(pointer: coarse)').matches;
+  var coarse = touchDevice();
+  updateRotatePrompt();
   // 先保持角色可读，再扩展取景范围。窄屏允许小于 1 倍，避免最小视野撑破页面。
   // 倍率按设备像素对齐，剩余空间按逻辑像素使用，不再丢掉一整行/列瓦片。
   var fit = Math.min(availW / (TILE * MIN_TILES_W), availH / (TILE * MIN_TILES_H));
@@ -5688,6 +5770,7 @@ var lastT = 0;
 function frame(ts) {
   requestAnimationFrame(frame);
   if (!state) return;
+  if (needsLandscape()) { lastT = ts; return; }
   var dt = lastT ? Math.min(0.1, (ts - lastT) / 1000) : 0;
   lastT = ts;
   clock += dt;
@@ -5717,6 +5800,7 @@ function boot() {
   actions.innerHTML = '';
 
   function startGame(s) {
+    requestLandscape();
     state = s;
     Game.ppos = { x: s.player.x * TILE + 8, y: s.player.y * TILE + 12 };
     Game.swingT = 0;
@@ -5780,6 +5864,10 @@ function boot() {
     });
     b3.style.width = '100%';
     actions.appendChild(b3);
+    var deviceButton = mkBtn('设备选择', 'ghost', function () {});
+    deviceButton.id = 'deviceSelect';
+    actions.appendChild(deviceButton);
+    initDevicePicker();
   }
 
   function freshGame() {
