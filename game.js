@@ -50,6 +50,7 @@ var CFG = {
   stack: 99,
   duskStart: 18 * 60,
   nightStart: 20 * 60,
+  dailyAllowance: 50,
   energyCost: { hoe: 2, water: 2, axe: 4, pickaxe: 4, fish: 4, shovel: 2 },
   saveDebounceMs: 750,
   regenFirstDay: 4,            // 第 4/7/10… 天恢复资源
@@ -78,7 +79,7 @@ var ITEMS = {
   tool_can:   { name: '水壶',   kind: 'tool',    tool: 'water',   desc: '给耕地浇水，每天一次。' },
   tool_axe:   { name: '斧头',   kind: 'tool',    tool: 'axe',     desc: '砍伐树木，获得木材。' },
   tool_pick:  { name: '镐子',   kind: 'tool',    tool: 'pickaxe', desc: '敲碎石块，获得石头。' },
-  tool_rod:   { name: '钓竿',   kind: 'tool',    tool: 'fish',    desc: '在河边对水面使用，开始钓鱼。' },
+  tool_rod:   { name: '钓竿',   kind: 'tool',    tool: 'fish',    desc: '站在农场池塘或河岸旁，点击附近水面（最多 3 格）抛竿。' },
   basket:     { name: '收获篮', kind: 'tool',    tool: 'harvest', desc: '采摘成熟作物和野莓。' },
   tool_shovel:{ name: '小铲子', kind: 'tool',    tool: 'shovel',  desc: '铲掉长得不合适的作物；刚种下的那株能把种子收回来。' },
   seed_radish:    { name: '萝卜种子', kind: 'seed', crop: 'radish',    desc: '翻土播种，浇水后 3 天成熟。' },
@@ -92,8 +93,8 @@ var ITEMS = {
   fish_bass:    { name: '河鲈',   kind: 'fish', sell: 35, food: 10, desc: '力气不小的淡水鱼，售价 35 金。' },
   fish_silver:  { name: '银纹鱼', kind: 'fish', sell: 60, food: 10, desc: '银鳞闪烁的稀有鱼，售价 60 金。' },
   jam:       { name: '莓果酱', kind: 'craft', sell: 50, food: 25, desc: '果酱罐熬制的果酱，售价 50 金。' },
-  wood:      { name: '木材',   kind: 'material', desc: '砍伐树木获得的木料，可制作与交付。' },
-  stone:     { name: '石头',   kind: 'material', desc: '敲碎石块获得的石料，可制作与交付。' },
+  wood:      { name: '木材',   kind: 'material', sell: 3, desc: '砍伐获得，可制作、交付或卖给木匠，售价 3 金。' },
+  stone:     { name: '石头',   kind: 'material', sell: 2, desc: '采掘获得，可制作、交付或卖给木匠，售价 2 金。' },
   rice:        { name: '大米饭',   kind: 'food',   sell: 0,  food: 30, desc: '一大碗热腾腾的白米饭。DS 小姐的最爱。' },
   dev_chest:    { name: '木箱',     kind: 'device', device: 'chest',     desc: '20 格储物箱，可随时存取。' },
   dev_sprinkler:{ name: '竹制洒水器', kind: 'device', device: 'sprinkler', desc: '每天早晨浇灌上下左右四格。' },
@@ -625,6 +626,7 @@ function normalizeSettleHistory(v) {
     var rec = {
       day: clamp(Math.floor(isInt(e.day) ? e.day : 0), 0, 100000),
       income: clamp(Math.floor(isFinite(e.income) ? e.income : 0), 0, 1e9),
+      dailyAllowance: clamp(Math.floor(isFinite(e.dailyAllowance) ? e.dailyAllowance : 0), 0, 1e9),
       matured: clamp(Math.floor(isFinite(e.matured) ? e.matured : 0), 0, 9999),
       jam: clamp(Math.floor(isFinite(e.jam) ? e.jam : 0), 0, 9999),
       weather: e.weather === 'rain' ? 'rain' : 'sun',
@@ -1193,6 +1195,7 @@ var INTERACTABLES = {
   ],
   town: [
     { id: 'shop', x: 8, y: 7, stand: [[8,8],[7,7],[9,7],[8,6]], kind: 'shop', label: '种子铺' },
+    { id: 'workshop', x: 20, y: 7, stand: [[20,8],[19,7],[21,7],[20,6]], kind: 'workshop', label: '阿栎木工作坊' },
     { id: 'board', x: 14, y: 9, stand: [[14,10],[13,9],[15,9],[14,8]], kind: 'board', label: '任务板' },
     { id: 'bridge', x: 26, y: 9, stand: [[25,9],[25,10]], kind: 'bridge', label: '小桥施工点' }
   ],
@@ -1349,7 +1352,7 @@ function sellToShop(id, qty) {
 function sellAllToShop() {
   var total = 0, n = 0, list = [];
   invList(state.inventory).forEach(function (id) {
-    if (!isSellable(id)) return;
+    if (!isSellable(id) || ITEMS[id].kind === 'material') return;
     var c = invCount(id);
     if (c <= 0) return;
     invRemove(id, c);
@@ -1454,7 +1457,7 @@ function useTool(tool, tx, ty, opts) {
   opts = opts || {};
   var p = state.player;
   var d = Math.abs(tx - p.x) + Math.abs(ty - p.y);
-  if (d > 1) { toast('走近一点。'); return false; }
+  if (d > (tool === 'fish' ? 3 : 1)) { toast(tool === 'fish' ? '站在岸边，点击 3 格以内的水面抛竿。' : '走近一点。'); return false; }
   if (sceneSwitch.busy || Game.busy) return false;
   if (Game.fishing && Game.fishing.active) return false;
   if (state.sceneId !== 'farm' && (tool === 'hoe' || tool === 'seed' || tool === 'water' || tool === 'shovel')) {
@@ -1838,7 +1841,7 @@ function performSettlement(auto) {
   var backup = null;
   try { backup = deepClone(state); } catch (e) { backup = null; }
   var summary = {
-    sold: [], income: 0, matured: 0, jam: 0, matureDetail: [], grew: [],
+    sold: [], income: 0, dailyAllowance: 0, matured: 0, jam: 0, matureDetail: [], grew: [],
     day: state.totalDay, auto: !!auto,
     newDay: state.totalDay + 1,
     weatherFrom: state.weather.today,
@@ -1896,6 +1899,9 @@ function performSettlement(auto) {
 
     /* 4. 日期 +1 */
     state.totalDay += 1;
+    summary.dailyAllowance = CFG.dailyAllowance;
+    summary.income += summary.dailyAllowance;
+    state.coins += summary.dailyAllowance;
     if (state.sceneId === 'house' && state.tutorial && state.tutorial.flags.watered) tutorialEvent('slept');
 
     /* 5. 天气滚动 */
@@ -1941,7 +1947,7 @@ function performSettlement(auto) {
     summary.quests = pendingQuestLines.slice();
     pendingQuestLines.length = 0;
     var histRec = {
-      day: summary.day, income: summary.income, matured: summary.matured, jam: summary.jam,
+      day: summary.day, income: summary.income, dailyAllowance: summary.dailyAllowance, matured: summary.matured, jam: summary.jam,
       weather: summary.weatherTo, auto: summary.auto,
       sold: summary.sold.map(function (x) { return { id: x.id, name: x.name, qty: x.qty, value: x.value }; }),
       matureDetail: summary.matureDetail.slice()
@@ -2010,7 +2016,8 @@ function stageLabel(g) {
 function settlementPages(s) {
   var pages = [];
   if (s.sold.length || s.income) {
-    var lines = s.income ? ['收入 ' + s.income + ' 金（现有 ' + state.coins + ' 金）'] : [];
+    var lines = s.income ? ['总收入 ' + s.income + ' 金（现有 ' + state.coins + ' 金）'] : [];
+    if (s.dailyAllowance) lines.push('每日补助 → ' + s.dailyAllowance + ' 金');
     s.sold.forEach(function (x) { lines.push(x.name + ' ×' + x.qty + ' → ' + x.value + ' 金'); });
     if (!s.sold.length) lines.push('出货箱是空的，今天没有卖出东西。');
     pages.push(settleStep('sold', '出货与收入', lines));
@@ -2131,6 +2138,7 @@ function openSettleLog() {
           block.appendChild(line);
         }
         add('收入', r.income + ' 金');
+        if (r.dailyAllowance) add('每日补助', r.dailyAllowance + ' 金');
         add('卖出', r.sold.length ? r.sold.map(function (x) { return x.name + ' ×' + x.qty; }).join('、') : '无');
         add('成熟', r.matured ? (r.matureDetail.join('、') || (r.matured + ' 株')) : '无');
         add('果酱', r.jam ? (r.jam + ' 份') : '无');
@@ -2389,8 +2397,12 @@ function pickFish() {
 }
 
 function toolFish(tx, ty) {
-  if (state.sceneId !== 'riverside') { toast('只能在河边钓鱼。'); return false; }
-  if (!isWater('riverside', tx, ty)) { toast('对着水面才能抛竿。'); return false; }
+  if (invCount('tool_rod') < 1) { toast('先完成修桥委托，获得钓竿。'); return false; }
+  if (state.sceneId !== 'riverside' && state.sceneId !== 'farm') { toast('可以在农场池塘或河边钓鱼。'); return false; }
+  var p = state.player;
+  var atBank = [[0,-1],[0,1],[-1,0],[1,0]].some(function (d) { return isWater(state.sceneId, p.x+d[0], p.y+d[1]); });
+  if (!atBank || Math.abs(tx-p.x)+Math.abs(ty-p.y) > 3) { toast('站在岸边，点击 3 格以内的水面抛竿。'); return false; }
+  if (!isWater(state.sceneId, tx, ty)) { toast('对着水面才能抛竿。'); return false; }
   if (freeSlots(state.inventory) < 1) { toast('背包满了，先整理一下。'); Audio2.play('fail'); return false; }
   if (!hasEnergy(CFG.energyCost.fish)) return false;
   state.energy -= CFG.energyCost.fish;
@@ -2401,7 +2413,7 @@ function toolFish(tx, ty) {
     fishSpeed: f.speed, turnT: 0, targetY: FISH.track / 2,
     progress: FISH.startProgress, elapsed: 0, holding: false, tx: tx, ty: ty,
     // 玩家解锁钓竿后的第一次下竿：必定钓起 DS 小姐。
-    dsFirst: !state.dsMet
+    dsFirst: !state.dsMet && state.sceneId === 'riverside'
   };
   if (Game.fishing.dsFirst) { Game.fishing.wait = 0.6; Game.fishing.fishSpeed = 18; }
   Audio2.play('splash');
@@ -2472,9 +2484,9 @@ function tickFishing(dt) {
 function succeedFish() {
   var F = Game.fishing;
   F.phase = 'result'; F.t = 0;
-  // 玩家解锁钓竿后的第一次成功钓鱼，钓上来的不是鱼，是 DS 小姐。
+  // 玩家在河湾第一次成功钓鱼，钓上来的不是鱼，是 DS 小姐。
   // 必须先判定再发鱼获，否则这一次会白白多一条普通鱼。
-  if (!state.dsMet) { F.dsEncounter = true; F.dsFirst = false; }
+  if (!state.dsMet && state.sceneId === 'riverside') { F.dsEncounter = true; F.dsFirst = false; }
   if (F.dsEncounter) {
     // 第一次钓上来的是 DS 小姐，不是鱼：不发放鱼获。
     F.caught = '';
@@ -3082,6 +3094,7 @@ function refreshHotbar() {
 }
 function selectTool(tool) {
   state.selectedTool = tool;
+  if (tool === 'fish' && invCount('tool_rod') > 0) toast('站在池塘或河岸旁，点击附近水面抛竿；咬钩后按空格或点击收线。');
   if (tool === 'seed' || tool === 'place') showTypePicker(tool);
   else hideTypePicker();
   refreshHotbar();
@@ -3242,6 +3255,45 @@ function openBag() {
 }
 
 /* --- 商店 --- */
+var WORKSHOP_GOODS = { wood: 6, stone: 4, dev_chest: 70 };
+function buyWorkshopItem(id, qty) {
+  if (!Object.prototype.hasOwnProperty.call(WORKSHOP_GOODS, id) || !Number.isInteger(qty) || qty <= 0) return false;
+  var price = WORKSHOP_GOODS[id] * qty;
+  if (state.coins < price) { toast('金币不足，还差 ' + (price-state.coins) + ' 金。'); return false; }
+  if (!bagAccepts(id, qty)) { toast('背包满了，先整理一下。'); return false; }
+  state.coins -= price;
+  invAdd(id, qty);
+  Audio2.play('trade');
+  toast('买入' + itemName(id) + ' ×' + qty + '，花费 ' + price + ' 金。');
+  markDirty(); refreshHud();
+  return true;
+}
+function openWorkshop() {
+  openWindow({
+    id: 'workshop', kind: 'custom', wide: true, title: '阿栎木工作坊',
+    build: function (b) {
+      b.appendChild(el('p', 'muted', '金币：' + state.coins + ' 金。材料可用于制作和委托，也可在这里买卖。'));
+      b.appendChild(el('div', 'section-title', '材料与木箱'));
+      Object.keys(WORKSHOP_GOODS).forEach(function (id) {
+        var row = itemTile(id, invCount(id), null, false,
+          '买入 ' + WORKSHOP_GOODS[id] + ' 金 / 件' + (ITEMS[id].kind === 'material' ? ' · 卖出 ' + sellValue(id) + ' 金 / 件' : ' · 20 格储物空间'));
+        var acts = el('div', 'item-actions');
+        function action(label, fn) { acts.appendChild(mkBtn(label, 'sm', function () { fn(); refreshWindow(); refreshHotbar(); })); }
+        action('买 1 个 · ' + WORKSHOP_GOODS[id] + ' 金', function () { buyWorkshopItem(id, 1); });
+        if (ITEMS[id].kind === 'material') {
+          action('买 10 个 · ' + WORKSHOP_GOODS[id]*10 + ' 金', function () { buyWorkshopItem(id, 10); });
+          if (invCount(id)>0) {
+            action('卖 1 个 · ' + sellValue(id) + ' 金', function () { sellToShop(id, 1); });
+            action('卖全部 · ' + invCount(id)*sellValue(id) + ' 金', function () { sellToShop(id, invCount(id)); });
+          }
+        }
+        row.appendChild(acts);b.appendChild(row);
+      });
+    },
+    actions: [{label:'离开作坊',kind:'ghost',close:true}]
+  });
+}
+
 function openShop() {
   openWindow({
     id: 'shop', kind: 'shop', wide: true, title: '芽芽种子铺',
@@ -3270,7 +3322,7 @@ function openShop() {
       b.appendChild(g);
       b.appendChild(el('div', 'hr'));
       b.appendChild(el('div', 'section-title', '出售'));
-      var sellables = invList(state.inventory).filter(isSellable);
+      var sellables = invList(state.inventory).filter(function(id) { return isSellable(id) && ITEMS[id].kind !== 'material'; });
       if (!sellables.length) b.appendChild(el('div', 'empty-note', '背包里没有可以出售的物品。'));
       else {
         var g2 = el('div', 'grid two');
@@ -3919,6 +3971,7 @@ function activateInteractable(it) {
   if (it.kind === 'calendar') { openCalendar(); return; }
   if (it.kind === 'handbook') { openHandbook(); return; }
   if (it.kind === 'shop') { openShop(); return; }
+  if (it.kind === 'workshop') { openWorkshop(); return; }
   if (it.kind === 'board') { openQuestLog('board'); return; }
   if (it.kind === 'bridge') {
     if (state.bridgeRepaired) { toast('小桥已经修好了，可以直接走过去。'); return; }
