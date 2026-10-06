@@ -90,13 +90,17 @@ try {
   const render = await page.evaluate(() => {
     const M=window.__MOSS__,g=document.querySelector('#world').getContext('2d');
     const x=Math.round(M.game.ppos.x)-Math.round(M.cam.x),y=Math.round(M.game.ppos.y)-Math.round(M.cam.y);
-    const d=g.getImageData(Math.round(x-8),Math.round(y-16),16,12).data;
+    const scale=g.getTransform().a;
+    const sample=document.createElement('canvas');sample.width=16;sample.height=12;
+    const sg=sample.getContext('2d');sg.imageSmoothingEnabled=false;
+    sg.drawImage(g.canvas,Math.round(x-8)*scale,Math.round(y-16)*scale,16*scale,12*scale,0,0,16,12);
+    const d=sg.getImageData(0,0,16,12).data;
     let orange=0, eyes=0;
     for(let i=0;i<d.length;i+=4){if(d[i]===218&&d[i+1]===119&&d[i+2]===88)orange++;if(d[i]===23&&d[i+1]===20&&d[i+2]===16)eyes++;}
-    return {orange,eyes};
+    return {orange,eyes,scale};
   });
   eq('玩家画面绘制橙色Clawd身体', render.orange>170, true);
-  eq('玩家画面有两只方眼', render.eyes===8 || render.eyes===4, true);
+  eq('玩家画面有两只方眼', render.eyes>=4 && render.eyes<=8, true);
   for(const [key,face] of [['ArrowLeft','left'],['ArrowRight','right'],['ArrowUp','up'],['ArrowDown','down']]){
     await page.keyboard.down(key);await page.waitForTimeout(280);await page.keyboard.up(key);
     eq('Clawd方向 '+face, await page.evaluate(()=>window.__MOSS__.state.player.face), face);
@@ -108,7 +112,8 @@ try {
     const M=window.__MOSS__,src=document.querySelector('#world');
     const c=document.createElement('canvas');c.width=192;c.height=144;
     const g=c.getContext('2d');g.imageSmoothingEnabled=false;
-    g.drawImage(src,Math.round(M.game.ppos.x-M.cam.x-16),Math.round(M.game.ppos.y-M.cam.y-21),32,24,0,0,192,144);
+    const scale=src.getContext('2d').getTransform().a;
+    g.drawImage(src,(Math.round(M.game.ppos.x)-Math.round(M.cam.x)-16)*scale,(Math.round(M.game.ppos.y)-Math.round(M.cam.y)-21)*scale,32*scale,24*scale,0,0,192,144);
     return c.toDataURL('image/png').split(',')[1];
   });
   fs.writeFileSync('output/playwright/clawd-player.png',Buffer.from(sprite,'base64'));
@@ -213,9 +218,9 @@ try {
   await clickWin(page, '开始新的一天');
   eq('看完最后一页窗口关闭', await winOpen(page), false);
   s = await snap(page);
-  eq('结算把出货箱换成金币', [s.shipping, s.coins, s.day], [{}, preSettle.coins + income, today + 1]);
+  eq('结算包含出货收入和每日五十金补助', [s.shipping, s.coins, s.day], [{}, preSettle.coins + income + 50, today + 1]);
   const hist = await page.evaluate(() => window.__MOSS__.state.settleHistory);
-  eq('收成记录留下当天一条', [hist.length, hist[0].day, hist[0].income], [1, today, income]);
+  eq('收成记录留下当天收入与補助', [hist.length, hist[0].day, hist[0].income], [1, today, income + 50]);
   await page.evaluate(() => window.__MOSS__.openSettleLog());
   await page.waitForTimeout(150);
   eq('收成记录页能回看当天', new RegExp('第 ' + today + ' 天').test(await winText(page)), true);

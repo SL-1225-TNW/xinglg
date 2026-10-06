@@ -382,6 +382,8 @@ button{font-family:inherit}
 .atlas-place.planned{border-style:dashed;background:#d9d3b9;color:#5f6453}
 .atlas-place.chosen,.atlas-place:focus-visible{outline:2px solid #b88c4b;outline-offset:2px}
 .atlas-detail p{margin:0;line-height:1.6}
+.city-plan{display:block;width:min(100%,640px);height:auto;align-self:center;border:2px solid #897e5c;image-rendering:pixelated;border-radius:4px}
+#quickFood{align-self:flex-start;pointer-events:auto}
 @media(max-width:520px){.atlas-place{font-size:10px;padding:3px 4px}.world-atlas{min-height:230px;aspect-ratio:auto}.atlas-place.here{max-width:94px;white-space:normal}}
 .win-head{
   flex:0 0 auto;

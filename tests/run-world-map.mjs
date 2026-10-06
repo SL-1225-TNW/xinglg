@@ -13,8 +13,8 @@ try{
  const time=await p.evaluate(()=>__MOSS__.state.timeMinutes);await p.waitForTimeout(350);
  check('查看地图暂停时间',await p.evaluate(()=>__MOSS__.state.timeMinutes),time);
  const state=await p.evaluate(()=>JSON.stringify(__MOSS__.state));
- await p.getByRole('button',{name:'白蔷薇城，待开放',exact:true}).click();
- check('中央城堡可以查看但尚未建造',(await p.locator('.atlas-detail').innerText()).includes('白蔷薇城 · 待开放'),true);
+ await p.getByRole('button',{name:'白蔷薇城，未解锁 · 小镇南口办理通行证',exact:true}).click();
+ check('城市未解锁时显示办证条件',(await p.locator('.atlas-detail').innerText()).includes('白蔷薇城 · 未解锁'),true);
  check('选择地点不传送或修改进度',await p.evaluate(()=>JSON.stringify(__MOSS__.state)),state);
  await p.getByRole('button',{name:/溪畔河湾，未解锁/}).click();
  check('河湾显示真实修桥条件',(await p.locator('.atlas-detail').innerText()).includes('未解锁 · 修复小桥'),true);
@@ -32,7 +32,7 @@ try{
  const p=mobile.page;await p.addInitScript(()=>{Element.prototype.requestFullscreen=async()=>{throw new Error('emulated fullscreen unavailable');};});await boot(p);await p.keyboard.press('Escape');await p.getByRole('button',{name:'全境地图（M）',exact:true}).click();
  check('手机可从菜单打开地图',await p.locator('.world-atlas').isVisible(),true);
  check('所有地点按钮没有超出地图',await p.evaluate(()=>{const r=document.querySelector('.world-atlas').getBoundingClientRect();return [...document.querySelectorAll('.atlas-place')].every(b=>{const q=b.getBoundingClientRect();return q.left>=r.left&&q.right<=r.right&&q.bottom<=r.bottom;});}),true);
- await p.getByRole('button',{name:'白蔷薇城，待开放',exact:true}).click();
+ await p.getByRole('button',{name:'白蔷薇城，未解锁 · 小镇南口办理通行证',exact:true}).click();
  await p.screenshot({path:'output/playwright/world-map-mobile.png'});
  check('手机无报错',mobile.errors,[]);
 }finally{await mobile.browser.close();}

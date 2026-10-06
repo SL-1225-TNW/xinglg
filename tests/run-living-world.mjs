@@ -1,0 +1,93 @@
+/* 正常采莓和食用使用键鼠；解锁、容量、时间与旧存档边界使用隔离夹具。 */
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {launch,boot,walkTo,clickTile} from './harness.mjs';
+fs.mkdirSync('output/playwright',{recursive:true});
+let passed=0;
+function check(name,actual,expected){assert.deepEqual(actual,expected,name);passed++;console.log('PASS',name);}
+const {browser,page,errors}=await launch();
+async function close(){if(await page.evaluate(()=>!!__MOSS__.ui.window))await page.keyboard.press('Escape');}
+async function pose(scene,x,y,patch={}){
+ await close();await page.waitForFunction(()=>!document.querySelector('#fade').classList.contains('on'));
+ await page.evaluate(({scene,x,y,patch})=>{const m=__MOSS__,s=m.state;Object.assign(s,patch);s.sceneId=scene;s.player={x,y,face:'up'};m.game.fishing=null;m.startGame(s);},{scene,x,y,patch});await page.waitForTimeout(250);
+}
+async function changeScene(scene){await page.waitForFunction(sc=>__MOSS__.state.sceneId===sc,scene);await page.waitForTimeout(300);}
+async function speak(id){await page.evaluate(id=>__MOSS__.__talkToNpc(id),id);}
+try{
+ await boot(page);await page.locator('#tutorialSkip').click();
+ await page.keyboard.press('1');await clickTile(page,9,9);await walkTo(page,10,16);
+ await page.keyboard.press('4');await clickTile(page,10,17);
+ check('真实采莓给出食用入口',await page.evaluate(()=>__MOSS__.toasts.at(-1).m.includes('打开背包')),true);
+ await page.keyboard.press('b');
+ check('背包第一项是食物',await page.locator('.item').first().innerText().then(t=>t.includes('野莓')),true);
+ await page.locator('.item',{hasText:'野莓×'}).getByRole('button',{name:'吃一个 · 体力 +15',exact:true}).click();
+ check('实际食用消耗野莓',await page.evaluate(()=>__MOSS__.state.inventory.berry||0),0);
+ check('体力封顶反馈实际恢复值',await page.evaluate(()=>__MOSS__.toasts.at(-1).m),'吃掉了野莓，恢复 2 点体力。');await close();
+ await page.evaluate(()=>{__MOSS__.state.energy=10;__MOSS__.state.inventory.berry=2;});await page.waitForTimeout(300);
+ check('低体力时出现快捷食用',await page.locator('#quickFood').isVisible(),true);
+ await page.locator('#quickFood').click();check('快捷食用真实恢复体力',await page.evaluate(()=>__MOSS__.state.energy),25);
+ check('恢复后快捷入口收起',await page.locator('#quickFood').isVisible(),false);
+ await pose('forest',4,15,{energy:100});await page.evaluate(()=>__MOSS__.state.exploration.forest=true);
+ check('普通景观树已转成可采节点',await page.evaluate(()=>__MOSS__.exploreNode('forest',4,16).def.item),'wood');
+ check('林场有至少三十棵普通树',await page.evaluate(()=>Object.values(__MOSS__.livingInfo().forestNodes).filter(n=>n.item==='wood').length>=30),true);
+ await page.keyboard.press('ArrowDown');await page.keyboard.press('5');
+ const wood=await page.evaluate(()=>__MOSS__.state.inventory.wood||0);
+ for(let i=0;i<3;i++)await page.keyboard.press('Space');
+ check('普通树砍倒产五木材',await page.evaluate(()=>__MOSS__.state.inventory.wood),wood+5);
+ check('砍树消耗十二体力',await page.evaluate(()=>__MOSS__.state.energy),88);
+ check('砍倒后解除碰撞',await page.evaluate(()=>__MOSS__.isSolid('forest',4,16)),false);
+ check('可以真实走过砍倒的树',await walkTo(page,4,16),true);await walkTo(page,4,15);
+ await page.evaluate(()=>__MOSS__.state.totalDay+=2);
+ check('普通树两天不恢复',await page.evaluate(()=>__MOSS__.exploreNode('forest',4,16).saved.hp),0);
+ await page.evaluate(()=>__MOSS__.state.totalDay++);
+ check('普通树第三天恢复',await page.evaluate(()=>__MOSS__.exploreNode('forest',4,16).saved.hp),3);
+ await pose('forest',6,13,{energy:100});await page.keyboard.press('5');for(let i=0;i<4;i++)await page.keyboard.press('Space');
+ check('硬木树真实采伐',await page.evaluate(()=>__MOSS__.state.inventory.hardwood),4);
+ await page.evaluate(()=>__MOSS__.state.totalDay+=4);check('硬木第四天仍未恢复',await page.evaluate(()=>__MOSS__.exploreNode('forest',6,12).saved.hp),0);
+ await page.evaluate(()=>__MOSS__.state.totalDay++);check('硬木第五天恢复',await page.evaluate(()=>__MOSS__.exploreNode('forest',6,12).saved.hp),4);
+ check('最外围密林继续阻挡越界',await page.evaluate(()=>__MOSS__.isSolid('forest',1,1)),true);
+ await pose('town',14,22,{bridgeRepaired:false,coins:500});await page.keyboard.press('e');
+ await page.getByRole('button',{name:'办理通行证 · 150 金',exact:true}).click();
+ check('修桥前不能办理城市通行证',await page.evaluate(()=>!!__MOSS__.state.exploration.city),false);check('拒绝办证不扣钱',await page.evaluate(()=>__MOSS__.state.coins),500);
+ await page.evaluate(()=>__MOSS__.state.bridgeRepaired=true);
+ await page.getByRole('button',{name:'办理通行证 · 150 金',exact:true}).click();
+ check('办证只扣一百五十金',await page.evaluate(()=>__MOSS__.state.coins),350);
+ check('城市开放状态真实保存',await page.evaluate(()=>__MOSS__.state.exploration.city),true);
+ check('沿南口真实走进入城',await walkTo(page,14,23),true);await changeScene('city');
+ check('城市面积是农场十六倍',await page.evaluate(()=>__MOSS__.livingInfo().city.w*__MOSS__.livingInfo().city.h/(32*24)),16);
+ check('三十二栋建筑与六个街区',await page.evaluate(()=>[__MOSS__.livingInfo().city.buildings.length,__MOSS__.livingInfo().city.districts.length]),[32,6]);
+ const valid=await page.evaluate(()=>{const m=__MOSS__;return m.livingInfo().city.buildings.every(b=>!m.isSolid('city',b.door.x,b.door.y+1)&&!!m.findPath('city',64,92,b.door.x,b.door.y+1));});
+ check('所有建筑入口均可从南门寻路到达',valid,true);
+ const schedules=await page.evaluate(()=>Object.values(__MOSS__.NPCS).filter(n=>n.style).flatMap(n=>n.schedule.filter(s=>__MOSS__.isSolid(n.scene,s.x,s.y)).map(s=>n.id+' '+s.x+','+s.y)));
+ check('新增居民日程落点均可行走',schedules,[]);
+ await page.screenshot({path:'output/playwright/living-city-gate.png'});
+ const inn=await page.evaluate(()=>__MOSS__.livingInfo().city.buildings.find(b=>b.id==='inn').door);
+ check('从城门真实走到旅馆',await walkTo(page,inn.x,inn.y+1,25000),true);await page.keyboard.press('e');await changeScene('city_inn');
+ check('旅馆室内可真实走动',await walkTo(page,11,5),true);await page.keyboard.press('e');check('旅馆服务台可交互',await page.evaluate(()=>__MOSS__.ui.window.id),'city_service');await close();
+ check('室内可走到出口',await walkTo(page,11,15),true);await changeScene('city');
+ const bakery=await page.evaluate(()=>__MOSS__.livingInfo().city.buildings.find(b=>b.id==='bakery').door);
+ await pose('city',bakery.x,bakery.y+1);await page.keyboard.press('e');await changeScene('city_bakery');await walkTo(page,11,5);await page.keyboard.press('e');
+ const money=await page.evaluate(()=>__MOSS__.state.coins);await page.getByRole('button',{name:'买一个面包 · 30 金',exact:true}).click();
+ check('面包房真实交易',await page.evaluate(()=>[__MOSS__.state.coins,__MOSS__.state.inventory.bread]),[money-30,1]);await close();
+ await pose('city',100,82);await page.evaluate(()=>__MOSS__.saveNow());await page.reload();await page.getByRole('button',{name:'继续游戏',exact:true}).click();
+ check('大地图坐标超过六十三仍能恢复',await page.evaluate(()=>[__MOSS__.state.sceneId,__MOSS__.state.player.x,__MOSS__.state.player.y]),['city',100,82]);
+ await page.keyboard.press('m');check('城市地图显示城区总图',await page.locator('.city-plan').count(),1);await page.screenshot({path:'output/playwright/living-city-map.png'});await close();
+ await pose('town',18,16);await page.evaluate(()=>{__MOSS__.state.inventory.radish=3;});await speak('baker');await page.getByRole('button',{name:'帮忙委托',exact:true}).click();
+ const prev=await page.evaluate(()=>({coins:__MOSS__.state.coins,bread:__MOSS__.state.inventory.bread||0}));await page.getByRole('button',{name:'交付委托',exact:true}).click();
+ check('居民委托真实扣料发奖',await page.evaluate(()=>[__MOSS__.state.inventory.radish||0,__MOSS__.state.inventory.bread,__MOSS__.state.coins]),[0,prev.bread+2,prev.coins+20]);
+ await page.getByRole('button',{name:'交付委托',exact:true}).click();check('同一天不能重复领居民奖励',await page.evaluate(()=>__MOSS__.state.coins),prev.coins+20);await close();
+ await page.evaluate(()=>__MOSS__.saveNow());await page.reload();await page.getByRole('button',{name:'继续游戏',exact:true}).click();
+ check('新居民好感和委托日数保存',await page.evaluate(()=>[__MOSS__.state.npcFriendship.baker,__MOSS__.state.exploration.jobs.baker]),[2,await page.evaluate(()=>__MOSS__.state.totalDay)]);
+ await page.evaluate(()=>__MOSS__.state.inventory.berry=1);await speak('postie');await page.getByRole('button',{name:'赠送礼物',exact:true}).click();await page.locator('.item',{hasText:'野莓×'}).getByRole('button',{name:'赠送 1 个',exact:true}).click();
+ check('新居民赠礼不报错并增加好感',await page.evaluate(()=>__MOSS__.state.npcFriendship.postie),10);await close();
+ await pose('farm',9,10);const a=await page.evaluate(()=>__MOSS__.livingInfo().animals.map(a=>[a.x,a.y]));await page.waitForTimeout(1800);const b=await page.evaluate(()=>__MOSS__.livingInfo().animals.map(a=>[a.x,a.y]));
+ check('动物确实移动',JSON.stringify(a)!==JSON.stringify(b),true);
+ await page.keyboard.press('Escape');const paused=await page.evaluate(()=>__MOSS__.livingInfo().animals);await page.waitForTimeout(300);check('暂停时动物停止',await page.evaluate(()=>__MOSS__.livingInfo().animals),paused);await close();
+ await pose('farm',3,7);await page.keyboard.press('e');check('猫可以互动',await page.evaluate(()=>__MOSS__.toasts.at(-1).m.includes('小猫')),true);
+ await page.screenshot({path:'output/playwright/living-farm.png'});
+ await pose('city',64,18);await page.screenshot({path:'output/playwright/living-castle.png'});
+ const frames=await page.evaluate(()=>new Promise(resolve=>{let samples=[],last=performance.now();function f(t){samples.push(t-last);last=t;if(samples.length<90)requestAnimationFrame(f);else resolve(samples.reduce((a,b)=>a+b,0)/samples.length);}requestAnimationFrame(f);}));
+ check('城市持续绘制不过度阻塞（平均帧间隔低于六十毫秒）',frames<60,true);console.log('平均帧间隔',frames.toFixed(2),'ms');
+ check('桌面全过程无浏览器报错',errors,[]);
+}finally{await browser.close();}
+console.log(`生活与城市验收 ${passed}/${passed} 通过`);

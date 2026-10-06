@@ -69,13 +69,13 @@ await pickTool(page, 1); await clickTile(page, 7, 8);
 await pickTool(page, 2); await clickTile(page, 7, 8);
 await page.evaluate(() => { const s = window.__MOSS__.state; s.energy = 1; s.plots['7,8'].mature = true; s.inventory.radish = 2; });
 await press(page, 'b');
-await page.locator('.win .item', { hasText: '萝卜' }).locator('button', { hasText: '食用' }).click();
+await page.locator('.win .item', { hasText: '萝卜' }).locator('button', { hasText: '吃一个' }).click();
 await page.waitForTimeout(150);
 rep.ok('体力不足时也能吃东西恢复', (await snap(page)).energy > 1, `体力 ${(await snap(page)).energy}`);
 rep.eq('吃 1 个消耗 1 个食物', (await snap(page)).inv.radish, 1);
 // 体力已满时不消耗食物
 await page.evaluate(() => { window.__MOSS__.state.energy = 100; });
-await page.locator('.win .item', { hasText: '萝卜' }).locator('button', { hasText: '食用' }).click();
+await page.locator('.win .item', { hasText: '萝卜' }).locator('button', { hasText: '吃一个' }).click();
 await page.waitForTimeout(150);
 s = await snap(page);
 rep.ok('体力已满时提示不消耗', /体力已经满/.test(await lastToast(page)));
@@ -452,7 +452,8 @@ await page.waitForTimeout(300);
 s = await snap(page);
 rep.eq('合法存档导入成功', s.coins, 1234);
 rep.eq('导入恢复库存', s.inv.radish, 7);
-rep.eq('导入恢复好感', s.friend, { yaya: 33, aqi: 12, ds: 0 });
+rep.eq('导入恢复好感', {yaya:s.friend.yaya,aqi:s.friend.aqi,ds:s.friend.ds}, { yaya: 33, aqi: 12, ds: 0 });
+rep.ok('新增居民好感默认值为零', Object.entries(s.friend).filter(([id])=>!['yaya','aqi','ds'].includes(id)).every(([,v])=>v===0));
 rep.eq('导入恢复配方', s.recipes, ['chest', 'sprinkler']);
 
 /* ================= 12. 损坏存档 ================= */

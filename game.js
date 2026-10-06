@@ -89,6 +89,7 @@ var ITEMS = {
   potato:    { name: '土豆',   kind: 'crop',  sell: 40, food: 18, desc: '饱腹的块茎，售价 40 金。' },
   strawberry:{ name: '草莓',   kind: 'crop',  sell: 30, food: 10, desc: '甜美的红果，售价 30 金。' },
   berry:     { name: '野莓',   kind: 'forage', sell: 6, food: 15, desc: '野外浆果，售价 6 金。' },
+  bread:     { name: '乡村面包', kind: 'food', sell: 18, food: 25, desc: '面包师烤制的圆面包，打开背包即可食用。' },
   fish_crucian: { name: '小鲫鱼', kind: 'fish', sell: 20, food: 10, desc: '最常见的河鱼，售价 20 金。' },
   fish_bass:    { name: '河鲈',   kind: 'fish', sell: 35, food: 10, desc: '力气不小的淡水鱼，售价 35 金。' },
   fish_silver:  { name: '银纹鱼', kind: 'fish', sell: 60, food: 10, desc: '银鳞闪烁的稀有鱼，售价 60 金。' },
@@ -433,7 +434,7 @@ function newGameState() {
     npcDailyInteractions: {},
     dsMet: false,
     rodLevel: 1,
-    exploration: {forest:false,mine:false,depth:1,hut:false,tools:false,nodes:{},treasures:{},requestDay:-1},
+    exploration: {forest:false,mine:false,city:false,depth:1,hut:false,tools:false,nodes:{},treasures:{},jobs:{},requestDay:-1},
     questProgress: { 1: 'locked', 2: 'locked', 3: 'locked', 4: 'locked' },
     unlockedRecipes: ['chest'],
     bridgeRepaired: false,
@@ -451,6 +452,7 @@ function newGameState() {
   s.inventory.tool_pick = 1;
   s.inventory.basket = 1;
   s.inventory.tool_shovel = 1;
+  Object.keys(NPCS).forEach(function(id){s.npcFriendship[id]=0;});
   return s;
 }
 
@@ -569,11 +571,11 @@ function normalizeSave(raw) {
   s.timeMinutes = num(raw.timeMinutes, CFG.dayStart, CFG.dayStart, CFG.dayEnd);
   s.coins = Math.max(0, Math.floor(num(raw.coins, 0, 0, 1e9)));
   s.energy = clamp(Math.floor(num(raw.energy, CFG.maxEnergy, 0, CFG.maxEnergy)), 0, CFG.maxEnergy);
-  s.sceneId = (['town','riverside','house','forest','mine1','mine2','mine3'].indexOf(raw.sceneId)>=0) ? raw.sceneId : 'farm';
+  s.sceneId = SCENE_ORDER.indexOf(raw.sceneId)>=0 ? raw.sceneId : 'farm';
   if (raw.player && typeof raw.player === 'object') {
     s.player = {
-      x: Math.floor(num(raw.player.x, 9, 0, 63)),
-      y: Math.floor(num(raw.player.y, 10, 0, 63)),
+      x: Math.floor(num(raw.player.x, 9, 0, MAPS[s.sceneId].w-1)),
+      y: Math.floor(num(raw.player.y, 10, 0, MAPS[s.sceneId].h-1)),
       face: ['up', 'down', 'left', 'right'].indexOf(raw.player.face) >= 0 ? raw.player.face : 'down'
     };
   }
@@ -603,10 +605,12 @@ function normalizeSave(raw) {
     aqi:  clamp(Math.floor(num(raw.npcFriendship && raw.npcFriendship.aqi, 0, 0, 100)), 0, 100),
     ds:   clamp(Math.floor(num(raw.npcFriendship && raw.npcFriendship.ds, 0, 0, 100)), 0, 100)
   };
+  Object.keys(NPCS).forEach(function(id){s.npcFriendship[id]=clamp(Math.floor(num(raw.npcFriendship&&raw.npcFriendship[id],0,0,100)),0,100);});
   s.npcDailyInteractions = (raw.npcDailyInteractions && typeof raw.npcDailyInteractions === 'object') ? raw.npcDailyInteractions : {};
   // DS 小姐：没有该字段的旧存档视为尚未相遇，她会在玩家解锁钓竿后的第一次钓鱼时出现。
   s.dsMet = !!raw.dsMet;
   s.exploration = normalizeExploration(raw.exploration);
+  if ((s.sceneId==='city'||s.sceneId.indexOf('city_')===0)&&!s.exploration.city){s.sceneId='town';s.player={x:14,y:22,face:'up'};}
   if ((s.sceneId === 'forest' && !s.exploration.forest) || (s.sceneId.indexOf('mine') === 0 && (!s.exploration.mine || +s.sceneId.slice(4)>s.exploration.depth))) { s.sceneId='town';s.player={x:14,y:2,face:'down'}; }
   s.rodLevel = clamp(Math.floor(num(raw.rodLevel, 1, 1, 3)), 1, 3);
   var qp = {};
@@ -1025,11 +1029,19 @@ var SCENE_ORDER = ['farm', 'town', 'riverside', 'house','forest','mine1','mine2'
 var EXPLORE_NODES={forest:{},mine1:{},mine2:{},mine3:{}};
 [[6,12],[9,16],[18,18],[24,20],[33,18],[36,23],[8,22],[20,3]].forEach(function(p){EXPLORE_NODES.forest[key2(p[0],p[1])]={type:'tree',item:'hardwood',qty:4,hp:4};});
 [[11,9],[5,16],[17,8],[25,16],[31,19],[35,9],[6,24],[22,23]].forEach(function(p){EXPLORE_NODES.forest[key2(p[0],p[1])]={type:'forage',item:'mushroom',qty:2,hp:1};});
+// 独立树均为真实节点；地图最外圈保留连续密林边界。
+MAPS.forest.trees=MAPS.forest.trees.filter(function(p){
+ if(p[0]===1||p[0]>=37||p[1]===1||p[1]>=25)return true;
+ var k=key2(p[0],p[1]);if(!EXPLORE_NODES.forest[k])EXPLORE_NODES.forest[k]={type:'tree',item:'wood',qty:5,hp:3,regen:3};
+ MAPS.forest.solid[p[0]][p[1]]=0;return false;
+});
+Object.keys(EXPLORE_NODES.forest).forEach(function(k){var n=EXPLORE_NODES.forest[k];if(n.item==='hardwood')n.regen=5;});
 for(var depth=1;depth<=3;depth++)[[4,3],[9,8],[15,10],[23,8],[5,14],[11,18],[23,19],[18,21]].forEach(function(p,i){EXPLORE_NODES['mine'+depth][key2(p[0],p[1])]={type:'stone',item:depth===1?'copper_ore':depth===2?'iron_ore':i%3===0?'gem':'iron_ore',qty:depth===3&&i%3===0?1:3,hp:3};});
 function normalizeExploration(raw){
  function num(v,d,min,max){return typeof v==='number'&&isFinite(v)?clamp(v,min,max):d;}
  raw=raw&&typeof raw==='object'?raw:{};
- var e={forest:!!raw.forest,mine:!!raw.mine,depth:clamp(Math.floor(num(raw.depth,1,1,3)),1,3),hut:!!raw.hut,tools:!!raw.tools,nodes:{},treasures:{},requestDay:Math.floor(num(raw.requestDay,-1,-1,1e6))};
+ var e={forest:!!raw.forest,mine:!!raw.mine,city:!!raw.city,depth:clamp(Math.floor(num(raw.depth,1,1,3)),1,3),hut:!!raw.hut,tools:!!raw.tools,nodes:{},treasures:{},jobs:{},requestDay:Math.floor(num(raw.requestDay,-1,-1,1e6))};
+ Object.keys(LIVING_JOBS||{}).forEach(function(id){if(raw.jobs&&Number.isInteger(raw.jobs[id]))e.jobs[id]=Math.max(-1,raw.jobs[id]);});
  if(!e.forest){e.mine=false;e.hut=false;}if(!e.mine)e.depth=1;
  ['forest_cache','mine_cache'].forEach(function(k){e.treasures[k]=!!(raw.treasures&&raw.treasures[k]);});
  Object.keys(EXPLORE_NODES).forEach(function(sc){Object.keys(EXPLORE_NODES[sc]).forEach(function(k){var n=EXPLORE_NODES[sc][k],key=sc+':'+k,v=raw.nodes&&raw.nodes[key];if(v&&typeof v==='object')e.nodes[key]={hp:clamp(Math.floor(num(v.hp,n.hp,0,n.hp)),0,n.hp),day:Math.floor(num(v.day,0,0,1e6))};});});return e;
@@ -1038,15 +1050,15 @@ function exploreState(){if(!state.exploration)state.exploration=normalizeExplora
 function exploreNode(sc,x,y){var def=EXPLORE_NODES[sc]&&EXPLORE_NODES[sc][key2(x,y)];if(!def)return null;
  var e=exploreState(),key=sc+':'+key2(x,y),saved=e.nodes[key];
  if(!saved){saved=e.nodes[key]={hp:def.hp,day:state.totalDay};}
- var delay=def.type==='forage'?1:3;
- if(saved.hp<=0&&state.totalDay-saved.day>=delay){saved.hp=def.hp;}
+ var delay=def.regen||(def.type==='forage'?1:3);
+ if(saved.hp<=0&&state.totalDay-saved.day>=delay&&!(state.sceneId===sc&&state.player.x===x&&state.player.y===y)){saved.hp=def.hp;}
  return {def:def,saved:saved};
 }
 function gatherExplore(tool,x,y){
  var n=exploreNode(state.sceneId,x,y);if(!n){toast('这里没有可采集的资源。');return false;}
  var expected=n.def.type==='tree'?'axe':n.def.type==='stone'?'pickaxe':'harvest';
  if(tool!==expected){toast('请用'+(expected==='axe'?'斧头':expected==='pickaxe'?'镐子':'收获篮')+'采集'+itemName(n.def.item)+'。');return false;}
- if(n.saved.hp<=0){toast('这里的资源尚未恢复，蘑菇隔天、硬木和矿石每 3 天恢复。');return false;}
+ if(n.saved.hp<=0){toast('这里的资源尚未恢复：蘑菇隔天、木材和矿石 3 天、硬木 5 天。');return false;}
  var cost=expected==='harvest'?2:CFG.energyCost[expected],damage=exploreState().tools&&expected!=='harvest'?2:1;
  if(!hasEnergy(cost))return false;
  if(n.saved.hp<=damage&&!bagAccepts(n.def.item,n.def.qty)){toast('背包满了，先整理一下。');return false;}
@@ -1074,7 +1086,7 @@ function exploreStairs(next){
 }
 function exploreTreasure(id){var e=exploreState();if(e.treasures[id]){toast('这个宝箱已经打开了。');return;}var amount=id==='forest_cache'?120:200;e.treasures[id]=true;state.coins+=amount;markDirty();refreshHud();saveNow();toast('发现隐藏宝箱，获得 '+amount+' 金！');}
 function drawExploreNode(g,x,y,n){
- if(n.type==='tree'){drawTree(g,x,y);px(g,x*TILE+6,y*TILE-3,4,12,'#765438');}
+ if(n.type==='tree'){drawTree(g,x,y);if(n.item==='hardwood')px(g,x*TILE+6,y*TILE-3,4,12,'#765438');}
  else if(n.type==='stone'){drawRock(g,x,y);var color=n.item==='copper_ore'?'#D48F58':n.item==='iron_ore'?'#94B5CA':'#C59EEA';px(g,x*TILE+5,y*TILE+6,3,3,color);px(g,x*TILE+10,y*TILE+9,2,3,color);}
  else{px(g,x*TILE+4,y*TILE+9,3,5,'#F1DFC4');px(g,x*TILE+1,y*TILE+6,9,4,'#B87759');px(g,x*TILE+3,y*TILE+5,5,2,'#DDA27B');px(g,x*TILE+12,y*TILE+10,2,4,'#EADBBE');px(g,x*TILE+10,y*TILE+8,5,3,'#9E6952');}
 }
@@ -1230,7 +1242,7 @@ function checkExit() {
   var e;
   for (e = 0; e < (map.exits || []).length; e++) {
     var ex = map.exits[e];
-    if (ex.x === px && ex.y === py) { if(ex.to === 'forest' && !exploreState().forest){toast('森林入口尚未清理。到小镇北口路牌按 E 修复。');return false;} doSwitchScene(ex.to, ex.tx, ex.ty); return true; }
+    if (ex.x === px && ex.y === py) { if(ex.to==='city'&&!exploreState().city){toast('先在小镇南口驿路牌按 E 办理城市通行证。');return false;} if(ex.to === 'forest' && !exploreState().forest){toast('森林入口尚未清理。到小镇北口路牌按 E 修复。');return false;} doSwitchScene(ex.to, ex.tx, ex.ty); return true; }
   }
   if (map.eastExits) {
     for (e = 0; e < map.eastExits.length; e++) {
@@ -1315,6 +1327,215 @@ var INTERACTABLES = {
     { id: 'h_book',     x: 8, y: 3, stand: [[8,2],[9,3]], kind: 'handbook', label: '农场手册' }
   ]
 };
+
+/* 城市与居民扩展：地图、日程和委托分别保存，环境动物只保存运行状态。 */
+var CITY_DISTRICTS = [
+  {name:'南门驿站',x:64,y:86}, {name:'中央市集',x:64,y:52},
+  {name:'西侧住宅区',x:24,y:54}, {name:'工匠街',x:101,y:65},
+  {name:'学院河岸',x:100,y:31}, {name:'城堡与蔷薇园',x:64,y:16}
+];
+var CITY_BUILDINGS = [];
+MAPS.city=(function(){
+  var m=mkMap(128,96,T_GRASS),decor=[];
+  fillRect(m,0,0,127,0,T_BUILDING,true);fillRect(m,0,95,127,95,T_BUILDING,true);
+  fillCol(m,0,0,95,T_BUILDING,true);fillCol(m,127,0,95,T_BUILDING,true);
+  [28,52,76,90].forEach(function(y){fillRect(m,3,y-1,124,y+1,T_PATH,false);});
+  [12,40,64,88,116].forEach(function(x){fillRect(m,x-1,3,x+1,95,T_PATH,false);});
+  fillRect(m,53,44,75,60,T_PATH,false);
+  // 一条有多座桥的城市河道，桥和主道路相交。
+  fillRect(m,80,2,83,94,T_WATER,true);
+  [28,52,76,90].forEach(function(y){fillRect(m,79,y-1,84,y+1,T_PATH,false);});
+  function building(id,label,x,y,w,h,theme){
+    fillRect(m,x,y,x+w-1,y+h-1,T_BUILDING,true);
+    var door={x:x+Math.floor(w/2),y:y+h};fillRect(m,door.x,door.y,door.x,Math.min(94,door.y+2),T_PATH,false);
+    CITY_BUILDINGS.push({id:id,label:label,x:x,y:y,w:w,h:h,kind:theme||'home',door:door});
+    var roomId='city_'+id,r=mkMap(id==='castle'?32:22,id==='castle'?22:16,T_PATH);
+    fillRect(r,0,0,r.w-1,0,T_BUILDING,true);fillRect(r,0,r.h-1,r.w-1,r.h-1,T_BUILDING,true);
+    fillCol(r,0,0,r.h-1,T_BUILDING,true);fillCol(r,r.w-1,0,r.h-1,T_BUILDING,true);
+    var rx=Math.floor(r.w/2);r.solid[rx][r.h-1]=0;r.t[rx][r.h-1]=T_PATH;
+    fillRect(r,2,2,5,3,T_BUILDING,true);fillRect(r,r.w-6,2,r.w-3,3,T_BUILDING,true);
+    fillRect(r,4,6,6,7,T_BUILDING,true);fillRect(r,r.w-7,6,r.w-5,7,T_BUILDING,true);
+    fillRect(r,rx-1,3,rx+1,4,T_BUILDING,true);
+    MAPS[roomId]={w:r.w,h:r.h,t:r.t,solid:r.solid,name:label,indoor:true,roomTheme:theme||'home',
+      exits:[{x:rx,y:r.h-1,to:'city',tx:door.x,ty:door.y+1}],buildings:[],decor:[]};
+    SCENE_ORDER.push(roomId);
+    INTERACTABLES[roomId]=[{id:id+'_desk',x:rx,y:4,stand:[[rx,5],[rx-2,4],[rx+2,4]],kind:'cityService',label:label+'服务台',service:id}];
+    INTERACTABLES.city.push({id:id,x:door.x,y:door.y,stand:[[door.x,door.y+1],[door.x-1,door.y],[door.x+1,door.y]],kind:'cityDoor',label:label,to:roomId});
+  }
+  INTERACTABLES.city=[];
+  building('castle','白蔷薇城堡',54,6,21,10,'castle');
+  building('library','蔷薇图书馆',94,16,11,7,'library');
+  building('academy','河岸学院',108,16,10,7,'library');
+  building('bakery','暖炉面包房',44,37,7,5,'shop');
+  building('market','城市商会',68,37,9,5,'shop');
+  building('inn','南门旅馆',68,81,9,5,'home');
+  building('post','驿站邮局',47,81,9,5,'shop');
+  building('smith','白蔷薇铁匠铺',93,61,9,6,'workshop');
+  building('tailor','丝带裁缝铺',106,61,8,6,'shop');
+  building('greenhouse','蔷薇温室',44,18,7,6,'shop');
+  building('cafe','河岸茶室',92,37,8,6,'shop');
+  building('hall','居民议事厅',18,37,9,6,'home');
+  var n=0;
+  [[5,5],[19,5],[31,5],[5,18],[19,18],[31,18],[5,37],[30,37],[5,61],[19,61],[30,61],[44,61],[67,61],[5,81],[19,81],[30,81],[92,81],[106,81],[93,5],[108,5]].forEach(function(p){n++;building('home'+n,'蔷薇街 '+n+' 号',p[0],p[1],6,5,'home');});
+  for(var y=19;y<26;y+=2)for(var x=55;x<=74;x+=3)decor.push({t:'flower',x:x,y:y});
+  [12,40,64,88,116].forEach(function(x){[30,54,78,91].forEach(function(y){decor.push({t:'bench',x:x+3,y:y});decor.push({t:'flower',x:x-3,y:y});});});
+  m.t[64][95]=T_PATH;m.solid[64][95]=0;
+  return {w:m.w,h:m.h,t:m.t,solid:m.solid,name:'白蔷薇城',exits:[{x:64,y:95,to:'town',tx:14,ty:22}],buildings:CITY_BUILDINGS,decor:decor};
+})();
+SCENE_ORDER.push('city');
+MAPS.town.t[14][23]=T_PATH;MAPS.town.solid[14][23]=0;
+MAPS.town.exits.push({x:14,y:23,to:'city',tx:64,ty:92});
+INTERACTABLES.town.push({id:'city_gate',x:14,y:21,stand:[[14,22],[13,21],[15,21]],kind:'cityGate',label:'白蔷薇城驿路'});
+
+var LIVING_JOBS = {
+  baker:{title:'明早的蔬菜面包',cost:{radish:3},reward:{bread:2},coins:20},
+  postie:{title:'修补邮递箱',cost:{wood:5},reward:{},coins:35},
+  ranger:{title:'护林员的野外午餐',cost:{mushroom:3},reward:{hardwood:2},coins:20},
+  engineer:{title:'营地维护',cost:{stone:5,copper_ore:3},reward:{},coins:75},
+  archivist:{title:'图书馆书架修补',cost:{wood:10},reward:{},coins:65},
+  gardener:{title:'城堡园丁的午餐',cost:{potato:3},reward:{bread:2},coins:45},
+  merchant:{title:'市集当日补货',cost:{radish:5,fish_crucian:2},reward:{},coins:145}
+};
+function addResident(id,name,title,scene,x,y,style,colors,lines){
+  NPCS[id]={id:id,name:name,title:title,scene:scene,style:style,hair:colors[0],shirt:colors[1],accent:colors[2],skin:'#EDC6A3',
+    like:['bread','berry','potato'],dislike:['stone'],
+    schedule:[{from:360,to:540,x:x,y:y},{from:540,to:1080,x:x+2,y:y},{from:1080,to:1320,x:x,y:y+2}],
+    lines:lines,rainLines:['下雨了，今天的工作慢一点也没关系。'],bridgeLines:lines,
+    heartLines:{25:'以后有空就过来坐坐吧。',50:'和你一起做事总是很安心。',75:'山谷里有你这样的朋友，真好。'}};
+}
+addResident('baker','麦穗','面包师','town',18,15,'baker',['#A86642','#F5E4CB','#B97046'],['刚出炉的圆面包，掰开还冒着热气。','带三颗萝卜来，我给明早的面包添点蔬菜。']);
+addResident('postie','小翎','邮递员','town',10,20,'postie',['#D5AF6B','#577C9B','#DCC39D'],['南边驿路通往白蔷薇城，去城门前先办一张通行证。','小镇的每一封信，我都会送到。']);
+addResident('ranger','松岚','护林员','forest',23,12,'ranger',['#635340','#56734D','#A8BC79'],['独立的树都能砍，外围那片密林是山谷边界。','普通树三天恢复，硬木五天；树桩旁的嫩芽会告诉你它正在长回来。']);
+addResident('engineer','铜钉','营地铁匠','mine1',11,21,'engineer',['#6B5C57','#675B51','#B4BBC4'],['矿洞每三天恢复矿脉，记得带上吃的。','我在营地维护工具，你可以帮我带些铜矿和石头。']);
+NPCS.engineer.schedule[2].y=22;
+[
+ ['archivist','艾琳','图书管理员',96,26,'scholar'],['gardener','萝莎','城堡园丁',58,24,'ranger'],
+ ['merchant','路易','市集采购员',70,55,'merchant'],['innkeeper','贝尔','旅馆老板',73,88,'baker'],
+ ['tailor','莉丝','裁缝',110,69,'scholar'],['teacher','诺尔','学院教师',110,26,'scholar'],
+ ['porter','阿诺','城门守卫',67,92,'engineer'],['florist','芙洛','花商',47,45,'ranger'],
+ ['cook','米勒','茶室厨师',96,45,'baker'],['musician','莱恩','街头琴师',60,57,'postie'],
+ ['steward','塞琳','城堡管家',66,19,'merchant'],['resident','露米','住宅区居民',24,55,'scholar']
+].forEach(function(p,i){addResident(p[0],p[1],p[2],'city',p[3],p[4],p[5],['#'+['835438','4A444F','B89262'][i%3],'#'+['6686A0','976D76','6E9169'][i%3],'#E2D0A4'],[
+  p[2]+'的一天，通常从这条街开始。','城门在南边，市集在中央，城堡在北边；按 M 可以查看城区地图。'
+]);});
+
+function openCityGate(){
+  if(exploreState().city){doSwitchScene('city',64,92);return;}
+  openWindow({id:'city_gate',kind:'custom',title:'白蔷薇城 · 城市通行证',build:function(b){
+    b.appendChild(el('p',null,'城门、市集、住宅、工匠街、学院与蔷薇城堡。办好通行证后可沿南方驿路自由往返。'));
+    b.appendChild(el('p','muted','先修好小镇桥梁，再交纳 150 金办证。'));},actions:[
+    {label:'办理通行证 · 150 金',kind:'primary',close:false,onClick:function(){if(!state.bridgeRepaired){toast('先完成修桥委托，再去城市。');return;}if(!payExplore({coins:150}))return;exploreState().city=true;saveNow();closeWindow();toast('已获得通行证，向南走可到白蔷薇城。');}},
+    {label:'稍后再来',close:true}]});
+}
+function openResidentJob(id){
+  var job=LIVING_JOBS[id];if(!job)return;
+  openWindow({id:'resident_job',kind:'custom',title:NPCS[id].name+' · '+job.title,build:function(b){
+    b.appendChild(el('p',null,'需求：'+Object.keys(job.cost).map(function(k){return itemName(k)+' ×'+job.cost[k];}).join('、')));
+    b.appendChild(el('p',null,'奖励：'+job.coins+' 金'+Object.keys(job.reward).map(function(k){return '、'+itemName(k)+' ×'+job.reward[k];}).join('')));
+    b.appendChild(el('p','muted',exploreState().jobs[id]===state.totalDay?'今天已完成，明天再来。':'每天可以帮助一次。'));},actions:[
+    {label:'交付委托',kind:'primary',close:false,onClick:function(){var e=exploreState();if(e.jobs[id]===state.totalDay){toast('今天已经完成了。');return;}
+      var next=Object.assign({},state.inventory),ok=true;
+      Object.keys(job.cost).forEach(function(k){if((next[k]||0)<job.cost[k])ok=false;next[k]=(next[k]||0)-job.cost[k];});
+      if(!ok){toast('材料还不够。');return;}
+      Object.keys(job.reward).forEach(function(k){next[k]=(next[k]||0)+job.reward[k];});
+      if(countSlots(next)>CFG.bagSlots){toast('背包放不下奖励，先整理一下。');return;}
+      Object.keys(job.cost).forEach(function(k){invRemove(k,job.cost[k]);});Object.keys(job.reward).forEach(function(k){invAdd(k,job.reward[k]);});
+      state.coins+=job.coins;e.jobs[id]=state.totalDay;markDirty();refreshHud();saveNow();toast('帮助了'+NPCS[id].name+'，获得 '+job.coins+' 金。');refreshWindow();}},
+    {label:'离开',close:true}]});
+}
+function openCityService(it){
+  if(it.service==='bakery'){openWindow({id:'bread_shop',kind:'custom',title:'暖炉面包房',build:function(b){b.appendChild(el('p',null,'乡村面包 · 30 金一个，食用恢复 25 点体力。'));},actions:[{label:'买一个面包 · 30 金',close:false,onClick:function(){if(!bagAccepts('bread',1)){toast('背包满了。');return;}if(payExplore({coins:30})){invAdd('bread',1);markDirty();refreshHud();toast('买到了一个热面包。');}}},{label:'离开',close:true}]});return;}
+  if(it.service==='smith'){openExploreSite('tools');return;}
+  var texts={castle:'这里是白蔷薇城堡议事厅。城门、市集和公共街区已经开放，城堡侧翼与大型庆典将在后续更新中加入。',library:'蔷薇谷地方志：小镇北面是雾杉森林，矿山藏在东北。城市环河而建，学院守着旧桥。',market:'城市采购员路易每天在广场收购农产品，可以找他接补货委托。',inn:'南门旅馆提供旅人休息的公共大厅。结束今天仍可从暂停菜单睡觉。',post:'这里的信件会送往芽芽小镇，邮递员小翎就在镇里。',greenhouse:'温室里收藏着蔷薇谷的植物。稀有花卉与栽培系统将在后续开放。'};
+  openWindow({id:'city_service',kind:'custom',title:it.label,build:function(b){b.appendChild(el('p',null,texts[it.service]||'这是居民使用的房间。可以四处走走，街区中的居民会随时间活动。'));},actions:[{label:'继续参观',close:true}]});
+}
+var ANIMAL_HOMES={
+  farm:[['cat',3,6],['bird',15,12],['bird',18,13],['butterfly',7,11],['duck',27,19],['duck',29,20]],
+  town:[['dog',6,13],['bird',15,15],['bird',17,15],['butterfly',12,17]],
+  riverside:[['duck',15,8],['duck',17,9],['bird',7,12]],
+  forest:[['rabbit',17,16],['squirrel',11,16],['butterfly',16,14],['duck',6,7]],
+  city:[['dog',63,88],['cat',24,54],['bird',60,54],['bird',62,56],['bird',67,55],['butterfly',56,24]]
+};
+var ambientAnimals={},animalClock=0;
+function sceneAnimals(){var sc=state.sceneId;if(!ambientAnimals[sc])ambientAnimals[sc]=(ANIMAL_HOMES[sc]||[]).map(function(a,i){return {kind:a[0],x:a[1],y:a[2],homeX:a[1],homeY:a[2],targetX:a[1],targetY:a[2],timer:1+i*.3,phase:i,mode:'停留',face:1};});return ambientAnimals[sc];}
+function tickAnimals(dt){
+  if(timePaused())return;animalClock+=dt;
+  sceneAnimals().forEach(function(a){
+    a.timer-=dt;
+    var near=Math.abs(state.player.x-a.x)+Math.abs(state.player.y-a.y)<2;
+    if((a.kind==='rabbit'||a.kind==='squirrel')&&near&&a.mode!=='躲开')a.timer=0;
+    if(a.timer<=0){var angle=animalClock*.7+a.phase*2.7;
+      var tx=a.homeX+Math.cos(angle)*1.8,ty=a.homeY+Math.sin(angle)*1.4;
+      var x=Math.floor(tx),y=Math.floor(ty),map=MAPS[state.sceneId];
+      var valid=x>=1&&y>=1&&x<map.w-1&&y<map.h-1;
+      if(valid)valid=a.kind==='duck'?isWater(state.sceneId,x,y):!isSolid(state.sceneId,x,y)&&!isWater(state.sceneId,x,y);
+      if(valid){a.targetX=tx;a.targetY=ty;}
+      a.timer=3+(a.phase%3);a.mode=near&&(a.kind==='rabbit'||a.kind==='squirrel')?'躲开':isRaining()&&a.kind==='cat'?'打盹':'走动';
+    }
+    if(a.mode==='打盹')return;
+    var dx=a.targetX-a.x,dy=a.targetY-a.y,d=Math.sqrt(dx*dx+dy*dy),speed=a.mode==='躲开'?2.3:.65;
+    if(d>.08){var step=Math.min(d,dt*speed),nx=a.x+dx/d*step,ny=a.y+dy/d*step;
+      var valid=a.kind==='duck'?isWater(state.sceneId,Math.floor(nx),Math.floor(ny)):!isSolid(state.sceneId,Math.floor(nx),Math.floor(ny))&&!isWater(state.sceneId,Math.floor(nx),Math.floor(ny));
+      if(valid){a.x=nx;a.y=ny;a.face=dx<0?-1:1;}else a.timer=0;
+    }else a.mode=a.kind==='cat'?'打盹':'觅食';
+  });
+}
+function drawAnimal(g,x,y,a){
+  var fx=Math.round(x*TILE+8),fy=Math.round(y*TILE+12),bob=a.mode==='走动'?Math.floor(animalClock*5)%2:0;
+  px(g,fx-5,fy,10,2,'rgba(0,0,0,.15)');
+  if(a.kind==='butterfly'){var flap=Math.floor(animalClock*8)%2;px(g,fx-5,fy-10-flap,4,4,'#DFC0CB');px(g,fx+1,fy-10+flap,4,4,'#EACD8F');px(g,fx-1,fy-9,2,5,'#725A54');return;}
+  if(a.kind==='bird'||a.kind==='duck'){px(g,fx-4,fy-6-bob,8,5,a.kind==='duck'?'#EEE4CB':'#94A9B8');px(g,fx+a.face*3,fy-10-bob,4,5,a.kind==='duck'?'#638C65':'#7993A1');px(g,fx+a.face*6,fy-7-bob,3,2,'#D5A566');px(g,fx+a.face*4+1,fy-9-bob,1,1,'#26332C');return;}
+  var color=a.kind==='cat'?'#CB9663':a.kind==='dog'?'#AA7854':a.kind==='rabbit'?'#D8CFC0':'#9C6749';
+  px(g,fx-5,fy-7-bob,10,6,color);px(g,fx+a.face*3-2,fy-10-bob,5,5,color);px(g,fx-4,fy-1-bob,2,2,'#6C5547');px(g,fx+2,fy-1-bob,2,2,'#6C5547');
+  if(a.kind==='rabbit'){px(g,fx+a.face*3-2,fy-16-bob,2,7,color);px(g,fx+a.face*3+1,fy-15-bob,2,6,color);}else{px(g,fx+a.face*3-2,fy-12-bob,2,3,color);px(g,fx-a.face*7,fy-9-bob,3,5,color);}
+  if(a.mode!=='打盹')px(g,fx+a.face*4,fy-8-bob,1,1,'#29352E');else px(g,fx+a.face*3,fy-7,2,1,'#6C5547');
+}
+function petNearbyAnimal(){var a=sceneAnimals().filter(function(a){return (a.kind==='cat'||a.kind==='dog')&&Math.abs(a.x-state.player.x)+Math.abs(a.y-state.player.y)<1.8;})[0];if(!a)return false;toast(a.kind==='cat'?'小猫眯起眼睛，轻轻蹭了蹭你。':'小狗摇着尾巴，绕着你转了一圈。');Audio2.play('quest');return true;}
+function drawForestStump(g,x,y,n){px(g,x*TILE+4,y*TILE+8,8,6,'#765438');px(g,x*TILE+3,y*TILE+7,10,3,'#BA9468');px(g,x*TILE+6,y*TILE+8,4,1,'#805A3A');if(state.totalDay>n.saved.day){px(g,x*TILE+12,y*TILE+7,1,5,'#537C47');px(g,x*TILE+10,y*TILE+6,5,2,'#9FBD66');}}
+function drawCityBuilding(g,bx,by,b){
+  var x=bx*TILE,y=by*TILE,w=b.w*TILE,h=b.h*TILE,roof=Math.min(30,Math.floor(h/3));
+  px(g,x+3,y+roof,w-6,h-roof,'#DBD7C3');px(g,x+3,y+h-6,w-6,6,'#AFA48C');
+  px(g,x-2,y,w+4,roof,b.kind==='workshop'?'#566572':'#687E94');px(g,x-2,y+roof-4,w+4,4,'#445A70');
+  for(var ri=0;ri<w;ri+=8)px(g,x+ri,y+2,1,roof-5,'#8395A4');
+  for(var wy=y+roof+7;wy<y+h-17;wy+=22)for(var wx=x+12;wx<x+w-10;wx+=24){px(g,wx-2,wy-2,12,15,'#9A8A73');px(g,wx,wy,8,11,state.timeMinutes>=CFG.duskStart?'#EACB86':'#8EAEB9');px(g,wx+3,wy,1,11,'#E8DEBF');px(g,wx,wy+5,8,1,'#E8DEBF');}
+  if(b.kind==='shop'){px(g,x+10,y+h-25,w-20,8,'#A46E75');for(var ax=12;ax<w-10;ax+=10)px(g,x+ax,y+h-25,4,8,'#E2C6B0');}
+  if(b.kind==='castle'){[0,b.w-3].forEach(function(v){var tx=x+v*TILE;px(g,tx,y-24,3*TILE,b.h*TILE+24,'#D9D4C0');px(g,tx-2,y-29,3*TILE+4,6,'#536B81');for(var i=0;i<3;i++)px(g,tx+5+i*14,y-36,7,9,'#C8C4B3');px(g,tx+18,y-14,10,15,'#6C8697');});}
+  var dx=b.door.x*TILE;px(g,dx+2,(b.door.y-1)*TILE,12,16,'#665449');px(g,dx+4,(b.door.y-1)*TILE+2,8,12,'#8B6B4C');
+  g.font='9px sans-serif';g.textAlign='center';var tw=Math.ceil(g.measureText(b.label).width)+8;px(g,x+w/2-tw/2,y+h-35,tw,13,'#405247');g.fillStyle='#EBDDAD';g.fillText(b.label,x+w/2,y+h-25);g.textAlign='left';
+}
+function drawCityInterior(g,map){
+  var wood=map.roomTheme==='library'?'#776552':'#8E6E4B';
+  [[2,2,4,2],[map.w-6,2,4,2],[4,6,3,2],[map.w-7,6,3,2]].forEach(function(r){px(g,r[0]*TILE,r[1]*TILE,r[2]*TILE,r[3]*TILE,wood);px(g,r[0]*TILE+2,r[1]*TILE+2,r[2]*TILE-4,4,'#B59A74');});
+  var cx=Math.floor(map.w/2)*TILE;px(g,cx-16,3*TILE,48,22,'#8B6B4C');px(g,cx-14,3*TILE+2,44,4,'#C5A277');
+  if(map.roomTheme==='library')for(var i=0;i<7;i++)px(g,2*TILE+5+i*7,2*TILE+8,4,14,['#8A6268','#668596','#9AA678'][i%3]);
+  if(map.roomTheme==='castle'){px(g,cx-12,6*TILE,40,10*TILE,'#9A6473');px(g,cx-10,6*TILE+3,36,2,'#E2C181');}
+  g.font='10px sans-serif';g.fillStyle='#E6D4A1';g.textAlign='center';g.fillText(map.name,cx+8,24);g.textAlign='left';
+}
+function drawCityPlan(c){
+  var g=c.getContext('2d'),map=MAPS.city;g.fillStyle='#99AC80';g.fillRect(0,0,c.width,c.height);
+  for(var x=0;x<map.w;x++)for(var y=0;y<map.h;y++){if(map.t[x][y]===T_PATH){g.fillStyle='#D9CEAE';g.fillRect(x*4,y*4,4,4);}else if(map.t[x][y]===T_WATER){g.fillStyle='#719DA6';g.fillRect(x*4,y*4,4,4);}}
+  CITY_BUILDINGS.forEach(function(b){g.fillStyle=b.id==='castle'?'#687C94':'#837A74';g.fillRect(b.x*4,b.y*4,b.w*4,b.h*4);});
+  CITY_DISTRICTS.forEach(function(d){g.font='12px sans-serif';g.textAlign='center';var w=g.measureText(d.name).width+10;g.fillStyle='rgba(30,48,37,.9)';g.fillRect(d.x*4-w/2,d.y*4-7,w,17);g.fillStyle='#EEDDB0';g.fillText(d.name,d.x*4,d.y*4+6);});g.textAlign='left';
+  var p=null;if(state.sceneId==='city')p=state.player;else if(state.sceneId.indexOf('city_')===0){var id=state.sceneId.slice(5),b=CITY_BUILDINGS.filter(function(b){return b.id===id;})[0];if(b)p=b.door;}
+  if(p){g.fillStyle='#FFF3D6';g.fillRect(p.x*4-5,p.y*4-5,10,10);g.fillStyle='#B24B4C';g.fillRect(p.x*4-3,p.y*4-3,6,6);}
+}
+function drawCityCrowd(ents,R){
+  for(var i=0;i<16;i++){
+    var row=[28,52,76,90][i%4],x=8+((animalClock*.7+i*7)%109),y=row+(i%2?1:0);
+    if(x>79&&x<84)y=row;
+    if(x<R.x0-1||x>R.x1+1||y<R.y0-1||y>R.y1+1)continue;
+    ents.push({z:y*TILE+TILE,f:drawResident,a:[x*TILE+8,y*TILE+14,{hair:['#615149','#B59669','#886451'][i%3],shirt:['#A58187','#7895A8','#8F9E74','#D7BD91'][i%4],accent:'#D8C6A3',skin:'#E6C29E',face:'right',moving:!timePaused(),phase:animalClock,apron:false,style:['postie','scholar','merchant','baker'][i%4]}]});
+  }
+}
+function drawResident(g,fx,fy,opt){
+  drawActor(g,fx,fy,opt);var style=opt.style;
+  if(style==='baker'){px(g,fx-6,fy-29,12,5,'#FFF0D5');px(g,fx-4,fy-32,8,4,'#FFF6E6');}
+  else if(style==='postie'){px(g,fx-7,fy-27,14,3,'#496B88');px(g,fx+4,fy-12,5,7,'#B38658');}
+  else if(style==='ranger'){px(g,fx-8,fy-26,16,2,'#3E5B3B');px(g,fx-5,fy-29,10,3,'#69835A');}
+  else if(style==='engineer'){px(g,fx-6,fy-26,12,3,'#ABB1B6');px(g,fx-5,fy-24,3,3,'#3F535B');px(g,fx+2,fy-24,3,3,'#3F535B');}
+  else if(style==='scholar'){px(g,fx-5,fy-22,4,3,'#465260');px(g,fx+1,fy-22,4,3,'#465260');px(g,fx+5,fy-9,4,6,'#8B6559');}
+  else{px(g,fx-6,fy-29,12,5,'#65586B');px(g,fx-8,fy-25,16,2,'#8E7E94');}
+}
 
 function findInteractable(px, py, fx, fy) {
   var list = INTERACTABLES[state.sceneId] || [];
@@ -1530,9 +1751,10 @@ function eatItem(id) {
   if (invCount(id) <= 0) { toast('背包里没有' + itemName(id) + '了。'); return false; }
   if (state.energy >= CFG.maxEnergy) { toast('体力已经满了，先干点活吧。'); return false; }
   invRemove(id, 1);
-  state.energy = clamp(state.energy + ITEMS[id].food, 0, CFG.maxEnergy);
+  var recovered=Math.min(ITEMS[id].food,CFG.maxEnergy-state.energy);
+  state.energy += recovered;
   Audio2.play('eat');
-  toast('吃掉了' + itemName(id) + '，恢复 ' + ITEMS[id].food + ' 点体力。');
+  toast('吃掉了' + itemName(id) + '，恢复 ' + recovered + ' 点体力。');
   markDirty(); refreshHud();
   return true;
 }
@@ -1718,7 +1940,7 @@ function pickBerry(tx, ty) {
   node.active = false;
   addParticle(tx, ty, 'harvest');
   Audio2.play('harvest');
-  toast('采到 1 个野莓。');
+  toast('获得野莓 ×1：打开背包点击「吃一个」，最多恢复 15 点体力。');
   markDirty(); refreshHud();
   return true;
 }
@@ -2289,6 +2511,7 @@ function updateNpcPositions(instant) {
     if (!Object.prototype.hasOwnProperty.call(npcRuntime, id)) continue;
     var npc = NPCS[id], r = npcRuntime[id];
     var slot = scheduleSlot(npc, state.timeMinutes);
+    if(!instant&&npc.scene!==state.sceneId){r.x=slot.x;r.y=slot.y;r.path=[];continue;}
     if (instant) { r.x = slot.x; r.y = slot.y; r.path = []; r.face = 'down'; continue; }
     if (r.x === slot.x && r.y === slot.y) { r.path = []; continue; }
     if (!r.path.length || r.pathGoal !== key2(slot.x, slot.y)) {
@@ -2300,6 +2523,7 @@ function updateNpcPositions(instant) {
 }
 
 function tickNpc(dt) {
+  if(timePaused())return;
   updateNpcPositions(false);
   var budget = dt;
   for (var id in npcRuntime) {
@@ -2379,7 +2603,7 @@ function giftToNpc(id, itemId) {
   invRemove(itemId, 1);
   d.gift = true;
   state.npcFriendship[id] = clamp((state.npcFriendship[id] || 0) + delta, 0, 100);
-  var fb = GIFT_FEEDBACK[kind][id];
+  var fb = GIFT_FEEDBACK[kind][id] || [kind==='love'?'这份礼物我很喜欢，谢谢你！':kind==='dislike'?'谢谢你的心意，不过我不太需要这个。':'谢谢，我会好好收下的。'];
   var line = fb[(d.chatCount + state.totalDay) % fb.length];
   Audio2.play(kind === 'dislike' ? 'fail' : 'quest');
   markDirty(); refreshHud();
@@ -2853,6 +3077,8 @@ function refreshFarmAssist() {
   var oldHeight = box.offsetHeight;
   box.hidden = !$('#boot').hidden;
   var t = tutorialState(), step = tutorialStep(), a = farmWork();
+  var foodButton=$('#quickFood'),food=invList(state.inventory).filter(isFood)[0];
+  if(foodButton){foodButton.hidden=state.energy>20||!food;foodButton.textContent=food?'吃一个'+itemName(food)+' · 体力 +'+ITEMS[food].food:'';foodButton.onclick=function(){if(!UI.window&&!Game.fishing&&!sceneSwitch.busy&&food)eatItem(food);};}
   if (step === 9 && t.status !== 'done') {
     var notify = t.status === 'active'; t.status = 'done'; markDirty();
     if (notify) toast('新手引导完成！你已学会种田、回家和交委托。');
@@ -3303,8 +3529,8 @@ function mkBtn(label, kind, fn) {
   return b;
 }
 function itemTile(id, qty, onClick, selected, extraText) {
-  var n = el('button', 'item' + (selected ? ' on' : '') + (onClick ? '' : ' static'));
-  n.type = 'button';
+  var n = el(onClick?'button':'div', 'item' + (selected ? ' on' : '') + (onClick ? '' : ' static'));
+  if(onClick)n.type = 'button';
   var ic = el('div', 'item-ico');
   var c = getIcon(id);
   if (c) ic.appendChild(c);
@@ -3338,16 +3564,8 @@ function openBag() {
         w.style.color = '#e08b74';
         b.appendChild(w);
       }
-      b.appendChild(el('div', 'hr'));
-      var tools = invList(state.inventory).filter(function (id) { return ITEMS[id].kind === 'tool'; });
-      if (tools.length) {
-        b.appendChild(el('div', 'section-title', '工具'));
-        var g0 = el('div', 'grid');
-        tools.forEach(function (id) { g0.appendChild(itemTile(id, null, null)); });
-        b.appendChild(g0);
-        b.appendChild(el('div', 'hr'));
-      }
       var others = invList(state.inventory).filter(function (id) { return ITEMS[id].kind !== 'tool'; });
+      others.sort(function(a,b){return (isFood(b)?1:0)-(isFood(a)?1:0);});
       b.appendChild(el('div', 'section-title', '物品'));
       if (!others.length) b.appendChild(el('div', 'empty-note', '背包里还没有其他物品。'));
       else {
@@ -3355,13 +3573,15 @@ function openBag() {
         others.forEach(function (id) {
           var it = ITEMS[id];
           var acts = el('div', 'item-actions');
-          if (isFood(id)) acts.appendChild(mkBtn('食用', 'sm', function () { eatItem(id); refreshWindow(); refreshHotbar(); }));
+          if (isFood(id)) acts.appendChild(mkBtn('吃一个 · 体力 +' + it.food, 'sm primary', function () { eatItem(id); refreshWindow(); refreshHotbar(); }));
           var tile = itemTile(id, invCount(id), null, false);
           tile.appendChild(acts);
           g.appendChild(tile);
         });
         b.appendChild(g);
       }
+      var tools = invList(state.inventory).filter(function (id) { return ITEMS[id].kind === 'tool'; });
+      if(tools.length){b.appendChild(el('div','section-title','工具 · 不占背包格'));var g0=el('div','grid');tools.forEach(function(id){g0.appendChild(itemTile(id,null,null));});b.appendChild(g0);}
     },
     actions: [{ label: '关闭', kind: 'ghost', close: true }]
   });
@@ -3756,6 +3976,7 @@ function openDialogue(id, text, friendshipGain) {
         if (friendshipGain) b.appendChild(el('p', 'muted', '聊天好感 +' + friendshipGain));
         var d = npcDaily(id);
         var row = el('div', 'row');
+        if(LIVING_JOBS[id])row.appendChild(mkBtn('帮忙委托','primary',function(){openResidentJob(id);}));
         if (!d.chat) row.appendChild(mkBtn('再聊一句', 'primary', function () { talkToNpc(id); }));
         if (!d.gift) {
           row.appendChild(mkBtn('赠送礼物', '', function () { view = 'gift'; renderWindow(); }));
@@ -3853,7 +4074,7 @@ var WORLD_REGIONS = [
   {id:'riverside',name:'溪畔河湾',x:33,y:76,desc:'小桥另一侧的钓鱼河岸。完成修桥委托后开放。'},
   {id:'vineyard',name:'金叶葡萄园',x:43,y:23,desc:'缓坡上的葡萄架、石墙与乡村庄园。未来探索路线的一站。'},
   {id:'forest',name:'雾杉森林',x:55,y:81,desc:'从小镇北口进入。硬木、蘑菇、林间湖、伐木屋与隐藏宝箱；东北通往旧矿山。'},
-  {id:'city',name:'白蔷薇城',x:57,y:47,desc:'山谷中央的石砌城堡城市。蓝灰色屋顶、蔷薇庭院与市集，作为逐步探索的远期目的地。'},
+  {id:'city',name:'白蔷薇城',x:57,y:47,desc:'从小镇南口办理通行证后进入。128×96 格城市：城堡、市集、住宅、工匠街、学院和驿站，32 栋可进入建筑。'},
   {id:'pass',name:'旧矿山',x:80,y:22,desc:'从森林东北进入，共三层：铜矿、铁矿、紫晶。修复轨道逐层深入，原路返回森林。'},
   {id:'mill',name:'风铃磨坊',x:81,y:67,desc:'河流穿过麦田与古老水磨坊，连接山谷东南部的乡野。'}
 ];
@@ -3861,6 +4082,7 @@ function worldRegionStatus(r) {
   if (r.id === 'farm' || r.id === 'town') return '已开放';
   if (r.id === 'riverside') return state.bridgeRepaired ? '已开放' : '未解锁 · 修复小桥';
   if(r.id==='forest')return exploreState().forest?'已开放':'未解锁 · 小镇北口清理倒木';
+  if(r.id==='city')return exploreState().city?'已开放':'未解锁 · 小镇南口办理通行证';
   if(r.id==='pass')return exploreState().mine?'已开放':'未解锁 · 森林东北修复矿山';
   return '待开放';
 }
@@ -3888,19 +4110,26 @@ function drawWorldAtlas(c) {
 }
 function openWorldMap() {
   clearKeys();
-  var current=state.sceneId==='house'?'farm':state.sceneId.indexOf('mine')===0?'pass':state.sceneId;
+  var current=state.sceneId==='house'?'farm':state.sceneId.indexOf('mine')===0?'pass':state.sceneId.indexOf('city_')===0?'city':state.sceneId;
   var selected=current;
+  var cityView=current==='city';
   openWindow({id:'worldmap',kind:'custom',wide:true,title:'蔷薇谷 · 全境地图',build:function(b){
     b.appendChild(el('p','muted','西北的家，中央的城。沿山谷逐步探索，前往白蔷薇城。'));
+    if(selected==='city'){
+      var mapTabs=el('div','row');
+      mapTabs.appendChild(mkBtn('全境总图',cityView?'ghost':'primary',function(){cityView=false;renderWindow();}));
+      mapTabs.appendChild(mkBtn('白蔷薇城区',cityView?'primary':'ghost',function(){cityView=true;renderWindow();}));b.appendChild(mapTabs);
+    }
     var wrap=el('div','world-atlas');var c=newCanvas(640,400);c.setAttribute('aria-hidden','true');drawWorldAtlas(c);wrap.appendChild(c);
     WORLD_REGIONS.forEach(function(r){var status=worldRegionStatus(r),here=r.id===current;
       var button=el('button','atlas-place'+(here?' here':'')+(status!=='已开放'?' planned':'')+(selected===r.id?' chosen':''),r.name+(here?' · 你在这里':''));
       button.title=r.name+' · '+status;
       button.type='button';button.style.left=r.x+'%';button.style.top=r.y+'%';button.setAttribute('aria-label',r.name+'，'+status+(here?'，当前位置':''));button.setAttribute('aria-pressed',selected===r.id?'true':'false');
       button.onclick=function(){selected=r.id;renderWindow();};wrap.appendChild(button);
-    });b.appendChild(wrap);
+    });if(!cityView)b.appendChild(wrap);
     var r=WORLD_REGIONS.filter(function(p){return p.id===selected;})[0]||WORLD_REGIONS[0];
     var detail=el('div','panel-box atlas-detail');detail.setAttribute('aria-live','polite');detail.appendChild(el('div','section-title',r.name+' · '+worldRegionStatus(r)));detail.appendChild(el('p',null,r.desc));b.appendChild(detail);
+    if(selected==='city'){var cityPlan=newCanvas(512,384);cityPlan.className='city-plan';cityPlan.setAttribute('aria-label','白蔷薇城城区地图，红点代表当前位置');drawCityPlan(cityPlan);b.appendChild(cityPlan);b.appendChild(el('p','muted','城市共 128×96 格。北部城堡、中央市集、西部住宅、东部学院与工匠街、南部驿站；红点是你的位置。'));}
     b.appendChild(el('p','muted','虚线边框地点：未解锁或待开放，点击查看详情。实线路：现有农场与小镇连接；虚线路：探索路线示意。森林由小镇北口进入，矿山由森林东北进入；其余待开放区域仍在规划中。M 或 Esc 关闭，地图不能传送。'));
   },actions:[{label:'返回游戏',kind:'primary',close:true}]});
 }
@@ -4065,6 +4294,7 @@ function interact() {
   if (it) { activateInteractable(it); return true; }
   var npcId = findNpcAdjacent(p.x, p.y, f[0], f[1]);
   if (npcId) { talkToNpc(npcId); return true; }
+  if(petNearbyAnimal())return true;
   if (state.sceneId === 'house') {
     var fur = houseFurnitureAt(f[0], f[1]);
     if (fur) { toast(fur.label + '：' + houseFurnitureHint(fur)); return true; }
@@ -4105,6 +4335,9 @@ function openStructure(st) {
   });
 }
 function activateInteractable(it) {
+  if(it.kind==='cityGate'){openCityGate();return;}
+  if(it.kind==='cityDoor'){var room=MAPS[it.to];doSwitchScene(it.to,Math.floor(room.w/2),room.h-2);return;}
+  if(it.kind==='cityService'){openCityService(it);return;}
   Audio2.unlock();
   if (it.kind === 'sleep') { requestSleep(); return; }
   if (it.kind === 'enterHouse') {
@@ -4317,6 +4550,7 @@ var ICON_ART = {
     px(g, 4, 6, 3, 3, '#5B4A8A'); px(g, 9, 6, 3, 3, '#5B4A8A'); px(g, 6, 9, 4, 3, '#6B5AA0');
     px(g, 5, 7, 1, 1, '#8A7AB8'); px(g, 10, 7, 1, 1, '#8A7AB8'); px(g, 7, 10, 1, 1, '#8A7AB8');
   },
+  bread: function(g){px(g,2,5,12,8,'#BB8651');px(g,3,3,10,3,'#D8A966');px(g,4,6,2,4,'#EAD098');px(g,8,5,2,4,'#EAD098');px(g,12,7,1,3,'#EAD098');},
   fish_crucian: function (g) {
     px(g, 3, 7, 9, 4, '#B9C6CC'); px(g, 2, 6, 2, 3, '#8FA3AB'); px(g, 4, 11, 8, 1, '#8FA3AB');
     px(g, 12, 6, 3, 5, '#C7D3D8'); px(g, 14, 5, 1, 2, '#8FA3AB'); px(g, 13, 7, 1, 1, '#141A1E');
@@ -4504,6 +4738,7 @@ function getNpcPortrait(id) {
     px(g, 13, 22, 6, 8, npc.accent);
   }
   portraitCache[id] = c;
+  if(npc.style){var pg=c.getContext('2d');if(npc.style==='baker'){px(pg,7,3,18,5,'#F8EDD5');px(pg,10,0,12,4,'#FFF4E0');}else if(npc.style==='ranger'){px(pg,4,6,24,3,'#5D784C');px(pg,9,1,14,5,'#7A945A');}else if(npc.style==='postie'){px(pg,7,4,18,4,'#537E9D');px(pg,20,24,8,6,'#B3885B');}else if(npc.style==='engineer'){px(pg,8,11,16,4,'#86949E');px(pg,10,12,4,2,'#344B5B');px(pg,18,12,4,2,'#344B5B');}else if(npc.style==='scholar'){px(pg,9,13,6,4,'#475D68');px(pg,17,13,6,4,'#475D68');}}
   var out = newCanvas(32, 32);
   out.getContext('2d').drawImage(c, 0, 0);
   return out;
@@ -5241,6 +5476,9 @@ function drawEnterHint(g, ox, oy) {
   else if (hit.kind === 'shop') text = 'E 进店';
   else if (hit.kind === 'board') text = 'E 看委托';
   else if (hit.kind === 'bridge') text = state.bridgeRepaired ? '小桥已修好' : 'E 看施工点';
+  else if(hit.kind==='cityGate')text='E 白蔷薇城驿路';
+  else if(hit.kind==='cityDoor')text='E 进入'+hit.label;
+  else if(hit.kind==='cityService')text='E 查看服务台';
   if (!text) text = 'E ' + hit.label;
   g.font = '10px ' + 'sans-serif';
   var wpx = Math.ceil(g.measureText(text).width) + 10;
@@ -5614,7 +5852,7 @@ function drawScene(g, dt) {
       }
     }
   }
-  if(EXPLORE_NODES[state.sceneId]) Object.keys(EXPLORE_NODES[state.sceneId]).forEach(function(k){var xy=k.split(',').map(Number),n=exploreNode(state.sceneId,xy[0],xy[1]);if(n.saved.hp>0)ents.push({z:xy[1]*TILE+TILE,f:drawExploreNode,a:[xy[0],xy[1],n.def]});});
+  if(EXPLORE_NODES[state.sceneId]) Object.keys(EXPLORE_NODES[state.sceneId]).forEach(function(k){var xy=k.split(',').map(Number);if(xy[0]<R.x0-1||xy[0]>R.x1+1||xy[1]<R.y0-3||xy[1]>R.y1+3)return;var n=exploreNode(state.sceneId,xy[0],xy[1]);if(n.saved.hp>0)ents.push({z:xy[1]*TILE+TILE,f:drawExploreNode,a:[xy[0],xy[1],n.def]});else if(n.def.type==='tree')ents.push({z:xy[1]*TILE+TILE,f:drawForestStump,a:[xy[0],xy[1],n]});});
   var nodeKeys = state.sceneId === 'farm' ? Object.keys(state.resourceNodes) : [];
   if (state.sceneId !== 'farm') {
     (map.trees || []).forEach(function (xy) {
@@ -5633,7 +5871,8 @@ function drawScene(g, dt) {
     }
   }
   (map.buildings || []).forEach(function (b) {
-    ents.push({ z: (b.y + b.h) * TILE, f: drawHouse, a: [b.x, b.y, b.w, b.h, b.kind] });
+    if(b.x+b.w<R.x0||b.x>R.x1||b.y+b.h<R.y0||b.y-3>R.y1)return;
+    ents.push({ z: (b.y + b.h) * TILE, f: state.sceneId==='city'?drawCityBuilding:drawHouse, a: state.sceneId==='city'?[b.x,b.y,b]:[b.x, b.y, b.w, b.h, b.kind] });
   });
   (INTERACTABLES[state.sceneId] || []).forEach(function (it) {
     if (it.x < R.x0 || it.x > R.x1 || it.y < R.y0 || it.y > R.y1) return;
@@ -5680,14 +5919,18 @@ function drawScene(g, dt) {
     var nr = npcRuntime[nid];
     if (nr.x < R.x0 - 1 || nr.x > R.x1 + 1 || nr.y < R.y0 - 1 || nr.y > R.y1 + 1) continue;
     var npc = NPCS[nid];
-    ents.push({ z: nr.y * TILE + TILE, f: nid === 'ds' ? drawDsActor : nid === 'yaya' ? drawYayaActor : drawActor, a: [nr.x * TILE + 8, nr.y * TILE + 14,
-      { hair: npc.hair, shirt: npc.shirt, accent: npc.accent, skin: npc.skin, face: nr.face, moving: false, phase: 0, swing: 0, apron: true }] });
+    ents.push({ z: nr.y * TILE + TILE, f: nid === 'ds' ? drawDsActor : nid === 'yaya' ? drawYayaActor : npc.style?drawResident:drawActor, a: [nr.x * TILE + 8, nr.y * TILE + 14,
+      { hair: npc.hair, shirt: npc.shirt, accent: npc.accent, skin: npc.skin, face: nr.face, moving: !!nr.path.length, phase: clock, swing: 0, apron: true,style:npc.style }] });
   }
   ents.push({
     z: Math.round(ppos.y), f: drawClawd, a: [Math.round(ppos.x), Math.round(ppos.y),
       { face: state.player.face, moving: Game.moving, phase: Game.walkPhase, swing: Game.swingT > 0 ? Game.swingT / 0.28 : 0, tool: state.selectedTool }]
   });
   ents.sort(function (a, b) { return a.z - b.z; });
+  sceneAnimals().forEach(function(a){if(a.x>=R.x0-1&&a.x<=R.x1+1&&a.y>=R.y0-1&&a.y<=R.y1+1)ents.push({z:a.y*TILE+TILE,f:drawAnimal,a:[a.x,a.y,a]});});
+  if(state.sceneId==='city')drawCityCrowd(ents,R);
+  if(state.sceneId.indexOf('city_')===0)drawCityInterior(g,map);
+  ents.sort(function(a,b){return a.z-b.z;});
   ents.forEach(function (e) { e.f(g, e.a[0], e.a[1], e.a[2], e.a[3], e.a[4]); });
 
   drawParticles(g);
@@ -6043,6 +6286,7 @@ function frame(ts) {
 
   tickPlayer(dt);
   tickNpc(dt);
+  tickAnimals(dt);
   tickTime(dt);
   tickFishing(dt);
   tickParticles(dt);
@@ -6213,7 +6457,8 @@ function bindInput() {
     var f = facingTile();
     if (useTool(state.selectedTool, f[0], f[1])) Game.swingT = 0.28;
   });
-  $('#touchAct').addEventListener('pointerdown', function (e) { e.preventDefault(); Audio2.unlock(); interact(); });
+  // 在点击完成后打开窗口，避免同一次触摸的抬起/点击落到新窗口的关闭按钮。
+  $('#touchAct').addEventListener('click', function (e) { e.preventDefault(); Audio2.unlock(); interact(); });
   $('#touchBag').onclick = function () { UI.window && UI.window.id === 'bag' ? closeWindow() : openBag(); };
   $('#touchCraft').onclick = function () { UI.window && UI.window.id === 'craft' ? closeWindow() : openCraft(); };
   $('#touchQuest').onclick = function () { UI.window && UI.window.id === 'quest' ? closeWindow() : openQuestLog(null); };
@@ -6261,6 +6506,7 @@ window.__MOSS__ = {
   get cam() { return cam; },
   get canvasRect() { var r = canvas.getBoundingClientRect(); return { w: r.width, h: r.height, left: r.left, top: r.top }; },
   get npcRuntime() { return npcRuntime; },
+  livingInfo: function(){return {city:{w:MAPS.city.w,h:MAPS.city.h,buildings:CITY_BUILDINGS,districts:CITY_DISTRICTS},animals:sceneAnimals().map(function(a){return Object.assign({},a);}),forestNodes:EXPLORE_NODES.forest};},
   QUEST_SITES: QUEST_SITES,
   TUTORIAL_DONE: TUTORIAL_DONE,
   npcScene: function (id) { return NPCS[id].scene; },
