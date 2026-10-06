@@ -1383,6 +1383,8 @@ MAPS.city=(function(){
   return {w:m.w,h:m.h,t:m.t,solid:m.solid,name:'白蔷薇城',exits:[{x:64,y:95,to:'town',tx:14,ty:22}],buildings:CITY_BUILDINGS,decor:decor};
 })();
 SCENE_ORDER.push('city');
+/* 南口驿路：从广场直通南缘的城市出口。此前这里只有孤立的一格地砖，路上没有任何指引。 */
+fillRect(MAPS.town, 13, 17, 15, 23, T_PATH, false);
 MAPS.town.t[14][23]=T_PATH;MAPS.town.solid[14][23]=0;
 MAPS.town.exits.push({x:14,y:23,to:'city',tx:64,ty:92});
 INTERACTABLES.town.push({id:'city_gate',x:14,y:21,stand:[[14,22],[13,21],[15,21]],kind:'cityGate',label:'白蔷薇城驿路'});
@@ -5186,6 +5188,23 @@ function drawBoard(g, x, y) {
   g.fillRect(x * TILE + 4, y * TILE + 5, 3, 1); g.fillRect(x * TILE + 10, y * TILE + 4, 2, 1);
   g.fillStyle = '#C0392B'; g.fillRect(x * TILE + 10, y * TILE + 6, 2, 2);
 }
+/* 南口驿路牌：未办证挂红缄，办证后换成金印 */
+function drawCityGateSite(g, x, y) {
+  var sx = x * TILE, sy = y * TILE;
+  var open = !!(state && state.exploration && state.exploration.city);
+  g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(sx + 4, sy + 13, 9, 3);
+  g.fillStyle = '#8A6B48'; g.fillRect(sx + 7, sy + 7, 2, 8);
+  g.fillStyle = '#8A6B48'; g.fillRect(sx + 1, sy + 2, 14, 6);
+  g.fillStyle = '#A67C4E'; g.fillRect(sx + 1, sy + 2, 14, 1);
+  g.fillStyle = '#6B4A2C'; g.fillRect(sx + 1, sy + 7, 14, 1);
+  // 白蔷薇纹章
+  g.fillStyle = '#F6E7EA'; g.fillRect(sx + 2, sy + 4, 4, 3);
+  g.fillStyle = open ? '#E8C46A' : '#D98BA6'; g.fillRect(sx + 3, sy + 5, 2, 1);
+  // 牌面字条
+  g.fillStyle = '#6B4A2C'; g.fillRect(sx + 8, sy + 4, 5, 1); g.fillRect(sx + 8, sy + 6, 3, 1);
+  // 通行印
+  g.fillStyle = open ? '#E8C46A' : '#C0392B'; g.fillRect(sx + 13, sy + 5, 2, 2);
+}
 function drawPlot(g, x, y, p) {
   var sx = x * TILE, sy = y * TILE;
   var r = hash2(9, x, y);
@@ -5881,6 +5900,7 @@ function drawScene(g, dt) {
       ents.push({ z: it.y * TILE + TILE, f: drawBridgeSite, a: [it.x, it.y] });
     } else if(it.kind==='treasure'){ents.push({z:it.y*TILE+TILE,f:function(g,x,y){px(g,x*TILE+2,y*TILE+5,12,9,'#895F38');px(g,x*TILE+2,y*TILE+5,12,3,'#BD9257');px(g,x*TILE+7,y*TILE+7,2,4,'#E5C775');},a:[it.x,it.y]});
     } else if(it.kind==='mineStairs'||it.kind==='mineGate'||it.kind==='forestGate'){ents.push({z:it.y*TILE+TILE,f:function(g,x,y){px(g,x*TILE,y*TILE,16,16,'#544A3D');px(g,x*TILE+3,y*TILE+2,10,14,'#272C32');for(var i=0;i<4;i++)px(g,x*TILE+4,y*TILE+5+i*3,8,1,'#A8A18C');},a:[it.x,it.y]});
+    } else if(it.kind==='cityGate'){ents.push({z:it.y*TILE+TILE,f:drawCityGateSite,a:[it.x,it.y]});
     } else if (it.kind === 'board') {
       ents.push({ z: it.y * TILE + TILE, f: drawBoard, a: [it.x, it.y] });
     }
