@@ -36,10 +36,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Generate public cloud configuration
+        env:
+          MOSS_SUPABASE_URL: ${{ vars.MOSS_SUPABASE_URL }}
+          MOSS_SUPABASE_PUBLISHABLE_KEY: ${{ vars.MOSS_SUPABASE_PUBLISHABLE_KEY }}
+        run: node tests/build-cloud-config.mjs
+
       - name: Prepare site
         run: |
-          mkdir -p site/assets
-          cp index.html styles.css game.js site/
+          mkdir -p site/assets site/vendor
+          cp index.html styles.css game.js save-repository.js cloud-config.js cloud-auth.js account-ui.js save-coordinator.js site/
+          cp vendor/supabase.js vendor/supabase-LICENSE site/vendor/
           # 顺带把单文件版也放上去，朋友可以直接在网页里下载
           cp "苔芽农场-单文件版.html" site/ 2>/dev/null || true
           # 装饰素材：百合花枝条/樱花/边框 SVG

@@ -24,6 +24,7 @@
     </div>
     <div class="topbar-actions">
       <span id="saveState" class="save-state" role="status" aria-live="polite">已保存</span>
+      <button type="button" class="btn sm" id="btnAccount">登录</button>
       <button type="button" class="icon-btn" id="btnMenu" aria-label="暂停菜单" title="暂停菜单 (Esc)">☰</button>
     </div>
   </header>
@@ -87,6 +88,8 @@
     <div class="boot-card">
       <h1>苔芽农场</h1>
       <p class="boot-sub">春日 · Clawd 的小农场</p>
+      <p id="accountLabel" class="boot-note">游客 · 本机存档</p>
+      <button type="button" class="btn" id="bootAccount">登录 / 注册</button>
       <div id="bootActions" class="boot-actions"></div>
       <section id="devicePicker" class="device-picker" hidden aria-label="设备选择">
         <h2>设备选择</h2>
@@ -104,6 +107,12 @@
 
 
 </div>
+<script src="cloud-config.js"></script>
+<script src="vendor/supabase.js"></script>
+<script src="cloud-auth.js"></script>
+<script src="save-repository.js"></script>
+<script src="account-ui.js"></script>
+<script src="save-coordinator.js"></script>
 <script src="game.js"></script>
 <!-- 装饰花边层 -->
 <div id="frame" aria-hidden="true">

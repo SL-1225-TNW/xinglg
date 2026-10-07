@@ -11,6 +11,10 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "playwright": "^1.63.0"
+    "@electric-sql/pglite": "0.3.14",
+    "@sparticuz/chromium": "141.0.0",
+    "@supabase/supabase-js": "2.99.3",
+    "esbuild": "0.25.12",
+    "playwright": "1.56.1"
   }
 }

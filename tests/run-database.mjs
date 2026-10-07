@@ -1,0 +1,41 @@
+import { PGlite } from '@electric-sql/pglite';
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const db = new PGlite();
+await db.exec(`create role anon; create role authenticated; create schema auth;
+create table auth.users(id uuid primary key);
+create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+insert into auth.users values ('11111111-1111-4111-8111-111111111111'),('22222222-2222-4222-8222-222222222222');`);
+await db.exec(fs.readFileSync(new URL('../supabase/migrations/202610070001_accounts.sql',import.meta.url),'utf8'));
+const a='11111111-1111-4111-8111-111111111111', b='22222222-2222-4222-8222-222222222222';
+const slot='00000000-0000-4000-8000-000000000001';
+async function identity(id,role='authenticated') { await db.exec(`reset role; set role ${role}; select set_config('request.jwt.claim.sub','${id}',false)`); }
+async function save(expected,coins,mutation=crypto.randomUUID(),version=2) {
+  return (await db.query('select public.commit_game_save($1,$2,$3,$4,$5,$6) as result',[slot,expected,version,{version,coins},a,mutation])).rows[0].result;
+}
+await identity(a);
+let mutation=crypto.randomUUID();
+assert.equal((await save(0,100,mutation)).save.revision,1);
+assert.equal((await save(0,100,mutation)).save.revision,1);
+assert.equal((await save(0,200)).status,'conflict');
+assert.equal((await save(1,200)).save.revision,2);
+assert.equal((await db.query('select * from public.save_backups')).rows.length,1);
+await assert.rejects(db.exec("update public.game_saves set revision=88"),/permission denied/);
+await identity(b);
+assert.equal((await db.query('select * from public.game_saves')).rows.length,0);
+assert.equal((await db.query('select * from public.save_backups')).rows.length,0);
+await assert.rejects(db.exec(`insert into public.game_saves select * from public.game_saves`),/permission denied/);
+await save(0,300);
+await identity(a); assert.equal((await db.query('select payload from public.game_saves')).rows[0].payload.coins,200);
+for(let revision=2;revision<15;revision++) await save(revision,revision*100);
+assert.equal((await db.query('select * from public.save_backups')).rows.length,10);
+await save(15,1600,crypto.randomUUID(),3);
+await assert.rejects(save(16,1700),/Upgrade required/);
+await identity('', 'anon');
+await assert.rejects(db.query('select * from public.game_saves'),/permission denied/);
+await assert.rejects(save(0,100),/permission denied/);
+await identity(b,'moss_save_writer');
+assert.equal((await db.query('select * from public.game_saves')).rows.length,1);
+await assert.rejects(db.exec(`update public.game_saves set user_id='${a}' where user_id='${b}'`),/row-level security/);
+await db.close();
+console.log('PASS: Postgres migration, RLS A/B isolation, anonymous denial, restricted writes, CAS, idempotency, backups=10, future schema');
