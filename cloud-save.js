@@ -55,7 +55,7 @@
   async function validSession() {
     var s = session();
     if (!s || !s.refresh_token || !s.user || !s.user.id) return null;
-    if (s.expires_at && Date.now() < s.expires_at - 60000 && s.access_token) return s;
+    if (s.expires_at && Date.now() < Number(s.expires_at) * 1000 - 60000 && s.access_token) return s;
     var next = await api('/auth/v1/token?grant_type=refresh_token', {
       method: 'POST', body: JSON.stringify({ refresh_token: s.refresh_token })
     });
@@ -267,8 +267,8 @@
   }
   async function uploadSave() {
     if (!window.__MOSS__ || !window.__MOSS__.serialize) throw new Error('游戏存档尚未准备好，请稍后再试。');
-    var s = await validSession();
     var remote = await readCloudSave();
+    var s = await validSession();
     var day = window.__MOSS__.serialize().totalDay;
     if (!window.confirm(remote
       ? '云端已有第 ' + (remote.payload && remote.payload.totalDay || '?') + ' 天的存档（版本 ' + remote.revision + '）。确定用本设备第 ' + day + ' 天的存档覆盖吗？'
