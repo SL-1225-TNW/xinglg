@@ -37,6 +37,21 @@ https://sl-1225-tnw.github.io/xinglg/
 让朋友打开 https://github.com/SL-1225-TNW/xinglg ，点 `Code` → `Download ZIP`，
 解压后双击 `index.html`。
 
+## 账号与手动云存档
+
+游戏仍会自动保存到当前设备。账号登录后，本地存档会按 Supabase 用户 ID 分开；需要换设备时，在暂停菜单 →「账号与云存档」里手动上传或下载。下载会覆盖当前设备该账号的存档，界面会先询问确认。游客存档仍保留在本地。
+
+账号使用**邮箱 + 密码**登录，唯一账号名用于显示和区分玩家；目前不能只用账号名登录，也没有密码重置邮件。注册不需要自有域名或 SMTP，但需在 Supabase 中关闭邮箱确认，并运行一次仓库中的 [玩家账号表迁移](supabase/migrations/202610070001_player_profiles.sql)。已有的 `game_saves` 表和 `commit_game_save` RPC 会继续使用，不要删除或重建。
+
+### 一次性配置
+
+1. 在 Supabase 项目打开 **Authentication → Sign In / Providers → Email**，关闭 **Confirm email** 并保存。这样注册后可直接登录，不会依赖邮件发送服务。
+2. 在 Supabase 的 **SQL Editor** 新建 query，把上述迁移文件全文粘贴后点 **Run**。这是新建 `player_profiles` 表；已存在的 `game_saves` 与保存 RPC 不需重跑。
+3. 确认仓库改动进入 `main` 后，GitHub Pages 会自动部署。游戏使用仓库内的 Supabase URL 和 publishable 公钥；不要把 service role/secret key 放进网页。
+4. 从 Pages 网址打开游戏，暂停菜单 →「账号与云存档」注册邮箱、密码和唯一账号名。另一台设备登录同一个账号后，手动下载云存档。
+
+云端存档使用固定的默认槽位；上传已有云档时会显示覆盖确认。没有开启自动同步，避免设备之间静默覆盖。单文件版和本地 `file://` 游戏仍可离线玩；Supabase 云操作需要网络并建议从 GitHub Pages 网址打开。
+
 ## 怎么玩
 
 | 操作 | 按键 |

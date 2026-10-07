@@ -33,7 +33,12 @@ var VIEW_W = 384;
 var VIEW_H = 256;
 var MIN_TILES_W = 24;   // 视野最少 24×16 格，保证手机上也看得清角色周围
 var MIN_TILES_H = 16;
-var SAVE_KEY = 'moss-farm-v2';
+var SAVE_KEY = (function () {
+  try {
+    var userId = localStorage.getItem('moss-cloud-user-id');
+    return userId ? 'moss-farm-v2:user:' + userId : 'moss-farm-v2';
+  } catch (e) { return 'moss-farm-v2'; }
+})();
 var SAVE_KEY_V1 = 'moss-farm-v1';
 var CORRUPT_KEY = 'moss-farm-v2-corrupt';
 var SCHEMA_VERSION = 2;
@@ -5400,6 +5405,10 @@ function openPause() {
       row2.appendChild(mkBtn('立即保存', '', function () { saveNow(); toast('已保存。'); }));
       row2.appendChild(mkBtn('导出存档', '', function () { openSaveIO('export'); }));
       row2.appendChild(mkBtn('导入存档', '', function () { openSaveIO('import'); }));
+      row2.appendChild(mkBtn('账号与云存档', '', function () {
+        if (window.MossCloud && window.MossCloud.open) window.MossCloud.open();
+        else toast('云存档模块尚未加载。');
+      }));
       b.appendChild(row2);
 
       b.appendChild(el('div', 'hr'));
@@ -7964,6 +7973,13 @@ window.__MOSS__ = {
   openSettleLog: openSettleLog, settlementPages: settlementPages,
   toolShovel: toolShovel,
   saveNow: saveNow, serialize: serialize,
+  openWindow: openWindow,
+  replaceSave: function (raw) {
+    var normalized = normalizeSave(raw);
+    if (!normalized) return false;
+    startGame(normalized);
+    return true;
+  },
   isSolid: isSolid, findPath: findPath, facingTile: facingTile,
   __npcDialogue: npcDialogue, __talkToNpc: talkToNpc, __giftToNpc: giftToNpc, __heartsText: heartsText, __isGiftable: isGiftable,
   __npcRuntime: npcRuntime, __findNpcAdjacent: findNpcAdjacent,
@@ -7979,6 +7995,24 @@ window.__MOSS__ = {
   },
   tileOfPixel: function (tx, ty) { return [Math.floor(tx * TILE + 8), Math.floor(ty * TILE + 12)]; },
   canFarmSteps: CAN_FARM_STEPS, farmRing: farmRingVisible, inPlantArea: inPlantArea, tileFrameVisible: tileFrameVisible,
+  replaceSave: function (raw) {
+    var normalized = normalizeSave(raw);
+    if (!normalized) return false;
+    state = normalized;
+    Game.ppos = { x: state.player.x * TILE + 8, y: state.player.y * TILE + 12 };
+    Game.swingT = 0;
+    cam.init = false;
+    ensureNpcRuntime();
+    updateNpcPositions(true);
+    closeWindow(true);
+    $('#boot').hidden = true;
+    resizeCanvas();
+    Audio2.setEnabled(!!state.settings.sound);
+    refreshHotbar();
+    onSceneChanged();
+    saveNow();
+    return true;
+  },
   startGame: function (s) { var r = loadGame(); state = s || r.state || newGameState(); if (!state.resourceNodes || !Object.keys(state.resourceNodes).length) initNewGameWorld(); Game.ppos = { x: state.player.x * TILE + 8, y: state.player.y * TILE + 12 }; ensureNpcRuntime(); updateNpcPositions(true); $('#boot').hidden = true; resizeCanvas(); refreshHotbar(); onSceneChanged(); }
 };
 
