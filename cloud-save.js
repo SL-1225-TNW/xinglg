@@ -69,6 +69,8 @@
     return api(path, options, s.access_token);
   }
   function activateAccount(s, username) {
+    // Flush the current game while its old storage key is still active.
+    if (window.__MOSS__ && window.__MOSS__.saveNow) window.__MOSS__.saveNow();
     var guest = localStorage.getItem('moss-farm-v2');
     var scoped = accountSaveKey(s.user.id);
     if (!localStorage.getItem(scoped) && guest) {
@@ -76,7 +78,6 @@
     }
     localStorage.setItem(ACTIVE_USER_KEY, s.user.id);
     if (username) writeJson(PROFILE_PREFIX + s.user.id, { username: username });
-    if (window.__MOSS__ && window.__MOSS__.saveNow) window.__MOSS__.saveNow();
     location.reload();
   }
   async function lookupProfile(s) {
