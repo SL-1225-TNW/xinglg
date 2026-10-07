@@ -5183,7 +5183,7 @@ function openQuestLog(site) {
         activeDailyJobIds().forEach(function(id){renderDailyJobCard(b,id);});return;
       }
       if(QUEST_TAB==='explore'){
-        b.appendChild(el('p','muted','探索度越高，森林、矿山和白蔷薇城会出现新的委托。'));
+        b.appendChild(el('p','muted','当前探索度：'+(exploreState().explorePoints||0)+' · 探索等级 '+explorationTier()+' / 3。探索度越高，森林、矿山和白蔷薇城会出现新的委托。'));
         WORLD_QUESTS.forEach(function(q){renderSpecialQuestCard(b,q,'explore');});return;
       }
       if(QUEST_TAB==='bond'){
