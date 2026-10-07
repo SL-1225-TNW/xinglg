@@ -434,7 +434,7 @@ function newGameState() {
     npcDailyInteractions: {},
     dsMet: false,
     rodLevel: 1,
-    exploration: {forest:false,mine:false,city:false,depth:1,hut:false,tools:false,nodes:{},treasures:{},jobs:{},dailyJobs:{day:-1,ids:[]},storyDone:{},bondDone:{},explorePoints:0,requestDay:-1},
+    exploration: {forest:false,mine:false,city:false,depth:1,hut:false,tools:false,nodes:{},treasures:{},jobs:{},dailyJobs:{day:-1,ids:[]},storyDone:{},bondDone:{},journalChoices:{},explorePoints:0,requestDay:-1},
     questProgress: { 1: 'locked', 2: 'locked', 3: 'locked', 4: 'locked' },
     unlockedRecipes: ['chest'],
     bridgeRepaired: false,
@@ -1040,10 +1040,11 @@ for(var depth=1;depth<=3;depth++)[[4,3],[9,8],[15,10],[23,8],[5,14],[11,18],[23,
 function normalizeExploration(raw){
  function num(v,d,min,max){return typeof v==='number'&&isFinite(v)?clamp(v,min,max):d;}
  raw=raw&&typeof raw==='object'?raw:{};
- var e={forest:!!raw.forest,mine:!!raw.mine,city:!!raw.city,depth:clamp(Math.floor(num(raw.depth,1,1,3)),1,3),hut:!!raw.hut,tools:!!raw.tools,nodes:{},treasures:{},jobs:{},dailyJobs:{day:-1,ids:[]},storyDone:{},bondDone:{},explorePoints:clamp(Math.floor(num(raw.explorePoints,0,0,100000)),0,100000),requestDay:Math.floor(num(raw.requestDay,-1,-1,1e6))};
+ var e={forest:!!raw.forest,mine:!!raw.mine,city:!!raw.city,depth:clamp(Math.floor(num(raw.depth,1,1,3)),1,3),hut:!!raw.hut,tools:!!raw.tools,nodes:{},treasures:{},jobs:{},dailyJobs:{day:-1,ids:[]},storyDone:{},bondDone:{},journalChoices:{},explorePoints:clamp(Math.floor(num(raw.explorePoints,0,0,100000)),0,100000),requestDay:Math.floor(num(raw.requestDay,-1,-1,1e6))};
  Object.keys(LIVING_JOBS||{}).forEach(function(id){if(raw.jobs&&Number.isInteger(raw.jobs[id]))e.jobs[id]=Math.max(-1,raw.jobs[id]);});
  if(raw.dailyJobs&&typeof raw.dailyJobs==='object'){e.dailyJobs.day=Math.floor(num(raw.dailyJobs.day,-1,-1,1e6));if(Array.isArray(raw.dailyJobs.ids))e.dailyJobs.ids=raw.dailyJobs.ids.filter(function(id){return !!LIVING_JOBS[id];}).slice(0,3);}
  ['storyDone','bondDone'].forEach(function(k){if(raw[k]&&typeof raw[k]==='object')Object.keys(raw[k]).forEach(function(id){if(raw[k][id])e[k][id]=true;});});
+ if(raw.journalChoices&&typeof raw.journalChoices==='object')Object.keys(raw.journalChoices).forEach(function(id){var v=raw.journalChoices[id];if(v&&Number.isInteger(v.day)&&Number.isInteger(v.option))e.journalChoices[id]={day:Math.max(-1,v.day),option:v.option};});
  if(!e.forest){e.mine=false;e.hut=false;}if(!e.mine)e.depth=1;
  ['forest_cache','mine_cache'].forEach(function(k){e.treasures[k]=!!(raw.treasures&&raw.treasures[k]);});
  Object.keys(EXPLORE_NODES).forEach(function(sc){Object.keys(EXPLORE_NODES[sc]).forEach(function(k){var n=EXPLORE_NODES[sc][k],key=sc+':'+k,v=raw.nodes&&raw.nodes[key];if(v&&typeof v==='object')e.nodes[key]={hp:clamp(Math.floor(num(v.hp,n.hp,0,n.hp)),0,n.hp),day:Math.floor(num(v.day,0,0,1e6))};});});return e;
@@ -5210,10 +5211,93 @@ function openQuestLog(site) {
         b.appendChild(box);
       });
     },
-    actions:[{label:'关闭',kind:'ghost',close:true}]
+    actions:[{label:'打开森林书',kind:'primary',close:false,onClick:function(){openFieldJournal();}},{label:'关闭',kind:'ghost',close:true}]
   });
 }
 
+var JOURNAL_PAGE='overview';
+var JOURNAL_EVENT='forest_route';
+var JOURNAL_PAGES={overview:'旅程总览',discoveries:'发现图鉴',choices:'分岔记录',people:'人物页'};
+var JOURNAL_DISCOVERIES=[
+  {id:'forest',title:'雾杉森林',desc:'蘑菇、硬木和林间湖。森林东北的旧矿山还藏着更深的路。',unlocked:function(){return exploreState().forest;}},
+  {id:'hut',title:'伐木屋',desc:'巡林员的临时营地，也是每日森林补给委托的起点。',unlocked:function(){return exploreState().hut;}},
+  {id:'mine',title:'旧矿山',desc:'三层矿脉沿轨道深入，铜、铁和紫晶都被记录在册。',unlocked:function(){return exploreState().mine;}},
+  {id:'city',title:'白蔷薇城',desc:'南门驿路通向城市，邮局、学院和城堡都在地图上留下了标记。',unlocked:function(){return exploreState().city;}}
+];
+function journalChoice(id){return exploreState().journalChoices&&exploreState().journalChoices[id];}
+function journalChoiceDoneToday(id){var c=journalChoice(id);return !!(c&&c.day===state.totalDay);}
+function recordJournalChoice(id,option){
+  if(id!=='forest_route'||!exploreState().forest){toast('这页记录还没有解锁。');return;}
+  if(journalChoiceDoneToday(id)){toast('今天已经写过这页了，明天再来。');return;}
+  if(option===2&&!bagAccepts('hardwood',1)){toast('背包放不下这份硬木。');return;}
+  if(option===1){exploreState().explorePoints+=8;toast('你沿湖走了一圈，补全了森林地图。探索度 +8。');}
+  else {invAdd('hardwood',1);exploreState().explorePoints+=4;toast('你回收了一段结实的硬木。探索度 +4。');}
+  exploreState().journalChoices[id]={day:state.totalDay,option:option};
+  markDirty();refreshHud();saveNow();JOURNAL_PAGE='choices';refreshWindow();
+}
+function openFieldJournal(){
+  openWindow({id:'field_journal',kind:'journal',wide:true,title:'森林书 · 巡林员手册',build:function(b){
+    var book=el('div','forest-journal');
+    var left=el('aside','forest-journal-cover');
+    left.appendChild(el('div','forest-journal-kicker','MOSS VALLEY / FIELD NOTES'));
+    left.appendChild(el('div','forest-journal-emblem','✦'));
+    left.appendChild(el('div','forest-journal-title','森林书'));
+    left.appendChild(el('div','forest-journal-subtitle','巡林员手册'));
+    left.appendChild(el('p','forest-journal-quote','“把走过的路写下来，下一次就不会迷路。”'));
+    var meta=el('div','forest-journal-meta');
+    meta.appendChild(el('strong',null,'第 '+state.totalDay+' 天'));
+    meta.appendChild(el('span',null,'探索度 '+(exploreState().explorePoints||0)+' · Lv '+explorationTier()));
+    left.appendChild(meta);
+    var nav=el('div','forest-journal-nav');
+    Object.keys(JOURNAL_PAGES).forEach(function(id){
+      var btn=mkBtn(JOURNAL_PAGES[id],JOURNAL_PAGE===id?'journal-nav-on':'journal-nav-btn',function(){JOURNAL_PAGE=id;renderWindow();});
+      nav.appendChild(btn);
+    });
+    left.appendChild(nav);
+    left.appendChild(el('div','forest-journal-foot','MOSS VALLEY RANGER ARCHIVE'));
+    var right=el('section','forest-journal-page');
+    right.appendChild(el('div','forest-journal-page-head','FIELD JOURNAL · '+(JOURNAL_PAGES[JOURNAL_PAGE]||'记录')));
+    if(JOURNAL_PAGE==='overview'){
+      right.appendChild(el('h2',null,'山谷巡查总览'));
+      right.appendChild(el('p','journal-lead','这不是任务清单，而是你在山谷留下的足迹。新的地方、遇见的人和每一次选择，都会慢慢长成一本只属于你的记录册。'));
+      var statGrid=el('div','journal-stat-grid');
+      [['已开放区域',(exploreState().forest?1:0)+(exploreState().mine?1:0)+(exploreState().city?1:0)+' / 3'],['矿山深度',exploreState().mine?'第 '+exploreState().depth+' 层':'尚未进入'],['今日委托',activeDailyJobIds().length+' 份轮换']].forEach(function(x){var cell=el('div','journal-stat');cell.appendChild(el('span',null,x[0]));cell.appendChild(el('strong',null,x[1]));statGrid.appendChild(cell);});
+      right.appendChild(statGrid);
+      right.appendChild(el('div','journal-section-label','最近的记录'));
+      right.appendChild(el('p','journal-hand','每日委托仍在委托日志中快速交付；森林书负责保存旅途的过程和结果。'));
+      var hint=el('div','journal-callout');hint.appendChild(el('strong',null,'巡林提示'));hint.appendChild(el('span',null,exploreState().forest?'森林已经开放。去“分岔记录”看看今天要沿湖勘察，还是回收硬木。':'先完成小镇北口的森林开放委托，这本书会自动添上第一页。'));right.appendChild(hint);
+    }else if(JOURNAL_PAGE==='discoveries'){
+      right.appendChild(el('h2',null,'发现图鉴'));
+      right.appendChild(el('p','journal-lead','每到一个新区域，就在地图边角盖上一枚印章。'));
+      JOURNAL_DISCOVERIES.forEach(function(d){var on=d.unlocked(),card=el('div','journal-discovery '+(on?'':'locked'));card.appendChild(el('div','journal-discovery-mark',on?'✦':'?'));var body=el('div');body.appendChild(el('strong',null,d.title));body.appendChild(el('p',null,on?d.desc:'尚未记录。继续探索后解锁这一页。'));card.appendChild(body);right.appendChild(card);});
+    }else if(JOURNAL_PAGE==='choices'){
+      right.appendChild(el('h2',null,'分岔记录'));
+      right.appendChild(el('p','journal-lead','这里记录那些没有标准答案的时刻。选择会留在存档里，并可能改变探索度、材料或后续叙事。'));
+      var c=el('div','journal-choice-card '+(exploreState().forest?'':'locked'));
+      c.appendChild(el('div','journal-choice-kicker','FOREST ROUTE / 01'));
+      c.appendChild(el('h3',null,'林间的分岔路'));
+      c.appendChild(el('p',null,exploreState().forest?'林间湖边有两条路：沿湖勘察，或把倒下的硬木带回营地。今天的选择会写进森林书。':'完成森林开放委托后，这条分岔路才会出现在手册里。'));
+      var ch=journalChoice('forest_route');
+      if(exploreState().forest&&!journalChoiceDoneToday('forest_route')){
+        var cr=el('div','journal-choice-actions');
+        cr.appendChild(mkBtn('沿湖勘察 · 探索度 +8','journal-choice-btn',function(){recordJournalChoice('forest_route',1);}));
+        cr.appendChild(mkBtn('回收硬木 · 获得硬木 ×1','journal-choice-btn',function(){recordJournalChoice('forest_route',2);}));
+        c.appendChild(cr);
+      }else if(ch&&ch.day===state.totalDay){
+        c.appendChild(el('div','journal-choice-result','今日已记录：'+(ch.option===1?'沿湖勘察。':'回收硬木。')+' 明天可以重新选择。'));
+      }
+      right.appendChild(c);
+    }else{
+      right.appendChild(el('h2',null,'人物页'));
+      right.appendChild(el('p','journal-lead','好感度不只是数字。每个人都会把你们共同经历过的事，留在自己的那一页。'));
+      ['yaya','aqi','ds','ranger','engineer','postie'].forEach(function(id){if(!NPCS[id])return;var v=state.npcFriendship[id]||0,card=el('div','journal-person');card.appendChild(el('div','journal-person-avatar',heartsText(v)));var body=el('div');body.appendChild(el('strong',null,NPCS[id].name+' · '+NPCS[id].title));var hasQuest=BOND_QUESTS.some(function(q){return q.npc===id&&!specialQuestDone(q,'bond')&&specialQuestUnlocked(q,'bond');});body.appendChild(el('p',null,'好感度 '+v+' / 100'+(hasQuest?' · 有新的居民委托':'')));card.appendChild(body);right.appendChild(card);});
+    }
+    book.appendChild(left);book.appendChild(right);b.appendChild(book);
+  },actions:[
+    {label:'打开委托日志',kind:'primary',close:false,onClick:function(){openQuestLog(null);}},
+    {label:'关闭',kind:'ghost',close:true}
+  ]});
+}
 /* --- 对话与赠礼 --- */
 function openDialogue(id, text, friendshipGain) {
   var npc = NPCS[id];
@@ -5303,6 +5387,7 @@ function openPause() {
       var row = el('div', 'row');
       row.appendChild(mkBtn('帮助与操作', '', function () { openHelp(); }));
       row.appendChild(mkBtn('全境地图（M）', '', function () { openWorldMap(); }));
+      row.appendChild(mkBtn('森林书（F）', '', function () { openFieldJournal(); }));
       row.appendChild(mkBtn('睡觉（结束今天）', '', function () { setTimeout(function () { requestSleep(); }, 20); }));
       b.appendChild(row);
 
@@ -7425,6 +7510,7 @@ function onKeyDown(e) {
   if (k === 'b' || k === 'B') { openBag(); return; }
   if (k === 'c' || k === 'C') { openCraft(); return; }
   if (k === 'j' || k === 'J') { openQuestLog(null); return; }
+  if (k === 'f' || k === 'F') { openFieldJournal(); return; }
   if (k === 'm' || k === 'M') { e.preventDefault(); openWorldMap(); return; }
   if (/^[1-9]$/.test(k)) {
     var t = TOOLS[+k - 1];

@@ -35,7 +35,6 @@
   --top-h:56px;
   --font: "PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,"Segoe UI",sans-serif;
 }
-
 *{box-sizing:border-box}
 html,body{height:100%}
 body{
@@ -907,3 +906,75 @@ html.compact-play[data-device="tablet"] .dpad{grid-template-columns:repeat(3,44p
 html.compact-play[data-device="tablet"] .tact{grid-template-columns:repeat(3,44px)}
 html.compact-play[data-device="tablet"] .tact-use,html.compact-play[data-device="tablet"] .tact-act{width:140px;height:44px}
 html.compact-play[data-device="tablet"] .tact-sm{width:44px;height:44px}
+
+/* --- 森林书 / 旅行日志：借鉴纸张、批注、图鉴与分岔选择的视觉语言 --- */
+.forest-journal{
+  display:grid;grid-template-columns:minmax(210px,32%) minmax(0,1fr);
+  min-height:560px;overflow:hidden;border:2px solid #8b6b48;border-radius:10px;
+  color:#4c3b2b;background:#d9c28e;
+  box-shadow:inset 0 0 0 2px rgba(255,245,209,.45),0 12px 24px rgba(31,20,9,.26);
+}
+.forest-journal-cover{
+  position:relative;padding:20px 18px 18px;
+  background:
+    radial-gradient(circle at 72% 18%,rgba(255,242,183,.35),transparent 26%),
+    repeating-linear-gradient(0deg,rgba(99,68,38,.06) 0 1px,transparent 1px 5px),
+    #c9a96c;
+  border-right:3px solid #89683f;box-shadow:inset -8px 0 rgba(79,52,29,.09);
+}
+.forest-journal-cover:after{content:'';position:absolute;top:12px;bottom:12px;right:7px;width:2px;background:rgba(74,47,27,.25);box-shadow:3px 0 rgba(255,239,187,.35)}
+.forest-journal-kicker,.forest-journal-page-head{font-size:10px;letter-spacing:1.4px;color:#78603d;font-weight:700}
+.forest-journal-emblem{width:54px;height:54px;margin:18px auto 12px;display:grid;place-items:center;border:1px solid #8c633a;border-radius:50%;font-size:28px;color:#806039;transform:rotate(-8deg);background:rgba(255,239,181,.2)}
+.forest-journal-title{text-align:center;font:700 32px Georgia,'Times New Roman',serif;letter-spacing:6px;color:#3d2b1c;text-shadow:1px 1px rgba(255,241,193,.48)}
+.forest-journal-subtitle{text-align:center;color:#705437;letter-spacing:3px;font-size:12px;margin-top:4px}
+.forest-journal-quote{font:italic 12px Georgia,'Times New Roman',serif;line-height:1.7;color:#735737;margin:22px 8px 18px}
+.forest-journal-meta{display:flex;flex-direction:column;gap:4px;padding:9px 0;border-top:1px solid rgba(88,57,29,.35);border-bottom:1px solid rgba(88,57,29,.35);color:#624a31;font-size:11px}
+.forest-journal-meta strong{font-size:14px;color:#3f3024}
+.forest-journal-nav{display:flex;flex-direction:column;gap:5px;margin-top:20px}
+.forest-journal-nav .btn{width:100%;text-align:left;justify-content:flex-start}
+.journal-nav-btn,.journal-nav-on{min-height:31px;padding:5px 8px;border-radius:3px;border:0;border-left:3px solid transparent;background:transparent;color:#604a31}
+.journal-nav-btn:hover{background:rgba(255,238,185,.34);color:#35271d}
+.journal-nav-on{background:rgba(255,239,186,.63);border-left-color:#7c4d2b;color:#38291d;font-weight:700}
+.forest-journal-foot{position:absolute;left:18px;bottom:15px;font:700 9px Georgia,serif;letter-spacing:1px;color:#815a3c;opacity:.72;transform:rotate(-5deg)}
+.forest-journal-page{
+  min-width:0;overflow:auto;padding:19px 22px 22px;
+  background:
+    radial-gradient(circle at 14% 14%,rgba(120,87,42,.08) 0 1px,transparent 2px),
+    radial-gradient(circle at 82% 76%,rgba(120,87,42,.07) 0 1px,transparent 2px),
+    repeating-linear-gradient(0deg,rgba(118,87,50,.055) 0 1px,transparent 1px 26px),
+    #f4e7c3;
+  box-shadow:inset 8px 0 rgba(255,249,216,.25);
+}
+.forest-journal-page h2{margin:8px 0 10px;font:700 25px Georgia,'Times New Roman',serif;color:#423225}
+.forest-journal-page h3{margin:8px 0 5px;font:700 19px Georgia,'Times New Roman',serif;color:#493426}
+.forest-journal-page p{line-height:1.7}
+.journal-lead{color:#6e5840;font-size:13px;max-width:58em}
+.journal-stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:15px 0}
+.journal-stat{padding:10px;background:rgba(255,248,218,.55);border:1px solid rgba(126,89,48,.3);border-radius:3px}
+.journal-stat span{display:block;font-size:11px;color:#7a6345}.journal-stat strong{display:block;margin-top:4px;font:700 16px Georgia,serif;color:#4c3825}
+.journal-section-label{margin-top:20px;border-bottom:1px solid rgba(117,82,44,.35);padding-bottom:6px;font-size:11px;letter-spacing:1.2px;color:#816547;font-weight:700}
+.journal-hand{font:italic 15px Georgia,'Times New Roman',serif;color:#614a34}
+.journal-callout{display:flex;flex-direction:column;gap:4px;margin-top:18px;padding:11px 13px;border-left:4px solid #8e6841;background:rgba(203,178,122,.2);color:#654c31}
+.journal-callout strong{font:700 14px Georgia,serif}
+.journal-discovery,.journal-person{display:flex;gap:11px;align-items:flex-start;padding:10px 2px;border-bottom:1px solid rgba(117,82,44,.25)}
+.journal-discovery-mark,.journal-person-avatar{flex:0 0 36px;width:36px;height:36px;display:grid;place-items:center;border:1px solid #a27b4c;border-radius:50%;color:#79552f;background:rgba(255,240,190,.5);font-size:18px}
+.journal-discovery strong,.journal-person strong{font:700 16px Georgia,serif;color:#493426}.journal-discovery p,.journal-person p{margin:3px 0 0;color:#705a40;font-size:12px}
+.journal-discovery.locked{opacity:.52;filter:grayscale(.3)}
+.journal-choice-card{margin-top:13px;padding:15px;background:rgba(255,247,213,.66);border:1px solid #a27b4c;border-radius:4px;box-shadow:2px 3px 0 rgba(100,64,30,.1)}
+.journal-choice-card.locked{opacity:.6}
+.journal-choice-kicker{font-size:10px;letter-spacing:1.2px;color:#856846;font-weight:700}
+.journal-choice-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:13px}
+.journal-choice-btn{min-height:38px!important;background:linear-gradient(180deg,#f8eac2,#ddc693)!important;border:1px solid #9d7648!important;color:#5b432b!important}
+.journal-choice-result{margin-top:12px;padding:8px 10px;border-left:3px solid #788d58;background:rgba(119,147,77,.12);color:#53663a;font-size:12px}
+@media (max-width:620px){
+  .forest-journal{grid-template-columns:1fr;min-height:0}
+  .forest-journal-cover{padding:14px;border-right:0;border-bottom:3px solid #89683f}
+  .forest-journal-cover:after{display:none}
+  .forest-journal-emblem{margin:8px auto}.forest-journal-title{font-size:27px}
+  .forest-journal-quote{display:none}
+  .forest-journal-meta{flex-direction:row;gap:12px;margin-top:9px;padding:7px 0}
+  .forest-journal-nav{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:9px}
+  .forest-journal-nav .btn{text-align:center;justify-content:center;padding:4px 2px;font-size:11px}
+  .forest-journal-foot{display:none}.forest-journal-page{padding:14px 13px 17px}
+  .forest-journal-page h2{font-size:22px}.journal-stat-grid{grid-template-columns:1fr}
+}

@@ -1,5 +1,5 @@
-Warning: truncated output (original token count: 107216)
-Total output lines: 8940
+Warning: truncated output (original token count: 110829)
+Total output lines: 9096
 
 <!doctype html>
 <html lang="zh-CN">
@@ -46,7 +46,6 @@ Total output lines: 8940
   --top-h:56px;
   --font: "PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,"Segoe UI",sans-serif;
 }
-
 *{box-sizing:border-box}
 html,body{height:100%}
 body{
@@ -919,6 +918,77 @@ html.compact-play[data-device="tablet"] .tact{grid-template-columns:repeat(3,44p
 html.compact-play[data-device="tablet"] .tact-use,html.compact-play[data-device="tablet"] .tact-act{width:140px;height:44px}
 html.compact-play[data-device="tablet"] .tact-sm{width:44px;height:44px}
 
+/* --- 森林书 / 旅行日志：借鉴纸张、批注、图鉴与分岔选择的视觉语言 --- */
+.forest-journal{
+  display:grid;grid-template-columns:minmax(210px,32%) minmax(0,1fr);
+  min-height:560px;overflow:hidden;border:2px solid #8b6b48;border-radius:10px;
+  color:#4c3b2b;background:#d9c28e;
+  box-shadow:inset 0 0 0 2px rgba(255,245,209,.45),0 12px 24px rgba(31,20,9,.26);
+}
+.forest-journal-cover{
+  position:relative;padding:20px 18px 18px;
+  background:
+    radial-gradient(circle at 72% 18%,rgba(255,242,183,.35),transparent 26%),
+    repeating-linear-gradient(0deg,rgba(99,68,38,.06) 0 1px,transparent 1px 5px),
+    #c9a96c;
+  border-right:3px solid #89683f;box-shadow:inset -8px 0 rgba(79,52,29,.09);
+}
+.forest-journal-cover:after{content:'';position:absolute;top:12px;bottom:12px;right:7px;width:2px;background:rgba(74,47,27,.25);box-shadow:3px 0 rgba(255,239,187,.35)}
+.forest-journal-kicker,.forest-journal-page-head{font-size:10px;letter-spacing:1.4px;color:#78603d;font-weight:700}
+.forest-journal-emblem{width:54px;height:54px;margin:18px auto 12px;display:grid;place-items:center;border:1px solid #8c633a;border-radius:50%;font-size:28px;color:#806039;transform:rotate(-8deg);background:rgba(255,239,181,.2)}
+.forest-journal-title{text-align:center;font:700 32px Georgia,'Times New Roman',serif;letter-spacing:6px;color:#3d2b1c;text-shadow:1px 1px rgba(255,241,193,.48)}
+.forest-journal-subtitle{text-align:center;color:#705437;letter-spacing:3px;font-size:12px;margin-top:4px}
+.forest-journal-quote{font:italic 12px Georgia,'Times New Roman',serif;line-height:1.7;color:#735737;margin:22px 8px 18px}
+.forest-journal-meta{display:flex;flex-direction:column;gap:4px;padding:9px 0;border-top:1px solid rgba(88,57,29,.35);border-bottom:1px solid rgba(88,57,29,.35);color:#624a31;font-size:11px}
+.forest-journal-meta strong{font-size:14px;color:#3f3024}
+.forest-journal-nav{display:flex;flex-direction:column;gap:5px;margin-top:20px}
+.forest-journal-nav .btn{width:100%;text-align:left;justify-content:flex-start}
+.journal-nav-btn,.journal-nav-on{min-height:31px;padding:5px 8px;border-radius:3px;border:0;border-left:3px solid transparent;background:transparent;color:#604a31}
+.journal-nav-btn:hover{background:rgba(255,238,185,.34);color:#35271d}
+.journal-nav-on{background:rgba(255,239,186,.63);border-left-color:#7c4d2b;color:#38291d;font-weight:700}
+.forest-journal-foot{position:absolute;left:18px;bottom:15px;font:700 9px Georgia,serif;letter-spacing:1px;color:#815a3c;opacity:.72;transform:rotate(-5deg)}
+.forest-journal-page{
+  min-width:0;overflow:auto;padding:19px 22px 22px;
+  background:
+    radial-gradient(circle at 14% 14%,rgba(120,87,42,.08) 0 1px,transparent 2px),
+    radial-gradient(circle at 82% 76%,rgba(120,87,42,.07) 0 1px,transparent 2px),
+    repeating-linear-gradient(0deg,rgba(118,87,50,.055) 0 1px,transparent 1px 26px),
+    #f4e7c3;
+  box-shadow:inset 8px 0 rgba(255,249,216,.25);
+}
+.forest-journal-page h2{margin:8px 0 10px;font:700 25px Georgia,'Times New Roman',serif;color:#423225}
+.forest-journal-page h3{margin:8px 0 5px;font:700 19px Georgia,'Times New Roman',serif;color:#493426}
+.forest-journal-page p{line-height:1.7}
+.journal-lead{color:#6e5840;font-size:13px;max-width:58em}
+.journal-stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:15px 0}
+.journal-stat{padding:10px;background:rgba(255,248,218,.55);border:1px solid rgba(126,89,48,.3);border-radius:3px}
+.journal-stat span{display:block;font-size:11px;color:#7a6345}.journal-stat strong{display:block;margin-top:4px;font:700 16px Georgia,serif;color:#4c3825}
+.journal-section-label{margin-top:20px;border-bottom:1px solid rgba(117,82,44,.35);padding-bottom:6px;font-size:11px;letter-spacing:1.2px;color:#816547;font-weight:700}
+.journal-hand{font:italic 15px Georgia,'Times New Roman',serif;color:#614a34}
+.journal-callout{display:flex;flex-direction:column;gap:4px;margin-top:18px;padding:11px 13px;border-left:4px solid #8e6841;background:rgba(203,178,122,.2);color:#654c31}
+.journal-callout strong{font:700 14px Georgia,serif}
+.journal-discovery,.journal-person{display:flex;gap:11px;align-items:flex-start;padding:10px 2px;border-bottom:1px solid rgba(117,82,44,.25)}
+.journal-discovery-mark,.journal-person-avatar{flex:0 0 36px;width:36px;height:36px;display:grid;place-items:center;border:1px solid #a27b4c;border-radius:50%;color:#79552f;background:rgba(255,240,190,.5);font-size:18px}
+.journal-discovery strong,.journal-person strong{font:700 16px Georgia,serif;color:#493426}.journal-discovery p,.journal-person p{margin:3px 0 0;color:#705a40;font-size:12px}
+.journal-discovery.locked{opacity:.52;filter:grayscale(.3)}
+.journal-choice-card{margin-top:13px;padding:15px;background:rgba(255,247,213,.66);border:1px solid #a27b4c;border-radius:4px;box-shadow:2px 3px 0 rgba(100,64,30,.1)}
+.journal-choice-card.locked{opacity:.6}
+.journal-choice-kicker{font-size:10px;letter-spacing:1.2px;color:#856846;font-weight:700}
+.journal-choice-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:13px}
+.journal-choice-btn{min-height:38px!important;background:linear-gradient(180deg,#f8eac2,#ddc693)!important;border:1px solid #9d7648!important;color:#5b432b!important}
+.journal-choice-result{margin-top:12px;padding:8px 10px;border-left:3px solid #788d58;background:rgba(119,147,77,.12);color:#53663a;font-size:12px}
+@media (max-width:620px){
+  .forest-journal{grid-template-columns:1fr;min-height:0}
+  .forest-journal-cover{padding:14px;border-right:0;border-bottom:3px solid #89683f}
+  .forest-journal-cover:after{display:none}
+  .forest-journal-emblem{margin:8px auto}.forest-journal-title{font-size:27px}
+  .forest-journal-quote{display:none}
+  .forest-journal-meta{flex-direction:row;gap:12px;margin-top:9px;padding:7px 0}
+  .forest-journal-nav{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:9px}
+  .forest-journal-nav .btn{text-align:center;justify-content:center;padding:4px 2px;font-size:11px}
+  .forest-journal-foot{display:none}.forest-journal-page{padding:14px 13px 17px}
+  .forest-journal-page h2{font-size:22px}.journal-stat-grid{grid-template-columns:1fr}
+}
 
 </style>
 </head>
@@ -1456,7 +1526,7 @@ function newGameState() {
     npcDailyInteractions: {},
     dsMet: false,
     rodLevel: 1,
-    exploration: {forest:false,mine:false,city:false,depth:1,hut:false,tools:false,nodes:{},treasures:{},jobs:{},dailyJobs:{day:-1,ids:[]},storyDone:{},bondDone:{},explorePoints:0,requestDay:-1},
+    exploration: {forest:false,mine:false,city:false,depth:1,hut:false,tools:false,nodes:{},treasures:{},jobs:{},dailyJobs:{day:-1,ids:[]},storyDone:{},bondDone:{},journalChoices:{},explorePoints:0,requestDay:-1},
     questProgress: { 1: 'locked', 2: 'locked', 3: 'locked', 4: 'locked' },
     unlockedRecipes: ['chest'],
     bridgeRepaired: false,
@@ -2062,10 +2132,11 @@ for(var depth=1;depth<=3;depth++)[[4,3],[9,8],[15,10],[23,8],[5,14],[11,18],[23,
 function normalizeExploration(raw){
  function num(v,d,min,max){return typeof v==='number'&&isFinite(v)?clamp(v,min,max):d;}
  raw=raw&&typeof raw==='object'?raw:{};
- var e={forest:!!raw.forest,mine:!!raw.mine,city:!!raw.city,depth:clamp(Math.floor(num(raw.depth,1,1,3)),1,3),hut:!!raw.hut,tools:!!raw.tools,nodes:{},treasures:{},jobs:{},dailyJobs:{day:-1,ids:[]},storyDone:{},bondDone:{},explorePoints:clamp(Math.floor(num(raw.explorePoints,0,0,100000)),0,100000),requestDay:Math.floor(num(raw.requestDay,-1,-1,1e6))};
+ var e={forest:!!raw.forest,mine:!!raw.mine,city:!!raw.city,depth:clamp(Math.floor(num(raw.depth,1,1,3)),1,3),hut:!!raw.hut,tools:!!raw.tools,nodes:{},treasures:{},jobs:{},dailyJobs:{day:-1,ids:[]},storyDone:{},bondDone:{},journalChoices:{},explorePoints:clamp(Math.floor(num(raw.explorePoints,0,0,100000)),0,100000),requestDay:Math.floor(num(raw.requestDay,-1,-1,1e6))};
  Object.keys(LIVING_JOBS||{}).forEach(function(id){if(raw.jobs&&Number.isInteger(raw.jobs[id]))e.jobs[id]=Math.max(-1,raw.jobs[id]);});
  if(raw.dailyJobs&&typeof raw.dailyJobs==='object'){e.dailyJobs.day=Math.floor(num(raw.dailyJobs.day,-1,-1,1e6));if(Array.isArray(raw.dailyJobs.ids))e.dailyJobs.ids=raw.dailyJobs.ids.filter(function(id){return !!LIVING_JOBS[id];}).slice(0,3);}
  ['storyDone','bondDone'].forEach(function(k){if(raw[k]&&typeof raw[k]==='object')Object.keys(raw[k]).forEach(function(id){if(raw[k][id])e[k][id]=true;});});
+ if(raw.journalChoices&&typeof raw.journalChoices==='object')Object.keys(raw.journalChoices).forEach(function(id){var v=raw.journalChoices[id];if(v&&Number.isInteger(v.day)&&Number.isInteger(v.option))e.journalChoices[id]={day:Math.max(-1,v.day),option:v.option};});
  if(!e.forest){e.mine=false;e.hut=false;}if(!e.mine)e.depth=1;
  ['forest_cache','mine_cache'].forEach(function(k){e.treasures[k]=!!(raw.treasures&&raw.treasures[k]);});
  Object.keys(EXPLORE_NODES).forEach(function(sc){Object.keys(EXPLORE_NODES[sc]).forEach(function(k){var n=EXPLORE_NODES[sc][k],key=sc+':'+k,v=raw.nodes&&raw.nodes[key];if(v&&typeof v==='object')e.nodes[key]={hp:clamp(Math.floor(num(v.hp,n.hp,0,n.hp)),0,n.hp),day:Math.floor(num(v.day,0,0,1e6))};});});return e;
@@ -4000,348 +4071,7 @@ function chestMove(structure, id, qty, toBox) {
     var after = countSlotsWith(box, id, (box[id] || 0) + n);
     if (after > CFG.chestSlots) { toast('箱子放不下了，先取出一部分。'); Audio2.play('fail'); return false; }
     invRemove(id, n); box[id] = (box[id] || 0) + n;
-    toast('放入 ' + itemName(id) + ' ×' + n + '。');
-  } else {
-    var have = box[id] || 0;
-    var m = Math.min(have, qty);
-    if (m <= 0) { toast('箱子里没有这个物品。'); return false; }
-    if (!bagAccepts(id, m)) { toast('背包满了，先整理一下。'); Audio2.play('fail'); return false; }
-    box[id] = have - m; if (box[id] <= 0) delete box[id];
-    invAdd(id, m);
-    toast('取出 ' + itemName(id) + ' ×' + m + '。');
-  }
-  Audio2.play('place');
-  markDirty();
-  return true;
-}
-function chestMoveAll(structure, toBox) {
-  var box = getChest(structure);
-  var moved = 0, guard = 0;
-  if (toBox) {
-    invList(state.inventory).forEach(function (id) {
-      while (invCount(id) > 0 && guard++ < 400) {
-        if (!chestMove(structure, id, 1, true)) return;
-        moved++;
-      }
-    });
-  } else {
-    invList(box).forEach(function (id) {
-      while ((box[id] || 0) > 0 && guard++ < 400) {
-        if (!chestMove(structure, id, 1, false)) return;
-        moved++;
-      }
-    });
-  }
-  if (moved) { toast((toBox ? '放入' : '取出') + ' ' + moved + ' 个物品。'); Audio2.play('place'); markDirty(); }
-  else toast('没有可以转移的物品。');
-  return moved > 0;
-}
-
-/* --- 食用 --- */
-function eatItem(id) {
-  if (!isFood(id)) { toast('这个不能吃。'); return false; }
-  if (invCount(id) <= 0) { toast('背包里没有' + itemName(id) + '了。'); return false; }
-  if (state.energy >= CFG.maxEnergy) { toast('体力已经满了，先干点活吧。'); return false; }
-  invRemove(id, 1);
-  var recovered=Math.min(ITEMS[id].food,CFG.maxEnergy-state.energy);
-  state.energy += recovered;
-  Audio2.play('eat');
-  toast('吃掉了' + itemName(id) + '，恢复 ' + recovered + ' 点体力。');
-  markDirty(); refreshHud();
-  return true;
-}
-
-/* ============================================================
-   6. 工具、土地与资源采集
-   ============================================================ */
-
-function facingTile() {
-  var f = FACE_DIR[state.player.face] || [0, 1];
-  return [state.player.x + f[0], state.player.y + f[1]];
-}
-var FACE_DIR = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
-
-function inPlantArea(x, y) {
-  var a = MAPS.farm.plantArea;
-  return x >= a.x0 && x <= a.x1 && y >= a.y0 && y <= a.y1;
-}
-function hasEnergy(cost) {
-  if (state.energy < cost) {
-    toast('体力不足，吃点东西或休息吧。');
-    Audio2.play('fail');
-    return false;
-  }
-  return true;
-}
-
-/* 统一的工具入口 */
-function useTool(tool, tx, ty, opts) {
-  opts = opts || {};
-  var p = state.player;
-  var d = Math.abs(tx - p.x) + Math.abs(ty - p.y);
-  if (d > (tool === 'fish' ? 3 : 1)) { toast(tool === 'fish' ? '站在岸边，点击 3 格以内的水面抛竿。' : '走近一点。'); return false; }
-  if (sceneSwitch.busy || Game.busy) return false;
-  if (Game.fishing && Game.fishing.active) return false;
-  if (state.sceneId !== 'farm' && (tool === 'hoe' || tool === 'seed' || tool === 'water' || tool === 'shovel')) {
-    toast('这里没有可以耕种的土地。');
-    return false;
-  }
-  if(EXPLORE_NODES[state.sceneId] && ['axe','pickaxe','harvest'].indexOf(tool)>=0) return gatherExplore(tool,tx,ty);
-  switch (tool) {
-    case 'hoe': return toolHoe(tx, ty);
-    case 'seed': return toolSeed(tx, ty);
-    case 'shovel': return toolShovel(tx, ty);
-    case 'water': return toolWater(tx, ty);
-    case 'harvest': return toolHarvest(tx, ty);
-    case 'axe': return toolNode(tx, ty, 'tree');
-    case 'pickaxe': return toolNode(tx, ty, 'stone');
-    case 'fish': return toolFish(tx, ty);
-    case 'place': return toolPlace(tx, ty);
-  }
-  return false;
-}
-
-function toolHoe(tx, ty) {
-  if (!inPlantArea(tx, ty)) { toast('这里不能耕种。'); return false; }
-  if (state.plots[key2(tx, ty)]) { toast('这块土地已经松好了。'); return false; }
-  if (!hasEnergy(CFG.energyCost.hoe)) return false;
-  state.energy -= CFG.energyCost.hoe;
-  state.plots[key2(tx, ty)] = {
-    tilled: true, water: isRaining() && state.sceneId === 'farm', crop: null,
-    age: 0, mature: false, harvested: false, regrow: 0
-  };
-  Audio2.play('hoe');
-  addParticle(tx, ty, 'soil');
-  if (isRaining()) toast('翻好土了，雨天 土地已经是湿润的。');
-  tutorialEvent('tilled');
-  markDirty(); refreshHud();
-  return true;
-}
-function toolSeed(tx, ty) {
-  if (state.sceneId !== 'farm') { toast('这里不能播种。'); return false; }
-  if (!inPlantArea(tx, ty)) { toast('这里不能播种。'); return false; }
-  var p = state.plots[key2(tx, ty)];
-  if (!p) { toast('先把这块土地松好。'); return false; }
-  if (p.crop) { toast('这里已经种了作物。'); return false; }
-  var cropId = state.selectedSeed;
-  var crop = CROPS[cropId];
-  var seedId = crop.seed;
-  if (invCount(seedId) <= 0) { toast('没有' + crop.name + '种子了，去种子铺买一些。'); Audio2.play('fail'); return false; }
-  invRemove(seedId, 1);
-  p.crop = cropId; p.age = 0; p.mature = false; p.harvested = false; p.regrow = 0;
-  tutorialEvent('seeded', key2(tx, ty));
-  if (p.water) tutorialEvent('watered');
-  Audio2.play('hoe');
-  addParticle(tx, ty, 'seed');
-  toast(isRaining() ? '播下' + crop.name + '，雨天不用浇水。' : '播下' + crop.name + '，记得浇水。');
-  markDirty(); refreshHud();
-  return true;
-}
-/* 铲除：把长得不合适的作物铲掉。刚播下的那株（年龄 0）能把种子收回来，
-   已经长过一天的就得自己承担种子的损失——否则播种+铲除可以无限刷种子。 */
-function toolShovel(tx, ty) {
-  if (state.sceneId !== 'farm') { toast('这里没有可以铲除的作物。'); return false; }
-  if (!inPlantArea(tx, ty)) { toast('这里没有可以铲除的作物。'); return false; }
-  var p = state.plots[key2(tx, ty)];
-  if (!p || !p.crop) { toast('这里没有作物可以铲除。'); return false; }
-  if (isTutorialBlocking('铲除')) return false;
-  var crop = CROPS[p.crop];
-  if (!crop) { p.crop = null; return true; }
-  var young = !p.harvested && p.age <= 0;          // 刚种下：种子还能收回
-  if (young && !bagAccepts(crop.seed, 1)) { toast('背包满了，先腾出一格再来铲。'); Audio2.play('fail'); return false; }
-  if (!hasEnergy(CFG.energyCost.shovel)) return false;
-  state.energy -= CFG.energyCost.shovel;
-  if (young) invAdd(crop.seed, 1);
-  p.crop = null; p.age = 0; p.mature = false; p.harvested = false; p.regrow = 0;
-  addParticle(tx, ty, 'soil');
-  Audio2.play('ho…7216 tokens truncated…tate.questProgress[2] === 'done' && state.questProgress[3] !== 'done')) {
-    text = npc.bridgeLines[(d.chatCount + (id === 'yaya' ? 0 : 1)) % npc.bridgeLines.length];
-  } else if (isRaining()) {
-    text = npc.rainLines[d.chatCount % npc.rainLines.length];
-  } else {
-    text = npc.lines[(d.chatCount + state.totalDay) % npc.lines.length];
-  }
-  d.chatCount += 1;
-  return text;
-}
-
-function talkToNpc(id) {
-  var text = npcDialogue(id);
-  var d = npcDaily(id);
-  var gained = 0;
-  if (!d.chat) {
-    d.chat = true;
-    state.npcFriendship[id] = clamp((state.npcFriendship[id] || 0) + 2, 0, 100);
-    gained = 2;
-    markDirty();
-  }
-  openDialogue(id, text, gained);
-}
-
-function giftToNpc(id, itemId) {
-  if (!isGiftable(itemId)) { toast('这个东西不能当作礼物。'); return false; }
-  var d = npcDaily(id);
-  if (d.gift) { toast(NPCS[id].name + '今天已经收过礼物了，明天再来吧。'); Audio2.play('fail'); return false; }
-  if (invCount(itemId) <= 0) { toast('背包里没有这个物品了。'); return false; }
-  var npc = NPCS[id];
-  var kind = 'like';
-  if (npc.like.indexOf(itemId) >= 0) kind = 'love';
-  else if (npc.dislike.indexOf(itemId) >= 0) kind = 'dislike';
-  var delta = kind === 'love' ? 8 : kind === 'dislike' ? -2 : 3;
-  invRemove(itemId, 1);
-  d.gift = true;
-  state.npcFriendship[id] = clamp((state.npcFriendship[id] || 0) + delta, 0, 100);
-  var fb = GIFT_FEEDBACK[kind][id] || [kind==='love'?'这份礼物我很喜欢，谢谢你！':kind==='dislike'?'谢谢你的心意，不过我不太需要这个。':'谢谢，我会好好收下的。'];
-  var line = fb[(d.chatCount + state.totalDay) % fb.length];
-  Audio2.play(kind === 'dislike' ? 'fail' : 'quest');
-  markDirty(); refreshHud();
-  openDialogue(id, line + '\n（' + (delta > 0 ? '好感 +' : '好感 ') + delta + ' · ' + heartsText(state.npcFriendship[id]) + '）', 0);
-  return true;
-}
-
-/* ============================================================
-   9. 委托与修桥
-   ============================================================ */
-
-function questById(id) { for (var i = 0; i < QUESTS.length; i++) if (QUESTS[i].id === id) return QUESTS[i]; return null; }
-function questState(id) { return state.questProgress[id] || 'locked'; }
-function questNeedText(q) {
-  return Object.keys(q.need).map(function (k) {
-    if (k === 'anyFish') {
-      var n = anyFishIn(state.inventory);
-      return '任意鱼 ' + (n > 0 ? n : 0) + ' / 1';
-    }
-    return itemName(k) + ' ' + (state.inventory[k] || 0) + ' / ' + q.need[k];
-  });
-}
-function questReady(q) {
-  return Object.keys(q.need).every(function (k) {
-    if (k === 'anyFish') return anyFishIn(state.inventory) >= 1;
-    return (state.inventory[k] || 0) >= q.need[k];
-  });
-}
-function currentQuest() {
-  for (var i = 0; i < QUESTS.length; i++) if (questState(QUESTS[i].id) === 'unlocked') return QUESTS[i];
-  return null;
-}
-function questStripText() {
-  var q = currentQuest();
-  if (!q) return '所有委托都完成了，去钓鱼或继续经营农场吧。';
-  var t = questTargetOf(q), tail = '';
-  if (t) {
-    if (t.scene === state.sceneId) {
-      tail = ' → ' + t.label + ' ' + questDistText(t.x - state.player.x, t.y - state.player.y);
-    } else {
-      tail = ' → 先去' + MAPS[t.scene].name;
-    }
-  }
-  return q.id + ' · ' + q.name + ' — ' + questNeedText(q).join('、') + tail;
-}
-
-function submitQuest(id) {
-  var q = questById(id);
-  if (!q) return false;
-  if (questState(id) !== 'unlocked') { toast('这个委托还没解锁。'); Audio2.play('fail'); return false; }
-  if (!questReady(q)) {
-    var miss = questNeedText(q).filter(function (s) { return / 0 \//.test(s); });
-    toast('材料不足：' + (miss.length ? miss.join('、') : questNeedText(q).join('、')));
-    Audio2.play('fail');
-    return false;
-  }
-  var cost = [];
-  Object.keys(q.need).forEach(function (k) {
-    if (k === 'anyFish') {
-      var f = lowestPricedFishIn(state.inventory);
-      invRemove(f.id, 1);
-      cost.push(f.name + ' ×1');
-    } else {
-      invRemove(k, q.need[k]);
-      cost.push(itemName(k) + ' ×' + q.need[k]);
-    }
-  });
-  var r = q.reward;
-  if (r.coins) state.coins += r.coins;
-  if (r.friendship) {
-    Object.keys(r.friendship).forEach(function (n) {
-      state.npcFriendship[n] = clamp((state.npcFriendship[n] || 0) + r.friendship[n], 0, 100);
-    });
-  }
-  if (r.recipe && state.unlockedRecipes.indexOf(r.recipe) < 0) state.unlockedRecipes.push(r.recipe);
-  if (r.tool) invAdd(r.tool, 1);
-  if (r.bridge) {
-    state.bridgeRepaired = true;
-    addParticle(27, 10, 'bridge');
-    addParticle(28, 11, 'bridge');
-    Audio2.play('bridge');
-  }
-  state.questProgress[id] = 'done';
-  questLogPush('完成委托 ' + id + '「' + q.name + '」，交付 ' + cost.join('、') + '。');
-  var next = questById(id + 1);
-  if (next && state.questProgress[next.id] === 'locked') {
-    state.questProgress[next.id] = 'unlocked';
-    questLogPush('新委托 ' + next.id + '「' + next.name + '」已解锁。');
-  }
-  saveNow(); refreshHud();
-  toast('完成委托「' + q.name + '」，交付了 ' + cost.join('、') + '。');
-  Audio2.play('quest');
-  if (r.bridge) {
-    setTimeout(function () {
-      openWindow({
-        id: 'bridgeDone', kind: 'custom', narrow: true, title: '小桥修好了',
-        build: function (b) {
-          b.appendChild(el('p', null, '旧桥重新连上了河岸。明天，也许能遇见新的风景。'));
-          b.appendChild(el('p', 'muted', '现在可以穿过小镇东侧前往河边了，钓竿已经放进背包。'));
-        },
-        actions: [{ label: '太好了', kind: 'primary', close: true }]
-      });
-    }, 260);
-  }
-  return true;
-}
-
-/* ============================================================
-   10. 钓鱼小游戏
-   ============================================================ */
-
-var FISH = { track: 200, bar: 64, up: 100, down: 70, gain: 0.25, loss: 0.12, limit: 20, startProgress: 0.25 };
-
-function fishPool() {
-  var level = state.rodLevel || 1;
-  return FISHES.filter(function(f) { return (f.tier || 1) <= level; }).map(function(f) {
-    var tier = f.tier || 1;
-    var weight = tier === 1 ? (isRaining() ? f.rain : f.sunny) * (level === 1 ? 1 : 0.3)
-      : (tier === level ? 0.7 : 0.3) * (isRaining() ? f.rain : f.sunny);
-    return {fish:f,weight:weight};
-  });
-}
-function pickFish() {
-  var pool = fishPool(), total = pool.reduce(function(n,p) { return n+p.weight; },0);
-  var r = rand()*total;
-  for(var i=0;i<pool.length;i++) { r-=pool[i].weight; if(r<=0) return pool[i].fish; }
-  return pool[pool.length-1].fish;
-}
-
-function toolFish(tx, ty) {
-  if (invCount('tool_rod') < 1) { toast('先完成修桥委托，获得钓竿。'); return false; }
-  if (state.sceneId !== 'riverside' && state.sceneId !== 'farm' && state.sceneId !== 'forest') { toast('可以在农场池塘、河边或森林湖钓鱼。'); return false; }
-  var p = state.player;
-  var atBank = [[0,-1],[0,1],[-1,0],[1,0]].some(function (d) { return isWater(state.sceneId, p.x+d[0], p.y+d[1]); });
-  if (!atBank || Math.abs(tx-p.x)+Math.abs(ty-p.y) > 3) { toast('站在岸边，点击 3 格以内的水面抛竿。'); return false; }
-  if (!isWater(state.sceneId, tx, ty)) { toast('对着水面才能抛竿。'); return false; }
-  if (freeSlots(state.inventory) < 1) { toast('背包满了，先整理一下。'); Audio2.play('fail'); return false; }
-  if (!hasEnergy(CFG.energyCost.fish)) return false;
-  state.energy -= CFG.energyCost.fish;
-  var f = pickFish();
-  Game.fishing = {
-    active: true, phase: 'cast', t: 0, wait: 0, fish: f,
-    barY: (FISH.track - FISH.bar) / 2, fishY: FISH.track / 2, fishDir: 1,
-    fishSpeed: f.speed, turnT: 0, targetY: FISH.track / 2,
-    progress: FISH.startProgress, elapsed: 0, holding: false, tx: tx, ty: ty,
-    // 玩家解锁钓竿后的第一次下竿：必定钓起 DS 小姐。
-    dsFirst: !state.dsMet && state.sceneId === 'riverside'
-  };
-  if (Game.fishing.dsFirst) { Game.fishing.wait = 0.6; Game.fishing.fishSpeed = 18; }
-  Audio2.play('splash');
+    toast('放…10829 tokens truncated…lash');
   markDirty(); refreshHud();
   return true;
 }
@@ -5528,10 +5258,93 @@ function openQuestLog(site) {
         b.appendChild(box);
       });
     },
-    actions:[{label:'关闭',kind:'ghost',close:true}]
+    actions:[{label:'打开森林书',kind:'primary',close:false,onClick:function(){openFieldJournal();}},{label:'关闭',kind:'ghost',close:true}]
   });
 }
 
+var JOURNAL_PAGE='overview';
+var JOURNAL_EVENT='forest_route';
+var JOURNAL_PAGES={overview:'旅程总览',discoveries:'发现图鉴',choices:'分岔记录',people:'人物页'};
+var JOURNAL_DISCOVERIES=[
+  {id:'forest',title:'雾杉森林',desc:'蘑菇、硬木和林间湖。森林东北的旧矿山还藏着更深的路。',unlocked:function(){return exploreState().forest;}},
+  {id:'hut',title:'伐木屋',desc:'巡林员的临时营地，也是每日森林补给委托的起点。',unlocked:function(){return exploreState().hut;}},
+  {id:'mine',title:'旧矿山',desc:'三层矿脉沿轨道深入，铜、铁和紫晶都被记录在册。',unlocked:function(){return exploreState().mine;}},
+  {id:'city',title:'白蔷薇城',desc:'南门驿路通向城市，邮局、学院和城堡都在地图上留下了标记。',unlocked:function(){return exploreState().city;}}
+];
+function journalChoice(id){return exploreState().journalChoices&&exploreState().journalChoices[id];}
+function journalChoiceDoneToday(id){var c=journalChoice(id);return !!(c&&c.day===state.totalDay);}
+function recordJournalChoice(id,option){
+  if(id!=='forest_route'||!exploreState().forest){toast('这页记录还没有解锁。');return;}
+  if(journalChoiceDoneToday(id)){toast('今天已经写过这页了，明天再来。');return;}
+  if(option===2&&!bagAccepts('hardwood',1)){toast('背包放不下这份硬木。');return;}
+  if(option===1){exploreState().explorePoints+=8;toast('你沿湖走了一圈，补全了森林地图。探索度 +8。');}
+  else {invAdd('hardwood',1);exploreState().explorePoints+=4;toast('你回收了一段结实的硬木。探索度 +4。');}
+  exploreState().journalChoices[id]={day:state.totalDay,option:option};
+  markDirty();refreshHud();saveNow();JOURNAL_PAGE='choices';refreshWindow();
+}
+function openFieldJournal(){
+  openWindow({id:'field_journal',kind:'journal',wide:true,title:'森林书 · 巡林员手册',build:function(b){
+    var book=el('div','forest-journal');
+    var left=el('aside','forest-journal-cover');
+    left.appendChild(el('div','forest-journal-kicker','MOSS VALLEY / FIELD NOTES'));
+    left.appendChild(el('div','forest-journal-emblem','✦'));
+    left.appendChild(el('div','forest-journal-title','森林书'));
+    left.appendChild(el('div','forest-journal-subtitle','巡林员手册'));
+    left.appendChild(el('p','forest-journal-quote','“把走过的路写下来，下一次就不会迷路。”'));
+    var meta=el('div','forest-journal-meta');
+    meta.appendChild(el('strong',null,'第 '+state.totalDay+' 天'));
+    meta.appendChild(el('span',null,'探索度 '+(exploreState().explorePoints||0)+' · Lv '+explorationTier()));
+    left.appendChild(meta);
+    var nav=el('div','forest-journal-nav');
+    Object.keys(JOURNAL_PAGES).forEach(function(id){
+      var btn=mkBtn(JOURNAL_PAGES[id],JOURNAL_PAGE===id?'journal-nav-on':'journal-nav-btn',function(){JOURNAL_PAGE=id;renderWindow();});
+      nav.appendChild(btn);
+    });
+    left.appendChild(nav);
+    left.appendChild(el('div','forest-journal-foot','MOSS VALLEY RANGER ARCHIVE'));
+    var right=el('section','forest-journal-page');
+    right.appendChild(el('div','forest-journal-page-head','FIELD JOURNAL · '+(JOURNAL_PAGES[JOURNAL_PAGE]||'记录')));
+    if(JOURNAL_PAGE==='overview'){
+      right.appendChild(el('h2',null,'山谷巡查总览'));
+      right.appendChild(el('p','journal-lead','这不是任务清单，而是你在山谷留下的足迹。新的地方、遇见的人和每一次选择，都会慢慢长成一本只属于你的记录册。'));
+      var statGrid=el('div','journal-stat-grid');
+      [['已开放区域',(exploreState().forest?1:0)+(exploreState().mine?1:0)+(exploreState().city?1:0)+' / 3'],['矿山深度',exploreState().mine?'第 '+exploreState().depth+' 层':'尚未进入'],['今日委托',activeDailyJobIds().length+' 份轮换']].forEach(function(x){var cell=el('div','journal-stat');cell.appendChild(el('span',null,x[0]));cell.appendChild(el('strong',null,x[1]));statGrid.appendChild(cell);});
+      right.appendChild(statGrid);
+      right.appendChild(el('div','journal-section-label','最近的记录'));
+      right.appendChild(el('p','journal-hand','每日委托仍在委托日志中快速交付；森林书负责保存旅途的过程和结果。'));
+      var hint=el('div','journal-callout');hint.appendChild(el('strong',null,'巡林提示'));hint.appendChild(el('span',null,exploreState().forest?'森林已经开放。去“分岔记录”看看今天要沿湖勘察，还是回收硬木。':'先完成小镇北口的森林开放委托，这本书会自动添上第一页。'));right.appendChild(hint);
+    }else if(JOURNAL_PAGE==='discoveries'){
+      right.appendChild(el('h2',null,'发现图鉴'));
+      right.appendChild(el('p','journal-lead','每到一个新区域，就在地图边角盖上一枚印章。'));
+      JOURNAL_DISCOVERIES.forEach(function(d){var on=d.unlocked(),card=el('div','journal-discovery '+(on?'':'locked'));card.appendChild(el('div','journal-discovery-mark',on?'✦':'?'));var body=el('div');body.appendChild(el('strong',null,d.title));body.appendChild(el('p',null,on?d.desc:'尚未记录。继续探索后解锁这一页。'));card.appendChild(body);right.appendChild(card);});
+    }else if(JOURNAL_PAGE==='choices'){
+      right.appendChild(el('h2',null,'分岔记录'));
+      right.appendChild(el('p','journal-lead','这里记录那些没有标准答案的时刻。选择会留在存档里，并可能改变探索度、材料或后续叙事。'));
+      var c=el('div','journal-choice-card '+(exploreState().forest?'':'locked'));
+      c.appendChild(el('div','journal-choice-kicker','FOREST ROUTE / 01'));
+      c.appendChild(el('h3',null,'林间的分岔路'));
+      c.appendChild(el('p',null,exploreState().forest?'林间湖边有两条路：沿湖勘察，或把倒下的硬木带回营地。今天的选择会写进森林书。':'完成森林开放委托后，这条分岔路才会出现在手册里。'));
+      var ch=journalChoice('forest_route');
+      if(exploreState().forest&&!journalChoiceDoneToday('forest_route')){
+        var cr=el('div','journal-choice-actions');
+        cr.appendChild(mkBtn('沿湖勘察 · 探索度 +8','journal-choice-btn',function(){recordJournalChoice('forest_route',1);}));
+        cr.appendChild(mkBtn('回收硬木 · 获得硬木 ×1','journal-choice-btn',function(){recordJournalChoice('forest_route',2);}));
+        c.appendChild(cr);
+      }else if(ch&&ch.day===state.totalDay){
+        c.appendChild(el('div','journal-choice-result','今日已记录：'+(ch.option===1?'沿湖勘察。':'回收硬木。')+' 明天可以重新选择。'));
+      }
+      right.appendChild(c);
+    }else{
+      right.appendChild(el('h2',null,'人物页'));
+      right.appendChild(el('p','journal-lead','好感度不只是数字。每个人都会把你们共同经历过的事，留在自己的那一页。'));
+      ['yaya','aqi','ds','ranger','engineer','postie'].forEach(function(id){if(!NPCS[id])return;var v=state.npcFriendship[id]||0,card=el('div','journal-person');card.appendChild(el('div','journal-person-avatar',heartsText(v)));var body=el('div');body.appendChild(el('strong',null,NPCS[id].name+' · '+NPCS[id].title));var hasQuest=BOND_QUESTS.some(function(q){return q.npc===id&&!specialQuestDone(q,'bond')&&specialQuestUnlocked(q,'bond');});body.appendChild(el('p',null,'好感度 '+v+' / 100'+(hasQuest?' · 有新的居民委托':'')));card.appendChild(body);right.appendChild(card);});
+    }
+    book.appendChild(left);book.appendChild(right);b.appendChild(book);
+  },actions:[
+    {label:'打开委托日志',kind:'primary',close:false,onClick:function(){openQuestLog(null);}},
+    {label:'关闭',kind:'ghost',close:true}
+  ]});
+}
 /* --- 对话与赠礼 --- */
 function openDialogue(id, text, friendshipGain) {
   var npc = NPCS[id];
@@ -5621,6 +5434,7 @@ function openPause() {
       var row = el('div', 'row');
       row.appendChild(mkBtn('帮助与操作', '', function () { openHelp(); }));
       row.appendChild(mkBtn('全境地图（M）', '', function () { openWorldMap(); }));
+      row.appendChild(mkBtn('森林书（F）', '', function () { openFieldJournal(); }));
       row.appendChild(mkBtn('睡觉（结束今天）', '', function () { setTimeout(function () { requestSleep(); }, 20); }));
       b.appendChild(row);
 
@@ -7743,6 +7557,7 @@ function onKeyDown(e) {
   if (k === 'b' || k === 'B') { openBag(); return; }
   if (k === 'c' || k === 'C') { openCraft(); return; }
   if (k === 'j' || k === 'J') { openQuestLog(null); return; }
+  if (k === 'f' || k === 'F') { openFieldJournal(); return; }
   if (k === 'm' || k === 'M') { e.preventDefault(); openWorldMap(); return; }
   if (/^[1-9]$/.test(k)) {
     var t = TOOLS[+k - 1];
