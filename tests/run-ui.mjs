@@ -184,12 +184,16 @@ const dpad = await page.locator('[data-dir="1,0"]').boundingBox();
 await page.touchscreen.tap(dpad.x + dpad.width / 2, dpad.y + dpad.height / 2);
 await page.waitForTimeout(50);
 rep.ok('触屏轻点后没有卡住移动键', await page.evaluate(() => !window.__MOSS__.game.moving));
+rep.eq('长按方向键禁用浏览器触摸手势', await page.locator('[data-dir="1,0"]').evaluate(el => getComputedStyle(el).touchAction), 'none');
+rep.eq('长按方向键禁用文字选择', await page.locator('[data-dir="1,0"]').evaluate(el => getComputedStyle(el).userSelect), 'none');
 // 用 pointer 事件模拟按住移动
 await page.locator('[data-dir="1,0"]').dispatchEvent('pointerdown');
-await page.waitForTimeout(600);
+await page.waitForTimeout(250);
+await page.locator('[data-dir="1,0"]').dispatchEvent('pointerleave');
+await page.waitForTimeout(350);
 await page.locator('[data-dir="1,0"]').dispatchEvent('pointerup');
 await page.waitForTimeout(150);
-rep.ok('触屏按住可移动', (await pos(page))[0] > p0[0], `${JSON.stringify(p0)} -> ${JSON.stringify(await pos(page))}`);
+rep.ok('触屏长按且手指滑出按键时仍持续移动', (await pos(page))[0] > p0[0], `${JSON.stringify(p0)} -> ${JSON.stringify(await pos(page))}`);
 // 触屏点快捷栏换工具
 await page.locator('.hotbar .slot').nth(2).click();
 await page.waitForTimeout(150);

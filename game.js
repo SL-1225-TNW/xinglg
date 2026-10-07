@@ -8005,10 +8005,41 @@ function bindInput() {
   Array.prototype.forEach.call(document.querySelectorAll('[data-dir]'), function (b) {
     var d = b.getAttribute('data-dir').split(',');
     var key = d[0] === '0' ? (d[1] === '-1' ? 'ArrowUp' : 'ArrowDown') : (d[0] === '-1' ? 'ArrowLeft' : 'ArrowRight');
-    b.addEventListener('pointerdown', function (e) { e.preventDefault(); keys[key] = true; lastDir = key; });
-    b.addEventListener('pointerup', function (e) { e.preventDefault(); keys[key] = false; });
-    b.addEventListener('pointerleave', function () { keys[key] = false; });
-    b.addEventListener('pointercancel', function () { keys[key] = false; });
+    function release(e) {
+      if (b._movePointerId == null) return;
+      if (e && e.pointerId != null && e.pointerId !== b._movePointerId) return;
+      if (e && e.cancelable) e.preventDefault();
+      b._movePointerId = null;
+      keys[key] = false;
+    }
+    b.addEventListener('dragstart', function (e) { e.preventDefault(); });
+    b.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    b.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (e.cancelable) e.preventDefault();
+      if (b._movePointerId != null) return;
+      b._movePointerId = e.pointerId;
+      // 捕获触点，手指稍微滑出按钮时仍持续移动，直到抬起或系统取消触摸。
+      if (b.setPointerCapture && e.pointerId != null) {
+        try { b.setPointerCapture(e.pointerId); } catch (_) { /* 合成事件或旧浏览器不支持时由 touch-action 兜底 */ }
+      }
+      keys[key] = true;
+      lastDir = key;
+    });
+    b.addEventListener('pointerup', release);
+    b.addEventListener('pointercancel', release);
+    b.addEventListener('lostpointercapture', release);
+  });
+  // 来电、切换应用等情况会让浏览器丢弃触摸抬起事件；失焦时清掉长按状态。
+  window.addEventListener('blur', function () {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-dir]'), function (b) {
+      if (b._movePointerId != null) {
+        b._movePointerId = null;
+        var d = b.getAttribute('data-dir').split(',');
+        var key = d[0] === '0' ? (d[1] === '-1' ? 'ArrowUp' : 'ArrowDown') : (d[0] === '-1' ? 'ArrowLeft' : 'ArrowRight');
+        keys[key] = false;
+      }
+    });
   });
 }
 
