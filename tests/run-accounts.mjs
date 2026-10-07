@@ -80,6 +80,14 @@ try{
  assert.equal(await q.evaluate(()=>__MOSS__.saves.read().pending),true);
  offline=false;await q.evaluate(()=>__MOSS__.coordinator().sync());assert.equal(saves.get(a).payload.coins,150);
  await q.reload();await q.waitForFunction(()=>!document.querySelector('#bootAccount').disabled);await start(q);assert.equal(await q.evaluate(()=>__MOSS__.state.coins),150);
+ offline=true;
+ await q.addInitScript(()=>Object.defineProperty(navigator,'onLine',{get:()=>window.testOnline===true,configurable:true}));
+ await q.reload();await q.waitForFunction(()=>!document.querySelector('#bootAccount').disabled);await start(q);
+ assert.equal(await q.evaluate(()=>__MOSS__.state.coins),150,'offline startup restores own account cache');
+ offline=false;await q.evaluate(()=>{window.testOnline=true;window.dispatchEvent(new Event('online'));});
+ await q.locator('#btnAccount').click();
+ const bounds=await q.locator('dialog[aria-label="账号与云存档"]').boundingBox();
+ assert.ok(bounds.x>=0&&bounds.y>=0&&bounds.x+bounds.width<=391&&bounds.y+bounds.height<=845,'mobile account dialog fits viewport');
  await q.screenshot({path:'/tmp/moss-account-mobile.png'});
  assert.deepEqual(errors,[]);
  console.log('PASS: real SDK email OTP contract, guest binding, A/B switch, restore, mobile, two devices, conflicts, offline recovery, refresh');

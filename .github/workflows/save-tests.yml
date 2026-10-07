@@ -1,0 +1,30 @@
+name: Account and save regression
+on:
+  pull_request:
+  push:
+    branches: [main, feat/accounts-cloud-saves]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+      - run: npm ci --prefix tests
+      - run: npx --prefix tests playwright install --with-deps chromium
+      - run: |
+          node tests/run-save-repository.cjs
+          node tests/run-save-coordinator.cjs
+          node tests/run-database.mjs
+          node tests/build-single-file.mjs
+          node tests/run-accounts.mjs
+          node tests/run-save-browser.mjs
+          node tests/single-file-smoke.mjs
+          node tests/run-fishing-economy.mjs
+          node tests/run-exploration.mjs
+          node tests/run-review-fixes.mjs

@@ -93,6 +93,7 @@ begin
 end;
 $$;
 -- A function owner needs CREATE briefly to receive ownership; it is revoked immediately.
+grant moss_save_writer to postgres;
 grant create on schema public to moss_save_writer;
 alter function public.commit_game_save(uuid,bigint,integer,jsonb,uuid,uuid) owner to moss_save_writer;
 revoke create on schema public from moss_save_writer;
