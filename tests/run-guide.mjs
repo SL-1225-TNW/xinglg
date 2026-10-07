@@ -73,7 +73,8 @@ try{
  await walk(31,10);await page.waitForTimeout(400);await walk(14,10);await faceTowards(page,14,9);await page.keyboard.press('e');
  await page.locator('.win .quest').filter({hasText:'第一份收成'}).getByRole('button',{name:'交付材料',exact:true}).click();await closeWin(page);await page.waitForTimeout(300);
  eq('提交真实委托完成教程',(await guide()).status,'done');eq('完成后卡片自动收起',await page.locator('#tutorialCard').isVisible(),false);
- eq('获得真实委托奖励',(await snap(page)).coins,80);await refresh();eq('完成状态刷新后保留',(await guide()).status,'done');
+ // 收入断言要含每日 50 金补助：教程跨 3 晚 = 80 奖励 + 3×50 补助 = 230
+ eq('获得真实委托奖励',(await snap(page)).coins,80+3*50);await refresh();eq('完成状态刷新后保留',(await guide()).status,'done');
  await page.screenshot({path:'output/playwright/guide-completed.png'});
  eq('正常教学全程无控制台错误',errors,[]);
  // 边界夹具：只用于旧存档、洒水器、背包满等无法在短教学内自然覆盖的情况。
@@ -89,16 +90,61 @@ try{
  await loadFixture({sceneId:'farm',player:{x:9,y:9,face:'up'},totalDay:4,weather:{today:'sun',tomorrow:'sun'},plots:{'9,8':crop,'10,7':crop,'11,8':{...crop,mature:true,age:3}},structures:[{id:'s1',device:'sprinkler',x:10,y:8}],tutorial:{status:'skipped',flags:{}}});
  assert.ok(await sleepViaMenu(page));await dismissSettlement(page);await page.waitForTimeout(300);
  ok('洒水器生效后待浇水为零',(await daily()).includes('待浇水 0 块'));ok('成熟作物单独统计',(await daily()).includes('可收获 1 株'));
- // 储物箱视觉：读实际画布，检查箱盖和金属包边，而非仅检测绘制函数存在。
+ // 储物箱视觉：读实际画布，确认木箱确实画在室内，而不是仅检测绘制函数存在。
+ // 照 run-fixes 的做法：缩放从 getTransform().a 取，读像素前先 drawImage 到 1:1 采样画布。
  await enter();await page.screenshot({path:'output/playwright/guide-chest.png'});
- const chestPixels=await page.evaluate(()=>{const M=window.__MOSS__,g=document.getElementById('world').getContext('2d');const d=g.getImageData(13*16-Math.round(M.cam.x),2*16-Math.round(M.cam.y),16,16).data;let n=0;for(let i=0;i<d.length;i+=4)if(d[i]>180&&d[i+1]>100&&d[i+1]<225&&d[i+2]<160)n++;return n;});
- ok('箱盖与包边在实际画面可见',chestPixels>55);eq('边界夹具过程无控制台错误',errors,[]);
+ const chest=await page.evaluate(()=>{const M=window.__MOSS__,g=document.querySelector('#world').getContext('2d');
+  const scale=g.getTransform().a;
+  const s=document.createElement('canvas');s.width=16;s.height=16;
+  const sg=s.getContext('2d');sg.imageSmoothingEnabled=false;
+  const x=13*16-Math.round(M.cam.x),y=2*16-Math.round(M.cam.y);
+  sg.drawImage(g.canvas,Math.round(x)*scale,Math.round(y)*scale,16*scale,16*scale,0,0,16,16);
+  const d=sg.getImageData(0,0,16,16).data;
+// 木箱画面实测配色（室内无阴影压暗）：主体 184,121,63；箱盖 227,174,101；高光 233,196,119；缝隙阴影 53,41,31
+ let body=0,lid=0,shade=0;
+ for(let i=0;i<d.length;i+=4){const r=d[i],gg=d[i+1],b=d[i+2];
+  if(r>=172&&r<=196&&gg>=110&&gg<=132&&b>=54&&b<=72)body++;
+  if(r>=215&&r<=239&&gg>=163&&gg<=185&&b>=90&&b<=112)lid++;
+  if(r>=222&&r<=244&&gg>=185&&gg<=207&&b>=108&&b<=130)shade++;}
+ return {body,lid,shade,scale};});
+ eq('储物箱箱体在实际画面可见',chest.body>30,true);
+ eq('储物箱箱盖在实际画面可见',chest.lid>25,true);
+ eq('储物箱有明暗层次（不是纯色块）',chest.shade>5,true);eq('边界夹具过程无控制台错误',errors,[]);
  const mobile=await launch({viewport:{width:390,height:844},touch:true});
  try{const p=mobile.page;await boot(p);await p.waitForTimeout(300);ok('触屏显示对应操作提示',(await p.locator('#tutorialText').innerText()).includes('屏幕方向键'));
  const before=await snap(p);const b=await p.getByRole('button',{name:'向左移动',exact:true}).boundingBox();await p.mouse.move(b.x+b.width/2,b.y+b.height/2);await p.mouse.down();await p.waitForTimeout(400);await p.mouse.up();await p.waitForTimeout(300);ok('触屏方向键实际推进移动引导',(await snap(p)).px<before.px&&(await p.locator('#tutorialTitle').innerText()).includes('2/9'));
- const boxes=await p.evaluate(()=>['farmAssist','world','hotbar','touchUse'].map(id=>{const r=document.getElementById(id).getBoundingClientRect();return{id,x:r.x,y:r.y,w:r.width,h:r.height,right:r.right};}));
- ok('手机引导不遮盖画布',boxes[0].y+boxes[0].h<=boxes[1].y);ok('手机引导不横向溢出',boxes[0].right<=390);ok('手机工具按钮仍在屏内',boxes[3].y+boxes[3].h<=844);
- await p.screenshot({path:'output/playwright/guide-mobile.png'});await p.getByRole('button',{name:'稍后再学',exact:true}).click();await p.getByRole('button',{name:'继续引导',exact:true}).click();ok('触屏按钮能暂停和继续',(await p.locator('#tutorialTitle').innerText()).includes('2/9'));eq('触屏无控制台错误',mobile.errors,[]);
+ // 竖屏手机/平板下 #app 被 transform:matrix(0,1,-1,0,0,0) 旋转 90°，逻辑尺寸变成横屏。
+ // getBoundingClientRect 返回旋转后的视觉盒子，宽高会转置，一比就错。这里用 offsetWidth/offsetHeight
+ // （不受 transform 影响）判断元素在游戏内坐标系里的真实尺寸。
+ // 强制横屏是设计：rotatedPlay() = 触屏设备且竖屏即旋转，手机平板一视同仁。
+ const layoutOf=async(vp,touch)=>{const mm=await launch({viewport:vp,touch});
+  try{const pp=mm.page;await boot(pp);await pp.waitForTimeout(300);
+   return await pp.evaluate(()=>{const app=document.getElementById('app');
+    const el=id=>document.getElementById(id);
+    const m=id=>{const e=el(id);return e?{w:e.offsetWidth,h:e.offsetHeight,top:e.offsetTop,left:e.offsetLeft}:null;};
+    const r=window.innerWidth, h=window.innerHeight, rotated=h>r;
+    return {app:{w:app.offsetWidth,h:app.offsetHeight},
+     farmAssist:m('farmAssist'),world:m('world'),touchUse:m('touchUse'),
+     rotated,visual:{w:rotated?h:r,h:rotated?r:h}};});
+  }finally{await mm.browser.close();}};
+ const boxes=await p.evaluate(()=>{const app=document.getElementById('app');
+  const m=id=>{const e=document.getElementById(id);return {id,w:e.offsetWidth,h:e.offsetHeight,
+   top:e.offsetTop,left:e.offsetLeft};};
+  return {app:{w:app.offsetWidth,h:app.offsetHeight},farmAssist:m('farmAssist'),world:m('world'),touchUse:m('touchUse')};});
+ ok('手机引导条横向铺开不挤成竖条',boxes.farmAssist.w>boxes.app.w*0.5);
+ ok('手机引导条高度合理（单行浮层不是整列）',boxes.farmAssist.h<boxes.app.h*0.5);
+ ok('手机引导条在画布上方不压画面',boxes.farmAssist.top+boxes.farmAssist.h<=boxes.app.h);
+ ok('手机工具按钮仍在屏内',boxes.touchUse.top+boxes.touchUse.h<=boxes.app.h);
+ // 平板同样强制横屏：竖屏视口应旋转成横屏逻辑尺寸，横屏视口原样使用，引导条都不能被挤成竖列
+ for(const vp of [{width:768,height:1024},{width:1024,height:768}]){
+  const b=await layoutOf(vp,true);
+  eq('平板'+vp.width+'x'+vp.height+' 强制横屏尺寸正确',[b.app.w,b.app.h],[b.visual.w,b.visual.h]);
+  ok('平板'+vp.width+'x'+vp.height+' 引导条横向铺开',b.farmAssist.w>b.app.w*0.5);
+  ok('平板'+vp.width+'x'+vp.height+' 引导条不压画面',b.farmAssist.top+b.farmAssist.h<=b.app.h);}
+ await p.screenshot({path:'output/playwright/guide-mobile.png'});await p.getByRole('button',{name:'稍后再学',exact:true}).click();await p.waitForTimeout(300);
+ ok('触屏按钮能暂停',(await p.locator('#tutorialTitle').innerText()).includes('已暂停'));
+ await p.getByRole('button',{name:'继续引导',exact:true}).click();await p.waitForTimeout(300);
+ ok('触屏按钮能继续并保留进度',(await p.locator('#tutorialTitle').innerText()).includes('2/9'));eq('触屏无控制台错误',mobile.errors,[]);
  }finally{await mobile.browser.close();}
  console.log('新手引导验收 '+passed+'/'+passed+' 通过');fs.appendFileSync('output/playwright/guide-results.log','新手引导验收 '+passed+'/'+passed+' 通过\n');
 }catch(error){await page.screenshot({path:'output/playwright/guide-failed.png'});console.error(await guide(),await daily(),await page.locator('#tutorialTitle').innerText());throw error;}finally{await browser.close();}
