@@ -34,10 +34,28 @@ var VIEW_H = 256;
 var MIN_TILES_W = 24;   // 视野最少 24×16 格，保证手机上也看得清角色周围
 var MIN_TILES_H = 16;
 var SAVE_KEY = (function () {
+  var localKey = 'moss-farm-v2';
   try {
     var userId = localStorage.getItem('moss-cloud-user-id');
-    return userId ? 'moss-farm-v2:user:' + userId : 'moss-farm-v2';
-  } catch (e) { return 'moss-farm-v2'; }
+    if (userId) {
+      var scopedKey = localKey + ':user:' + userId;
+      var scopedSave = localStorage.getItem(scopedKey);
+      var guestSave = localStorage.getItem(localKey);
+      if (scopedSave && scopedSave !== guestSave) {
+        localStorage.setItem(localKey, scopedSave);
+        if (guestSave && !localStorage.getItem(localKey + ':pre-cloud-guest')) {
+          try { localStorage.setItem(localKey + ':pre-cloud-guest', guestSave); } catch (e) {}
+        }
+      }
+    }
+    localStorage.removeItem('moss-cloud-session');
+    localStorage.removeItem('moss-cloud-user-id');
+    localStorage.removeItem('moss-cloud-device-id');
+    Object.keys(localStorage).forEach(function (key) {
+      if (key.indexOf('moss-cloud-profile:') === 0) localStorage.removeItem(key);
+    });
+  } catch (e) {}
+  return localKey;
 })();
 var SAVE_KEY_V1 = 'moss-farm-v1';
 var CORRUPT_KEY = 'moss-farm-v2-corrupt';
@@ -5611,10 +5629,6 @@ function openPause() {
       row2.appendChild(mkBtn('立即保存', '', function () { saveNow(); toast('已保存。'); }));
       row2.appendChild(mkBtn('导出存档', '', function () { openSaveIO('export'); }));
       row2.appendChild(mkBtn('导入存档', '', function () { openSaveIO('import'); }));
-      row2.appendChild(mkBtn('账号与云存档', '', function () {
-        if (window.MossCloud && window.MossCloud.open) window.MossCloud.open();
-        else toast('云存档模块尚未加载。');
-      }));
       b.appendChild(row2);
 
       b.appendChild(el('div', 'hr'));

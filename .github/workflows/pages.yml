@@ -39,7 +39,7 @@ jobs:
       - name: Prepare site
         run: |
           mkdir -p site/assets
-          cp index.html styles.css game.js cloud-save.js site/
+          cp index.html styles.css game.js site/
           node tests/build-single-file.mjs
           # 顺带把单文件版也放上去，朋友可以直接在网页里下载
           cp "苔芽农场-单文件版.html" site/ 2>/dev/null || true
