@@ -2651,6 +2651,19 @@ var CITY_ROOMS = {
     spots: [{ x: 6, y: 6, kind: 'cityService', service: 'stable', label: '马具架', stand: [[6, 7], [6, 5], [2, 6], [10, 6]] }],
     staff: []
   },
+  /* 公园亭舍：音乐亭、茶亭与园丁小屋共用的小空间 */
+  park: {
+    w: 14, h: 11, floor: 'stone',
+    props: [
+      { t: 'roundTable', x: 3, y: 3, w: 4, h: 3 },
+      { t: 'chair', x: 9, y: 3, w: 2, h: 2 },
+      { t: 'counter', x: 9, y: 7, w: 4, h: 2 },
+      { t: 'potPlant', x: 2, y: 7, w: 2, h: 2 },
+      { t: 'planter', x: 11, y: 2, w: 2, h: 2 }
+    ],
+    spots: [{ x: 6, y: 5, kind: 'cityService', service: 'park', label: '亭下服务处', stand: [[6, 6], [6, 4], [2, 5], [10, 5]] }],
+    staff: []
+  },
   /* 学院学部主楼：接待、阶梯讲堂、公告栏与教室，不再借用图书馆的布局 */
   academy: {
     w: 28, h: 18, floor: 'marble',
@@ -2807,6 +2820,10 @@ function zoneOf(x, y) {
   });
   return best.id;
 }
+/* 道路净宽按用途分级：宽度是设计提案，也是不同片区的手感差异来源。 */
+var CITY_ROAD_WIDTHS = {
+  main: 6, freight: 7, oldMain: 4, alley: 3, campus: 4, park: 3
+};
 function districtEra(districtId) {
   var d = CITY_DISTRICTS.filter(function (x) { return x.id === districtId; })[0];
   return d ? d.era : 'mid';
@@ -2835,27 +2852,34 @@ MAPS.city = (function () {
   }
   for (var ri = 0; ri < RIVER.length - 1; ri++) seg(RIVER[ri][0], RIVER[ri][1], RIVER[ri + 1][0], RIVER[ri + 1][1], 8, T_WATER, true);
 
-  /* 道路：主干道宽，街巷窄，旧城故意弯曲 */
-  function road(x0, y0, x1, y1, w) { seg(x0, y0, x1, y1, w, T_PATH, false); }
-  // 主干
-  road(320, H - 6, 320, 150, 7);        // 南北主街：城门直通城堡
-  road(70, 300, 624, 300, 7);          // 东西主街
-  road(250, 152, 400, 152, 6);         // 城堡环路
-  road(200, 152, 250, 152, 5);
+  /* 道路净宽按用途分级：主要步行与车行路 5—7，工业货运路 6—8，老城主街 3—4、
+   支巷 2—3，校园步道 3—5，公园支路 2—3。 */
+var RW = CITY_ROAD_WIDTHS;
+function road(x0, y0, x1, y1, w) { seg(x0, y0, x1, y1, w, T_PATH, false); }
+  // 主干与货运
+  road(320, H - 6, 320, 150, RW.main);      // 南北主街：城门直通城堡
+  road(70, 300, 624, 300, RW.main);         // 东西主街
+  road(250, 152, 400, 152, RW.main);        // 城堡环路
+  road(200, 152, 250, 152, RW.main);
+  road(396, 380, 430, 250, RW.freight);     // 工业货运路：绕开庭院连码头
+  road(208, 252, 270, 380, RW.freight);
+  road(430, 250, 410, 188, RW.freight);
   // 花园区：更宽、笔直的林荫道
-  road(95, 90, 244, 90, 5); road(95, 62, 95, 140, 4); road(168, 62, 168, 140, 4);
-  // 旧城：窄而弯，贴着地形走
-  road(88, 178, 214, 178, 4); road(96, 214, 150, 246, 3); road(150, 246, 152, 278, 3); road(96, 214, 96, 272, 3);
+  road(95, 90, 244, 90, RW.main); road(95, 62, 95, 140, RW.alley); road(168, 62, 168, 140, RW.alley);
+  // 旧城：主街不宽但连续，支巷更窄，贴着地形走
+  road(88, 178, 214, 178, RW.oldMain); road(96, 214, 150, 246, RW.alley);
+  road(150, 246, 152, 278, RW.alley); road(96, 214, 96, 272, RW.alley);
   // 市集：多条街汇入不规则广场
-  road(232, 300, 262, 344, 5); road(408, 300, 380, 344, 5); road(300, 268, 300, 344, 5); road(352, 268, 352, 344, 5);
-  // 工匠区
-  road(96, 360, 246, 360, 4); road(96, 404, 236, 414, 4); road(168, 344, 168, 452, 4);
-  // 河岸
-  road(450, 200, 606, 200, 5); road(492, 246, 606, 258, 4); road(452, 330, 610, 330, 5);
-  // 学院区
-  road(440, 108, 606, 108, 5); road(444, 62, 606, 62, 4); road(440, 152, 600, 158, 4);
+  road(232, 300, 262, 344, RW.main); road(408, 300, 380, 344, RW.main);
+  road(300, 268, 300, 344, RW.main); road(352, 268, 352, 344, RW.main);
+  // 工匠街
+  road(96, 360, 246, 360, RW.oldMain); road(96, 404, 236, 414, RW.oldMain); road(168, 344, 168, 452, RW.alley);
+  // 河岸文化街：横向连续带
+  road(450, 200, 606, 200, RW.main); road(492, 246, 606, 258, RW.alley); road(452, 330, 610, 330, RW.main);
+  // 校园步道：庭院和入口可辨，服务路独立
+  road(440, 108, 606, 108, RW.campus); road(444, 62, 606, 62, RW.campus); road(440, 152, 600, 158, RW.alley);
   // 南门
-  road(248, 432, 402, 432, 5); road(300, 392, 300, 466, 4); road(352, 392, 352, 466, 4);
+  road(248, 432, 402, 432, RW.main); road(300, 392, 300, 466, RW.alley); road(352, 392, 352, 466, RW.alley);
   // 广场：形状刻意不规则，免得看起来像停车场
   fillRect(m, 312, 322, 336, 334, T_PATH, false);       // 步行市集：控制广场尺度
   road(294,338,352,338,3);road(294,312,352,312,3);
@@ -2922,8 +2946,9 @@ MAPS.city = (function () {
   }
 
   INTERACTABLES.city = [];
-  /* 城堡地基保持紧凑；高耸的塔楼由独立立面图层表现，不占通行格。 */
-  building('castle', '白蔷薇城堡', 312, 58, 32, 10, 'castle');
+  /* 城堡地基保持紧凑；高耸的塔楼由独立立面图层表现，不占通行格。
+   城堡回到建成区的中央偏北，前面是仪式广场，两侧是街墙，不再贴着画布顶边。 */
+  building('castle', '白蔷薇城堡', 306, 154, 28, 10, 'castle');
   // 地基仍保留建筑碰撞，但不把整块占地染成褐色地砖；石台已由城堡立面绘制。
   for (var cfx = 312; cfx < 344; cfx++) for (var cfy = 58; cfy < 68; cfy++) m.t[cfx][cfy] = T_GRASS;
   road(328, 68, 328, 152, 5);            // 大门轴线接入前庭和南北主街
@@ -2935,7 +2960,11 @@ MAPS.city = (function () {
   building('bakery', '暖炉面包房', 292, 316, 16, 11, 'shop');
   building('market', '城市商会', 350, 296, 20, 13, 'shop');
   building('tailor', '丝带裁缝铺', 238, 252, 17, 12, 'shop');
-  /* 东侧河岸 */
+  /* 北部公园：主入口、宽草坪、弯曲散步道、池塘与三处亭舍 */
+  building('bandstand', '蔷薇音乐亭', 296, 52, 13, 8, 'park');
+  building('teahouse', '公园茶亭', 352, 74, 13, 8, 'park');
+  building('keeper', '园丁小屋', 268, 106, 13, 8, 'home');
+  /* 东南工业码头 */
   building('cafe', '河岸茶室', 542, 208, 17, 12, 'shop');
   building('smith', '白蔷薇铁匠铺', 600, 266, 19, 13, 'workshop');
   /* 西侧旧城 */
@@ -2983,8 +3012,9 @@ MAPS.city = (function () {
     { x0: 434, y0: 318, x1: 614, y1: 458 },  // 东南工业码头
     { x0: 262, y0: 368, x1: 418, y1: 460 },  // 工人生活街
     { x0: 256, y0: 458, x1: 418, y1: 479 },  // 南门驿站院区
-    { x0: 252, y0: 150, x1: 390, y1: 246 },  // 城堡核心两侧街墙
-    { x0: 262, y0: 150, x1: 420, y1: 182 }   // 仪式广场两翼
+    { x0: 254, y0: 152, x1: 300, y1: 212 },  // 城堡西侧街墙
+    { x0: 340, y0: 152, x1: 392, y1: 212 },  // 城堡东侧街墙
+    { x0: 262, y0: 198, x1: 418, y1: 244 }   // 仪式广场南侧街墙
   ];
   // 施工只落在空地，已有店铺、河道与桥保持原位置。
   function lane(x0,y0,x1,y1,width) {
@@ -3053,15 +3083,36 @@ MAPS.city = (function () {
   [[318, 324], [330, 324]].forEach(function (p) { fixture('fountain', p[0], p[1]); });
   [[294, 312], [294, 338], [352, 314], [352, 340], [312, 310], [338, 344], [276, 326]].forEach(function (p, i) { fixture('stall', p[0], p[1], i); });
   [[300, 322], [300, 332], [348, 322], [348, 332], [320, 312], [320, 342]].forEach(function (p) { fixture('lamp', p[0], p[1]); });
-  /* 城堡前庭：花箱与灯柱围着高台 */
-  [[296, 164], [296, 178], [358, 164], [358, 178], [306, 154], [348, 154], [326, 180]].forEach(function (p) { fixture('planter', p[0], p[1]); });
-  [[320, 160], [336, 160], [320, 182], [336, 182]].forEach(function (p) { fixture('lamp', p[0], p[1]); });
+  /* 城堡前庭：花箱与灯柱围着仪式广场，大门正中的台阶留空 */
+  [[294,160],[294,180],[346,160],[346,180]].forEach(function (p) { fixture('planter', p[0], p[1]); });
+  [[308,176],[332,176],[320,186]].forEach(function (p) { fixture('lamp', p[0], p[1]); });
   /* 南门驿站：货车、告示与长凳 */
   [[300, 428], [300, 444], [352, 428], [352, 444]].forEach(function (p) { fixture('cart', p[0], p[1]); });
   [[326, 424], [326, 448], [308, 436], [344, 436]].forEach(function (p) { fixture('lamp', p[0], p[1]); });
   [[316, 430], [336, 430]].forEach(function (p) { fixture('planter', p[0], p[1]); });
   /* 河岸与码头：货箱与系缆桩 */
   [[440, 430], [448, 430], [456, 430], [444, 442], [452, 442]].forEach(function (p) { fixture('cart', p[0], p[1]); });
+
+  /* 北部公园：池塘、弯曲散步道与林荫边缘，是一段可完整游玩的场景 */
+  fillRect(m, 316, 96, 348, 124, T_WATER, true);            // 池塘
+  fillRect(m, 312, 100, 316, 108, T_PIER, false);            // 伸进水里的一角
+  fillRect(m, 348, 100, 352, 108, T_PIER, false);
+  lane(262, 44, 420, 44, 4);                                 // 主入口大道
+  lane(268, 44, 268, 132, 3);                                // 西侧散步道
+  lane(420, 44, 420, 132, 3);                                // 东侧散步道
+  lane(268, 132, 420, 132, 3);                               // 南侧散步道
+  lane(296, 60, 352, 82, 3);                                 // 音乐亭到茶亭的弯道
+  lane(268, 132, 330, 92, 3);                                // 到池塘的弯道
+  lane(420, 100, 352, 118, 3);                               // 环池塘东岸
+  for (var px2 = 268; px2 < 424; px2 += 9) {                 // 树林集中在边缘
+    if (hash2(6, px2, 36) > .35) decor.push({ t: 'streetTree', x: px2, y: 34 });
+    if (hash2(6, px2, 140) > .35) decor.push({ t: 'streetTree', x: px2, y: 140 });
+  }
+  for (var py2 = 52; py2 < 130; py2 += 11) {
+    if (hash2(7, 262, py2) > .4) decor.push({ t: 'streetTree', x: 262, y: py2 });
+    if (hash2(7, 424, py2) > .4) decor.push({ t: 'streetTree', x: 424, y: py2 });
+  }
+  [[292, 46], [330, 46], [368, 46], [300, 130], [340, 130], [380, 130]].forEach(function (p) { fixture('bench', p[0], p[1]); });
 
   /* 花园、树木与街边装饰 */
   for (var fx = 70; fx < 250; fx += 11) for (var fy = 66; fy < 140; fy += 11) if (hash2(4, fx, fy) > .55) decor.push({ t: 'flower', x: fx, y: fy });
@@ -3092,6 +3143,7 @@ MAPS.city = (function () {
   });
   return {
     w: W, h: H, t: m.t, solid: m.solid, name: '白蔷薇城',
+    pond: { x0: 316, y0: 96, x1: 348, y1: 124 },
     exits: [{ x: 320, y: H - 1, to: 'town', tx: 14, ty: 22 }],
     buildings: CITY_BUILDINGS.concat(facades), decor: decor
   };
@@ -3239,7 +3291,7 @@ NPCS.engineer.schedule[2].y=22;
  ['tailor','莉丝','裁缝',254,268,'scholar'],['teacher','诺尔','学院教师',520,96,'scholar'],
  ['porter','阿诺','城门守卫',320,462,'engineer'],['florist','芙洛','花商',462,152,'ranger'],
  ['cook','米勒','茶室厨师',556,218,'baker'],['musician','莱恩','街头琴师',336,330,'postie'],
- ['steward','塞琳','城堡管家',330,140,'merchant'],['resident','露米','住宅区居民',140,178,'scholar']
+ ['steward','塞琳','城堡管家',330,182,'merchant'],['resident','露米','住宅区居民',140,178,'scholar']
 ].forEach(function(p,i){addResident(p[0],p[1],p[2],'city',p[3],p[4],p[5],['#'+['835438','4A444F','B89262'][i%3],'#'+['6686A0','976D76','6E9169'][i%3],'#E2D0A4'],[
   p[2]+'的一天，通常从这条街开始。','城门在南边，市集在中央，城堡在北边；按 M 可以查看城区图。'
 ]);});
@@ -3343,6 +3395,7 @@ var CITY_INFO = {
   inn: { name: '南门旅馆', who: '老板贝尔守着接待处', desc: '接待处后面是餐厅和厨房，楼梯通向几间风格各异的客房。' },
   post: { name: '驿站邮局', who: '邮递员小翎在分信柜前', desc: '整面墙的分信柜塞满信件，邮袋堆在柜台边，公告板上贴着今日告示。' },
   carriage: { name: '南门马车站', who: '马车夫守着售票处', desc: '装卸台上堆着待发的货，售票处可以直达各街区。' },
+  park: { name: '公园亭舍', who: '园丁在这里照看花坛', desc: '亭子四面敞开，能看见池塘和散步道；长凳上坐着歇脚的人。' },
   castle: { name: '白蔷薇城堡 · 王座厅', who: '管家塞琳在核对清单', desc: '大理石地面通向王座，四壁挂着旧挂毯，长毯一直铺到大门。' },
   home: { name: '住处', who: '这里住着一位城市居民', desc: '一张床、一个衣柜和一张餐桌——城里大多数人的家就是这样。' }
 };
@@ -3448,7 +3501,7 @@ function openCityService(it) {
       { id: 'market', name: '中央市集', x: 320, y: 330, fare: 30, mins: 25 },
       { id: 'academy', name: '东北学院', x: 500, y: 108, fare: 45, mins: 45 },
       { id: 'river', name: '东岸桥头', x: 546, y: 300, fare: 35, mins: 35 },
-      { id: 'castle', name: '城堡前庭', x: 320, y: 168, fare: 40, mins: 40 }
+      { id: 'castle', name: '城堡前庭', x: 320, y: 178, fare: 40, mins: 40 }
     ];
     openWindow({ id: 'city_carriage', kind: 'custom', title: '南门马车站', build: function (b) {
       b.appendChild(el('p', null, '马车夫把车厢擦得干净，装卸台上堆着待发的货。售票处可以直达各街区。'));
@@ -7948,7 +8001,7 @@ function paintGroundRegion(g, sceneId, rx, ry, rw, rh) {
     }
   }
   // 池塘：连续水面 + 只在外轮廓描一圈岸线，避免看起来像方砖
-  if ((sceneId === 'farm' || sceneId === 'forest') && MAPS[sceneId].pond) {
+  if ((sceneId === 'farm' || sceneId === 'forest' || sceneId === 'city') && MAPS[sceneId].pond) {
     var pr = MAPS[sceneId].pond;
     var px0 = pr.x0 * TILE, py0 = pr.y0 * TILE, pw = (pr.x1 - pr.x0 + 1) * TILE, ph = (pr.y1 - pr.y0 + 1) * TILE;
     g.fillStyle = PAL.water; g.fillRect(px0, py0, pw, ph);
@@ -9630,7 +9683,22 @@ window.__MOSS__ = {
   },
   get canvasRect() { var r = canvas.getBoundingClientRect(); return { w: r.width, h: r.height, left: r.left, top: r.top }; },
   get npcRuntime() { return npcRuntime; },
-  livingInfo: function(){return {city:{w:MAPS.city.w,h:MAPS.city.h,buildings:CITY_BUILDINGS,allBuildings:MAPS.city.buildings,districts:CITY_DISTRICTS,archetypes:CITY_ARCHETYPES},animals:sceneAnimals().map(function(a){return Object.assign({},a);}),forestNodes:EXPLORE_NODES.forest};},
+  livingInfo: function(){return {city:{w:MAPS.city.w,h:MAPS.city.h,buildings:CITY_BUILDINGS,allBuildings:MAPS.city.buildings,districts:CITY_DISTRICTS,archetypes:CITY_ARCHETYPES,roadWidths:CITY_ROAD_WIDTHS},animals:sceneAnimals().map(function(a){return Object.assign({},a);}),forestNodes:EXPLORE_NODES.forest};},
+  /* 实测一条路的净宽：horizontalRoad=true 表示路沿 x 延伸，宽度沿 y 量；
+     否则路沿 y 延伸，宽度沿 x 量。用来验收道路分级真的落在地图上。 */
+  roadWidthAt: function(x, y, horizontalRoad) {
+    var map = MAPS.city, n = 0;
+    var dx = horizontalRoad ? 0 : 1, dy = horizontalRoad ? 1 : 0;
+    for (var s = -1; s <= 1; s += 2) {
+      for (var i = 0; i < 400; i++) {
+        var cx = x + dx * i * s, cy = y + dy * i * s;
+        if (cx < 0 || cy < 0 || cx >= map.w || cy >= map.h) break;
+        if (isSolid('city', cx, cy) || map.t[cx][cy] !== T_PATH) break;
+        n++;
+      }
+    }
+    return n;
+  },
   QUEST_SITES: QUEST_SITES,
   TUTORIAL_DONE: TUTORIAL_DONE,
   npcScene: function (id) { return NPCS[id].scene; },

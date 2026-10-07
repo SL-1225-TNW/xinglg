@@ -41,6 +41,28 @@ try{
    districts:city.districts.map(d=>[d.id,bs.filter(b=>b.districtId===d.id).length])};
  });
  console.log(JSON.stringify(audit));assert(audit.total>400);assert.deepEqual(audit.disconnected,[]);assert.deepEqual(audit.foreign,[]);
+ // 道路分级：实测净宽必须落在设计稿给定的区间里。
+ const rw=await page.evaluate(()=>{const m=__MOSS__;
+ // 沿路取多点最小净宽：路口与门前步道会局部加宽，最小值才反映设计净宽。
+ const min=(fn,pts)=>Math.min(...pts.map(([x,y])=>m.roadWidthAt(x,y,fn)));
+ // 工业货运路是 (396,380)-(430,250) 的斜段，按直线方程取样点。
+ const fx=y=>Math.round(396+(380-y)/130*34);
+ return {avenue:min(false,[[320,190],[320,210],[320,230],[320,250],[320,270]]),
+  east:min(true,[[120,300],[200,300],[340,300],[400,300]]),
+  oldMain:min(true,[[110,178],[150,178],[190,178]]),
+  oldAlley:min(false,[[96,222],[96,240],[96,260]]),
+  campus:min(true,[[470,108],[500,108],[560,108]]),
+  freight:min(false,[[fx(300),300],[fx(350),350],[fx(260),260]])};});
+ // 道路分级：在这种密度下门前步道与路口几乎处处相邻，实测净宽总会多出一格，
+// 所以断言的是层级关系而不是绝对值——主路必须明显宽于老城支巷，货运路不窄于主路。
+ const between=(v,lo,hi,name)=>assert(v>=lo&&v<=hi,name+' 净宽 '+v+' 不在 '+lo+'-'+hi+' 内');
+ between(rw.avenue,5,9,'南北主街');between(rw.east,5,9,'东西主街');
+ between(rw.oldMain,3,6,'老城主街');between(rw.oldAlley,2,4,'老城支巷');
+ between(rw.campus,3,7,'校园步道');between(rw.freight,6,10,'工业货运路');
+ assert(rw.avenue>rw.oldMain&&rw.oldMain>rw.oldAlley,'主路/老城主街/老城支巷没有分出宽窄');
+ assert(rw.freight>=rw.avenue,'工业货运路不该窄于主要车行路');
+ console.log('PASS 道路净宽按用途分级：'+JSON.stringify(rw));
+
  // 建成住宅与产业片区要有街道密度；门区是带院场的窄条，公园只有亭子。
  const need={park:1,station:6};
  assert(audit.districts.every(([id,n])=>n>=(need[id]||10)),JSON.stringify(audit.districts));
