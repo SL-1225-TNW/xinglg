@@ -56,6 +56,9 @@ try{
  check('沿南口真实走进入城',await walkTo(page,14,23),true);await changeScene('city');
  check('城市面积是农场四百倍',await page.evaluate(()=>__MOSS__.livingInfo().city.w*__MOSS__.livingInfo().city.h/(32*24)),400);
  check('八个街区与大批可进入建筑',await page.evaluate(()=>[__MOSS__.livingInfo().city.districts.length,__MOSS__.livingInfo().city.buildings.length>=30]),[8,true]);
+ const architecture=await page.evaluate(()=>{const bs=__MOSS__.livingInfo().city.buildings,c=bs.find(b=>b.id==='castle'),homes=bs.filter(b=>b.id.indexOf('home')===0||b.noEnter&&b.kind==='home');return{castleFootprint:c.w*c.h,castleRows:c.h,castleVisualHeight:c.visualHeight,homeMaxRows:Math.max(...homes.map(b=>b.h)),homeMaxVisualHeight:Math.max(...homes.map(b=>b.visualHeight))};});
+ check('城堡紧凑地基支撑显著高于地基的立面',architecture.castleFootprint<=320&&architecture.castleVisualHeight/16>architecture.castleRows*1.8,true);
+ check('居民楼保持低矮尺度',architecture.homeMaxRows<=8&&architecture.homeMaxVisualHeight<=74,true);
  const valid=await page.evaluate(()=>{const m=__MOSS__;return m.livingInfo().city.buildings.every(b=>!m.isSolid('city',b.door.x,b.door.y+1)&&!!m.findPath('city',320,470,b.door.x,b.door.y+1));});
  check('所有建筑入口均可从南门寻路到达',valid,true);
  const schedules=await page.evaluate(()=>Object.values(__MOSS__.NPCS).filter(n=>n.style).flatMap(n=>n.schedule.filter(s=>__MOSS__.isSolid(n.scene,s.x,s.y)).map(s=>n.id+' '+s.x+','+s.y)));
@@ -85,7 +88,7 @@ try{
  await page.keyboard.press('Escape');const paused=await page.evaluate(()=>__MOSS__.livingInfo().animals);await page.waitForTimeout(300);check('暂停时动物停止',await page.evaluate(()=>__MOSS__.livingInfo().animals),paused);await close();
  await pose('farm',3,7);await page.keyboard.press('e');check('猫可以互动',await page.evaluate(()=>__MOSS__.toasts.at(-1).m.includes('小猫')),true);
  await page.screenshot({path:'output/playwright/living-farm.png'});
- await pose('city',64,18);await page.screenshot({path:'output/playwright/living-castle.png'});
+ const castleDoor=await page.evaluate(()=>__MOSS__.livingInfo().city.buildings.find(b=>b.id==='castle').door);await pose('city',castleDoor.x,castleDoor.y+1);await page.screenshot({path:'output/playwright/living-castle.png'});
  const frames=await page.evaluate(()=>new Promise(resolve=>{let samples=[],last=performance.now();function f(t){samples.push(t-last);last=t;if(samples.length<90)requestAnimationFrame(f);else resolve(samples.reduce((a,b)=>a+b,0)/samples.length);}requestAnimationFrame(f);}));
  check('城市持续绘制不过度阻塞（平均帧间隔低于六十毫秒）',frames<60,true);console.log('平均帧间隔',frames.toFixed(2),'ms');
  check('桌面全过程无浏览器报错',errors,[]);
