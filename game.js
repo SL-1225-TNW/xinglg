@@ -439,7 +439,7 @@ function newGameState() {
     npcDailyInteractions: {},
     dsMet: false,
     rodLevel: 1,
-    exploration: {forest:false,mine:false,city:false,depth:1,hut:false,tools:false,nodes:{},treasures:{},jobs:{},dailyJobs:{day:-1,ids:[]},storyDone:{},bondDone:{},journalChoices:{},explorePoints:0,requestDay:-1},
+    exploration: {forest:false,mine:false,city:false,depth:1,hut:false,tools:false,nodes:{},treasures:{},jobs:{},dailyJobs:{day:-1,ids:[]},storyDone:{},bondDone:{},journalChoices:{},cityStories:{},cityReputation:0,smithCoupon:false,explorePoints:0,requestDay:-1},
     questProgress: { 1: 'locked', 2: 'locked', 3: 'locked', 4: 'locked' },
     unlockedRecipes: ['chest'],
     bridgeRepaired: false,
@@ -1045,8 +1045,9 @@ for(var depth=1;depth<=3;depth++)[[4,3],[9,8],[15,10],[23,8],[5,14],[11,18],[23,
 function normalizeExploration(raw){
  function num(v,d,min,max){return typeof v==='number'&&isFinite(v)?clamp(v,min,max):d;}
  raw=raw&&typeof raw==='object'?raw:{};
- var e={forest:!!raw.forest,mine:!!raw.mine,city:!!raw.city,depth:clamp(Math.floor(num(raw.depth,1,1,3)),1,3),hut:!!raw.hut,tools:!!raw.tools,nodes:{},treasures:{},jobs:{},dailyJobs:{day:-1,ids:[]},storyDone:{},bondDone:{},journalChoices:{},explorePoints:clamp(Math.floor(num(raw.explorePoints,0,0,100000)),0,100000),requestDay:Math.floor(num(raw.requestDay,-1,-1,1e6))};
+ var e={forest:!!raw.forest,mine:!!raw.mine,city:!!raw.city,depth:clamp(Math.floor(num(raw.depth,1,1,3)),1,3),hut:!!raw.hut,tools:!!raw.tools,nodes:{},treasures:{},jobs:{},dailyJobs:{day:-1,ids:[]},storyDone:{},bondDone:{},journalChoices:{},cityStories:{},cityReputation:Math.floor(num(raw.cityReputation,0,0,9999)),smithCoupon:!!raw.smithCoupon,explorePoints:clamp(Math.floor(num(raw.explorePoints,0,0,100000)),0,100000),requestDay:Math.floor(num(raw.requestDay,-1,-1,1e6))};
  Object.keys(LIVING_JOBS||{}).forEach(function(id){if(raw.jobs&&Number.isInteger(raw.jobs[id]))e.jobs[id]=Math.max(-1,raw.jobs[id]);});
+ (CITY_STORY_QUESTS||[]).forEach(function(q){var st=raw.cityStories&&raw.cityStories[q.id];if(st==='accepted'||st==='done')e.cityStories[q.id]=st;});
  if(raw.dailyJobs&&typeof raw.dailyJobs==='object'){e.dailyJobs.day=Math.floor(num(raw.dailyJobs.day,-1,-1,1e6));if(Array.isArray(raw.dailyJobs.ids))e.dailyJobs.ids=raw.dailyJobs.ids.filter(function(id){return !!LIVING_JOBS[id];}).slice(0,3);}
  ['storyDone','bondDone'].forEach(function(k){if(raw[k]&&typeof raw[k]==='object')Object.keys(raw[k]).forEach(function(id){if(raw[k][id])e[k][id]=true;});});
  if(raw.journalChoices&&typeof raw.journalChoices==='object')Object.keys(raw.journalChoices).forEach(function(id){var v=raw.journalChoices[id];if(v&&Number.isInteger(v.day)&&Number.isInteger(v.option))e.journalChoices[id]={day:Math.max(-1,v.day),option:v.option};});
@@ -1054,7 +1055,7 @@ function normalizeExploration(raw){
  ['forest_cache','mine_cache'].forEach(function(k){e.treasures[k]=!!(raw.treasures&&raw.treasures[k]);});
  Object.keys(EXPLORE_NODES).forEach(function(sc){Object.keys(EXPLORE_NODES[sc]).forEach(function(k){var n=EXPLORE_NODES[sc][k],key=sc+':'+k,v=raw.nodes&&raw.nodes[key];if(v&&typeof v==='object')e.nodes[key]={hp:clamp(Math.floor(num(v.hp,n.hp,0,n.hp)),0,n.hp),day:Math.floor(num(v.day,0,0,1e6))};});});return e;
 }
-function exploreState(){if(!state.exploration)state.exploration=normalizeExploration();return state.exploration;}
+function exploreState(){if(!state.exploration)state.exploration=normalizeExploration();var e=state.exploration;if(!e.cityStories)e.cityStories={};if(!Number.isFinite(e.cityReputation))e.cityReputation=0;if(typeof e.smithCoupon!=='boolean')e.smithCoupon=false;return e;}
 function exploreNode(sc,x,y){var def=EXPLORE_NODES[sc]&&EXPLORE_NODES[sc][key2(x,y)];if(!def)return null;
  var e=exploreState(),key=sc+':'+key2(x,y),saved=e.nodes[key];
  if(!saved){saved=e.nodes[key]={hp:def.hp,day:state.totalDay};}
@@ -1085,7 +1086,7 @@ function openExploreSite(kind){
  if(kind==='mine'&&e.mine){doSwitchScene('mine1',13,21);return;}
  if(kind==='hut'&&e.hut){openWindow({id:'forest_request',kind:'custom',title:'伐木屋 · 每日委托',build:function(b){b.appendChild(el('p',null,'森林补给：蘑菇 ×5、木材 ×10，奖励 100 金。每天可交付一次。'));b.appendChild(el('p','muted',e.requestDay===state.totalDay?'今天已完成，明天再来。':'今天尚未交付。'));},actions:[{label:'交付补给',kind:'primary',onClick:function(){if(e.requestDay===state.totalDay){toast('今天已经交付过了。');return;}if(payExplore({mushroom:5,wood:10})){e.requestDay=state.totalDay;state.coins+=100;markDirty();refreshHud();saveNow();toast('森林委托完成，获得 100 金。');refreshWindow();}},close:false},{label:'离开',close:true}]});return;}
  if(kind==='tools'&&e.tools){toast('已拥有钢制斧头和镐子。');return;}
- var cfg=configs[kind];openWindow({id:'explore_repair',kind:'custom',title:cfg.title,build:function(b){b.appendChild(el('p',null,cfg.desc));b.appendChild(el('p','muted','需要：'+Object.keys(cfg.cost).map(function(k){return(k==='coins'?'金币':itemName(k))+' ×'+cfg.cost[k];}).join('、')));},actions:[{label:'确认修复 / 升级',kind:'primary',close:false,onClick:function(){if(kind==='forest'&&!state.bridgeRepaired){toast('先完成小镇修桥委托，再开始远行。');return;}if(payExplore(cfg.cost)){e[kind]=true;e.explorePoints+=(kind==='forest'||kind==='mine'?20:kind==='hut'?10:5);markDirty();refreshHud();refreshHotbar();saveNow();closeWindow();toast(cfg.title+'完成！');}}},{label:'稍后再来',close:true}]});
+ var cfg=configs[kind],cost=kind==='tools'&&e.smithCoupon?{iron_ore:8,coins:150}:cfg.cost;openWindow({id:'explore_repair',kind:'custom',title:cfg.title,build:function(b){b.appendChild(el('p',null,cfg.desc));b.appendChild(el('p','muted','需要：'+Object.keys(cost).map(function(k){return(k==='coins'?'金币':itemName(k))+' ×'+cost[k];}).join('、')));if(kind==='tools'&&e.smithCoupon)b.appendChild(el('p','req-chip ok','霍尔的修炉凭证已抵扣 2 块铁矿石与 50 金。'));},actions:[{label:'确认修复 / 升级',kind:'primary',close:false,onClick:function(){if(kind==='forest'&&!state.bridgeRepaired){toast('先完成小镇修桥委托，再开始远行。');return;}if(payExplore(cost)){e[kind]=true;if(kind==='tools')e.smithCoupon=false;e.explorePoints+=(kind==='forest'||kind==='mine'?20:kind==='hut'?10:5);markDirty();refreshHud();refreshHotbar();saveNow();closeWindow();toast(cfg.title+'完成！');}}},{label:'稍后再来',close:true}]});
 }
 function exploreStairs(next){
  var e=exploreState();if(next<=e.depth){doSwitchScene('mine'+next,13,21);return;}
@@ -1798,6 +1799,41 @@ var BOND_QUESTS=[
   {id:'ds_fishstudy',title:'DS 的鱼类研究',desc:'DS 想记录一条银纹鱼的鳞片。',npc:'ds',minFriendship:25,need:{fish_silver:1},reward:{coins:180,explorePoints:10},rewardText:'180 金 · 探索度 +10'},
   {id:'ranger_map',title:'松岚的森林地图',desc:'和松岚一起补齐森林深处的地图。',npc:'ranger',minFriendship:50,need:{hardwood:5,mushroom:5},reward:{coins:250,explorePoints:15},rewardText:'250 金 · 探索度 +15'}
 ];
+/* 白蔷薇城的长期委托：和每日委托、探索委托并行，不按天过期。 */
+var CITY_STORY_QUESTS = [
+  { id:'archive', building:'library', buildingName:'蔷薇图书馆', npc:'archivist', title:'补齐山谷旧志',
+    desc:'艾琳想修补记载山谷旧路的地方志。把木材和林间蘑菇带到图书馆档案桌。',
+    cost:{wood:6,mushroom:2}, rewardItems:{berry:2}, coins:75, friendship:10, reputation:5,
+    requires:null, rewardText:'75 金、野莓 ×2、艾琳好感 +10、城市声望 +5' },
+  { id:'seedbank', building:'greenhouse', buildingName:'蔷薇温室', npc:'florist', title:'重新整理种子库',
+    desc:'地方志修好后，芙洛找到了旧温室的种植记录。她需要新鲜萝卜作物来校准育苗盘。',
+    cost:{radish:3}, rewardItems:{seed_radish:3,seed_potato:2}, coins:35, friendship:10, reputation:5,
+    requires:'archive', rewardText:'萝卜种子 ×3、土豆种子 ×2、35 金、芙洛好感 +10、城市声望 +5' },
+  { id:'forge', building:'smith', buildingName:'白蔷薇铁匠铺', npc:'blacksmith', title:'重燃旧炉火',
+    desc:'种子库恢复后，温室送来了一张旧城修缮清单。霍尔需要石料与铜矿重新校准锻炉。',
+    cost:{stone:6,copper_ore:3}, rewardItems:{iron_ore:2}, coins:90, friendship:10, reputation:8,
+    requires:'seedbank', smithCoupon:true, rewardText:'铁矿石 ×2、90 金、霍尔好感 +10、下次钢制工具升级减价、城市声望 +8' },
+  { id:'supply', building:'market', buildingName:'城市商会', npc:'merchant', title:'完成春日采购单',
+    desc:'锻炉修复后，路易要为城里的餐桌补货。商会按订单收取新鲜农产品。',
+    cost:{radish:4,potato:2}, rewardItems:{bread:2}, coins:130, friendship:10, reputation:10,
+    requires:'forge', rewardText:'乡村面包 ×2、130 金、路易好感 +10、城市声望 +10' },
+  { id:'rose', building:'castle', buildingName:'白蔷薇城堡', npc:'steward', title:'为蔷薇园备下春宴',
+    desc:'春日采购完成后，塞琳邀请农场主为城堡春宴准备莓果与木料。完成后，城堡会把你记作正式的城中协作者。',
+    cost:{strawberry:2,wood:5}, rewardItems:{seed_strawberry:2}, coins:180, friendship:15, reputation:15,
+    requires:'supply', rewardText:'草莓种子 ×2、180 金、塞琳好感 +15、城市声望 +15' }
+];
+var CITY_STAFF_ROUTINES = {
+  baker:[[360,540,12,9],[540,660,19,7],[660,1020,12,9],[1020,1320,5,15]],
+  postie:[[360,540,15,7],[540,660,11,5],[660,1020,15,7],[1020,1320,11,15]],
+  florist:[[360,540,12,7],[540,660,8,16],[660,1020,12,11],[1020,1320,21,16]],
+  merchant:[[360,540,15,1],[540,660,10,8],[660,1020,15,1],[1020,1320,15,15]],
+  cook:[[360,540,9,6],[540,660,8,5],[660,1020,9,6],[1020,1320,23,14]],
+  archivist:[[360,540,7,12],[540,660,15,11],[660,1020,7,12],[1020,1320,15,17]],
+  blacksmith:[[360,540,13,6],[540,660,18,5],[660,1020,13,6],[1020,1320,18,12]],
+  tailor:[[360,540,13,5],[540,660,14,10],[660,1020,13,5],[1020,1320,10,15]],
+  innkeeper:[[360,540,15,4],[540,660,17,8],[660,1020,15,4],[1020,1320,15,17]],
+  steward:[[360,540,17,7],[540,660,10,11],[660,1020,17,7],[1020,1320,25,19]]
+};
 function specialQuestDone(q,kind){var e=exploreState();return !!e[kind==='bond'?'bondDone':'storyDone'][q.id];}
 function specialQuestUnlocked(q,kind){
   if(kind==='bond')return (state.npcFriendship[q.npc]||0)>=q.minFriendship;
@@ -1863,7 +1899,8 @@ function postResident(id, scene, x, y) {
   var n = NPCS[id];
   if (!n) return;
   n.scene = scene;
-  n.schedule = [{ from: 0, to: 1440, x: x, y: y }, { from: 0, to: 1440, x: x, y: y }, { from: 0, to: 1440, x: x, y: y }];
+  var routine=CITY_STAFF_ROUTINES[id]||[[360,540,x,y],[540,660,x,y],[660,1020,x,y],[1020,1320,x,y]];
+  n.schedule = routine.map(function(s){return {from:s[0],to:s[1],x:s[2],y:s[3]};});
   if (npcRuntime && npcRuntime[id]) { npcRuntime[id].x = x; npcRuntime[id].y = y; npcRuntime[id].path = []; }
 }
 addResident('blacksmith','霍尔','白蔷薇铁匠','city',96,63,'engineer',['#4A3E38','#6B5C57','#B4BBC4'],
@@ -1904,6 +1941,44 @@ function openResidentJob(id){
       state.coins+=job.coins;e.jobs[id]=state.totalDay;markDirty();refreshHud();saveNow();toast('帮助了'+NPCS[id].name+'，获得 '+job.coins+' 金。');refreshWindow();}},
     {label:'离开',close:true}]});
 }
+function cityStoryQuest(id){for(var i=0;i<CITY_STORY_QUESTS.length;i++)if(CITY_STORY_QUESTS[i].id===id)return CITY_STORY_QUESTS[i];return null;}
+function cityStoryStatus(q){var e=exploreState(),saved=e.cityStories[q.id];if(saved==='done'||saved==='accepted')return saved;return !q.requires||e.cityStories[q.requires]==='done'?'available':'locked';}
+function cityStoryNeedsMet(q){return Object.keys(q.cost).every(function(k){return invCount(k)>=(q.cost[k]||0);});}
+function cityStoryReqLine(q){return Object.keys(q.cost).map(function(k){return itemName(k)+' '+invCount(k)+' / '+q.cost[k];}).join(' · ');}
+function openCityStoryQuest(id){
+  var q=cityStoryQuest(id);if(!q)return;
+  function render(b){var st=cityStoryStatus(q);b.appendChild(el('p',null,q.desc));b.appendChild(el('p','muted','委托人：'+(NPCS[q.npc]?NPCS[q.npc].name:'城中居民')+' · 地点：'+q.buildingName));
+    if(st==='locked'){var before=cityStoryQuest(q.requires);b.appendChild(el('p','muted','前置委托：先完成「'+(before?before.title:'上一项城中委托')+'」。'));}
+    else if(st==='done')b.appendChild(el('p','req-chip ok','已完成 · 城市声望 '+exploreState().cityReputation));
+    else{b.appendChild(el('p','quest-req',cityStoryReqLine(q)));b.appendChild(el('p','muted','奖励：'+q.rewardText));b.appendChild(el('p','muted',st==='available'?'接受后委托会保存在委托日志中，不会过期。':'材料齐全后可在这里交付；委托不会按天过期。'));}}
+  var actions=[];
+  if(cityStoryStatus(q)==='available')actions.push({label:'接受委托',kind:'primary',close:false,onClick:function(){exploreState().cityStories[q.id]='accepted';markDirty();saveNow();toast('已接受「'+q.title+'」，可在 J 委托日志的“探索”页查看。');closeWindow();openCityStoryQuest(id);}});
+  if(cityStoryStatus(q)==='accepted')actions.push({label:'交付并完成',kind:'primary',close:false,onClick:function(){if(cityStoryStatus(q)!=='accepted'){closeWindow();openCityStoryQuest(id);return;}
+    var e=exploreState(),next=Object.assign({},state.inventory);Object.keys(q.cost).forEach(function(k){next[k]=(next[k]||0)-q.cost[k];});Object.keys(q.rewardItems||{}).forEach(function(k){next[k]=(next[k]||0)+q.rewardItems[k];});
+    if(!cityStoryNeedsMet(q)){toast('材料还不够：'+cityStoryReqLine(q));return;}if(countSlots(next)>CFG.bagSlots){toast('背包放不下奖励，先整理一下再交付。');return;}
+    Object.keys(q.cost).forEach(function(k){invRemove(k,q.cost[k]);});Object.keys(q.rewardItems||{}).forEach(function(k){invAdd(k,q.rewardItems[k]);});state.coins+=q.coins||0;
+    if(q.npc){state.npcFriendship=state.npcFriendship||{};state.npcFriendship[q.npc]=clamp((state.npcFriendship[q.npc]||0)+(q.friendship||0),0,100);}
+    e.cityStories[q.id]='done';e.cityReputation+=q.reputation||0;if(q.smithCoupon)e.smithCoupon=true;
+    markDirty();refreshHud();saveNow();closeWindow();toast('完成「'+q.title+'」！城市声望 +'+(q.reputation||0)+'。');openCityStoryQuest(id);}});
+  actions.push({label:'关闭',close:true});openWindow({id:'city_story_'+q.id,kind:'custom',title:q.buildingName+' · '+q.title,build:render,actions:actions});
+}
+function appendCityStoryCard(b,id){
+  var q=cityStoryQuest(id);if(!q||!exploreState().city)return;var st=cityStoryStatus(q),box=el('div','panel-box city-story-card');
+  var head=el('div','row between'),label=st==='done'?'已完成':st==='accepted'?'进行中':st==='available'?'新委托':'尚未开放';
+  head.appendChild(el('strong',null,q.title));head.appendChild(el('span','req-chip '+(st==='done'?'ok':st==='locked'?'no':''),label));box.appendChild(head);
+  if(st==='locked'){var before=cityStoryQuest(q.requires);box.appendChild(el('div','item-desc','完成「'+(before?before.title:'前置委托')+'」后，'+q.buildingName+'会有新的工作。'));}
+  else if(st==='done')box.appendChild(el('div','item-desc','委托已完成 · 当前城市声望 '+exploreState().cityReputation));
+  else box.appendChild(el('div','item-desc',st==='accepted'?cityStoryReqLine(q):q.desc));
+  var btn=mkBtn(st==='locked'?'查看前置要求':st==='done'?'查看完成记录':st==='accepted'?'查看 / 交付委托':'查看并接受委托',st==='available'||st==='accepted'?'primary':'sm',function(){openCityStoryQuest(id);});if(st==='locked')btn.disabled=true;box.appendChild(btn);b.appendChild(box);
+}
+function appendCityStoryLog(b){
+  if(!exploreState().city)return;b.appendChild(el('h3','section-title','白蔷薇城委托 · 声望 '+exploreState().cityReputation));
+  CITY_STORY_QUESTS.forEach(function(q){var st=cityStoryStatus(q),box=el('div','panel-box quest'+(st==='done'?' done':st==='locked'?' locked':'')),row=el('div','row between');
+    row.appendChild(el('div','quest-name',q.title));row.appendChild(el('span','req-chip '+(st==='done'?'ok':st==='locked'?'no':''),st==='done'?'已完成':st==='accepted'?'进行中':st==='available'?'可接受':'未开放'));box.appendChild(row);
+    box.appendChild(el('div','item-desc',q.desc));if(st==='accepted')box.appendChild(el('div','quest-req',cityStoryReqLine(q)));box.appendChild(el('div','item-desc','地点：'+q.buildingName+' · 奖励：'+q.rewardText));
+    var btn=mkBtn(st==='locked'?'查看前置要求':st==='done'?'查看记录':st==='accepted'?'继续委托':'查看委托',st==='accepted'||st==='available'?'primary':'sm',function(){openCityStoryQuest(q.id);});if(st==='locked')btn.disabled=true;box.appendChild(btn);b.appendChild(box);
+  });
+}
 /* 城市建筑各自提供的服务。有真实扣料/发奖的才做成按钮，
    纯介绍的只讲清楚这间屋子是干什么的、谁在里面工作。 */
 var CITY_INFO = {
@@ -1923,7 +1998,7 @@ var CITY_INFO = {
 function openCityService(it) {
   var s = it.service, info = CITY_INFO[s] || CITY_INFO.home;
   if (s === 'bakery') { openWindow({ id: 'bread_shop', kind: 'custom', title: info.name, build: function (b) { b.appendChild(el('p', null, '乡村面包 · 30 金一个，食用恢复 25 点体力。')); b.appendChild(el('p', 'muted', info.desc)); }, actions: [{ label: '买一个面包 · 30 金', close: false, onClick: function () { if (!bagAccepts('bread', 1)) { toast('背包满了。'); return; } if (payExplore({ coins: 30 })) { invAdd('bread', 1); markDirty(); refreshHud(); toast('买到了一个热面包。'); } } }, { label: '离开', close: true }] }); return; }
-  if (s === 'smith') { openExploreSite('tools'); return; }
+  if (s === 'smith') { openWindow({id:'city_smith',kind:'custom',title:info.name,build:function(b){b.appendChild(el('p',null,info.desc));b.appendChild(el('p','muted',info.who+'。'));appendCityStoryCard(b,'forge');},actions:[{label:exploreState().tools?'查看工具状态':'查看钢制工具升级',kind:'primary',close:false,onClick:function(){closeWindow();openExploreSite('tools');}},{label:'离开',close:true}]});return; }
   /* 茶室：付钱坐下喝茶，回体力并花掉一点时间 */
   if (s === 'cafe') {
     openWindow({ id: 'city_cafe', kind: 'custom', title: info.name, build: function (b) {
@@ -1959,6 +2034,7 @@ function openCityService(it) {
       });
       if (any) b.appendChild(row);
       b.appendChild(el('p', 'muted', any ? '商会按高于镇上收购价的价格结算。' : '背包里没有可以卖给商会的农产品。'));
+      appendCityStoryCard(b,'supply');
     }, actions: [{ label: '离开', close: true }] });
     return;
   }
@@ -1979,6 +2055,7 @@ function openCityService(it) {
       });
       if (any) b.appendChild(row);
       b.appendChild(el('p', 'muted', any ? '温室代为育苗，收成可以换成分发袋里的种子。' : '背包里没有可以育苗的收成。'));
+      appendCityStoryCard(b,'seedbank');
     }, actions: [{ label: '离开', close: true }] });
     return;
   }
@@ -2051,6 +2128,8 @@ function openCityService(it) {
     b.appendChild(el('p', null, info.desc));
     b.appendChild(el('p', 'muted', info.who + '。'));
     if (extra[s]) b.appendChild(el('p', null, extra[s]));
+    if(s==='library')appendCityStoryCard(b,'archive');
+    if(s==='castle')appendCityStoryCard(b,'rose');
   }, actions: [{ label: '继续参观', close: true }] });
 }
 var ANIMAL_HOMES={
@@ -5192,7 +5271,8 @@ function openQuestLog(site) {
       }
       if(QUEST_TAB==='explore'){
         b.appendChild(el('p','muted','当前探索度：'+(exploreState().explorePoints||0)+' · 探索等级 '+explorationTier()+' / 3。探索度越高，森林、矿山和白蔷薇城会出现新的委托。'));
-        WORLD_QUESTS.forEach(function(q){renderSpecialQuestCard(b,q,'explore');});return;
+        WORLD_QUESTS.forEach(function(q){renderSpecialQuestCard(b,q,'explore');});
+        appendCityStoryLog(b);return;
       }
       if(QUEST_TAB==='bond'){
         b.appendChild(el('p','muted','和居民聊天、送礼提升好感，个人委托会逐步解锁。'));

@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 110829)
-Total output lines: 9096
-
 <!doctype html>
 <html lang="zh-CN">
 <head>
@@ -990,6 +987,28 @@ html.compact-play[data-device="tablet"] .tact-sm{width:44px;height:44px}
   .forest-journal-page h2{font-size:22px}.journal-stat-grid{grid-template-columns:1fr}
 }
 
+
+/* ---------------- 账号与手动云存档 ---------------- */
+.cloud-note{margin:7px 0;line-height:1.55}
+.cloud-message{
+  margin:4px 0 10px;padding:8px 10px;border-left:3px solid var(--hint);
+  background:rgba(239,209,139,.12);color:var(--paper);font-size:12px;line-height:1.5;
+}
+.cloud-account-name{font-weight:700;color:var(--hint);margin:2px 0}
+.cloud-form{
+  display:flex;flex-direction:column;gap:8px;margin-top:13px;padding-top:11px;
+  border-top:1px solid rgba(239,209,139,.2);
+}
+.cloud-section-title{font-weight:700;color:var(--hint);font-size:13px}
+.cloud-field{display:flex;flex-direction:column;gap:4px;color:var(--text-dim);font-size:12px}
+.cloud-field input{
+  width:100%;min-height:40px;padding:8px 10px;border:1px solid var(--line-hi);
+  border-radius:7px;background:#15271f;color:var(--text);font:inherit;font-size:14px;
+}
+.cloud-field input:focus{outline:2px solid var(--focus);outline-offset:1px}
+.win-body.cloud-account{gap:8px}
+.win-body .btn:disabled{opacity:.55;cursor:wait}
+
 </style>
 </head>
 <body>
@@ -1125,7 +1144,12 @@ var VIEW_W = 384;
 var VIEW_H = 256;
 var MIN_TILES_W = 24;   // 视野最少 24×16 格，保证手机上也看得清角色周围
 var MIN_TILES_H = 16;
-var SAVE_KEY = 'moss-farm-v2';
+var SAVE_KEY = (function () {
+  try {
+    var userId = localStorage.getItem('moss-cloud-user-id');
+    return userId ? 'moss-farm-v2:user:' + userId : 'moss-farm-v2';
+  } catch (e) { return 'moss-farm-v2'; }
+})();
 var SAVE_KEY_V1 = 'moss-farm-v1';
 var CORRUPT_KEY = 'moss-farm-v2-corrupt';
 var SCHEMA_VERSION = 2;
@@ -1526,7 +1550,7 @@ function newGameState() {
     npcDailyInteractions: {},
     dsMet: false,
     rodLevel: 1,
-    exploration: {forest:false,mine:false,city:false,depth:1,hut:false,tools:false,nodes:{},treasures:{},jobs:{},dailyJobs:{day:-1,ids:[]},storyDone:{},bondDone:{},journalChoices:{},explorePoints:0,requestDay:-1},
+    exploration: {forest:false,mine:false,city:false,depth:1,hut:false,tools:false,nodes:{},treasures:{},jobs:{},dailyJobs:{day:-1,ids:[]},storyDone:{},bondDone:{},journalChoices:{},cityStories:{},cityReputation:0,smithCoupon:false,explorePoints:0,requestDay:-1},
     questProgress: { 1: 'locked', 2: 'locked', 3: 'locked', 4: 'locked' },
     unlockedRecipes: ['chest'],
     bridgeRepaired: false,
@@ -2132,8 +2156,9 @@ for(var depth=1;depth<=3;depth++)[[4,3],[9,8],[15,10],[23,8],[5,14],[11,18],[23,
 function normalizeExploration(raw){
  function num(v,d,min,max){return typeof v==='number'&&isFinite(v)?clamp(v,min,max):d;}
  raw=raw&&typeof raw==='object'?raw:{};
- var e={forest:!!raw.forest,mine:!!raw.mine,city:!!raw.city,depth:clamp(Math.floor(num(raw.depth,1,1,3)),1,3),hut:!!raw.hut,tools:!!raw.tools,nodes:{},treasures:{},jobs:{},dailyJobs:{day:-1,ids:[]},storyDone:{},bondDone:{},journalChoices:{},explorePoints:clamp(Math.floor(num(raw.explorePoints,0,0,100000)),0,100000),requestDay:Math.floor(num(raw.requestDay,-1,-1,1e6))};
+ var e={forest:!!raw.forest,mine:!!raw.mine,city:!!raw.city,depth:clamp(Math.floor(num(raw.depth,1,1,3)),1,3),hut:!!raw.hut,tools:!!raw.tools,nodes:{},treasures:{},jobs:{},dailyJobs:{day:-1,ids:[]},storyDone:{},bondDone:{},journalChoices:{},cityStories:{},cityReputation:Math.floor(num(raw.cityReputation,0,0,9999)),smithCoupon:!!raw.smithCoupon,explorePoints:clamp(Math.floor(num(raw.explorePoints,0,0,100000)),0,100000),requestDay:Math.floor(num(raw.requestDay,-1,-1,1e6))};
  Object.keys(LIVING_JOBS||{}).forEach(function(id){if(raw.jobs&&Number.isInteger(raw.jobs[id]))e.jobs[id]=Math.max(-1,raw.jobs[id]);});
+ (CITY_STORY_QUESTS||[]).forEach(function(q){var st=raw.cityStories&&raw.cityStories[q.id];if(st==='accepted'||st==='done')e.cityStories[q.id]=st;});
  if(raw.dailyJobs&&typeof raw.dailyJobs==='object'){e.dailyJobs.day=Math.floor(num(raw.dailyJobs.day,-1,-1,1e6));if(Array.isArray(raw.dailyJobs.ids))e.dailyJobs.ids=raw.dailyJobs.ids.filter(function(id){return !!LIVING_JOBS[id];}).slice(0,3);}
  ['storyDone','bondDone'].forEach(function(k){if(raw[k]&&typeof raw[k]==='object')Object.keys(raw[k]).forEach(function(id){if(raw[k][id])e[k][id]=true;});});
  if(raw.journalChoices&&typeof raw.journalChoices==='object')Object.keys(raw.journalChoices).forEach(function(id){var v=raw.journalChoices[id];if(v&&Number.isInteger(v.day)&&Number.isInteger(v.option))e.journalChoices[id]={day:Math.max(-1,v.day),option:v.option};});
@@ -2141,7 +2166,7 @@ function normalizeExploration(raw){
  ['forest_cache','mine_cache'].forEach(function(k){e.treasures[k]=!!(raw.treasures&&raw.treasures[k]);});
  Object.keys(EXPLORE_NODES).forEach(function(sc){Object.keys(EXPLORE_NODES[sc]).forEach(function(k){var n=EXPLORE_NODES[sc][k],key=sc+':'+k,v=raw.nodes&&raw.nodes[key];if(v&&typeof v==='object')e.nodes[key]={hp:clamp(Math.floor(num(v.hp,n.hp,0,n.hp)),0,n.hp),day:Math.floor(num(v.day,0,0,1e6))};});});return e;
 }
-function exploreState(){if(!state.exploration)state.exploration=normalizeExploration();return state.exploration;}
+function exploreState(){if(!state.exploration)state.exploration=normalizeExploration();var e=state.exploration;if(!e.cityStories)e.cityStories={};if(!Number.isFinite(e.cityReputation))e.cityReputation=0;if(typeof e.smithCoupon!=='boolean')e.smithCoupon=false;return e;}
 function exploreNode(sc,x,y){var def=EXPLORE_NODES[sc]&&EXPLORE_NODES[sc][key2(x,y)];if(!def)return null;
  var e=exploreState(),key=sc+':'+key2(x,y),saved=e.nodes[key];
  if(!saved){saved=e.nodes[key]={hp:def.hp,day:state.totalDay};}
@@ -2172,7 +2197,7 @@ function openExploreSite(kind){
  if(kind==='mine'&&e.mine){doSwitchScene('mine1',13,21);return;}
  if(kind==='hut'&&e.hut){openWindow({id:'forest_request',kind:'custom',title:'伐木屋 · 每日委托',build:function(b){b.appendChild(el('p',null,'森林补给：蘑菇 ×5、木材 ×10，奖励 100 金。每天可交付一次。'));b.appendChild(el('p','muted',e.requestDay===state.totalDay?'今天已完成，明天再来。':'今天尚未交付。'));},actions:[{label:'交付补给',kind:'primary',onClick:function(){if(e.requestDay===state.totalDay){toast('今天已经交付过了。');return;}if(payExplore({mushroom:5,wood:10})){e.requestDay=state.totalDay;state.coins+=100;markDirty();refreshHud();saveNow();toast('森林委托完成，获得 100 金。');refreshWindow();}},close:false},{label:'离开',close:true}]});return;}
  if(kind==='tools'&&e.tools){toast('已拥有钢制斧头和镐子。');return;}
- var cfg=configs[kind];openWindow({id:'explore_repair',kind:'custom',title:cfg.title,build:function(b){b.appendChild(el('p',null,cfg.desc));b.appendChild(el('p','muted','需要：'+Object.keys(cfg.cost).map(function(k){return(k==='coins'?'金币':itemName(k))+' ×'+cfg.cost[k];}).join('、')));},actions:[{label:'确认修复 / 升级',kind:'primary',close:false,onClick:function(){if(kind==='forest'&&!state.bridgeRepaired){toast('先完成小镇修桥委托，再开始远行。');return;}if(payExplore(cfg.cost)){e[kind]=true;e.explorePoints+=(kind==='forest'||kind==='mine'?20:kind==='hut'?10:5);markDirty();refreshHud();refreshHotbar();saveNow();closeWindow();toast(cfg.title+'完成！');}}},{label:'稍后再来',close:true}]});
+ var cfg=configs[kind],cost=kind==='tools'&&e.smithCoupon?{iron_ore:8,coins:150}:cfg.cost;openWindow({id:'explore_repair',kind:'custom',title:cfg.title,build:function(b){b.appendChild(el('p',null,cfg.desc));b.appendChild(el('p','muted','需要：'+Object.keys(cost).map(function(k){return(k==='coins'?'金币':itemName(k))+' ×'+cost[k];}).join('、')));if(kind==='tools'&&e.smithCoupon)b.appendChild(el('p','req-chip ok','霍尔的修炉凭证已抵扣 2 块铁矿石与 50 金。'));},actions:[{label:'确认修复 / 升级',kind:'primary',close:false,onClick:function(){if(kind==='forest'&&!state.bridgeRepaired){toast('先完成小镇修桥委托，再开始远行。');return;}if(payExplore(cost)){e[kind]=true;if(kind==='tools')e.smithCoupon=false;e.explorePoints+=(kind==='forest'||kind==='mine'?20:kind==='hut'?10:5);markDirty();refreshHud();refreshHotbar();saveNow();closeWindow();toast(cfg.title+'完成！');}}},{label:'稍后再来',close:true}]});
 }
 function exploreStairs(next){
  var e=exploreState();if(next<=e.depth){doSwitchScene('mine'+next,13,21);return;}
@@ -2885,6 +2910,41 @@ var BOND_QUESTS=[
   {id:'ds_fishstudy',title:'DS 的鱼类研究',desc:'DS 想记录一条银纹鱼的鳞片。',npc:'ds',minFriendship:25,need:{fish_silver:1},reward:{coins:180,explorePoints:10},rewardText:'180 金 · 探索度 +10'},
   {id:'ranger_map',title:'松岚的森林地图',desc:'和松岚一起补齐森林深处的地图。',npc:'ranger',minFriendship:50,need:{hardwood:5,mushroom:5},reward:{coins:250,explorePoints:15},rewardText:'250 金 · 探索度 +15'}
 ];
+/* 白蔷薇城的长期委托：和每日委托、探索委托并行，不按天过期。 */
+var CITY_STORY_QUESTS = [
+  { id:'archive', building:'library', buildingName:'蔷薇图书馆', npc:'archivist', title:'补齐山谷旧志',
+    desc:'艾琳想修补记载山谷旧路的地方志。把木材和林间蘑菇带到图书馆档案桌。',
+    cost:{wood:6,mushroom:2}, rewardItems:{berry:2}, coins:75, friendship:10, reputation:5,
+    requires:null, rewardText:'75 金、野莓 ×2、艾琳好感 +10、城市声望 +5' },
+  { id:'seedbank', building:'greenhouse', buildingName:'蔷薇温室', npc:'florist', title:'重新整理种子库',
+    desc:'地方志修好后，芙洛找到了旧温室的种植记录。她需要新鲜萝卜作物来校准育苗盘。',
+    cost:{radish:3}, rewardItems:{seed_radish:3,seed_potato:2}, coins:35, friendship:10, reputation:5,
+    requires:'archive', rewardText:'萝卜种子 ×3、土豆种子 ×2、35 金、芙洛好感 +10、城市声望 +5' },
+  { id:'forge', building:'smith', buildingName:'白蔷薇铁匠铺', npc:'blacksmith', title:'重燃旧炉火',
+    desc:'种子库恢复后，温室送来了一张旧城修缮清单。霍尔需要石料与铜矿重新校准锻炉。',
+    cost:{stone:6,copper_ore:3}, rewardItems:{iron_ore:2}, coins:90, friendship:10, reputation:8,
+    requires:'seedbank', smithCoupon:true, rewardText:'铁矿石 ×2、90 金、霍尔好感 +10、下次钢制工具升级减价、城市声望 +8' },
+  { id:'supply', building:'market', buildingName:'城市商会', npc:'merchant', title:'完成春日采购单',
+    desc:'锻炉修复后，路易要为城里的餐桌补货。商会按订单收取新鲜农产品。',
+    cost:{radish:4,potato:2}, rewardItems:{bread:2}, coins:130, friendship:10, reputation:10,
+    requires:'forge', rewardText:'乡村面包 ×2、130 金、路易好感 +10、城市声望 +10' },
+  { id:'rose', building:'castle', buildingName:'白蔷薇城堡', npc:'steward', title:'为蔷薇园备下春宴',
+    desc:'春日采购完成后，塞琳邀请农场主为城堡春宴准备莓果与木料。完成后，城堡会把你记作正式的城中协作者。',
+    cost:{strawberry:2,wood:5}, rewardItems:{seed_strawberry:2}, coins:180, friendship:15, reputation:15,
+    requires:'supply', rewardText:'草莓种子 ×2、180 金、塞琳好感 +15、城市声望 +15' }
+];
+var CITY_STAFF_ROUTINES = {
+  baker:[[360,540,12,9],[540,660,19,7],[660,1020,12,9],[1020,1320,5,15]],
+  postie:[[360,540,15,7],[540,660,11,5],[660,1020,15,7],[1020,1320,11,15]],
+  florist:[[360,540,12,7],[540,660,8,16],[660,1020,12,11],[1020,1320,21,16]],
+  merchant:[[360,540,15,1],[540,660,10,8],[660,1020,15,1],[1020,1320,15,15]],
+  cook:[[360,540,9,6],[540,660,8,5],[660,1020,9,6],[1020,1320,23,14]],
+  archivist:[[360,540,7,12],[540,660,15,11],[660,1020,7,12],[1020,1320,15,17]],
+  blacksmith:[[360,540,13,6],[540,660,18,5],[660,1020,13,6],[1020,1320,18,12]],
+  tailor:[[360,540,13,5],[540,660,14,10],[660,1020,13,5],[1020,1320,10,15]],
+  innkeeper:[[360,540,15,4],[540,660,17,8],[660,1020,15,4],[1020,1320,15,17]],
+  steward:[[360,540,17,7],[540,660,10,11],[660,1020,17,7],[1020,1320,25,19]]
+};
 function specialQuestDone(q,kind){var e=exploreState();return !!e[kind==='bond'?'bondDone':'storyDone'][q.id];}
 function specialQuestUnlocked(q,kind){
   if(kind==='bond')return (state.npcFriendship[q.npc]||0)>=q.minFriendship;
@@ -2950,7 +3010,8 @@ function postResident(id, scene, x, y) {
   var n = NPCS[id];
   if (!n) return;
   n.scene = scene;
-  n.schedule = [{ from: 0, to: 1440, x: x, y: y }, { from: 0, to: 1440, x: x, y: y }, { from: 0, to: 1440, x: x, y: y }];
+  var routine=CITY_STAFF_ROUTINES[id]||[[360,540,x,y],[540,660,x,y],[660,1020,x,y],[1020,1320,x,y]];
+  n.schedule = routine.map(function(s){return {from:s[0],to:s[1],x:s[2],y:s[3]};});
   if (npcRuntime && npcRuntime[id]) { npcRuntime[id].x = x; npcRuntime[id].y = y; npcRuntime[id].path = []; }
 }
 addResident('blacksmith','霍尔','白蔷薇铁匠','city',96,63,'engineer',['#4A3E38','#6B5C57','#B4BBC4'],
@@ -2991,6 +3052,44 @@ function openResidentJob(id){
       state.coins+=job.coins;e.jobs[id]=state.totalDay;markDirty();refreshHud();saveNow();toast('帮助了'+NPCS[id].name+'，获得 '+job.coins+' 金。');refreshWindow();}},
     {label:'离开',close:true}]});
 }
+function cityStoryQuest(id){for(var i=0;i<CITY_STORY_QUESTS.length;i++)if(CITY_STORY_QUESTS[i].id===id)return CITY_STORY_QUESTS[i];return null;}
+function cityStoryStatus(q){var e=exploreState(),saved=e.cityStories[q.id];if(saved==='done'||saved==='accepted')return saved;return !q.requires||e.cityStories[q.requires]==='done'?'available':'locked';}
+function cityStoryNeedsMet(q){return Object.keys(q.cost).every(function(k){return invCount(k)>=(q.cost[k]||0);});}
+function cityStoryReqLine(q){return Object.keys(q.cost).map(function(k){return itemName(k)+' '+invCount(k)+' / '+q.cost[k];}).join(' · ');}
+function openCityStoryQuest(id){
+  var q=cityStoryQuest(id);if(!q)return;
+  function render(b){var st=cityStoryStatus(q);b.appendChild(el('p',null,q.desc));b.appendChild(el('p','muted','委托人：'+(NPCS[q.npc]?NPCS[q.npc].name:'城中居民')+' · 地点：'+q.buildingName));
+    if(st==='locked'){var before=cityStoryQuest(q.requires);b.appendChild(el('p','muted','前置委托：先完成「'+(before?before.title:'上一项城中委托')+'」。'));}
+    else if(st==='done')b.appendChild(el('p','req-chip ok','已完成 · 城市声望 '+exploreState().cityReputation));
+    else{b.appendChild(el('p','quest-req',cityStoryReqLine(q)));b.appendChild(el('p','muted','奖励：'+q.rewardText));b.appendChild(el('p','muted',st==='available'?'接受后委托会保存在委托日志中，不会过期。':'材料齐全后可在这里交付；委托不会按天过期。'));}}
+  var actions=[];
+  if(cityStoryStatus(q)==='available')actions.push({label:'接受委托',kind:'primary',close:false,onClick:function(){exploreState().cityStories[q.id]='accepted';markDirty();saveNow();toast('已接受「'+q.title+'」，可在 J 委托日志的“探索”页查看。');closeWindow();openCityStoryQuest(id);}});
+  if(cityStoryStatus(q)==='accepted')actions.push({label:'交付并完成',kind:'primary',close:false,onClick:function(){if(cityStoryStatus(q)!=='accepted'){closeWindow();openCityStoryQuest(id);return;}
+    var e=exploreState(),next=Object.assign({},state.inventory);Object.keys(q.cost).forEach(function(k){next[k]=(next[k]||0)-q.cost[k];});Object.keys(q.rewardItems||{}).forEach(function(k){next[k]=(next[k]||0)+q.rewardItems[k];});
+    if(!cityStoryNeedsMet(q)){toast('材料还不够：'+cityStoryReqLine(q));return;}if(countSlots(next)>CFG.bagSlots){toast('背包放不下奖励，先整理一下再交付。');return;}
+    Object.keys(q.cost).forEach(function(k){invRemove(k,q.cost[k]);});Object.keys(q.rewardItems||{}).forEach(function(k){invAdd(k,q.rewardItems[k]);});state.coins+=q.coins||0;
+    if(q.npc){state.npcFriendship=state.npcFriendship||{};state.npcFriendship[q.npc]=clamp((state.npcFriendship[q.npc]||0)+(q.friendship||0),0,100);}
+    e.cityStories[q.id]='done';e.cityReputation+=q.reputation||0;if(q.smithCoupon)e.smithCoupon=true;
+    markDirty();refreshHud();saveNow();closeWindow();toast('完成「'+q.title+'」！城市声望 +'+(q.reputation||0)+'。');openCityStoryQuest(id);}});
+  actions.push({label:'关闭',close:true});openWindow({id:'city_story_'+q.id,kind:'custom',title:q.buildingName+' · '+q.title,build:render,actions:actions});
+}
+function appendCityStoryCard(b,id){
+  var q=cityStoryQuest(id);if(!q||!exploreState().city)return;var st=cityStoryStatus(q),box=el('div','panel-box city-story-card');
+  var head=el('div','row between'),label=st==='done'?'已完成':st==='accepted'?'进行中':st==='available'?'新委托':'尚未开放';
+  head.appendChild(el('strong',null,q.title));head.appendChild(el('span','req-chip '+(st==='done'?'ok':st==='locked'?'no':''),label));box.appendChild(head);
+  if(st==='locked'){var before=cityStoryQuest(q.requires);box.appendChild(el('div','item-desc','完成「'+(before?before.title:'前置委托')+'」后，'+q.buildingName+'会有新的工作。'));}
+  else if(st==='done')box.appendChild(el('div','item-desc','委托已完成 · 当前城市声望 '+exploreState().cityReputation));
+  else box.appendChild(el('div','item-desc',st==='accepted'?cityStoryReqLine(q):q.desc));
+  var btn=mkBtn(st==='locked'?'查看前置要求':st==='done'?'查看完成记录':st==='accepted'?'查看 / 交付委托':'查看并接受委托',st==='available'||st==='accepted'?'primary':'sm',function(){openCityStoryQuest(id);});if(st==='locked')btn.disabled=true;box.appendChild(btn);b.appendChild(box);
+}
+function appendCityStoryLog(b){
+  if(!exploreState().city)return;b.appendChild(el('h3','section-title','白蔷薇城委托 · 声望 '+exploreState().cityReputation));
+  CITY_STORY_QUESTS.forEach(function(q){var st=cityStoryStatus(q),box=el('div','panel-box quest'+(st==='done'?' done':st==='locked'?' locked':'')),row=el('div','row between');
+    row.appendChild(el('div','quest-name',q.title));row.appendChild(el('span','req-chip '+(st==='done'?'ok':st==='locked'?'no':''),st==='done'?'已完成':st==='accepted'?'进行中':st==='available'?'可接受':'未开放'));box.appendChild(row);
+    box.appendChild(el('div','item-desc',q.desc));if(st==='accepted')box.appendChild(el('div','quest-req',cityStoryReqLine(q)));box.appendChild(el('div','item-desc','地点：'+q.buildingName+' · 奖励：'+q.rewardText));
+    var btn=mkBtn(st==='locked'?'查看前置要求':st==='done'?'查看记录':st==='accepted'?'继续委托':'查看委托',st==='accepted'||st==='available'?'primary':'sm',function(){openCityStoryQuest(q.id);});if(st==='locked')btn.disabled=true;box.appendChild(btn);b.appendChild(box);
+  });
+}
 /* 城市建筑各自提供的服务。有真实扣料/发奖的才做成按钮，
    纯介绍的只讲清楚这间屋子是干什么的、谁在里面工作。 */
 var CITY_INFO = {
@@ -3010,7 +3109,7 @@ var CITY_INFO = {
 function openCityService(it) {
   var s = it.service, info = CITY_INFO[s] || CITY_INFO.home;
   if (s === 'bakery') { openWindow({ id: 'bread_shop', kind: 'custom', title: info.name, build: function (b) { b.appendChild(el('p', null, '乡村面包 · 30 金一个，食用恢复 25 点体力。')); b.appendChild(el('p', 'muted', info.desc)); }, actions: [{ label: '买一个面包 · 30 金', close: false, onClick: function () { if (!bagAccepts('bread', 1)) { toast('背包满了。'); return; } if (payExplore({ coins: 30 })) { invAdd('bread', 1); markDirty(); refreshHud(); toast('买到了一个热面包。'); } } }, { label: '离开', close: true }] }); return; }
-  if (s === 'smith') { openExploreSite('tools'); return; }
+  if (s === 'smith') { openWindow({id:'city_smith',kind:'custom',title:info.name,build:function(b){b.appendChild(el('p',null,info.desc));b.appendChild(el('p','muted',info.who+'。'));appendCityStoryCard(b,'forge');},actions:[{label:exploreState().tools?'查看工具状态':'查看钢制工具升级',kind:'primary',close:false,onClick:function(){closeWindow();openExploreSite('tools');}},{label:'离开',close:true}]});return; }
   /* 茶室：付钱坐下喝茶，回体力并花掉一点时间 */
   if (s === 'cafe') {
     openWindow({ id: 'city_cafe', kind: 'custom', title: info.name, build: function (b) {
@@ -3046,6 +3145,7 @@ function openCityService(it) {
       });
       if (any) b.appendChild(row);
       b.appendChild(el('p', 'muted', any ? '商会按高于镇上收购价的价格结算。' : '背包里没有可以卖给商会的农产品。'));
+      appendCityStoryCard(b,'supply');
     }, actions: [{ label: '离开', close: true }] });
     return;
   }
@@ -3066,6 +3166,7 @@ function openCityService(it) {
       });
       if (any) b.appendChild(row);
       b.appendChild(el('p', 'muted', any ? '温室代为育苗，收成可以换成分发袋里的种子。' : '背包里没有可以育苗的收成。'));
+      appendCityStoryCard(b,'seedbank');
     }, actions: [{ label: '离开', close: true }] });
     return;
   }
@@ -3138,6 +3239,8 @@ function openCityService(it) {
     b.appendChild(el('p', null, info.desc));
     b.appendChild(el('p', 'muted', info.who + '。'));
     if (extra[s]) b.appendChild(el('p', null, extra[s]));
+    if(s==='library')appendCityStoryCard(b,'archive');
+    if(s==='castle')appendCityStoryCard(b,'rose');
   }, actions: [{ label: '继续参观', close: true }] });
 }
 var ANIMAL_HOMES={
@@ -4071,7 +4174,1052 @@ function chestMove(structure, id, qty, toBox) {
     var after = countSlotsWith(box, id, (box[id] || 0) + n);
     if (after > CFG.chestSlots) { toast('箱子放不下了，先取出一部分。'); Audio2.play('fail'); return false; }
     invRemove(id, n); box[id] = (box[id] || 0) + n;
-    toast('放…10829 tokens truncated…lash');
+    toast('放入 ' + itemName(id) + ' ×' + n + '。');
+  } else {
+    var have = box[id] || 0;
+    var m = Math.min(have, qty);
+    if (m <= 0) { toast('箱子里没有这个物品。'); return false; }
+    if (!bagAccepts(id, m)) { toast('背包满了，先整理一下。'); Audio2.play('fail'); return false; }
+    box[id] = have - m; if (box[id] <= 0) delete box[id];
+    invAdd(id, m);
+    toast('取出 ' + itemName(id) + ' ×' + m + '。');
+  }
+  Audio2.play('place');
+  markDirty();
+  return true;
+}
+function chestMoveAll(structure, toBox) {
+  var box = getChest(structure);
+  var moved = 0, guard = 0;
+  if (toBox) {
+    invList(state.inventory).forEach(function (id) {
+      while (invCount(id) > 0 && guard++ < 400) {
+        if (!chestMove(structure, id, 1, true)) return;
+        moved++;
+      }
+    });
+  } else {
+    invList(box).forEach(function (id) {
+      while ((box[id] || 0) > 0 && guard++ < 400) {
+        if (!chestMove(structure, id, 1, false)) return;
+        moved++;
+      }
+    });
+  }
+  if (moved) { toast((toBox ? '放入' : '取出') + ' ' + moved + ' 个物品。'); Audio2.play('place'); markDirty(); }
+  else toast('没有可以转移的物品。');
+  return moved > 0;
+}
+
+/* --- 食用 --- */
+function eatItem(id) {
+  if (!isFood(id)) { toast('这个不能吃。'); return false; }
+  if (invCount(id) <= 0) { toast('背包里没有' + itemName(id) + '了。'); return false; }
+  if (state.energy >= CFG.maxEnergy) { toast('体力已经满了，先干点活吧。'); return false; }
+  invRemove(id, 1);
+  var recovered=Math.min(ITEMS[id].food,CFG.maxEnergy-state.energy);
+  state.energy += recovered;
+  Audio2.play('eat');
+  toast('吃掉了' + itemName(id) + '，恢复 ' + recovered + ' 点体力。');
+  markDirty(); refreshHud();
+  return true;
+}
+
+/* ============================================================
+   6. 工具、土地与资源采集
+   ============================================================ */
+
+function facingTile() {
+  var f = FACE_DIR[state.player.face] || [0, 1];
+  return [state.player.x + f[0], state.player.y + f[1]];
+}
+var FACE_DIR = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+
+function inPlantArea(x, y) {
+  var a = MAPS.farm.plantArea;
+  return x >= a.x0 && x <= a.x1 && y >= a.y0 && y <= a.y1;
+}
+function hasEnergy(cost) {
+  if (state.energy < cost) {
+    toast('体力不足，吃点东西或休息吧。');
+    Audio2.play('fail');
+    return false;
+  }
+  return true;
+}
+
+/* 统一的工具入口 */
+function useTool(tool, tx, ty, opts) {
+  opts = opts || {};
+  var p = state.player;
+  var d = Math.abs(tx - p.x) + Math.abs(ty - p.y);
+  if (d > (tool === 'fish' ? 3 : 1)) { toast(tool === 'fish' ? '站在岸边，点击 3 格以内的水面抛竿。' : '走近一点。'); return false; }
+  if (sceneSwitch.busy || Game.busy) return false;
+  if (Game.fishing && Game.fishing.active) return false;
+  if (state.sceneId !== 'farm' && (tool === 'hoe' || tool === 'seed' || tool === 'water' || tool === 'shovel')) {
+    toast('这里没有可以耕种的土地。');
+    return false;
+  }
+  if(EXPLORE_NODES[state.sceneId] && ['axe','pickaxe','harvest'].indexOf(tool)>=0) return gatherExplore(tool,tx,ty);
+  switch (tool) {
+    case 'hoe': return toolHoe(tx, ty);
+    case 'seed': return toolSeed(tx, ty);
+    case 'shovel': return toolShovel(tx, ty);
+    case 'water': return toolWater(tx, ty);
+    case 'harvest': return toolHarvest(tx, ty);
+    case 'axe': return toolNode(tx, ty, 'tree');
+    case 'pickaxe': return toolNode(tx, ty, 'stone');
+    case 'fish': return toolFish(tx, ty);
+    case 'place': return toolPlace(tx, ty);
+  }
+  return false;
+}
+
+function toolHoe(tx, ty) {
+  if (!inPlantArea(tx, ty)) { toast('这里不能耕种。'); return false; }
+  if (state.plots[key2(tx, ty)]) { toast('这块土地已经松好了。'); return false; }
+  if (!hasEnergy(CFG.energyCost.hoe)) return false;
+  state.energy -= CFG.energyCost.hoe;
+  state.plots[key2(tx, ty)] = {
+    tilled: true, water: isRaining() && state.sceneId === 'farm', crop: null,
+    age: 0, mature: false, harvested: false, regrow: 0
+  };
+  Audio2.play('hoe');
+  addParticle(tx, ty, 'soil');
+  if (isRaining()) toast('翻好土了，雨天 土地已经是湿润的。');
+  tutorialEvent('tilled');
+  markDirty(); refreshHud();
+  return true;
+}
+function toolSeed(tx, ty) {
+  if (state.sceneId !== 'farm') { toast('这里不能播种。'); return false; }
+  if (!inPlantArea(tx, ty)) { toast('这里不能播种。'); return false; }
+  var p = state.plots[key2(tx, ty)];
+  if (!p) { toast('先把这块土地松好。'); return false; }
+  if (p.crop) { toast('这里已经种了作物。'); return false; }
+  var cropId = state.selectedSeed;
+  var crop = CROPS[cropId];
+  var seedId = crop.seed;
+  if (invCount(seedId) <= 0) { toast('没有' + crop.name + '种子了，去种子铺买一些。'); Audio2.play('fail'); return false; }
+  invRemove(seedId, 1);
+  p.crop = cropId; p.age = 0; p.mature = false; p.harvested = false; p.regrow = 0;
+  tutorialEvent('seeded', key2(tx, ty));
+  if (p.water) tutorialEvent('watered');
+  Audio2.play('hoe');
+  addParticle(tx, ty, 'seed');
+  toast(isRaining() ? '播下' + crop.name + '，雨天不用浇水。' : '播下' + crop.name + '，记得浇水。');
+  markDirty(); refreshHud();
+  return true;
+}
+/* 铲除：把长得不合适的作物铲掉。刚播下的那株（年龄 0）能把种子收回来，
+   已经长过一天的就得自己承担种子的损失——否则播种+铲除可以无限刷种子。 */
+function toolShovel(tx, ty) {
+  if (state.sceneId !== 'farm') { toast('这里没有可以铲除的作物。'); return false; }
+  if (!inPlantArea(tx, ty)) { toast('这里没有可以铲除的作物。'); return false; }
+  var p = state.plots[key2(tx, ty)];
+  if (!p || !p.crop) { toast('这里没有作物可以铲除。'); return false; }
+  if (isTutorialBlocking('铲除')) return false;
+  var crop = CROPS[p.crop];
+  if (!crop) { p.crop = null; return true; }
+  var young = !p.harvested && p.age <= 0;          // 刚种下：种子还能收回
+  if (young && !bagAccepts(crop.seed, 1)) { toast('背包满了，先腾出一格再来铲。'); Audio2.play('fail'); return false; }
+  if (!hasEnergy(CFG.energyCost.shovel)) return false;
+  state.energy -= CFG.energyCost.shovel;
+  if (young) invAdd(crop.seed, 1);
+  p.crop = null; p.age = 0; p.mature = false; p.harvested = false; p.regrow = 0;
+  addParticle(tx, ty, 'soil');
+  Audio2.play('hoe');
+  toast(young
+    ? '铲掉了刚播下的' + crop.name + '，种子已收回背包。'
+    : '铲掉了' + crop.name + '（已经长过一天，种子不退还）。');
+  markDirty(); refreshHud();
+  return true;
+}
+
+/* 引导进行中保留作物，避免播种后铲空田地却仍要求浇水或收获。
+   暂停、跳过或完成引导后即可自由铲除。 */
+function isTutorialBlocking(what) {
+  var t = state.tutorial;
+  if (t && t.status === 'active' && tutorialStep() < 9) {
+    toast('先跟着新手引导完成第一份收成，' + what + '稍后再说；也可以暂停或跳过引导后再操作。');
+    Audio2.play('fail');
+    return true;
+  }
+  return false;
+}
+
+function toolWater(tx, ty) {
+  if (state.sceneId !== 'farm') { toast('这里没有耕地。'); return false; }
+  if (!inPlantArea(tx, ty)) { toast('这里没有耕地。'); return false; }
+  var p = state.plots[key2(tx, ty)];
+  if (!p) { toast('这里还没有翻过土。'); return false; }
+  if (p.water) { toast('这块地已经浇过水了。'); return false; }
+  if (isRaining()) { toast('正在下雨，不用浇水。'); return false; }
+  if (!hasEnergy(CFG.energyCost.water)) return false;
+  state.energy -= CFG.energyCost.water;
+  p.water = true;
+  if (p.crop) tutorialEvent('watered');
+  Game.plotSplash[key2(tx, ty)] = { t: 0.7, max: 0.7 };
+  Audio2.play('water');
+  addParticle(tx, ty, 'water');
+  markDirty(); refreshHud();
+  return true;
+}
+function toolHarvest(tx, ty) {
+  if (state.sceneId === 'farm' || state.sceneId === 'town') {
+    var node = state.resourceNodes[key2(tx, ty)];
+    if (node && node.type === 'berry' && node.active) return pickBerry(tx, ty);
+  }
+  if (state.sceneId !== 'farm') { toast('这里没有可以收获的东西。'); return false; }
+  var p = state.plots[key2(tx, ty)];
+  if (!p) { toast('这里没有作物。'); return false; }
+  if (!p.crop) { toast('这块地是空的。'); return false; }
+  if (!p.mature) {
+    var c = CROPS[p.crop];
+    var extra = p.harvested ? ('还需 ' + Math.max(0, c.regrow - p.regrow) + ' 天再生') : (Math.max(0, c.growDays - p.age) + ' 天后成熟');
+    toast(c.name + '还需要' + extra + '。');
+    return false;
+  }
+  var crop = CROPS[p.crop];
+  var prod = crop.produce, y = crop.yield;
+  if (!bagAccepts(prod, y)) { toast('背包满了，先整理一下。'); Audio2.play('fail'); return false; }
+  invAdd(prod, y);
+  tutorialEvent('harvested');
+  tutorialEvent('inspected'); // 提前收获也是已经看过作物生长的实际结果。
+  addParticle(tx, ty, 'harvest');
+  Audio2.play('harvest');
+  if (crop.regrow > 0) {
+    p.harvested = true; p.regrow = 0; p.mature = false; p.age = crop.growDays;
+    toast('收获了' + crop.name + ' ×' + y + '，' + crop.regrow + ' 天后可再收。');
+  } else {
+    p.crop = null; p.age = 0; p.mature = false; p.harvested = false; p.regrow = 0;
+    toast('收获了' + crop.name + ' ×' + y + '，地块保留，需要重新播种。');
+  }
+  markDirty(); refreshHud();
+  return true;
+}
+function pickBerry(tx, ty) {
+  var node = state.resourceNodes[key2(tx, ty)];
+  if (!node || !node.active) { toast('这里的野莓已经采过了。'); return false; }
+  if (!bagAccepts('berry', 1)) { toast('背包满了，先整理一下。'); Audio2.play('fail'); return false; }
+  invAdd('berry', 1);
+  node.active = false;
+  addParticle(tx, ty, 'harvest');
+  Audio2.play('harvest');
+  toast('获得野莓 ×1：打开背包点击「吃一个」，最多恢复 15 点体力。');
+  markDirty(); refreshHud();
+  return true;
+}
+function toolNode(tx, ty, type) {
+  var node = state.resourceNodes[key2(tx, ty)];
+  if (!node || node.type !== type) {
+    if (node && node.type === 'tree') toast('这里是树，应该用斧头。');
+    else if (node && node.type === 'stone') toast('这里是石头，应该用镐子。');
+    else toast(type === 'tree' ? '这里没有树，斧头用不上。' : '这里没有石头，镐子用不上。');
+    return false;
+  }
+  if (!node.active) { toast(type === 'tree' ? '这棵树已经被砍掉了。' : '这块石头已经敲碎了。'); return false; }
+  if (!hasEnergy(CFG.energyCost[type === 'tree' ? 'axe' : 'pickaxe'])) return false;
+  state.energy -= CFG.energyCost[type === 'tree' ? 'axe' : 'pickaxe'];
+  node.hp -= exploreState().tools ? 2 : 1;
+  addParticle(tx, ty, type === 'tree' ? 'wood' : 'stone');
+  addShake(tx, ty, type);
+  Audio2.play(type === 'tree' ? 'chop' : 'breakrock');
+  if (node.hp <= 0) {
+    if (type === 'tree') {
+      if (!bagAccepts('wood', 5)) {
+        node.hp = 1;                       // 装不下则保留节点，最终命中不扣体力
+        state.energy += CFG.energyCost.axe;
+        toast('背包放不下 5 份木材，先整理一下。');
+        Audio2.play('fail');
+        markDirty(); return false;
+      }
+      invAdd('wood', 5); node.active = false;
+      toast('砍倒了树，获得木材 ×5。');
+    } else {
+      if (!bagAccepts('stone', 3)) {
+        node.hp = 1;
+        state.energy += CFG.energyCost.pickaxe;
+        toast('背包放不下 3 份石头，先整理一下。');
+        Audio2.play('fail');
+        markDirty(); return false;
+      }
+      invAdd('stone', 3); node.active = false;
+      toast('敲碎了石头，获得石头 ×3。');
+    }
+    Audio2.play('harvest');
+  } else {
+    toast((type === 'tree' ? '木头' : '石头') + '裂开了（还需 ' + node.hp + ' 次）。');
+  }
+  markDirty(); refreshHud();
+  return true;
+}
+
+/* --- 设备放置 --- */
+function toolPlace(tx, ty) {
+  if (state.sceneId !== 'farm') { toast('设备只能放在农场的种植区里。'); return false; }
+  if (!inPlantArea(tx, ty)) { toast('设备只能放在农场的种植区里。'); return false; }
+  var devId = state.selectedDevice;
+  if (invCount(devId) <= 0) { toast('背包里没有这个设备。'); Audio2.play('fail'); return false; }
+  if (tx === state.player.x && ty === state.player.y) { toast('不能放在脚下。'); return false; }
+  var plot = state.plots[key2(tx, ty)];
+  if (plot && plot.crop) { toast('这里已经有作物了，先收获再放设备。'); return false; }
+  if (state.resourceNodes[key2(tx, ty)] && state.resourceNodes[key2(tx, ty)].active) { toast('这里有资源节点，先清理掉。'); return false; }
+  for (var i = 0; i < state.structures.length; i++) {
+    if (state.structures[i].x === tx && state.structures[i].y === ty) { toast('这里已经有设备了。'); return false; }
+  }
+  invRemove(devId, 1);
+  delete state.plots[key2(tx, ty)]; // 空耕地可放设备；去掉其水分、生长记录。
+  state.structures.push({ id: 's' + state.nextStructureId, device: ITEMS[devId].device, x: tx, y: ty, contents: {} });
+  state.nextStructureId += 1;
+  Audio2.play('place');
+  addParticle(tx, ty, 'place');
+  toast('放置了' + ITEMS[devId].name + '。');
+  markDirty(); refreshHud();
+  return true;
+}
+function pickupStructure(structure) {
+  var devId = null;
+  for (var k in ITEMS) { if (Object.prototype.hasOwnProperty.call(ITEMS, k) && ITEMS[k].device === structure.device) devId = k; }
+  if (!devId) { toast('无法收起这个设备。'); return false; }
+  if (structure.device === 'chest') {
+    var c = getChest(structure);
+    if (invList(c).length) { toast('箱子不是空的，先清空再收起。'); return false; }
+  } else if (structure.device === 'jam_jar') {
+    if (structure.input > 0) { toast('果酱罐正在加工，等完成并领取后再收起。'); return false; }
+    if (structure.ready) { toast('果酱罐里有成品，先领取再收起。'); return false; }
+  }
+  if (!bagAccepts(devId, 1)) { toast('背包满了，先整理一下。'); return false; }
+  for (var i = 0; i < state.structures.length; i++) {
+    if (state.structures[i] === structure) { state.structures.splice(i, 1); break; }
+  }
+  invAdd(devId, 1);
+  Audio2.play('place');
+  toast('收起了' + ITEMS[devId].name + '。');
+  markDirty(); refreshHud();
+  return true;
+}
+
+/* --- 果酱罐 --- */
+function jamLoad(structure) {
+  if (structure.input > 0 || structure.ready) { toast('果酱罐正忙，先把上一份处理完。'); return false; }
+  if (invCount('strawberry') <= 0) { toast('没有草莓了，先去收获一些。'); return false; }
+  invRemove('strawberry', 1);
+  structure.input = 1;
+  structure.startDay = state.totalDay;
+  structure.ready = false;
+  Audio2.play('place');
+  toast('投入 1 颗草莓，明天来取莓果酱。');
+  markDirty(); refreshHud();
+  return true;
+}
+function jamClaim(structure) {
+  if (!structure.ready) { toast('还没有可领取的成品。'); return false; }
+  if (!bagAccepts('jam', 1)) { toast('背包满了，成品先留在罐子里。'); Audio2.play('fail'); return false; }
+  structure.ready = false; structure.input = 0; structure.startDay = 0;
+  invAdd('jam', 1);
+  Audio2.play('harvest');
+  toast('领取了 1 份莓果酱，售价 ' + ITEMS.jam.sell + ' 金。');
+  markDirty(); refreshHud();
+  return true;
+}
+
+/* --- 制作 --- */
+function recipeUnlocked(r) {
+  if (state.unlockedRecipes.indexOf(r.id) >= 0) return true;
+  if (r.unlock === 'quest2') return state.questProgress[2] === 'done';
+  if (r.unlock === 'friendship') return (state.npcFriendship.yaya || 0) >= 25;
+  return false;
+}
+function craftingInventory(r) {
+  var next = Object.assign({}, state.inventory);
+  for (var k in r.cost) {
+    if (!Object.prototype.hasOwnProperty.call(r.cost, k)) continue;
+    if ((next[k] || 0) < r.cost[k]) return null;
+    next[k] -= r.cost[k];
+    if (next[k] === 0) delete next[k];
+  }
+  next[r.out] = (next[r.out] || 0) + r.qty;
+  return countSlots(next) <= CFG.bagSlots ? next : null;
+}
+function canCraft(r) {
+  return recipeUnlocked(r) && craftingInventory(r) !== null;
+}
+function craft(r) {
+  if (!recipeUnlocked(r)) { toast('这个配方还没解锁。'); Audio2.play('fail'); return false; }
+  for (var k in r.cost) {
+    if (!Object.prototype.hasOwnProperty.call(r.cost, k)) continue;
+    if (invCount(k) < r.cost[k]) { toast('材料不足：' + itemName(k) + ' 还差 ' + (r.cost[k] - invCount(k)) + ' 个。'); Audio2.play('fail'); return false; }
+  }
+  var next = craftingInventory(r);
+  if (!next) { toast('背包放不下成品，材料未消耗。'); Audio2.play('fail'); return false; }
+  state.inventory = next;
+  state.overloaded = false;
+  Audio2.play('trade');
+  toast('制作完成：' + ITEMS[r.out].name + ' ×' + r.qty + '。');
+  markDirty(); refreshHud();
+  return true;
+}
+
+/* ============================================================
+   7. 时间、天气与日结算
+   ============================================================ */
+
+var Game = {
+  busy: null,            // 'settle' 等一次性流程锁
+  fishing: null,
+  particles: [],
+  shakes: {},
+  plotSplash: {},        // 刚浇过的耕地：短暂水花
+  pondFish: null,        // 池塘装饰鱼：按需创建，不写入存档
+  hoverTile: null,
+  selectTile: null,      // 触屏点选的格子，用于显示地块信息
+  lastFrame: 0,
+  walkPhase: 0,
+  moving: false,
+  fade: 0
+};
+
+function timePaused() {
+  if (document.hidden) return true;
+  if (UI.window) return true;
+  if (Game.fishing && Game.fishing.active) return true;
+  if (Game.busy !== null) return true;
+  if (sceneSwitch.busy) return true;
+  return false;
+}
+
+function tickTime(dt) {
+  if (timePaused()) return;
+  if (state.timeMinutes >= CFG.dayEnd) return;
+  state.timeMinutes += (dt / CFG.tickSeconds) * CFG.tickMinutes;
+  if (state.timeMinutes >= CFG.dayEnd) {
+    state.timeMinutes = CFG.dayEnd;
+    autoSleep();
+  }
+  refreshHud();
+}
+
+/* --- 日结算 --- */
+function autoSleep() {
+  if (Game.busy === 'settle') return;
+  performSettlement(true);
+}
+
+function requestSleep() {
+  var unwatered = 0;
+  for (var k in state.plots) {
+    if (!Object.prototype.hasOwnProperty.call(state.plots, k)) continue;
+    var p = state.plots[k];
+    if (p.crop && !p.water && !p.mature) unwatered++;
+  }
+  openWindow({
+    id: 'sleepconfirm', kind: 'custom', narrow: true, title: '结束今天？',
+    build: function (body) {
+      body.appendChild(el('p', null, '现在睡觉会推进到' + fmtTime(CFG.dayStart) + '的第二天。'));
+      if (unwatered > 0) {
+        var warn = el('p', 'muted', '还有 ' + unwatered + ' 株作物今天没有浇水，它们今天不会生长（不会枯死）。');
+        body.appendChild(warn);
+      } else {
+        body.appendChild(el('p', 'muted', '所有作物都浇好水了。'));
+      }
+      body.appendChild(el('p', 'muted', '出货箱里的物品会在睡觉时统一结算。'));
+    },
+    actions: [
+      { label: '再玩一会儿', kind: 'ghost', close: true },
+      { label: '确认睡觉', kind: 'primary', onClick: function () { closeWindow(); setTimeout(function () { performSettlement(false); }, 30); } }
+    ]
+  });
+}
+
+function performSettlement(auto) {
+  if (Game.busy === 'settle') return;
+  Game.busy = 'settle';
+  var backup = null;
+  try { backup = deepClone(state); } catch (e) { backup = null; }
+  var summary = {
+    sold: [], income: 0, dailyAllowance: 0, matured: 0, jam: 0, matureDetail: [], grew: [],
+    day: state.totalDay, auto: !!auto,
+    newDay: state.totalDay + 1,
+    weatherFrom: state.weather.today,
+    weatherTo: state.weather.tomorrow,
+    quests: [],
+    energy: 0,
+    jamWaiting: 0,
+    fallback: false
+  };
+  try {
+    /* 1. 按当天浇水推进生长 */
+    var maturedList = [];
+    var grewList = [];
+    for (var k in state.plots) {
+      if (!Object.prototype.hasOwnProperty.call(state.plots, k)) continue;
+      var p = state.plots[k];
+      if (!p.crop || !p.water || p.mature) continue;
+      var crop = CROPS[p.crop];
+      if (!crop) continue;
+      if (!p.harvested) {
+        p.age += 1;
+        if (p.age >= crop.growDays) { p.mature = true; maturedList.push(crop.name); }
+        // 先定 mature 再取 stage，否则今天刚长熟的这株会被记成"生长中"。
+        var st1 = cropStage(p);
+        grewList.push({ name: crop.name, stage: st1, stageKey: st1 ? st1.key : '', stageLabel: st1 ? st1.label : '' });
+      } else {
+        p.regrow += 1;
+        if (p.regrow >= crop.regrow) { p.mature = true; maturedList.push(crop.name); }
+        var st2 = cropStage(p);
+        grewList.push({ name: crop.name + '（再生）', stage: st2, stageKey: st2 ? st2.key : '', stageLabel: st2 ? st2.label : '' });
+      }
+    }
+    summary.grew = grewList;
+    summary.matured = maturedList.length;
+    summary.matureDetail = maturedList;
+
+    /* 2. 出货箱结算并清空 */
+    for (var sid in state.shipping) {
+      if (!Object.prototype.hasOwnProperty.call(state.shipping, sid)) continue;
+      var q = state.shipping[sid];
+      if (q <= 0) continue;
+      var val = sellValue(sid) * q;
+      summary.income += val;
+      summary.sold.push({ id: sid, name: itemName(sid), qty: q, value: val });
+    }
+    state.shipping = {};
+    state.coins += summary.income;
+
+    /* 3. 果酱罐加工 */
+    state.structures.forEach(function (st) {
+      if (st.device !== 'jam_jar') return;
+      if (st.input > 0 && !st.ready) { st.ready = true; summary.jam += 1; }
+      else if (st.input > 0 && st.ready) summary.jamWaiting += 1;
+    });
+
+    /* 4. 日期 +1 */
+    state.totalDay += 1;
+    summary.dailyAllowance = CFG.dailyAllowance;
+    summary.income += summary.dailyAllowance;
+    state.coins += summary.dailyAllowance;
+    if (state.sceneId === 'house' && state.tutorial && state.tutorial.flags.watered) tutorialEvent('slept');
+
+    /* 5. 天气滚动 */
+    state.weather.today = state.weather.tomorrow;
+    refreshForecast();
+
+    /* 6. 恢复体力与位置：在床上睡则睡醒在床旁，其它情况回农场 */
+    state.energy = CFG.maxEnergy;
+    state.timeMinutes = CFG.dayStart;
+    if (state.sceneId === 'house') {
+      state.player.x = HOUSE_BED_WAKE.x; state.player.y = HOUSE_BED_WAKE.y; state.player.face = 'right';
+    } else {
+      state.sceneId = 'farm';
+      state.player.x = 9; state.player.y = 10; state.player.face = 'down';
+    }
+    syncPlayerPixel();
+
+    /* 7. 重置水分，再应用雨天与洒水器 */
+    for (var pk in state.plots) {
+      if (Object.prototype.hasOwnProperty.call(state.plots, pk)) state.plots[pk].water = false;
+    }
+    if (isRaining()) {
+      for (var rk in state.plots) {
+        if (Object.prototype.hasOwnProperty.call(state.plots, rk)) state.plots[rk].water = true;
+      }
+    }
+    state.structures.forEach(function (st) {
+      if (st.device !== 'sprinkler') return;
+      [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(function (d) {
+        var px = st.x + d[0], py = st.y + d[1];
+        if (!inPlantArea(px, py)) return;
+        var pl = state.plots[key2(px, py)];
+        if (pl) pl.water = true;
+      });
+    });
+
+    /* 8. 资源刷新 */
+    regenResources();
+
+    /* 9. 每日互动重置 + NPC 位置 */
+    state.npcDailyInteractions = {};
+    /* 把白天攒下的委托消息并进当天的结算，并留一条收成记录。 */
+    summary.quests = pendingQuestLines.slice();
+    pendingQuestLines.length = 0;
+    var histRec = {
+      day: summary.day, income: summary.income, dailyAllowance: summary.dailyAllowance, matured: summary.matured, jam: summary.jam,
+      weather: summary.weatherTo, auto: summary.auto,
+      sold: summary.sold.map(function (x) { return { id: x.id, name: x.name, qty: x.qty, value: x.value }; }),
+      matureDetail: summary.matureDetail.slice()
+    };
+    state.settleHistory = normalizeSettleHistory((state.settleHistory || []).concat([histRec]));
+    summary.energy = state.energy;
+    saveNow();
+    updateNpcPositions(true);
+    onSceneChanged();
+    showSettlement(summary);
+    Audio2.play('quest');
+  } catch (e) {
+    if (backup) { state = backup; }
+    toast('日结算出现问题，已回滚到今天的状态。');
+    if (window.console) console.error(e);
+    summary.fallback = true;
+  } finally {
+    Game.busy = null;
+  }
+}
+
+function regenResources() {
+  var d = state.totalDay;
+  // 野莓每天恢复
+  Object.keys(state.resourceNodes).forEach(function (k) {
+    var n = state.resourceNodes[k];
+    if (n.type === 'berry') n.active = true;
+  });
+  if (d >= CFG.regenFirstDay && (d - CFG.regenFirstDay) % CFG.regenInterval === 0) {
+    var order = Object.keys(state.resourceNodes).sort();
+    var trees = 0, stones = 0;
+    for (var i = 0; i < order.length; i++) {
+      var n2 = state.resourceNodes[order[i]];
+      if (n2.type === 'tree' && !n2.active && trees < CFG.regenTrees) { n2.active = true; n2.hp = 3; trees++; }
+      else if (n2.type === 'stone' && !n2.active && stones < CFG.regenStones) { n2.active = true; n2.hp = 2; stones++; }
+    }
+  }
+}
+
+/* --- 日结算演出：一页一件事，翻完才算过完这一天 --- */
+var settleUI = { pages: [], index: 0, summary: null };
+
+/* 白天发生的委托变化先记在待入列的缓冲里，睡觉时并进当天的结算页。
+   （不写进存档：结算页已经打开的当口，这一条只会出现在演出里。） */
+var pendingQuestLines = [];
+function questLogPush(text) {
+  pendingQuestLines.push(text);
+  if (pendingQuestLines.length > 8) pendingQuestLines.shift();
+}
+
+function settleStep(kind, title, lines) {
+  return { kind: kind, title: title, lines: lines };
+}
+
+/* 结算里引用作物阶段时统一走这里：cropStage() 返回的是对象，
+   直接拼进文案会变成 [object Object]。 */
+function stageLabel(g) {
+  if (!g || !g.stage) return '生长中';
+  if (typeof g.stage === 'string') return g.stage;
+  return g.stage.label || g.stage.key || '生长中';
+}
+
+/* 把当天的变化整理成 2~5 页：
+   钱 → 庄稼 → 果酱 → 委托 → 天气。没有内容的页会跳过，
+   但天气那页一定留着，让玩家每次都看到"明天是什么天"。 */
+function settlementPages(s) {
+  var pages = [];
+  if (s.sold.length || s.income) {
+    var lines = s.income ? ['总收入 ' + s.income + ' 金（现有 ' + state.coins + ' 金）'] : [];
+    if (s.dailyAllowance) lines.push('每日补助 → ' + s.dailyAllowance + ' 金');
+    s.sold.forEach(function (x) { lines.push(x.name + ' ×' + x.qty + ' → ' + x.value + ' 金'); });
+    if (!s.sold.length) lines.push('出货箱是空的，今天没有卖出东西。');
+    pages.push(settleStep('sold', '出货与收入', lines));
+  }
+  if (s.grew.length || s.matured) {
+    var glines = [];
+    if (s.matured) {
+      s.matureDetail.forEach(function (n) { glines.push('★ ' + n + ' 今天长熟了，现在就能收。'); });
+    }
+    /* 刚长熟的那几株今天已经不再生长，别算进"又长了一天"里，否则自相矛盾。 */
+    var growing = s.grew.filter(function (g) { return g.stageKey !== 'mature'; });
+    if (growing.length) {
+      glines.push('浇过水的 ' + growing.length + ' 株又长了一天。');
+      var byName = {};
+      growing.forEach(function (g) { byName[g.name] = stageLabel(g); });
+      Object.keys(byName).forEach(function (n) { glines.push('· ' + n + ' 现在是「' + byName[n] + '」。'); });
+    } else if (!s.matured) {
+      glines.push('今天没有作物在生长——睡觉前记得浇水。');
+    }
+    if (!s.matured) glines.push('还没有作物成熟。');
+    pages.push(settleStep('crop', '田里的变化', glines));
+  }
+  if (s.jam) {
+    pages.push(settleStep('jam', '果酱罐', [
+      '有 ' + s.jam + ' 份莓果酱加工完成，取出来就能放进出货箱。',
+      '罐子空着的时候记得再放一颗草莓进去。'
+    ]));
+  }
+  if (s.quests && s.quests.length) {
+    pages.push(settleStep('quest', '委托进展', s.quests.slice()));
+  }
+  var toRain = s.weatherTo === 'rain';
+  var wlines = [];
+  if (s.auto) wlines.push('你累得直接在田里睡着了，体力已经恢复满。');
+  wlines.push('今天：' + (s.weatherFrom === 'rain' ? '雨天' : '晴天') + '。');
+  wlines.push('明天：' + (toRain ? '雨天 —— 耕地会自动湿润，不用浇水。' : '晴天 —— 记得浇水。'));
+  wlines.push('体力已恢复到 ' + state.energy + ' / ' + CFG.maxEnergy + '，今天是第 ' + state.totalDay + ' 天。');
+  if (s.fallback) wlines.push('（今天的记录只存下了关键部分。）');
+  pages.push(settleStep('weather', '天气与明天', wlines));
+  return pages;
+}
+
+function settleRenderPage(body, page) {
+  body.appendChild(el('p', 'muted', settleUI.summary ? ('第 ' + settleUI.summary.day + ' 天结束 · 第 ' + (settleUI.index + 1) + ' / ' + settleUI.pages.length + ' 页') : ''));
+  body.appendChild(el('div', 'section-title', page.title));
+  var box = el('div', 'panel-box');
+  page.lines.forEach(function (t) {
+    var line = el('div', 'sum-line');
+    line.appendChild(el('span', null, t));
+    if (page.kind === 'sold' && /→/.test(t)) line.lastChild.classList.add('gold');
+    box.appendChild(line);
+  });
+  body.appendChild(box);
+}
+
+function settleNext() {
+  if (settleUI.index < settleUI.pages.length - 1) { settleUI.index += 1; renderWindow(); return; }
+  closeWindow();
+}
+function settleSkip() {
+  settleUI.index = settleUI.pages.length - 1;
+  renderWindow();
+}
+
+function showSettlement(summary) {
+  settleUI.pages = settlementPages(summary);
+  settleUI.index = 0;
+  settleUI.summary = summary;
+  openWindow({
+    id: 'settlement', kind: 'custom', title: function () {
+      return '第 ' + (summary.day || 0) + ' 天结束 · ' + (settleUI.index + 1) + ' / ' + settleUI.pages.length;
+    },
+    build: function (body) {
+      var multi = settleUI.pages.length > 1;
+      if (multi) {
+        var steps = el('div', 'sum-grid');
+        for (var i = 0; i < settleUI.pages.length; i++) {
+          var cell = el('div', 'sum-cell' + (i === settleUI.index ? ' cur' : ''));
+          cell.appendChild(el('div', 'sum-k', '第 ' + (i + 1) + ' 页'));
+          cell.appendChild(el('div', 'sum-v' + (i === settleUI.index ? ' good' : ''), settleUI.pages[i].title));
+          steps.appendChild(cell);
+        }
+        body.appendChild(steps);
+      }
+      settleRenderPage(body, settleUI.pages[settleUI.index]);
+    },
+    actions: [
+      { label: '翻到最后', kind: 'ghost', close: false, onClick: settleSkip },
+      {
+        label: '开始新的一天', kind: 'primary', close: false,
+        onClick: function () { settleNext(); }
+      }
+    ]
+  });
+}
+
+/* --- 收成记录：最近 7 天的日结算回看 --- */
+function openSettleLog() {
+  var list = (state.settleHistory || []).slice().reverse();
+  openWindow({
+    id: 'settlelog', kind: 'custom', narrow: true, title: '收成记录',
+    build: function (body) {
+      if (!list.length) {
+        body.appendChild(el('p', 'muted', '还没有记录。睡一觉过完一天，这里就会记下当天的收入、庄稼、果酱和天气。'));
+        return;
+      }
+      list.forEach(function (r) {
+        var box = el('div', 'panel-box');
+        var head = el('div', 'row between');
+        head.appendChild(el('div', 'quest-name', '第 ' + r.day + ' 天'));
+        head.appendChild(el('span', 'req-chip', (r.weather === 'rain' ? '雨天' : '晴天') + (r.auto ? ' · 累倒' : '')));
+        box.appendChild(head);
+        var block = el('div', 'sum-block');
+        function add(k, v) {
+          var line = el('div', 'sum-line');
+          line.appendChild(el('span', 'sum-k rec-k', k));
+          line.appendChild(el('span', null, v));
+          block.appendChild(line);
+        }
+        add('收入', r.income + ' 金');
+        if (r.dailyAllowance) add('每日补助', r.dailyAllowance + ' 金');
+        add('卖出', r.sold.length ? r.sold.map(function (x) { return x.name + ' ×' + x.qty; }).join('、') : '无');
+        add('成熟', r.matured ? (r.matureDetail.join('、') || (r.matured + ' 株')) : '无');
+        add('果酱', r.jam ? (r.jam + ' 份') : '无');
+        box.appendChild(block);
+        body.appendChild(box);
+      });
+    },
+    actions: [{ label: '合上记录', kind: 'ghost', close: true }]
+  });
+}
+
+/* ============================================================
+   8. 村民日程、对话与好感
+   ============================================================ */
+
+var npcRuntime = {};
+
+function scheduleSlot(npc, minutes) {
+  for (var i = 0; i < npc.schedule.length; i++) {
+    var s = npc.schedule[i];
+    if (minutes >= s.from && minutes < s.to) return s;
+  }
+  return npc.schedule[npc.schedule.length - 1];
+}
+
+function ensureNpcRuntime() {
+  for (var id in NPCS) {
+    if (!Object.prototype.hasOwnProperty.call(NPCS, id)) continue;
+    if (!npcRuntime[id]) {
+      var slot = scheduleSlot(NPCS[id], state.timeMinutes);
+      npcRuntime[id] = { x: slot.x, y: slot.y, face: 'down', path: [], turnT: 0, speed: 1.9 };
+    }
+  }
+}
+
+function updateNpcPositions(instant) {
+  ensureNpcRuntime();
+  for (var id in npcRuntime) {
+    if (!Object.prototype.hasOwnProperty.call(npcRuntime, id)) continue;
+    var npc = NPCS[id], r = npcRuntime[id];
+    var slot = scheduleSlot(npc, state.timeMinutes);
+    if(!instant&&npc.scene!==state.sceneId){r.x=slot.x;r.y=slot.y;r.path=[];continue;}
+    if (instant) { r.x = slot.x; r.y = slot.y; r.path = []; r.face = 'down'; continue; }
+    if (r.x === slot.x && r.y === slot.y) { r.path = []; continue; }
+    if (!r.path.length || r.pathGoal !== key2(slot.x, slot.y)) {
+      var p = findPath(npc.scene, r.x, r.y, slot.x, slot.y);
+      r.path = p || [];
+      r.pathGoal = key2(slot.x, slot.y);
+    }
+  }
+}
+
+function tickNpc(dt) {
+  if(timePaused())return;
+  updateNpcPositions(false);
+  var budget = dt;
+  for (var id in npcRuntime) {
+    if (!Object.prototype.hasOwnProperty.call(npcRuntime, id)) continue;
+    var r = npcRuntime[id];
+    if (!r.path.length) continue;
+    var step = r.speed * budget;
+    while (step > 0 && r.path.length) {
+      var nxt = r.path[0];
+      var dx = nxt[0] - r.x, dy = nxt[1] - r.y;
+      var dist = Math.abs(dx) + Math.abs(dy);
+      if (dist <= step) { r.x = nxt[0]; r.y = nxt[1]; r.path.shift(); step -= dist; }
+      else {
+        r.x += dx * (step / dist); r.y += dy * (step / dist); step = 0;
+        r.face = dx < 0 ? 'left' : dx > 0 ? 'right' : dy < 0 ? 'up' : 'down';
+      }
+      if (dist > 0) {
+        r.face = dx < 0 ? 'left' : dx > 0 ? 'right' : dy < 0 ? 'up' : 'down';
+      }
+    }
+  }
+}
+
+function npcDaily(id) {
+  var d = state.npcDailyInteractions[id];
+  if (!d || d.day !== state.totalDay) d = state.npcDailyInteractions[id] = { day: state.totalDay, chat: false, gift: false, chatCount: 0, heartStage: 0 };
+  return d;
+}
+
+function friendshipStage(v) { return v >= 75 ? 75 : v >= 50 ? 50 : v >= 25 ? 25 : 0; }
+function heartsText(v) {
+  var full = Math.floor(v / 25);
+  return '♥'.repeat(full) + '♡'.repeat(Math.max(0, 4 - full));
+}
+
+function npcDialogue(id) {
+  var npc = NPCS[id], d = npcDaily(id);
+  var stage = friendshipStage(state.npcFriendship[id] || 0);
+  var text;
+  if (stage > 0 && stage > d.heartStage) {
+    d.heartStage = stage;
+    text = npc.heartLines[stage];
+  } else if (state.questProgress[3] === 'unlocked' || (state.questProgress[2] === 'done' && state.questProgress[3] !== 'done')) {
+    text = npc.bridgeLines[(d.chatCount + (id === 'yaya' ? 0 : 1)) % npc.bridgeLines.length];
+  } else if (isRaining()) {
+    text = npc.rainLines[d.chatCount % npc.rainLines.length];
+  } else {
+    text = npc.lines[(d.chatCount + state.totalDay) % npc.lines.length];
+  }
+  d.chatCount += 1;
+  return text;
+}
+
+function talkToNpc(id) {
+  var text = npcDialogue(id);
+  var d = npcDaily(id);
+  var gained = 0;
+  if (!d.chat) {
+    d.chat = true;
+    state.npcFriendship[id] = clamp((state.npcFriendship[id] || 0) + 2, 0, 100);
+    gained = 2;
+    markDirty();
+  }
+  openDialogue(id, text, gained);
+}
+
+function giftToNpc(id, itemId) {
+  if (!isGiftable(itemId)) { toast('这个东西不能当作礼物。'); return false; }
+  var d = npcDaily(id);
+  if (d.gift) { toast(NPCS[id].name + '今天已经收过礼物了，明天再来吧。'); Audio2.play('fail'); return false; }
+  if (invCount(itemId) <= 0) { toast('背包里没有这个物品了。'); return false; }
+  var npc = NPCS[id];
+  var kind = 'like';
+  if (npc.like.indexOf(itemId) >= 0) kind = 'love';
+  else if (npc.dislike.indexOf(itemId) >= 0) kind = 'dislike';
+  var delta = kind === 'love' ? 8 : kind === 'dislike' ? -2 : 3;
+  invRemove(itemId, 1);
+  d.gift = true;
+  state.npcFriendship[id] = clamp((state.npcFriendship[id] || 0) + delta, 0, 100);
+  var fb = GIFT_FEEDBACK[kind][id] || [kind==='love'?'这份礼物我很喜欢，谢谢你！':kind==='dislike'?'谢谢你的心意，不过我不太需要这个。':'谢谢，我会好好收下的。'];
+  var line = fb[(d.chatCount + state.totalDay) % fb.length];
+  Audio2.play(kind === 'dislike' ? 'fail' : 'quest');
+  markDirty(); refreshHud();
+  openDialogue(id, line + '\n（' + (delta > 0 ? '好感 +' : '好感 ') + delta + ' · ' + heartsText(state.npcFriendship[id]) + '）', 0);
+  return true;
+}
+
+/* ============================================================
+   9. 委托与修桥
+   ============================================================ */
+
+function questById(id) { for (var i = 0; i < QUESTS.length; i++) if (QUESTS[i].id === id) return QUESTS[i]; return null; }
+function questState(id) { return state.questProgress[id] || 'locked'; }
+function questNeedText(q) {
+  return Object.keys(q.need).map(function (k) {
+    if (k === 'anyFish') {
+      var n = anyFishIn(state.inventory);
+      return '任意鱼 ' + (n > 0 ? n : 0) + ' / 1';
+    }
+    return itemName(k) + ' ' + (state.inventory[k] || 0) + ' / ' + q.need[k];
+  });
+}
+function questReady(q) {
+  return Object.keys(q.need).every(function (k) {
+    if (k === 'anyFish') return anyFishIn(state.inventory) >= 1;
+    return (state.inventory[k] || 0) >= q.need[k];
+  });
+}
+function currentQuest() {
+  for (var i = 0; i < QUESTS.length; i++) if (questState(QUESTS[i].id) === 'unlocked') return QUESTS[i];
+  return null;
+}
+function questStripText() {
+  var q = currentQuest();
+  if (!q) return '所有委托都完成了，去钓鱼或继续经营农场吧。';
+  var t = questTargetOf(q), tail = '';
+  if (t) {
+    if (t.scene === state.sceneId) {
+      tail = ' → ' + t.label + ' ' + questDistText(t.x - state.player.x, t.y - state.player.y);
+    } else {
+      tail = ' → 先去' + MAPS[t.scene].name;
+    }
+  }
+  return q.id + ' · ' + q.name + ' — ' + questNeedText(q).join('、') + tail;
+}
+
+function submitQuest(id) {
+  var q = questById(id);
+  if (!q) return false;
+  if (questState(id) !== 'unlocked') { toast('这个委托还没解锁。'); Audio2.play('fail'); return false; }
+  if (!questReady(q)) {
+    var miss = questNeedText(q).filter(function (s) { return / 0 \//.test(s); });
+    toast('材料不足：' + (miss.length ? miss.join('、') : questNeedText(q).join('、')));
+    Audio2.play('fail');
+    return false;
+  }
+  var cost = [];
+  Object.keys(q.need).forEach(function (k) {
+    if (k === 'anyFish') {
+      var f = lowestPricedFishIn(state.inventory);
+      invRemove(f.id, 1);
+      cost.push(f.name + ' ×1');
+    } else {
+      invRemove(k, q.need[k]);
+      cost.push(itemName(k) + ' ×' + q.need[k]);
+    }
+  });
+  var r = q.reward;
+  if (r.coins) state.coins += r.coins;
+  if (r.friendship) {
+    Object.keys(r.friendship).forEach(function (n) {
+      state.npcFriendship[n] = clamp((state.npcFriendship[n] || 0) + r.friendship[n], 0, 100);
+    });
+  }
+  if (r.recipe && state.unlockedRecipes.indexOf(r.recipe) < 0) state.unlockedRecipes.push(r.recipe);
+  if (r.tool) invAdd(r.tool, 1);
+  if (r.bridge) {
+    state.bridgeRepaired = true;
+    addParticle(27, 10, 'bridge');
+    addParticle(28, 11, 'bridge');
+    Audio2.play('bridge');
+  }
+  state.questProgress[id] = 'done';
+  questLogPush('完成委托 ' + id + '「' + q.name + '」，交付 ' + cost.join('、') + '。');
+  var next = questById(id + 1);
+  if (next && state.questProgress[next.id] === 'locked') {
+    state.questProgress[next.id] = 'unlocked';
+    questLogPush('新委托 ' + next.id + '「' + next.name + '」已解锁。');
+  }
+  saveNow(); refreshHud();
+  toast('完成委托「' + q.name + '」，交付了 ' + cost.join('、') + '。');
+  Audio2.play('quest');
+  if (r.bridge) {
+    setTimeout(function () {
+      openWindow({
+        id: 'bridgeDone', kind: 'custom', narrow: true, title: '小桥修好了',
+        build: function (b) {
+          b.appendChild(el('p', null, '旧桥重新连上了河岸。明天，也许能遇见新的风景。'));
+          b.appendChild(el('p', 'muted', '现在可以穿过小镇东侧前往河边了，钓竿已经放进背包。'));
+        },
+        actions: [{ label: '太好了', kind: 'primary', close: true }]
+      });
+    }, 260);
+  }
+  return true;
+}
+
+/* ============================================================
+   10. 钓鱼小游戏
+   ============================================================ */
+
+var FISH = { track: 200, bar: 64, up: 100, down: 70, gain: 0.25, loss: 0.12, limit: 20, startProgress: 0.25 };
+
+function fishPool() {
+  var level = state.rodLevel || 1;
+  return FISHES.filter(function(f) { return (f.tier || 1) <= level; }).map(function(f) {
+    var tier = f.tier || 1;
+    var weight = tier === 1 ? (isRaining() ? f.rain : f.sunny) * (level === 1 ? 1 : 0.3)
+      : (tier === level ? 0.7 : 0.3) * (isRaining() ? f.rain : f.sunny);
+    return {fish:f,weight:weight};
+  });
+}
+function pickFish() {
+  var pool = fishPool(), total = pool.reduce(function(n,p) { return n+p.weight; },0);
+  var r = rand()*total;
+  for(var i=0;i<pool.length;i++) { r-=pool[i].weight; if(r<=0) return pool[i].fish; }
+  return pool[pool.length-1].fish;
+}
+
+function toolFish(tx, ty) {
+  if (invCount('tool_rod') < 1) { toast('先完成修桥委托，获得钓竿。'); return false; }
+  if (state.sceneId !== 'riverside' && state.sceneId !== 'farm' && state.sceneId !== 'forest') { toast('可以在农场池塘、河边或森林湖钓鱼。'); return false; }
+  var p = state.player;
+  var atBank = [[0,-1],[0,1],[-1,0],[1,0]].some(function (d) { return isWater(state.sceneId, p.x+d[0], p.y+d[1]); });
+  if (!atBank || Math.abs(tx-p.x)+Math.abs(ty-p.y) > 3) { toast('站在岸边，点击 3 格以内的水面抛竿。'); return false; }
+  if (!isWater(state.sceneId, tx, ty)) { toast('对着水面才能抛竿。'); return false; }
+  if (freeSlots(state.inventory) < 1) { toast('背包满了，先整理一下。'); Audio2.play('fail'); return false; }
+  if (!hasEnergy(CFG.energyCost.fish)) return false;
+  state.energy -= CFG.energyCost.fish;
+  var f = pickFish();
+  Game.fishing = {
+    active: true, phase: 'cast', t: 0, wait: 0, fish: f,
+    barY: (FISH.track - FISH.bar) / 2, fishY: FISH.track / 2, fishDir: 1,
+    fishSpeed: f.speed, turnT: 0, targetY: FISH.track / 2,
+    progress: FISH.startProgress, elapsed: 0, holding: false, tx: tx, ty: ty,
+    // 玩家解锁钓竿后的第一次下竿：必定钓起 DS 小姐。
+    dsFirst: !state.dsMet && state.sceneId === 'riverside'
+  };
+  if (Game.fishing.dsFirst) { Game.fishing.wait = 0.6; Game.fishing.fishSpeed = 18; }
+  Audio2.play('splash');
   markDirty(); refreshHud();
   return true;
 }
@@ -5234,7 +6382,8 @@ function openQuestLog(site) {
       }
       if(QUEST_TAB==='explore'){
         b.appendChild(el('p','muted','当前探索度：'+(exploreState().explorePoints||0)+' · 探索等级 '+explorationTier()+' / 3。探索度越高，森林、矿山和白蔷薇城会出现新的委托。'));
-        WORLD_QUESTS.forEach(function(q){renderSpecialQuestCard(b,q,'explore');});return;
+        WORLD_QUESTS.forEach(function(q){renderSpecialQuestCard(b,q,'explore');});
+        appendCityStoryLog(b);return;
       }
       if(QUEST_TAB==='bond'){
         b.appendChild(el('p','muted','和居民聊天、送礼提升好感，个人委托会逐步解锁。'));
@@ -5447,6 +6596,10 @@ function openPause() {
       row2.appendChild(mkBtn('立即保存', '', function () { saveNow(); toast('已保存。'); }));
       row2.appendChild(mkBtn('导出存档', '', function () { openSaveIO('export'); }));
       row2.appendChild(mkBtn('导入存档', '', function () { openSaveIO('import'); }));
+      row2.appendChild(mkBtn('账号与云存档', '', function () {
+        if (window.MossCloud && window.MossCloud.open) window.MossCloud.open();
+        else toast('云存档模块尚未加载。');
+      }));
       b.appendChild(row2);
 
       b.appendChild(el('div', 'hr'));
@@ -8011,6 +9164,13 @@ window.__MOSS__ = {
   openSettleLog: openSettleLog, settlementPages: settlementPages,
   toolShovel: toolShovel,
   saveNow: saveNow, serialize: serialize,
+  openWindow: openWindow,
+  replaceSave: function (raw) {
+    var normalized = normalizeSave(raw);
+    if (!normalized) return false;
+    startGame(normalized);
+    return true;
+  },
   isSolid: isSolid, findPath: findPath, facingTile: facingTile,
   __npcDialogue: npcDialogue, __talkToNpc: talkToNpc, __giftToNpc: giftToNpc, __heartsText: heartsText, __isGiftable: isGiftable,
   __npcRuntime: npcRuntime, __findNpcAdjacent: findNpcAdjacent,
@@ -8026,6 +9186,24 @@ window.__MOSS__ = {
   },
   tileOfPixel: function (tx, ty) { return [Math.floor(tx * TILE + 8), Math.floor(ty * TILE + 12)]; },
   canFarmSteps: CAN_FARM_STEPS, farmRing: farmRingVisible, inPlantArea: inPlantArea, tileFrameVisible: tileFrameVisible,
+  replaceSave: function (raw) {
+    var normalized = normalizeSave(raw);
+    if (!normalized) return false;
+    state = normalized;
+    Game.ppos = { x: state.player.x * TILE + 8, y: state.player.y * TILE + 12 };
+    Game.swingT = 0;
+    cam.init = false;
+    ensureNpcRuntime();
+    updateNpcPositions(true);
+    closeWindow(true);
+    $('#boot').hidden = true;
+    resizeCanvas();
+    Audio2.setEnabled(!!state.settings.sound);
+    refreshHotbar();
+    onSceneChanged();
+    saveNow();
+    return true;
+  },
   startGame: function (s) { var r = loadGame(); state = s || r.state || newGameState(); if (!state.resourceNodes || !Object.keys(state.resourceNodes).length) initNewGameWorld(); Game.ppos = { x: state.player.x * TILE + 8, y: state.player.y * TILE + 12 }; ensureNpcRuntime(); updateNpcPositions(true); $('#boot').hidden = true; resizeCanvas(); refreshHotbar(); onSceneChanged(); }
 };
 
@@ -8040,6 +9218,329 @@ toast = function (m) {
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
 else boot();
 
+})();
+
+</script>
+<script>
+/* Optional manual cloud saves for Moss Farm. No third-party SDK or CDN. */
+(function () {
+  'use strict';
+
+  var SUPABASE_URL = 'https://sgreogmeysnapfqipfmz.supabase.co';
+  var SUPABASE_KEY = 'sb_publishable___r54AYp8AWKzpHXd8jIew_PQ-CLaL0';
+  var SLOT_ID = '00000000-0000-4000-8000-000000000001';
+  var SESSION_KEY = 'moss-cloud-session';
+  var ACTIVE_USER_KEY = 'moss-cloud-user-id';
+  var DEVICE_KEY = 'moss-cloud-device-id';
+  var PROFILE_PREFIX = 'moss-cloud-profile:';
+  var busy = false;
+  var message = '';
+
+  function readJson(key) {
+    try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { return null; }
+  }
+  function writeJson(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch (e) { return false; }
+  }
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 3 | 8)).toString(16);
+    });
+  }
+  function deviceId() {
+    var id = localStorage.getItem(DEVICE_KEY);
+    if (!id) { id = uuid(); localStorage.setItem(DEVICE_KEY, id); }
+    return id;
+  }
+  function session() { return readJson(SESSION_KEY); }
+  function userId() { var s = session(); return s && s.user && s.user.id; }
+  function profile() { var id = userId(); return id ? readJson(PROFILE_PREFIX + id) : null; }
+  function accountSaveKey(id) { return 'moss-farm-v2:user:' + id; }
+
+  async function api(path, options, token) {
+    options = options || {};
+    var headers = Object.assign({
+      apikey: SUPABASE_KEY,
+      'Content-Type': 'application/json'
+    }, options.headers || {});
+    if (token) headers.Authorization = 'Bearer ' + token;
+    var response = await fetch(SUPABASE_URL + path, Object.assign({}, options, { headers: headers }));
+    var body = null;
+    var raw = await response.text();
+    if (raw) { try { body = JSON.parse(raw); } catch (e) { body = raw; } }
+    if (!response.ok) {
+      var detail = body && (body.msg || body.message || body.error_description || body.error) || response.statusText;
+      throw new Error(String(detail || '请求失败') + '（' + response.status + '）');
+    }
+    return body;
+  }
+  async function validSession() {
+    var s = session();
+    if (!s || !s.refresh_token || !s.user || !s.user.id) return null;
+    if (s.expires_at && Date.now() < Number(s.expires_at) * 1000 - 60000 && s.access_token) return s;
+    var next = await api('/auth/v1/token?grant_type=refresh_token', {
+      method: 'POST', body: JSON.stringify({ refresh_token: s.refresh_token })
+    });
+    if (!next || !next.access_token) throw new Error('登录状态已过期，请重新登录。');
+    writeJson(SESSION_KEY, next);
+    return next;
+  }
+  async function authorized(path, options) {
+    var s = await validSession();
+    if (!s) throw new Error('请先登录账号。');
+    return api(path, options, s.access_token);
+  }
+  function activateAccount(s, username) {
+    // Flush the current game while its old storage key is still active.
+    if (window.__MOSS__ && window.__MOSS__.saveNow) window.__MOSS__.saveNow();
+    var guest = localStorage.getItem('moss-farm-v2');
+    var scoped = accountSaveKey(s.user.id);
+    if (!localStorage.getItem(scoped) && guest) {
+      try { localStorage.setItem(scoped, guest); } catch (e) {}
+    }
+    localStorage.setItem(ACTIVE_USER_KEY, s.user.id);
+    if (username) writeJson(PROFILE_PREFIX + s.user.id, { username: username });
+    location.reload();
+  }
+  async function lookupProfile(s) {
+    var rows = await api('/rest/v1/player_profiles?select=username&user_id=eq.' +
+      encodeURIComponent(s.user.id) + '&limit=1', { method: 'GET' }, s.access_token);
+    return Array.isArray(rows) && rows.length ? rows[0].username : '';
+  }
+  async function createProfile(s, username) {
+    username = username.trim();
+    if (!/^[A-Za-z0-9_]{3,20}$/.test(username)) {
+      throw new Error('账号名需为 3–20 位字母、数字或下划线。');
+    }
+    await api('/rest/v1/player_profiles', {
+      method: 'POST',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ user_id: s.user.id, username: username })
+    }, s.access_token);
+    writeJson(PROFILE_PREFIX + s.user.id, { username: username });
+    return username;
+  }
+  async function finishAuth(s, username) {
+    writeJson(SESSION_KEY, s);
+    var actual = username || await lookupProfile(s);
+    if (!actual) {
+      message = '登录成功。请设置一个唯一账号名后继续。';
+      open();
+      return;
+    }
+    activateAccount(s, actual);
+  }
+
+  function addField(parent, labelText, type, autocomplete, value) {
+    var label = document.createElement('label');
+    label.className = 'cloud-field';
+    label.appendChild(document.createTextNode(labelText));
+    var input = document.createElement('input');
+    input.type = type;
+    input.autocomplete = autocomplete;
+    input.value = value || '';
+    input.required = true;
+    label.appendChild(input);
+    parent.appendChild(label);
+    return input;
+  }
+  function addNote(parent, text, className) {
+    var p = document.createElement('p');
+    p.className = className || 'muted cloud-note';
+    p.textContent = text;
+    parent.appendChild(p);
+    return p;
+  }
+  function button(parent, label, callback, kind) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn ' + (kind || '');
+    b.textContent = label;
+    b.disabled = busy;
+    b.onclick = callback;
+    parent.appendChild(b);
+    return b;
+  }
+  function reportError(error) {
+    message = error && error.message ? error.message : String(error);
+    open();
+  }
+  async function run(action) {
+    if (busy) return;
+    busy = true;
+    open();
+    try { await action(); }
+    catch (e) { message = e.message || String(e); }
+    finally { busy = false; open(); }
+  }
+  function open() {
+    if (!window.__MOSS__ || !window.__MOSS__.ui) {
+      setTimeout(open, 150);
+      return;
+    }
+    window.__MOSS__.openWindow({
+      id: 'cloud-account', kind: 'cloud-account', narrow: true, title: '账号与云存档',
+      build: function (body) {
+        var uid = userId();
+        var s = session();
+        var p = profile();
+        var active = localStorage.getItem(ACTIVE_USER_KEY);
+        if (message) addNote(body, message, 'cloud-message');
+        if (busy) addNote(body, '正在处理…', 'muted cloud-note');
+        if (s && uid) {
+          body.appendChild(elText('div', 'cloud-account-name', p && p.username ? '账号名：' + p.username : '账号已登录'));
+          addNote(body, s.user.email || '已登录', 'muted cloud-note');
+          if (active !== uid) {
+            addNote(body, '这个账号尚未连接当前设备的本地存档。连接后会重载游戏；现有游客存档会复制到账号的本地存档（仅当账号本地存档为空时）。', 'muted cloud-note');
+            button(body, '连接此设备', function () {
+              run(async function () {
+                var fresh = await validSession();
+                var name = await lookupProfile(fresh);
+                activateAccount(fresh, name);
+              });
+            }, 'primary');
+          } else {
+            addNote(body, '游戏仍会自动保存在本设备。需要跨设备时，请手动上传或下载。', 'muted cloud-note');
+            button(body, '上传本地存档到云端', function () { run(uploadSave); }, 'primary');
+            button(body, '从云端下载并覆盖本地存档', function () { run(downloadSave); });
+            button(body, '退出账号', function () {
+              run(async function () {
+                var current = await validSession();
+                try { await api('/auth/v1/logout', { method: 'POST' }, current.access_token); } catch (e) {}
+                localStorage.removeItem(SESSION_KEY);
+                localStorage.removeItem(ACTIVE_USER_KEY);
+                location.reload();
+              });
+            }, 'ghost');
+          }
+          if (!p || !p.username) {
+            var nameInput = addField(body, '设置唯一账号名（3–20 位字母、数字、下划线）', 'text', 'username');
+            button(body, '保存账号名', function () {
+              run(async function () {
+                if (!nameInput.value.trim()) throw new Error('请输入账号名。');
+                var fresh = await validSession();
+                var name = await createProfile(fresh, nameInput.value);
+                writeJson(PROFILE_PREFIX + fresh.user.id, { username: name });
+                activateAccount(fresh, name);
+              });
+            }, 'primary');
+          }
+        } else {
+          addNote(body, '用邮箱和密码注册或登录；账号名需唯一。关闭 Supabase 的邮箱确认后，不需要配置域名或 SMTP。忘记密码时目前需要重新注册。', 'muted cloud-note');
+          var signup = document.createElement('div');
+          signup.className = 'cloud-form';
+          signup.appendChild(elText('div', 'cloud-section-title', '创建账号'));
+          var newName = addField(signup, '唯一账号名', 'text', 'username');
+          var newEmail = addField(signup, '邮箱', 'email', 'email');
+          var newPassword = addField(signup, '密码（至少 6 位）', 'password', 'new-password');
+          button(signup, '注册并连接', function () {
+            run(async function () {
+              if (newPassword.value.length < 6) throw new Error('密码至少需要 6 位。');
+              var result = await api('/auth/v1/signup', {
+                method: 'POST',
+                body: JSON.stringify({ email: newEmail.value.trim(), password: newPassword.value })
+              });
+              if (!result || !result.access_token || !result.user) {
+                throw new Error('注册请求已发送但没有登录会话。请在 Supabase Authentication 设置中关闭 Confirm email 后再注册。');
+              }
+              writeJson(SESSION_KEY, result);
+              var name = await createProfile(result, newName.value);
+              activateAccount(result, name);
+            });
+          }, 'primary');
+          body.appendChild(signup);
+
+          var login = document.createElement('div');
+          login.className = 'cloud-form';
+          login.appendChild(elText('div', 'cloud-section-title', '已有账号登录'));
+          var email = addField(login, '邮箱', 'email', 'email');
+          var password = addField(login, '密码', 'password', 'current-password');
+          button(login, '登录并连接', function () {
+            run(async function () {
+              var result = await api('/auth/v1/token?grant_type=password', {
+                method: 'POST',
+                body: JSON.stringify({ email: email.value.trim(), password: password.value })
+              });
+              if (!result || !result.access_token || !result.user) throw new Error('登录失败，请检查邮箱和密码。');
+              writeJson(SESSION_KEY, result);
+              var name = await lookupProfile(result);
+              if (!name) {
+                message = '该账号还没有账号名，请在下方设置。';
+                open();
+                return;
+              }
+              activateAccount(result, name);
+            });
+          }, 'primary');
+          body.appendChild(login);
+        }
+      }
+    });
+  }
+  function elText(tag, className, text) {
+    var n = document.createElement(tag);
+    n.className = className;
+    n.textContent = text;
+    return n;
+  }
+  async function readCloudSave() {
+    var rows = await authorized('/rest/v1/game_saves?select=revision,updated_at,payload,schema_version,last_mutation_id&slot_id=eq.' +
+      encodeURIComponent(SLOT_ID) + '&limit=1', { method: 'GET' });
+    return Array.isArray(rows) && rows.length ? rows[0] : null;
+  }
+  async function uploadSave() {
+    if (!window.__MOSS__ || !window.__MOSS__.serialize) throw new Error('游戏存档尚未准备好，请稍后再试。');
+    var remote = await readCloudSave();
+    var s = await validSession();
+    var day = window.__MOSS__.serialize().totalDay;
+    if (!window.confirm(remote
+      ? '云端已有第 ' + (remote.payload && remote.payload.totalDay || '?') + ' 天的存档（版本 ' + remote.revision + '）。确定用本设备第 ' + day + ' 天的存档覆盖吗？'
+      : '确定把本设备第 ' + day + ' 天的存档上传到云端吗？')) return;
+    var mutationId = uuid();
+    var result = await api('/rest/v1/rpc/commit_game_save', {
+      method: 'POST',
+      body: JSON.stringify({
+        p_slot_id: SLOT_ID,
+        p_expected_revision: remote ? Number(remote.revision) : 0,
+        p_schema_version: 2,
+        p_payload: window.__MOSS__.serialize(),
+        p_device_id: deviceId(),
+        p_mutation_id: mutationId
+      })
+    }, s.access_token);
+    if (result && (result.ok === false || result.success === false || result.conflict === true)) {
+      throw new Error(result.message || '云端版本已变化，未覆盖存档。请重新上传并确认云端版本。');
+    }
+    var verify = await readCloudSave();
+    if (!verify || !verify.payload || verify.last_mutation_id !== mutationId) {
+      throw new Error('云端版本发生变化或上传未提交成功；本地存档保留未变。请重新检查后再上传。');
+    }
+    message = '上传完成：第 ' + (verify.payload.totalDay || day) + ' 天 · 云端版本 ' + verify.revision + '。';
+  }
+  async function downloadSave() {
+    var remote = await readCloudSave();
+    if (!remote) throw new Error('云端还没有存档。先在有进度的设备上上传一次。');
+    if (!remote.payload || remote.schema_version !== 2 || remote.payload.version !== 2) {
+      throw new Error('云端存档版本不兼容，未覆盖本地进度。');
+    }
+    var local = window.__MOSS__ && window.__MOSS__.serialize ? window.__MOSS__.serialize() : null;
+    var localDay = local && local.totalDay || 1;
+    if (!window.confirm('确定用云端第 ' + (remote.payload.totalDay || '?') + ' 天（版本 ' + remote.revision +
+      '）覆盖本设备第 ' + localDay + ' 天的本地存档吗？')) return;
+    var ok = window.__MOSS__.replaceSave && window.__MOSS__.replaceSave(remote.payload);
+    if (!ok) throw new Error('云端存档无法被当前游戏版本读取，未覆盖本地进度。');
+    message = '下载完成：第 ' + (remote.payload.totalDay || '?') + ' 天。';
+  }
+
+  window.MossCloud = { open: open, upload: uploadSave, download: downloadSave };
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text) n.textContent = text;
+    return n;
+  }
 })();
 
 </script>
