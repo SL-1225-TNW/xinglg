@@ -1562,7 +1562,7 @@ function newGameState() {
     bridgeRepaired: false,
     settleHistory: [],
     nextStructureId: 1,
-    settings: { sound: false, showHelpOnce: true },
+    settings: { sound: true, soundConfigured: false, showHelpOnce: true },
     migratedFrom: null,
     overloaded: false
   };
@@ -1756,8 +1756,11 @@ function normalizeSave(raw) {
   s.bridgeRepaired = !!raw.bridgeRepaired;
   s.settleHistory = normalizeSettleHistory(raw.settleHistory);
   s.nextStructureId = Math.max(1, Math.floor(num(raw.nextStructureId, 1, 1, 1e6)));
+  var soundConfigured = !!(raw.settings && raw.settings.soundConfigured === true);
   s.settings = {
-    sound: !!(raw.settings && raw.settings.sound),
+    // 老存档里的 false 是旧版默认值；首次升级时开启音效，之后严格保留玩家选择。
+    sound: soundConfigured ? !!raw.settings.sound : true,
+    soundConfigured: soundConfigured,
     showHelpOnce: raw.settings && raw.settings.showHelpOnce === false ? false : true
   };
   s.migratedFrom = typeof raw.migratedFrom === 'string' ? raw.migratedFrom : null;
@@ -6696,6 +6699,7 @@ function openPause() {
       cb.id = 'sndSwitch';
       cb.onchange = function () {
         state.settings.sound = cb.checked;
+        state.settings.soundConfigured = true;
         Audio2.setEnabled(cb.checked);
         if (cb.checked) Audio2.play('trade');
         saveNow();
@@ -6851,7 +6855,7 @@ function openHelp() {
       b.appendChild(el('p', 'muted', '左下方向键移动，右下「使用工具 / 交互」，底部快捷栏可直接点击。横屏视野更大。'));
     },
     actions: [
-      { label: '音效开关', close: false, onClick: function () { state.settings.sound = !state.settings.sound; Audio2.setEnabled(state.settings.sound); saveNow(); openHelp(); } },
+      { label: '音效开关', close: false, onClick: function () { state.settings.sound = !state.settings.sound; state.settings.soundConfigured = true; Audio2.setEnabled(state.settings.sound); saveNow(); openHelp(); } },
       { label: '关闭', kind: 'ghost', close: true }
     ]
   });

@@ -14,8 +14,11 @@ async function pose(scene,x,y,patch={}){
 async function changeScene(scene){await page.waitForFunction(sc=>__MOSS__.state.sceneId===sc,scene);await page.waitForTimeout(300);}
 async function speak(id){await page.evaluate(id=>__MOSS__.__talkToNpc(id),id);}
 try{
+ await page.addInitScript(()=>{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;window.__mossOscillatorCount=0;const create=C.prototype.createOscillator;C.prototype.createOscillator=function(){window.__mossOscillatorCount++;return create.apply(this,arguments);};});
  await boot(page);await page.locator('#tutorialSkip').click();
+ check('新档默认开启音效',await page.evaluate(()=>__MOSS__.state.settings.sound),true);
  await page.keyboard.press('1');await clickTile(page,9,9);await walkTo(page,10,16);
+ check('实际工具操作创建音效节点',await page.evaluate(()=>window.__mossOscillatorCount>0),true);
  await page.keyboard.press('4');await clickTile(page,10,17);
  check('真实采莓给出食用入口',await page.evaluate(()=>__MOSS__.toasts.at(-1).m.includes('打开背包')),true);
  await page.keyboard.press('b');
