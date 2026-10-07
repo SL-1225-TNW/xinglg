@@ -1746,6 +1746,8 @@ MAPS.town.exits.push({x:14,y:23,to:'city',tx:320,ty:470});
 INTERACTABLES.town.push({id:'city_gate',x:14,y:21,stand:[[14,22],[13,21],[15,21]],kind:'cityGate',label:'白蔷薇城驿路'});
 
 var LIVING_JOBS = {
+  yaya:{title:'种子铺的明日备货',cost:{seed_radish:3},reward:{seed_potato:1},coins:25},
+  aqi:{title:'木匠的桥材整理',cost:{wood:5,stone:3},reward:{},coins:55},
   baker:{title:'明早的蔬菜面包',cost:{radish:3},reward:{bread:2},coins:20},
   postie:{title:'修补邮递箱',cost:{wood:5},reward:{},coins:35},
   ranger:{title:'护林员的野外午餐',cost:{mushroom:3},reward:{hardwood:2},coins:20},
