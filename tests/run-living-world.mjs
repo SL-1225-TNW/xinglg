@@ -58,10 +58,14 @@ try{
  check('城市开放状态真实保存',await page.evaluate(()=>__MOSS__.state.exploration.city),true);
  check('沿南口真实走进入城',await walkTo(page,14,23),true);await changeScene('city');
  check('城市面积是农场四百倍',await page.evaluate(()=>__MOSS__.livingInfo().city.w*__MOSS__.livingInfo().city.h/(32*24)),400);
- check('八个街区与大批可进入建筑',await page.evaluate(()=>[__MOSS__.livingInfo().city.districts.length,__MOSS__.livingInfo().city.buildings.length>=30]),[8,true]);
+ check('十个片区与大批可进入建筑',await page.evaluate(()=>[__MOSS__.livingInfo().city.districts.length,__MOSS__.livingInfo().city.buildings.length>=30]),[10,true]);
+ const families=await page.evaluate(()=>{const c=__MOSS__.livingInfo().city,byD={};c.allBuildings.forEach(b=>{(byD[b.districtId]=byD[b.districtId]||new Set()).add(b.archetypeId);});return c.districts.filter(d=>d.id!=='park').map(d=>(byD[d.id]||new Set()).size);});
+ check('每个片区都有多种建筑家族且不跨区借用',await page.evaluate(()=>{const c=__MOSS__.livingInfo().city;return c.districts.every(d=>{const ids=(c.archetypes[d.family]||[]).map(a=>a.id);return c.allBuildings.filter(b=>b.districtId===d.id).every(b=>ids.indexOf(b.archetypeId)>=0);});}),true);
+ check('建成片区实际用到的家族变体不少于三种',Math.min.apply(null,families)>=3,true);
  const architecture=await page.evaluate(()=>{const bs=__MOSS__.livingInfo().city.buildings,c=bs.find(b=>b.id==='castle'),homes=bs.filter(b=>b.id.indexOf('home')===0||b.noEnter&&b.kind==='home');return{castleFootprint:c.w*c.h,castleRows:c.h,castleVisualHeight:c.visualHeight,homeMaxRows:Math.max(...homes.map(b=>b.h)),homeMaxVisualHeight:Math.max(...homes.map(b=>b.visualHeight))};});
  check('城堡紧凑地基支撑显著高于地基的立面',architecture.castleFootprint<=320&&architecture.castleVisualHeight/16>architecture.castleRows*1.8,true);
- check('居民楼保持低矮尺度',architecture.homeMaxRows<=8&&architecture.homeMaxVisualHeight<=74,true);
+ check('居民楼保持低矮尺度',architecture.homeMaxRows<=8&&architecture.homeMaxVisualHeight<=80,true);
+ check('住宅不超过三���',await page.evaluate(()=>Math.max(...__MOSS__.livingInfo().city.allBuildings.filter(b=>b.kind==='home').map(b=>(__MOSS__.livingInfo().city.archetypes[Object.keys(__MOSS__.livingInfo().city.archetypes).find(k=>__MOSS__.livingInfo().city.archetypes[k].some(a=>a.id===b.archetypeId))]||[]).find(a=>a.id===b.archetypeId).storeys)))<=3,true);
  const valid=await page.evaluate(()=>{const m=__MOSS__;return m.livingInfo().city.buildings.every(b=>!m.isSolid('city',b.door.x,b.door.y+1)&&!!m.findPath('city',320,470,b.door.x,b.door.y+1));});
  check('所有建筑入口均可从南门寻路到达',valid,true);
  const schedules=await page.evaluate(()=>Object.values(__MOSS__.NPCS).filter(n=>n.style).flatMap(n=>n.schedule.filter(s=>__MOSS__.isSolid(n.scene,s.x,s.y)).map(s=>n.id+' '+s.x+','+s.y)));

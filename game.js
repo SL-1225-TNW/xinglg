@@ -1359,11 +1359,6 @@ var INTERACTABLES = {
 };
 
 /* 城市与居民扩展：地图、日程和委托分别保存，环境动物只保存运行状态。 */
-var CITY_DISTRICTS = [
-  {name:'南门驿站',x:64,y:86}, {name:'中央市集',x:64,y:52},
-  {name:'西侧住宅区',x:24,y:54}, {name:'工匠街',x:101,y:65},
-  {name:'学院河岸',x:100,y:31}, {name:'城堡与蔷薇园',x:64,y:16}
-];
 /* ============================================================
    白蔷薇城室内定义
    每栋建筑按用途单独设计布局：谁在工作、放着什么、玩家能做什么。
@@ -1547,6 +1542,52 @@ var CITY_ROOMS = {
     spots: [{ x: 12, y: 9, kind: 'cityService', service: 'carriage', label: '售票处', stand: [[12, 10], [12, 7], [8, 9], [16, 9]] }],
     staff: []
   },
+  /* 马厩：草料槽、隔栏与马具架 */
+  stable: {
+    w: 22, h: 14, floor: 'earth',
+    props: [
+      { t: 'trough', x: 2, y: 2, w: 8, h: 2 },
+      { t: 'trough', x: 12, y: 2, w: 8, h: 2 },
+      { t: 'chest', x: 2, y: 9, w: 5, h: 2 },
+      { t: 'barrel', x: 9, y: 9, w: 2, h: 2 },
+      { t: 'barrel', x: 12, y: 9, w: 2, h: 2 },
+      { t: 'toolRack', x: 17, y: 8, w: 4, h: 2 }
+    ],
+    spots: [{ x: 6, y: 6, kind: 'cityService', service: 'stable', label: '马具架', stand: [[6, 7], [6, 5], [2, 6], [10, 6]] }],
+    staff: []
+  },
+  /* 学院学部主楼：接待、阶梯讲堂、公告栏与教室，不再借用图书馆的布局 */
+  academy: {
+    w: 28, h: 18, floor: 'marble',
+    props: [
+      { t: 'desk', x: 11, y: 2, w: 6, h: 2 },
+      { t: 'orderBoard', x: 3, y: 2, w: 6, h: 5 },
+      { t: 'bookshelf', x: 20, y: 2, w: 5, h: 8 },
+      { t: 'longTable', x: 5, y: 9, w: 8, h: 3 },
+      { t: 'longTable', x: 15, y: 9, w: 8, h: 3 },
+      { t: 'readingTable', x: 10, y: 14, w: 8, h: 3 },
+      { t: 'statue', x: 3, y: 10, w: 3, h: 4 },
+      { t: 'banner', x: 24, y: 10, w: 2, h: 6 }
+    ],
+    spots: [{ x: 13, y: 3, kind: 'cityService', service: 'academy', label: '接待处', stand: [[13, 4], [10, 3], [17, 3]] }],
+    staff: []
+  },
+  /* 居民议事厅：长桌、席位与公文箱 */
+  civic: {
+    w: 22, h: 16, floor: 'wood',
+    props: [
+      { t: 'longTable', x: 6, y: 5, w: 10, h: 4 },
+      { t: 'chair', x: 5, y: 9, w: 2, h: 2 },
+      { t: 'chair', x: 9, y: 9, w: 2, h: 2 },
+      { t: 'chair', x: 13, y: 9, w: 2, h: 2 },
+      { t: 'archiveShelf', x: 2, y: 2, w: 4, h: 5 },
+      { t: 'noticeBoard', x: 17, y: 2, w: 4, h: 4 },
+      { t: 'chest', x: 17, y: 11, w: 3, h: 2 },
+      { t: 'fireplace', x: 9, y: 12, w: 5, h: 3 }
+    ],
+    spots: [{ x: 10, y: 6, kind: 'cityService', service: 'hall', label: '议事长桌', stand: [[10, 10], [6, 6], [15, 6]] }],
+    staff: []
+  },
   /* 普通住宅：床、衣柜、桌椅，各户略有差别 */
   home: {
     w: 16, h: 13, floor: 'wood',
@@ -1564,16 +1605,117 @@ var CITY_ROOMS = {
 /* 白蔷薇城：640×480 格，环绕古老城堡生长起来的中叶山谷城市。
    西侧贴山坡，东侧沿河湾展开，南侧向码头与城门延伸。
    道路分三个年代：旧城绕地形，商业区沿运输路线，学院与花园区更宽更整齐。 */
+/* 建成区片区：每片有自己的街道组织、建筑家族与居民活动。
+   边界是实际地块范围，建筑归属按地块判定，不再靠最近区名坐标猜。 */
 var CITY_DISTRICTS = [
-  { id: 'castle', name: '城堡高台', x: 330, y: 100, era: 'old' },
-  { id: 'oldtown', name: '西侧旧城', x: 140, y: 215, era: 'old' },
-  { id: 'garden', name: '花园住宅区', x: 155, y: 88, era: 'new' },
-  { id: 'market', name: '南部老市集', x: 320, y: 325, era: 'mid' },
-  { id: 'artisan', name: '西南工匠区', x: 165, y: 395, era: 'mid' },
-  { id: 'river', name: '东侧河岸', x: 540, y: 265, era: 'mid' },
-  { id: 'academy', name: '东北学院区', x: 520, y: 108, era: 'new' },
-  { id: 'gate', name: '南门驿站区', x: 320, y: 432, era: 'mid' }
+  { id: 'castle', name: '城堡与仪式核心', x: 320, y: 196, x0: 246, y0: 146, x1: 396, y1: 252, era: 'old', family: 'castle' },
+  { id: 'park', name: '北部公园', x: 342, y: 86, x0: 258, y0: 26, x1: 426, y1: 144, era: 'new', family: 'park' },
+  { id: 'garden', name: '花园住宅', x: 158, y: 96, x0: 62, y0: 34, x1: 246, y1: 152, era: 'new', family: 'garden' },
+  { id: 'oldtown', name: '西坡老城', x: 148, y: 226, x0: 62, y0: 158, x1: 242, y1: 300, era: 'old', family: 'oldtown' },
+  { id: 'craft', name: '手工业街', x: 160, y: 356, x0: 66, y0: 306, x1: 250, y1: 402, era: 'mid', family: 'craft' },
+  { id: 'commerce', name: '市政商业区', x: 330, y: 300, x0: 252, y0: 258, x1: 412, y1: 354, era: 'mid', family: 'commerce' },
+  { id: 'university', name: '白蔷薇大学', x: 526, y: 106, x0: 432, y0: 28, x1: 620, y1: 180, era: 'new', family: 'university' },
+  { id: 'industry', name: '东南工业码头', x: 522, y: 386, x0: 428, y0: 312, x1: 620, y1: 462, era: 'mid', family: 'industry' },
+  { id: 'workers', name: '工人生活街', x: 344, y: 408, x0: 256, y0: 362, x1: 424, y1: 452, era: 'mid', family: 'workers' },
+  { id: 'station', name: '南门驿站', x: 330, y: 468, x0: 250, y0: 456, x1: 424, y1: 479, era: 'mid', family: 'station' }
 ];
+/* 建筑家族：每个片区一套材料与结构语言，同一家族至少三套结构变体。
+   颜色、裂纹、窗帘属于第二层变化，不能拿颜色变体冒充独立建筑类型。 */
+var CITY_ARCHETYPES = {
+  oldtown: [
+    { id: 'old_timber', wall: '#CDBF9E', side: '#A99B80', roof: '#6E5747', edge: '#4A3B31', roofForm: 'gable', storeys: 2, chimney: 1 },
+    { id: 'old_stone', wall: '#C0BAA9', side: '#9B958A', roof: '#5E5954', edge: '#423F3B', roofForm: 'hip', storeys: 2, chimney: 1 },
+    { id: 'old_patched', wall: '#BE957C', side: '#99725C', roof: '#7B4E42', edge: '#543630', roofForm: 'gable', storeys: 2, chimney: 1 },
+    { id: 'old_corner', wall: '#D4C4A4', side: '#AD9C82', roof: '#87614D', edge: '#584036', roofForm: 'hip', storeys: 3, chimney: 1, shopfront: 1 },
+    { id: 'old_court', wall: '#C6BCA4', side: '#A59B86', roof: '#6B5A4A', edge: '#473A31', roofForm: 'step', storeys: 2, chimney: 1 }
+  ],
+  garden: [
+    { id: 'garden_brick', wall: '#C2957E', side: '#A07763', roof: '#6B4A45', edge: '#4A332F', roofForm: 'terrace', storeys: 3, chimney: 1, railing: 1 },
+    { id: 'garden_stucco', wall: '#DCCDAE', side: '#B5A68C', roof: '#5D6B78', edge: '#414C56', roofForm: 'terrace', storeys: 3, chimney: 1, railing: 1 },
+    { id: 'garden_villa', wall: '#D9CDB6', side: '#B4A88F', roof: '#7C5B52', edge: '#54403A', roofForm: 'hip', storeys: 2, chimney: 2, porch: 1 },
+    { id: 'garden_mansion', wall: '#CFC2A6', side: '#A99C82', roof: '#46586B', edge: '#2F3C4A', roofForm: 'hip', storeys: 2, chimney: 2, porch: 1, bay: 1 }
+  ],
+  commerce: [
+    { id: 'shop_arcade', wall: '#D6CDB6', side: '#B2A892', roof: '#6F5347', edge: '#4C3931', roofForm: 'terrace', storeys: 3, chimney: 1, awning: 1 },
+    { id: 'shop_corner', wall: '#CBB79C', side: '#A8937B', roof: '#7A5040', edge: '#50362C', roofForm: 'gable', storeys: 3, chimney: 1, awning: 1 },
+    { id: 'civic_hall', wall: '#DCD3BC', side: '#B8AE96', roof: '#4F6478', edge: '#374756', roofForm: 'hip', storeys: 2, chimney: 1, colonnade: 1 },
+    { id: 'theatre', wall: '#CBB9A6', side: '#A69784', roof: '#8A4F46', edge: '#5C3731', roofForm: 'hip', storeys: 2, chimney: 0, marquee: 1 },
+    { id: 'guild_hall', wall: '#CFC4A8', side: '#ADA28A', roof: '#5A6B62', edge: '#3D4A43', roofForm: 'gable', storeys: 3, chimney: 1, colonnade: 1 }
+  ],
+  university: [
+    { id: 'uni_main', wall: '#DED8C6', side: '#BAB3A0', roof: '#4A6178', edge: '#324455', roofForm: 'hip', storeys: 2, chimney: 1, colonnade: 1 },
+    { id: 'uni_wing', wall: '#D6CFBB', side: '#B1A996', roof: '#53687C', edge: '#38495A', roofForm: 'gable', storeys: 2, chimney: 1 },
+    { id: 'uni_lab', wall: '#BFA88F', side: '#9C8871', roof: '#6E5A4C', edge: '#4A3B31', roofForm: 'flat', storeys: 2, chimney: 2, vent: 1 },
+    { id: 'uni_dorm', wall: '#D2C6AC', side: '#AD9F89', roof: '#7A5A4C', edge: '#503D34', roofForm: 'terrace', storeys: 3, chimney: 1 },
+    { id: 'uni_greenhouse', wall: '#CFE0E2', side: '#A9C0C4', roof: '#9FC4C6', edge: '#6E8E92', roofForm: 'glass', storeys: 1, chimney: 0 }
+  ],
+  industry: [
+    { id: 'ind_longstore', wall: '#B08874', side: '#8E6C5B', roof: '#5E4A42', edge: '#3E302B', roofForm: 'flat', storeys: 1, chimney: 0, loading: 1 },
+    { id: 'ind_sawmill', wall: '#BC9A80', side: '#987A64', roof: '#6A5546', edge: '#46382E', roofForm: 'gable', storeys: 2, chimney: 1, loading: 1 },
+    { id: 'ind_foundry', wall: '#A8836F', side: '#86685A', roof: '#4F4040', edge: '#332A2A', roofForm: 'flat', storeys: 2, chimney: 3, stack: 1 },
+    { id: 'ind_mill', wall: '#C0A88C', side: '#9B866D', roof: '#7A5F45', edge: '#4F3D2E', roofForm: 'gable', storeys: 2, chimney: 1, waterwheel: 1 },
+    { id: 'ind_boiler', wall: '#9E7A68', side: '#7E6153', roof: '#46393A', edge: '#2C2425', roofForm: 'flat', storeys: 1, chimney: 0, stack: 1 }
+  ],
+  craft: [
+    { id: 'craft_smithy', wall: '#BC9377', side: '#987760', roof: '#6B4E3E', edge: '#463429', roofForm: 'gable', storeys: 2, chimney: 2, forge: 1 },
+    { id: 'craft_carpentry', wall: '#C6AC8A', side: '#A08A6C', roof: '#7B5C42', edge: '#503B2B', roofForm: 'gable', storeys: 2, chimney: 1, timber: 1 },
+    { id: 'craft_kiln', wall: '#C7B49A', side: '#A2947A', roof: '#8A6A4E', edge: '#5B4433', roofForm: 'flat', storeys: 1, chimney: 2, kiln: 1 },
+    { id: 'craft_weaver', wall: '#CBBEA2', side: '#A79B82', roof: '#6D5A46', edge: '#473A2D', roofForm: 'gable', storeys: 3, chimney: 1 },
+    { id: 'craft_print', wall: '#C2AE92', side: '#9D8B72', roof: '#5E5062', edge: '#3E3442', roofForm: 'gable', storeys: 3, chimney: 1, shopfront: 1 }
+  ],
+  workers: [
+    { id: 'work_brickrow', wall: '#BC9376', side: '#98755E', roof: '#6F4E42', edge: '#4B352D', roofForm: 'terrace', storeys: 2, chimney: 1, patched: 1 },
+    { id: 'work_courtyard', wall: '#C3A488', side: '#9E8168', roof: '#7A5A48', edge: '#503C31', roofForm: 'gable', storeys: 2, chimney: 1 },
+    { id: 'work_canteen', wall: '#C9B294', side: '#A4906F', roof: '#6B5A40', edge: '#453A2A', roofForm: 'hip', storeys: 2, chimney: 2, awning: 1 },
+    { id: 'work_baths', wall: '#BFC0B2', side: '#9A9C90', roof: '#5C6A66', edge: '#3E4844', roofForm: 'flat', storeys: 1, chimney: 1, vent: 1 }
+  ],
+  station: [
+    { id: 'stat_inn', wall: '#CDBB9C', side: '#A89A7E', roof: '#6F5140', edge: '#493629', roofForm: 'hip', storeys: 3, chimney: 2, awning: 1 },
+    { id: 'stat_post', wall: '#C3A98C', side: '#9E886D', roof: '#5F6B74', edge: '#414B52', roofForm: 'gable', storeys: 2, chimney: 1 },
+    { id: 'stat_carriage', wall: '#BFA382', side: '#9C8466', roof: '#6B563C', edge: '#453728', roofForm: 'gable', storeys: 1, chimney: 1, loading: 1 },
+    { id: 'stat_stable', wall: '#B9A184', side: '#978267', roof: '#7A6244', edge: '#4F3F2C', roofForm: 'gable', storeys: 1, chimney: 0, loading: 1 }
+  ],
+  castle: [
+    { id: 'castle_keep', wall: '#DED7C2', side: '#B8B09A', roof: '#4C6480', edge: '#33445A', roofForm: 'castle', storeys: 3, chimney: 0, tower: 3 },
+    { id: 'castle_wing', wall: '#D6CFBA', side: '#B0A892', roof: '#54697F', edge: '#3A4859', roofForm: 'castle', storeys: 2, chimney: 0, tower: 1 },
+    { id: 'castle_range', wall: '#D2CAB4', side: '#ACA48E', roof: '#4E6180', edge: '#364356', roofForm: 'gable', storeys: 2, chimney: 1 },
+    { id: 'castle_gate', wall: '#C6BCA2', side: '#A0967E', roof: '#3F4E5C', edge: '#2A333D', roofForm: 'hip', storeys: 2, chimney: 0, tower: 2 },
+    { id: 'castle_chapel', wall: '#DBD4BE', side: '#B6AE96', roof: '#57687A', edge: '#3B4653', roofForm: 'gable', storeys: 1, chimney: 0, spire: 1 }
+  ],
+  park: [
+    { id: 'park_bandstand', wall: '#D2C8AE', side: '#AEA48C', roof: '#6E7A62', edge: '#4A5342', roofForm: 'hip', storeys: 1, chimney: 0, open: 1 },
+    { id: 'park_teahouse', wall: '#C6B694', side: '#A2937A', roof: '#7A6446', edge: '#4F3F2C', roofForm: 'hip', storeys: 1, chimney: 0, open: 1 },
+    { id: 'park_keeper', wall: '#C9BEA2', side: '#A69B84', roof: '#6E5A48', edge: '#473A2E', roofForm: 'gable', storeys: 1, chimney: 1 }
+  ]
+};
+/* 每个片区一套建筑家族与编号器：相邻建筑在家族内轮换变体，
+   但绝不会跨片区借外形，也不会按全局序号循环。 */
+var CITY_ARCHETYPE_CURSOR = {};
+function pickArchetype(districtId, kind) {
+  var d = CITY_DISTRICTS.filter(function (x) { return x.id === districtId; })[0];
+  var fam = (d && CITY_ARCHETYPES[d.family]) ? d.family : 'oldtown';
+  var list = CITY_ARCHETYPES[fam];
+  var key = districtId + '|' + (kind || 'home');
+  var n = CITY_ARCHETYPE_CURSOR[key] = ((CITY_ARCHETYPE_CURSOR[key] || 0) + 1);
+  return list[n % list.length];
+}
+function zoneOf(x, y) {
+  // 归属由实际地块范围决定；落在范围外才退回最近片区。
+  for (var i = 0; i < CITY_DISTRICTS.length; i++) {
+    var d = CITY_DISTRICTS[i];
+    if (x >= d.x0 && x <= d.x1 && y >= d.y0 && y <= d.y1) return d.id;
+  }
+  var best = CITY_DISTRICTS[0], bd = 1e9;
+  CITY_DISTRICTS.forEach(function (d) {
+    var dist = Math.abs(d.x - x) + Math.abs(d.y - y);
+    if (dist < bd) { bd = dist; best = d; }
+  });
+  return best.id;
+}
+function districtEra(districtId) {
+  var d = CITY_DISTRICTS.filter(function (x) { return x.id === districtId; })[0];
+  return d ? d.era : 'mid';
+}
 var CITY_BUILDINGS = [];
 MAPS.city = (function () {
   var W = 640, H = 480, m = mkMap(W, H, T_GRASS), decor = [], facades = [];
@@ -1634,14 +1776,18 @@ MAPS.city = (function () {
   });
 
   /* 可进入建筑：每栋按用途有自己的室内 */
-  function cityVisualHeight(theme, seed) {
-    // 记录从地面锚点到最高旗尖的完整投影高度，供视锥裁剪使用。
+  function cityVisualHeight(theme, arch) {
+    // 记录从地面锚点到最高旗尖/烟囱的完整投影高度，供视锥裁剪使用。
     if (theme === 'castle') return 304;
-    if (theme === 'library') return 104;
+    if (theme === 'library' || theme === 'academy') return 104;
     if (theme === 'workshop') return 82;
     if (theme === 'shop') return 76;
-    // 住宅控制在一到两层；外观高度和地块/碰撞格数彻底分离。
-    return [62, 68, 74][Math.abs(seed || 0) % 3];
+    // 其余按家族：玻璃与平顶厂房低而宽，连排与坡屋顶随层数加高。
+    var rf = arch && arch.roofForm, st = (arch && arch.storeys) || 2;
+    if (rf === 'glass') return 72;
+    if (rf === 'flat') return 64 + (arch && arch.stack ? 34 : 0);
+    if (rf === 'terrace') return 58 + st * 6;
+    return 54 + st * 6;
   }
   function building(id, label, x, y, w, h, theme) {
     // 保留门和任务坐标，只收紧背后的地基；不能有看不见的长条碰撞区。
@@ -1649,7 +1795,11 @@ MAPS.city = (function () {
     fillRect(m, x, y, x + w - 1, y + h - 1, T_GRASS, true);
     var door = { x: x + Math.floor(w / 2), y: y + h };
     fillRect(m, door.x, door.y, door.x, Math.min(H - 2, door.y + 2), T_PATH, false);
-    CITY_BUILDINGS.push({ id: id, label: label, x: x, y: y, w: w, h: h, kind: theme || 'home', door: door, district: zoneOf(x, y), visualHeight: cityVisualHeight(theme || 'home', CITY_BUILDINGS.length), facadeStyle: CITY_BUILDINGS.length % 4 });
+    var district = zoneOf(x, y);
+    var arch = pickArchetype(district, theme);
+    CITY_BUILDINGS.push({ id: id, label: label, x: x, y: y, w: w, h: h, kind: theme || 'home', door: door, district: district,
+      districtId: district, era: districtEra(district), archetype: arch, archetypeId: arch.id,
+      visualHeight: cityVisualHeight(theme || 'home', arch) });
     var def = CITY_ROOMS[id] || CITY_ROOMS[theme] || CITY_ROOMS.home;
     var roomId = 'city_' + id, r = mkMap(def.w, def.h, T_PATH);
     fillRect(r, 0, 0, r.w - 1, 0, T_BUILDING, true); fillRect(r, 0, r.h - 1, r.w - 1, r.h - 1, T_BUILDING, true);
@@ -1664,20 +1814,16 @@ MAPS.city = (function () {
     });
     INTERACTABLES.city.push({ id: id, x: door.x, y: door.y, stand: [[door.x, door.y + 1], [door.x - 1, door.y], [door.x + 1, door.y]], kind: 'cityDoor', label: label, to: roomId });
   }
-  function zoneOf(x, y) {
-    var best = CITY_DISTRICTS[0], bd = 1e9;
-    CITY_DISTRICTS.forEach(function (d) {
-      var dist = Math.abs(d.x - x) + Math.abs(d.y - y);
-      if (dist < bd) { bd = dist; best = d; }
-    });
-    return best.id;
-  }
-  /* 只做街景的房屋：给出街道密度，不生成室内 */
+  /* 只做街景的房屋：外观由所在片区的建筑家族决定 */
   function facade(x, y, w, h, kind, label) {
     if (!spotFree(x, y, w, h)) return;
     fillRect(m, x, y, x + w - 1, y + h - 1, T_GRASS, true);
     fillRect(m, x + Math.floor(w / 2), y + h, x + Math.floor(w / 2), Math.min(H - 2, y + h + 1), T_PATH, false);
-    facades.push({ id: 'f' + facades.length, label: label, x: x, y: y, w: w, h: h, kind: kind, noEnter: true, door: { x: x + Math.floor(w / 2), y: y + h }, visualHeight: cityVisualHeight(kind, homeIdx), facadeStyle: homeIdx % 4, district: zoneOf(x,y) });
+    var district = zoneOf(x, y);
+    var arch = pickArchetype(district, kind);
+    facades.push({ id: 'f' + facades.length, label: label, x: x, y: y, w: w, h: h, kind: kind, noEnter: true,
+      door: { x: x + Math.floor(w / 2), y: y + h }, visualHeight: cityVisualHeight(kind, arch),
+      archetype: arch, archetypeId: arch.id, district: district, districtId: district, era: districtEra(district) });
   }
 
   INTERACTABLES.city = [];
@@ -1688,8 +1834,8 @@ MAPS.city = (function () {
   road(328, 68, 328, 152, 5);            // 大门轴线接入前庭和南北主街
   /* 东北学院区 */
   building('library', '蔷薇图书馆', 440, 70, 26, 18, 'library');
-  building('academy', '河岸学院', 560, 58, 34, 22, 'library');
-  building('greenhouse', '蔷薇温室', 446, 130, 22, 15, 'shop');
+  building('academy', '河岸学院', 560, 58, 34, 22, 'academy');
+  building('greenhouse', '蔷薇温室', 446, 130, 22, 15, 'greenhouse');
   /* 南部老市集 */
   building('bakery', '暖炉面包房', 292, 316, 16, 11, 'shop');
   building('market', '城市商会', 350, 296, 20, 13, 'shop');
@@ -1698,11 +1844,12 @@ MAPS.city = (function () {
   building('cafe', '河岸茶室', 542, 208, 17, 12, 'shop');
   building('smith', '白蔷薇铁匠铺', 600, 266, 19, 13, 'workshop');
   /* 西侧旧城 */
-  building('hall', '居民议事厅', 104, 152, 19, 13, 'home');
+  building('hall', '居民议事厅', 104, 152, 19, 13, 'civic');
   /* 南门驿站区 */
   building('inn', '南门旅馆', 348, 428, 20, 13, 'home');
   building('post', '驿站邮局', 268, 428, 19, 13, 'shop');
   building('carriage', '南门马车站', 236, 396, 16, 11, 'shop');
+  building('stable', '南门马厩', 262, 458, 16, 9, 'workshop');
 
   /* 住宅：主要沿街区街道成排，少数可以进去 */
   var homeIdx = 0, ENTERABLE_HOMES = 24;
@@ -1730,17 +1877,19 @@ MAPS.city = (function () {
   }
   /* 街区由道路和连续街墙组成，而不是先在草地上撒房子。
      花园区采用伦敦式排屋与共享庭院；旧城街巷错位；环街连接城堡核心。 */
+  /* 住宅网格按新的十个片区落位：花园住宅与学院宿舍成排围绿，
+     老城街巷错位，工坊与工人街密而小，码头区是大跨度厂房。 */
   var blocks = [
-    { x0: 98, y0: 56, x1: 252, y1: 152 },    // 花园住宅区
-    { x0: 80, y0: 160, x1: 222, y1: 292 },   // 西侧旧城
-    { x0: 80, y0: 332, x1: 252, y1: 462 },   // 西南工匠区
-    { x0: 234, y0: 258, x1: 424, y1: 374 },  // 老市集周边
-    { x0: 438, y0: 168, x1: 624, y1: 362 },  // 东侧河岸
-    { x0: 432, y0: 40, x1: 624, y1: 174 },   // 东北学院区
-    { x0: 238, y0: 386, x1: 424, y1: 468 },  // 南门驿站
-    { x0: 262, y0: 90, x1: 422, y1: 146 },  // 城堡环街
-    { x0: 224, y0: 190, x1: 430, y1: 250 }, // 内环住宅与商街
-    { x0: 262, y0: 158, x1: 420, y1: 184 }  // 前庭两翼街墙
+    { x0: 72, y0: 44, x1: 240, y1: 148 },    // 花园住宅
+    { x0: 70, y0: 166, x1: 236, y1: 296 },   // 西坡老城
+    { x0: 72, y0: 312, x1: 244, y1: 398 },   // 手工业街
+    { x0: 258, y0: 264, x1: 406, y1: 350 },  // 市政商业区
+    { x0: 438, y0: 34, x1: 614, y1: 176 },   // 白蔷薇大学
+    { x0: 434, y0: 318, x1: 614, y1: 458 },  // 东南工业码头
+    { x0: 262, y0: 368, x1: 418, y1: 460 },  // 工人生活街
+    { x0: 256, y0: 458, x1: 418, y1: 479 },  // 南门驿站院区
+    { x0: 252, y0: 150, x1: 390, y1: 246 },  // 城堡核心两侧街墙
+    { x0: 262, y0: 150, x1: 420, y1: 182 }   // 仪式广场两翼
   ];
   // 施工只落在空地，已有店铺、河道与桥保持原位置。
   function lane(x0,y0,x1,y1,width) {
@@ -1761,22 +1910,24 @@ MAPS.city = (function () {
     var offset=bi===1?4:0;
     lane(box.x0-4,box.y0+7,box.x0-4,box.y1,3);
     lane(box.x1,box.y0+7,box.x1,box.y1,3);
-    for(var sy=box.y0+7;sy<box.y1;sy+=10){
+    for(var sy=box.y0+12;sy<box.y1;sy+=12){
       lane(box.x0-4,sy,box.x1,sy+(bi===1?4:0),3);
     }
     // 每组排屋留一条贯通的侧巷，庭院有出口，不形成封闭的障碍带。
     for(var sx=box.x0+32;sx<box.x1;sx+=44)lane(sx,box.y0, sx,box.y1,3);
     lane(box.x0-4,box.y1,320,box.y1,3);
-    for(var y=box.y0;y+4<=box.y1;y+=10){
+    // 排屋贴街成排：行距只留一条巷子，避免大片无用途的空地。
+    for(var y=box.y0;y+4<=box.y1;y+=6){
       for(var x=box.x0;x+8<=box.x1;x+=9){
         var hy=y+(bi===1?Math.floor((x-box.x0)/44)%2*2:0);
         // 共享小花园替代随机空白；每栋门前有连至街面的步道。
-        if((Math.floor((x-box.x0)/9)+Math.floor((y-box.y0)/10)*3)%17===8){
+        if((Math.floor((x-box.x0)/9)+Math.floor((y-box.y0)/6)*3)%23===8){
           if(spotFree(x,hy,8,4)){decor.push({t:'streetTree',x:x+2,y:hy+2});decor.push({t:'flower',x:x+3,y:hy+3});decor.push({t:'bench',x:x+5,y:hy+3});}
           continue;
         }
         if(placeHome(x,hy,8,4)){
-          var doorX=x+4;lane(doorX,hy+4,doorX,y+7+offset,1);
+          // 门前步道只连到排间巷子，不能向下伸进下一排的占地。
+          var doorX=x+4;lane(doorX,hy+4,doorX,hy+5,1);
         }
       }
     }
@@ -2357,22 +2508,21 @@ function drawWhiteRoseCastle(g,x,baseY,w,b){
 function drawCityBuilding(g,bx,by,b){
   var x=bx*TILE,y=by*TILE,w=b.w*TILE,baseY=b.door.y*TILE;
   if(b.kind==='castle'){drawWhiteRoseCastle(g,x,baseY,w,b);return;}
-  var totalH=b.visualHeight||64, roofH=b.kind==='library'?25:20, wallH=totalH-roofH;
+var arch=b.archetype||CITY_ARCHETYPES.oldtown[0];
+  var totalH=b.visualHeight||64;
+  // 屋面形式与层数由建筑家族决定，而不是按序号循环。
+  var roofForm=arch.roofForm||'gable';
+  var roofH=roofForm==='terrace'?14:roofForm==='flat'?10:roofForm==='glass'?18:20;
+  var wallH=totalH-roofH;
   var left=x+5, faceW=Math.max(24,w-10), wallTop=baseY-wallH, roofTop=wallTop-roofH;
-  var styles=[
-    {wall:'#D9CFB8',side:'#B7AA91',roof:'#765A51',edge:'#4F4140'},
-    {wall:'#C9CBB8',side:'#A9AE9E',roof:'#4E6472',edge:'#394E5D'},
-    {wall:'#D9C1A5',side:'#B79A7D',roof:'#915D4F',edge:'#70463F'},
-    {wall:'#D0D5D1',side:'#AAB5B7',roof:'#52657B',edge:'#3C4F64'}
-  ];
-  var palette=styles[(b.facadeStyle||0)%styles.length];
+  var palette=arch;
   // 落影按地基绘制；墙身高度取视觉参数，不再取占地 h。
   px(g,x+8,baseY+3,w-16,6,'rgba(28,35,35,.2)');
   px(g,left,wallTop,faceW,wallH,palette.wall);px(g,left+faceW-10,wallTop+5,10,wallH-5,palette.side);
   px(g,left,baseY-8,faceW,8,'#A89B83');px(g,left,baseY-8,faceW,2,'#EEE4D0');
-  // 两层细腰线将立面读成一到两层民居，而不是高层楼体。
-  px(g,left+3,wallTop+Math.floor(wallH*.52),faceW-6,3,'#B6AA93');
-  var floors=b.kind==='library'?3:2, floorGap=Math.max(17,Math.floor((wallH-13)/floors));
+  // 层数来自家族：住宅一到三层，厂房与附属用房的跨距更大。
+  var floors=arch.storeys||2, floorGap=Math.max(15,Math.floor((wallH-13)/floors));
+  if(floors>1)px(g,left+3,wallTop+Math.floor(wallH*.52),faceW-6,3,'rgba(0,0,0,.12)');
   for(var floor=0;floor<floors;floor++){
     var wy=wallTop+6+floor*floorGap;
     if(wy+13>baseY-25)break;
@@ -2381,11 +2531,10 @@ function drawCityBuilding(g,bx,by,b){
       drawCityWindow(g,wx,wy,9,13);
     }
   }
-  // 小屋顶采用山墙剪影，屋檐只略微外挑，不做高耸的大块屋面。
-  var roofX=left-5,roofW=faceW+10,roofStyle=(b.facadeStyle||0)%4;
+  var roofX=left-5,roofW=faceW+10;
   function roofSurface(atX){
-    if(roofStyle===1)return roofTop+6;
-    if(roofStyle===3)return roofTop+4;
+    if(roofForm==='terrace')return roofTop+6;
+    if(roofForm==='flat')return roofTop+4;
     return roofTop+Math.floor(Math.abs(atX-(roofX+roofW/2))*roofH/(roofW/2));
   }
   function chimney(cx,cw,rise,color){
@@ -2394,22 +2543,46 @@ function drawCityBuilding(g,bx,by,b){
     px(g,cx,top,cw,rise,color);px(g,cx-2,top-2,cw+4,3,'#A98969');
     px(g,cx+2,top+4,Math.max(2,cw-4),1,'#B48B72');
   }
-  if(roofStyle===1){
+  if(roofForm==='hip'){
     // 低矮四坡屋顶，用后坡色与檐口表现深度。
     px(g,roofX+8,roofTop+6,roofW-16,roofH-6,palette.roof);
     px(g,roofX+15,roofTop+3,roofW-30,4,palette.edge);
     for(var rs=6;rs<roofH;rs+=3){px(g,roofX+Math.max(0,roofH-rs),roofTop+rs,8,3,palette.edge);px(g,roofX+roofW-8-Math.max(0,roofH-rs),roofTop+rs,8,3,palette.edge);}
-  }else if(roofStyle===3){
-    // 连排城市住宅的低折坡屋顶与女儿墙。
+  }else if(roofForm==='terrace'){
+    // 连排住宅与学院宿舍的低折坡屋顶与女儿墙。
     px(g,roofX+3,roofTop+4,roofW-6,roofH-4,palette.roof);
     px(g,roofX+9,roofTop,roofW-18,5,palette.edge);
     px(g,roofX,wallTop-3,roofW,4,'#D7C8AF');
     drawCityWindow(g,roofX+roofW/2-4,roofTop+7,8,8);
+    if(arch.railing)for(var rw=roofX+4;rw<roofX+roofW-4;rw+=5)px(g,rw,wallTop-6,1,4,'#6E7377');
+  }else if(roofForm==='flat'){
+    // 厂房与附属用房：厚墙、低女儿墙、通风口或装卸门。
+    px(g,roofX+2,roofTop+3,roofW-4,roofH-3,palette.roof);
+    px(g,roofX+6,roofTop,roofW-12,5,palette.edge);
+    px(g,roofX,wallTop-3,roofW,4,'#9A9184');
+    if(arch.vent){px(g,roofX+8,roofTop-3,12,4,'#7E8A8C');px(g,roofX+12,roofTop-6,4,4,'#7E8A8C');}
+  }else if(roofForm==='glass'){
+    // 温室与植物研究建筑：玻璃拱顶与细框。
+    px(g,roofX+2,roofTop+2,roofW-4,roofH-2,'#BFDCDD');
+    for(var gf=roofX+4;gf<roofX+roofW-4;gf+=8){px(g,gf,roofTop,2,roofH,'#6E8E92');px(g,gf+1,roofTop+2,1,roofH-4,'rgba(230,248,248,.45)');}
+    px(g,roofX,roofTop,roofW,3,'#5F7F7D');
+    px(g,roofX+roofW/2-9,roofTop+roofH-8,18,8,'#A9C4C6');
   }else drawSteppedGable(g,roofX,roofTop,roofW,roofH,palette.roof,palette.edge);
-  if(b.kind!=='workshop')chimney(left+faceW-25,10,18,'#76584A');
-  if(b.kind==='shop'){
+  // 烟囱数量来自家族：厂房的烟囱多且高，门楼与教堂没有。
+  var stacks=arch.chimney||0;
+  for(var ci=0;ci<stacks;ci++)chimney(left+faceW-22-ci*16,9,arch.stack?30:17,palette.edge);
+  if(arch.tower)for(var tw=0;tw<arch.tower;tw++){var twi=left+6+tw*Math.floor((faceW-20)/Math.max(1,arch.tower));px(g,twi,roofTop-Math.floor(totalH*0.18),12,Math.floor(totalH*0.2),'#CFC7B2');px(g,twi-2,roofTop-Math.floor(totalH*0.18)-4,16,5,palette.roof);}
+  if(arch.spire)px(g,left+faceW/2-3,roofTop-26,6,26,'#C7BFAC');
+  if(arch.colonnade)for(var cc=left+5;cc<left+faceW-8;cc+=11)px(g,cc,baseY-20,5,14,'#E4DCC4');
+  if(arch.porch)px(g,left+faceW-26,baseY-13,22,13,'#B9AC92');
+  if(arch.loading)px(g,left+6,baseY-14,20,12,'#6E5C4A');
+  if(arch.kiln)px(g,left+3,wallTop,14,wallH,'#A98A6E');
+  if(arch.waterwheel){var wyc=left+faceW+2;for(var wi=0;wi<8;wi++){var ang=wi/8*Math.PI*2;px(g,wyc+Math.round(Math.cos(ang)*7),baseY-10+Math.round(Math.sin(ang)*10),3,3,'#8A6B48');}}
+  if(arch.open)for(var op=left+4;op<left+faceW-6;op+=7)px(g,op,baseY-14,3,14,'#C7BFAC');
+  if(arch.marquee)px(g,left+4,baseY-19,faceW-8,10,'#B8555C');
+  if(arch.awning||b.kind==='shop'){
     px(g,left+5,baseY-31,faceW-15,8,'#A65E65');
-    for(var aw=left+8;aw<left+faceW-12;aw+=12){px(g,aw,baseY-31,5,8,'#E5D1B2');}
+    for(var aw=left+8;aw<left+faceW-12;aw+=12)px(g,aw,baseY-31,5,8,'#E5D1B2');
   }
   if(b.kind==='workshop'){
     chimney(left+faceW-34,14,26,'#5E6260');
@@ -2425,8 +2598,20 @@ function drawCityBuilding(g,bx,by,b){
     var signW=Math.min(faceW-8,Math.max(42,Math.ceil(b.label.length*8)+10));
     px(g,x+w/2-signW/2,wallTop+2,signW,12,'#405247');g.font='8px sans-serif';g.textAlign='center';g.fillStyle='#F0DEB3';g.fillText(b.label,x+w/2,wallTop+11);g.textAlign='left';
   }else{
-    if(roofStyle===0){px(g,left+10,wallTop+4,3,wallH-13,'#917B60');px(g,left+faceW-17,wallTop+4,3,wallH-13,'#917B60');}
-    if(roofStyle===2){px(g,dx-16,baseY-30,32,3,'#6D665B');px(g,dx-16,baseY-36,2,6,'#6D665B');px(g,dx+14,baseY-36,2,6,'#6D665B');}
+    // 街景住宅的墙面细节也来自家族：老城的木构与补丁、工坊的货架、工人的晾衣。
+    if(arch.patched){
+      px(g,left+8,baseY-22,9,12,'#B6A98C');px(g,left+faceW-22,baseY-30,7,9,'#A89B80');
+      for(var pd=0;pd<5;pd++)px(g,left+4+pd*7,baseY-34+((pd*5)%9),3,2,'#8E836A');
+    }
+    if(arch.shopfront){
+      px(g,left+6,baseY-16,faceW-12,13,'#7E6A50');px(g,left+9,baseY-13,faceW-18,8,'#C9C1A4');
+    }
+    if(arch.forge){px(g,left+7,baseY-18,faceW-14,15,'#5A4A40');px(g,left+10,baseY-15,faceW-20,9,'#C4762E');}
+    if(arch.timber){
+      px(g,left+10,wallTop+4,3,wallH-13,'#8A6B4C');px(g,left+faceW-16,wallTop+4,3,wallH-13,'#8A6B4C');
+      px(g,left+6,baseY-30,faceW-12,3,'#8A6B4C');
+    }
+    if(arch.bay)px(g,left+faceW-18,baseY-26,14,22,'#BFD8DE');
     px(g,dx+11,baseY-9,10,5,'#AE8163');px(g,dx+12,baseY-12,8,4,'#7C9D66');
   }
 }
@@ -8350,7 +8535,7 @@ window.__MOSS__ = {
   },
   get canvasRect() { var r = canvas.getBoundingClientRect(); return { w: r.width, h: r.height, left: r.left, top: r.top }; },
   get npcRuntime() { return npcRuntime; },
-  livingInfo: function(){return {city:{w:MAPS.city.w,h:MAPS.city.h,buildings:CITY_BUILDINGS,allBuildings:MAPS.city.buildings,districts:CITY_DISTRICTS},animals:sceneAnimals().map(function(a){return Object.assign({},a);}),forestNodes:EXPLORE_NODES.forest};},
+  livingInfo: function(){return {city:{w:MAPS.city.w,h:MAPS.city.h,buildings:CITY_BUILDINGS,allBuildings:MAPS.city.buildings,districts:CITY_DISTRICTS,archetypes:CITY_ARCHETYPES},animals:sceneAnimals().map(function(a){return Object.assign({},a);}),forestNodes:EXPLORE_NODES.forest};},
   QUEST_SITES: QUEST_SITES,
   TUTORIAL_DONE: TUTORIAL_DONE,
   npcScene: function (id) { return NPCS[id].scene; },
