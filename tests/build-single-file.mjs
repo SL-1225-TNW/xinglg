@@ -14,7 +14,7 @@ const js = read('game.js');
 const cloud = read('cloud-save.js');
 
 /* 内联脚本里不能出现 </script>，否则浏览器会提前结束标签 */
-if (/<\/script/i.test(js)) {
+if (/<\/script/i.test(js) || /<\/script/i.test(cloud)) {
   console.error('脚本里含 </script 字样，需要转义后再内联');
   process.exit(1);
 }
@@ -25,7 +25,7 @@ if (/<\/style/i.test(css)) {
 
 const before = html;
 html = html.replace('<link rel="stylesheet" href="styles.css">', '<style>\n' + css + '\n</style>');
-html = html.replace('<script src="game.js"></script>', '<script>\n' + js + '\n</script>');
+html = html.replace('<script src="game.js"></script>\n<script src="cloud-save.js"></script>', '<script>\n' + js + '\n</script>\n<script>\n' + cloud + '\n</script>');
 if (html === before) { console.error('没有匹配到要内联的标签，index.html 结构变了？'); process.exit(1); }
 if (html.includes('styles.css') || html.includes('src="game.js"') || html.includes('src="cloud-save.js"')) {
   console.error('仍有外部引用残留：' + (html.includes('styles.css') ? 'styles.css ' : '') + (html.includes('src="game.js"') ? 'game.js ' : ''));
