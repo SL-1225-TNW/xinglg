@@ -978,3 +978,13 @@ html.compact-play[data-device="tablet"] .tact-sm{width:44px;height:44px}
   .forest-journal-foot{display:none}.forest-journal-page{padding:14px 13px 17px}
   .forest-journal-page h2{font-size:22px}.journal-stat-grid{grid-template-columns:1fr}
 }
+
+/* Native top-layer dialogs remain usable above the boot screen on all devices. */
+.account-dialog { color: #ecedda; background: #223c30; border: 2px solid #a9bc82; border-radius: 12px; padding: 20px; width: min(92vw, 520px); max-height: 85dvh; overflow: auto; box-sizing: border-box; }
+.account-dialog::backdrop { background: #071b16b8; }
+.account-dialog h2 { margin-top: 0; font-size: 1.2rem; }
+.account-dialog .btn { margin: 5px 4px 5px 0; white-space: normal; }
+.account-dialog label { display: block; margin: 12px 0; }
+.account-dialog input { display: block; box-sizing: border-box; width: 100%; padding: 10px; margin-top: 5px; font-size: 16px; border: 1px solid #a9bc82; border-radius: 5px; }
+.account-dialog p { line-height: 1.6; overflow-wrap: anywhere; }
+#accountLabel { overflow-wrap: anywhere; }

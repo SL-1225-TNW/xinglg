@@ -42,7 +42,7 @@
     var digest = hash(payload);
     var record = { format: 1, userId: this.userId, slotId: this.slotId, payload: payload,
       revision: options.revision !== undefined ? options.revision : (previous ? previous.revision : 0),
-      sequence: (previous ? previous.sequence : 0) + 1, hash: digest,
+      sequence: (previous ? previous.sequence : 0) + 1, mutationId: uuid(), hash: digest,
       pending: options.pending !== undefined ? options.pending : !!this.userId, savedAt: payload.savedAt };
     this.storage.setItem(this.key(this.userId), JSON.stringify(record));
     return record;
