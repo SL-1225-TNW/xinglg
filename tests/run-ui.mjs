@@ -14,13 +14,18 @@ let page = ctx.page;
 await boot(page, { fresh: true });
 await page.waitForTimeout(400);
 let rect = await page.evaluate(() => window.__MOSS__.canvasRect);
-const deskScale = rect.w / 384;
-// 缩放策略：0.5 步进（像素仍是规则网格），不再锁死在 1x/2x/3x
-rep.ok('桌面画布按 0.5 步进放大', Number.isInteger(deskScale * 2), JSON.stringify(rect));
-rep.ok('桌面画布不小于 2 倍', deskScale >= 2, JSON.stringify(rect));
+const deskZoom = await page.evaluate(() => window.__MOSS__.game.zoom);
+const deskDpr = await page.evaluate(() => window.devicePixelRatio);
+// 画布逻辑分辨率会随视口变化；检查实际像素缩放倍率，而非把画布尺寸误当作固定基准分辨率。
+rep.ok('桌面画布缩放与设备像素对齐', Number.isInteger(deskZoom * deskDpr), JSON.stringify({ zoom: deskZoom, dpr: deskDpr, rect }));
+rep.ok('桌面画布缩放不小于 2 倍', deskZoom >= 2, JSON.stringify({ zoom: deskZoom, rect }));
 rep.ok('桌面画布仍为最近邻（无平滑）', await page.evaluate(() =>
   ['pixelated', 'crisp-edges'].includes(getComputedStyle(document.getElementById('world')).imageRendering)));
-rep.eq('画布宽高比正确', Math.round(rect.w / rect.h * 100), Math.round(384 / 256 * 100));
+rep.ok('画布比例与自适应分辨率一致', await page.evaluate(() => {
+  const c = document.getElementById('world').getBoundingClientRect();
+  const b = document.getElementById('world');
+  return Math.abs(c.width / c.height - b.width / b.height) < 0.01;
+}), JSON.stringify(rect));
 rep.eq('快捷栏 9 格（第 9 格是小铲子）', await page.locator('.hotbar .slot').count(), 9);
 rep.ok('选中工具有边框与数字', await page.evaluate(() => {
   const s = document.querySelector('.slot.selected');
@@ -117,14 +122,19 @@ await closeWin(page);
 
 /* 摄像机 */
 await page.keyboard.down('ArrowLeft'); await page.waitForTimeout(2200); await page.keyboard.up('ArrowLeft');
-rep.ok('摄像机不越出地图左边界', await page.evaluate(() => window.__MOSS__.cam.x >= 0), JSON.stringify(await page.evaluate(() => window.__MOSS__.cam)));
+rep.ok('摄像机不越出地图左边界', await page.evaluate(() => {
+  const M = window.__MOSS__, b = M.cameraLimits;
+  return M.cam.x >= b.minX - 1 && M.cam.x <= b.maxX + 1;
+}), JSON.stringify(await page.evaluate(() => ({ cam: window.__MOSS__.cam, bounds: window.__MOSS__.cameraLimits }))));
 await page.keyboard.down('ArrowUp'); await page.waitForTimeout(2600); await page.keyboard.up('ArrowUp');
-rep.ok('摄像机不越出地图上边界', await page.evaluate(() => window.__MOSS__.cam.y >= 0));
+rep.ok('摄像机不越出地图上边界', await page.evaluate(() => {
+  const M = window.__MOSS__, b = M.cameraLimits;
+  return M.cam.y >= b.minY - 1 && M.cam.y <= b.maxY + 1;
+}));
 rep.ok('摄像机跟随玩家', await page.evaluate(() => {
   const M = window.__MOSS__, s = M.state, c = M.cam, r = M.canvasRect;
-  const px = s.player.x * 16 + 8, py = s.player.y * 16 + 12;
-  const sx = (px - c.x) / 384 * r.w, sy = (py - c.y) / 256 * r.h;
-  return sx > 0 && sx < r.w && sy > 0 && sy < r.h;
+  const p = M.tileToScreen(s.player.x, s.player.y);
+  return p[0] > r.left && p[0] < r.left + r.w && p[1] > r.top && p[1] < r.top + r.h;
 }));
 /* 缩放后点击坐标仍正确 */
 await walkTo(page, 7, 9);
@@ -295,7 +305,8 @@ for (const vp of [{ width: 1512, height: 982 }, { width: 2560, height: 1600 }]) 
   await boot(big.page, { fresh: true });
   await big.page.waitForTimeout(500);
   const r = await big.page.evaluate(() => window.__MOSS__.canvasRect);
-  const scale = r.w / 384;
+  const zoom = await big.page.evaluate(() => window.__MOSS__.game.zoom);
+  const dpr = await big.page.evaluate(() => window.devicePixelRatio);
   const label = vp.width + '×' + vp.height;
   // 2000×1100 以上才启用沉浸式（UI 浮在画面上），以下保持带状布局
   const immersive = vp.width >= 2000 && vp.height >= 1100;
@@ -304,7 +315,7 @@ for (const vp of [{ width: 1512, height: 982 }, { width: 2560, height: 1600 }]) 
     return { assist: g('farmAssist'), dock: g('dock'), canvas: window.__MOSS__.canvasRect, immersive: document.documentElement.classList.contains('immersive') };
   });
   rep.ok(label + ' 沉浸式开关与门槛一致', box.immersive === immersive, 'immersive=' + box.immersive);
-  rep.ok(label + ' 画布按 0.5 步进', Number.isInteger(scale * 2), JSON.stringify(r));
+  rep.ok(label + ' 画布缩放与设备像素对齐', Number.isInteger(zoom * dpr), JSON.stringify({ zoom, dpr, rect: r }));
   rep.ok(label + ' 画布不超出视口', r.h <= vp.height && r.w <= vp.width, JSON.stringify(r));
   rep.ok(label + ' 无横向滚动', await noScrollX(big.page));
   if (immersive) {
@@ -314,7 +325,7 @@ for (const vp of [{ width: 1512, height: 982 }, { width: 2560, height: 1600 }]) 
     rep.ok(label + ' 快捷栏浮在画面底部（已知取舍：会压住世界底部）',
       box.dock.y < box.canvas.top + box.canvas.h && box.dock.bottom <= vp.height + 1, JSON.stringify(box.dock));
   } else {
-    rep.ok(label + ' 非沉浸式画布至少 2.5 倍', scale >= 2.5, JSON.stringify(r));
+    rep.ok(label + ' 非沉浸式画布缩放至少 2 倍', zoom >= 2, JSON.stringify({ zoom, rect: r }));
     rep.ok(label + ' 引导条在画布上方不重叠', box.assist.bottom <= box.canvas.top, JSON.stringify(box.assist) + ' canvasTop=' + box.canvas.top);
   }
   rep.ok(label + ' 快捷栏仍在屏内', await big.page.evaluate(() => {

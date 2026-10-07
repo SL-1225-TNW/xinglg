@@ -8875,7 +8875,10 @@ function resizeCanvas() {
   updatePlayLayout();
   // 按游戏坐标系的宽高布局，系统锁竖屏时也使用完整横向画面。
   var app = $('#app');
-  var immersive = app.clientWidth > app.clientHeight;
+  var landscape = app.clientWidth > app.clientHeight;
+  // 手机/平板横屏必须充分利用矮屏高度；桌面则只在超宽大屏进入沉浸布局，
+  // 避免普通笔记本横屏时把教程和 HUD 压到游戏画面上。
+  var immersive = landscape && (touchDevice() || (app.clientWidth >= 2000 && app.clientHeight >= 1100));
   root.classList.toggle('immersive', immersive);
   root.style.setProperty('--assist-top', ($('#topbar').offsetTop + $('#topbar').offsetHeight + 4) + 'px');
   root.style.setProperty('--dock-h', $('#dock').offsetHeight + 'px');
@@ -9181,6 +9184,15 @@ window.__MOSS__ = {
   get game() { return Game; },
   get ui() { return UI; },
   get cam() { return cam; },
+  get cameraLimits() {
+    if (!state || !MAPS[state.sceneId]) return null;
+    var map = MAPS[state.sceneId], mapW = map.w * TILE, mapH = map.h * TILE;
+    var maxX = Math.max(0, mapW - VIEW_W), maxY = Math.max(0, mapH - VIEW_H);
+    return {
+      minX: maxX === 0 ? -Math.round((VIEW_W - mapW) / 2) : 0, maxX: maxX,
+      minY: maxY === 0 ? -Math.round((VIEW_H - mapH) / 2) : 0, maxY: maxY
+    };
+  },
   get canvasRect() { var r = canvas.getBoundingClientRect(); return { w: r.width, h: r.height, left: r.left, top: r.top }; },
   get npcRuntime() { return npcRuntime; },
   livingInfo: function(){return {city:{w:MAPS.city.w,h:MAPS.city.h,buildings:CITY_BUILDINGS,districts:CITY_DISTRICTS},animals:sceneAnimals().map(function(a){return Object.assign({},a);}),forestNodes:EXPLORE_NODES.forest};},
