@@ -261,7 +261,7 @@
     return n;
   }
   async function readCloudSave() {
-    var rows = await authorized('/rest/v1/game_saves?select=revision,updated_at,payload,schema_version&slot_id=eq.' +
+    var rows = await authorized('/rest/v1/game_saves?select=revision,updated_at,payload,schema_version,last_mutation_id&slot_id=eq.' +
       encodeURIComponent(SLOT_ID) + '&limit=1', { method: 'GET' });
     return Array.isArray(rows) && rows.length ? rows[0] : null;
   }
@@ -273,6 +273,7 @@
     if (!window.confirm(remote
       ? '云端已有第 ' + (remote.payload && remote.payload.totalDay || '?') + ' 天的存档（版本 ' + remote.revision + '）。确定用本设备第 ' + day + ' 天的存档覆盖吗？'
       : '确定把本设备第 ' + day + ' 天的存档上传到云端吗？')) return;
+    var mutationId = uuid();
     var result = await api('/rest/v1/rpc/commit_game_save', {
       method: 'POST',
       body: JSON.stringify({
@@ -281,11 +282,16 @@
         p_schema_version: 2,
         p_payload: window.__MOSS__.serialize(),
         p_device_id: deviceId(),
-        p_mutation_id: uuid()
+        p_mutation_id: mutationId
       })
     }, s.access_token);
+    if (result && (result.ok === false || result.success === false || result.conflict === true)) {
+      throw new Error(result.message || '云端版本已变化，未覆盖存档。请重新上传并确认云端版本。');
+    }
     var verify = await readCloudSave();
-    if (!verify || !verify.payload) throw new Error('上传请求完成，但未能读取云端结果。请重新打开账号窗口检查。');
+    if (!verify || !verify.payload || verify.last_mutation_id !== mutationId) {
+      throw new Error('云端版本发生变化或上传未提交成功；本地存档保留未变。请重新检查后再上传。');
+    }
     message = '上传完成：第 ' + (verify.payload.totalDay || day) + ' 天 · 云端版本 ' + verify.revision + '。';
   }
   async function downloadSave() {
