@@ -978,25 +978,3 @@ html.compact-play[data-device="tablet"] .tact-sm{width:44px;height:44px}
   .forest-journal-foot{display:none}.forest-journal-page{padding:14px 13px 17px}
   .forest-journal-page h2{font-size:22px}.journal-stat-grid{grid-template-columns:1fr}
 }
-
-
-/* ---------------- 账号与手动云存档 ---------------- */
-.cloud-note{margin:7px 0;line-height:1.55}
-.cloud-message{
-  margin:4px 0 10px;padding:8px 10px;border-left:3px solid var(--hint);
-  background:rgba(239,209,139,.12);color:var(--paper);font-size:12px;line-height:1.5;
-}
-.cloud-account-name{font-weight:700;color:var(--hint);margin:2px 0}
-.cloud-form{
-  display:flex;flex-direction:column;gap:8px;margin-top:13px;padding-top:11px;
-  border-top:1px solid rgba(239,209,139,.2);
-}
-.cloud-section-title{font-weight:700;color:var(--hint);font-size:13px}
-.cloud-field{display:flex;flex-direction:column;gap:4px;color:var(--text-dim);font-size:12px}
-.cloud-field input{
-  width:100%;min-height:40px;padding:8px 10px;border:1px solid var(--line-hi);
-  border-radius:7px;background:#15271f;color:var(--text);font:inherit;font-size:14px;
-}
-.cloud-field input:focus{outline:2px solid var(--focus);outline-offset:1px}
-.win-body.cloud-account{gap:8px}
-.win-body .btn:disabled{opacity:.55;cursor:wait}
