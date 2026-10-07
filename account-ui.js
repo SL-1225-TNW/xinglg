@@ -23,7 +23,7 @@
   AccountUI.prototype.open = function () {
     var self = this, dialog = this.dialog;
     dialog.replaceChildren();
-    if (this.handlers.pause) this.handlers.pause();
+    if (this.handlers.pause && this.handlers.pause() === false) return;
     var title = document.createElement('h2'); title.textContent = '账号与云存档'; dialog.appendChild(title);
     var status = document.createElement('p'); status.setAttribute('role','status'); dialog.appendChild(status);
     function run(action) {
@@ -69,7 +69,7 @@
       }, true);
       this.button(form, '验证并登录', function () {
         if (!email.reportValidity() || !code.reportValidity()) return;
-        run(async function () { var session = await self.auth.verify(email.value.trim(), code.value.trim());
+        run(async function () { if (self.handlers.prepareLogin) self.handlers.prepareLogin(); var session = await self.auth.verify(email.value.trim(), code.value.trim());
           await self.handlers.login(session); dialog.close(); });
       });
       dialog.appendChild(form);

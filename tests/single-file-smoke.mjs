@@ -12,7 +12,7 @@ if (!fs.existsSync(FILE)) { console.error('缺少单文件版，先运行 node t
 let failed = 0;
 const ok = (n, c, d) => { if (c) console.log('PASS ' + n + (d ? ' · ' + d : '')); else { failed++; console.log('FAIL ' + n + (d ? ' · ' + d : '')); } };
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, ...(process.env.MOSS_CHROMIUM ? { executablePath: process.env.MOSS_CHROMIUM, args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] } : {}) });
 const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
 page.setDefaultTimeout(15000);
 const errors = [];
@@ -73,7 +73,7 @@ const painted = await page.evaluate(() => {
 ok('画布已绘制', painted > 12, painted + ' 种颜色');
 
 /* 8. 存档写进 localStorage（刷新能继续） */
-const saved = await page.evaluate(() => !!localStorage.getItem('moss-farm-v2'));
+const saved = await page.evaluate(() => !!window.__MOSS__.saves.read()?.payload);
 ok('存档已写入 localStorage', saved);
 
 ok('全程无控制台错误', errors.length === 0, errors.slice(0, 3).join(' | ') || '0 条');

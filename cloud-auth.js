@@ -20,11 +20,28 @@
       global: { fetch: function (url, options) { return fetch(url, Object.assign({}, options, { signal: AbortSignal.timeout(15000) })); } }
     }) : null;
   }
+  AuthService.prototype.cachedSession = function () {
+    try {
+      var session = JSON.parse(localStorage.getItem('moss-auth:' + this.config.url));
+      if (session && session.access_token && session.refresh_token && /^[0-9a-f-]{36}$/i.test(session.user.id)) return session;
+    } catch (e) { /* No locally recoverable identity. */ }
+    return null;
+  };
   AuthService.prototype.restore = async function () {
     if (!this.client) return null;
-    var result = await this.client.auth.getSession();
-    if (result.error) throw result.error;
-    return result.data.session;
+    // The cached UUID only selects a local namespace; the backend still validates every JWT.
+    if (navigator.onLine === false && this.cachedSession()) return this.cachedSession();
+    var timeout;
+    try {
+      var result = await Promise.race([this.client.auth.getSession(), new Promise(function (_, reject) {
+        timeout = setTimeout(function () { var error = new Error('会话恢复超时'); error.name = 'TimeoutError'; reject(error); }, 12000);
+      })]);
+      if (result.error) throw result.error;
+      return result.data.session;
+    } catch (e) {
+      if (['AuthRetryableFetchError', 'TimeoutError', 'AbortError', 'TypeError'].indexOf(e.name) >= 0 && this.cachedSession()) return this.cachedSession();
+      throw e;
+    } finally { clearTimeout(timeout); }
   };
   AuthService.prototype.sendCode = async function (email) {
     if (!this.client) throw new Error('尚未配置云服务，游客存档可正常使用');

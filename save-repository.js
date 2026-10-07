@@ -8,7 +8,8 @@
     });
   }
   function hash(payload) {
-    var text = JSON.stringify(payload), n = 2166136261;
+    var copy = Object.assign({}, payload); delete copy.savedAt;
+    var text = JSON.stringify(copy), n = 2166136261;
     for (var i = 0; i < text.length; i++) n = Math.imul(n ^ text.charCodeAt(i), 16777619);
     return (n >>> 0).toString(16); // change fingerprint, not a security primitive
   }
@@ -40,6 +41,7 @@
     var previous = this.read();
     if (previous && previous.payload.version > payload.version) throw new Error('请升级游戏后读取此存档');
     var digest = hash(payload);
+    if (previous && previous.hash === digest && options.revision === undefined && options.pending === undefined) return previous;
     var record = { format: 1, userId: this.userId, slotId: this.slotId, payload: payload,
       revision: options.revision !== undefined ? options.revision : (previous ? previous.revision : 0),
       sequence: (previous ? previous.sequence : 0) + 1, mutationId: uuid(), hash: digest,

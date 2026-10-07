@@ -26,7 +26,7 @@ if (/<\/style/i.test(css)) {
 const before = html;
 // The shareable offline edition deliberately carries no production cloud configuration.
 html = html.replace('<script src="cloud-config.js"></script>', '<script>window.MOSS_CLOUD_CONFIG = {url:"",publishableKey:""};</script>');
-for (const name of ['vendor/supabase.js', 'cloud-auth.js', 'account-ui.js']) {
+for (const name of ['vendor/supabase.js', 'cloud-auth.js', 'account-ui.js', 'save-coordinator.js']) {
   const source = read(name).replace(/<\/script/gi, '<\\/script');
   html = html.replace('<script src="' + name + '"></script>', () => '<script>\n' + source + '\n</script>');
 }

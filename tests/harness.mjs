@@ -39,7 +39,7 @@ export class Report {
 
 /* ---------- 页面夹具 ---------- */
 export async function launch(opts = {}) {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: true, ...(process.env.MOSS_CHROMIUM ? { executablePath: process.env.MOSS_CHROMIUM, args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] } : {}) });
   // 冒烟测试要跑打包产物：给 url 就能覆盖默认的开发页地址
   if (opts.url) GAME_URL = opts.url;
   const ctx = await browser.newContext({

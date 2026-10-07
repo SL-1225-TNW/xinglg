@@ -467,7 +467,7 @@ rep.ok('提示存档损坏', /损坏/.test(corruptNote), corruptNote);
 rep.ok('提供导出原始数据入口', (await p2.locator('.boot-actions button', { hasText: '导出损坏的原始数据' }).count()) > 0);
 rep.ok('提供重新开始入口', (await p2.locator('.boot-actions button', { hasText: '重新开始' }).count()) > 0);
 rep.ok('不会自动进入损坏存档', await p2.evaluate(() => !window.__MOSS__.state));
-rep.eq('损坏原文被保留', await p2.evaluate(() => localStorage.getItem('moss-farm-v2-corrupt')), '{ broken json');
+rep.eq('损坏原文被保留', await p2.evaluate(() => localStorage.getItem('moss-farm-v2:guest:corrupt')), '{ broken json');
 await p2.locator('.boot-actions button', { hasText: '重新开始' }).click();
 await p2.waitForTimeout(600);
 await p2.waitForFunction(() => window.__MOSS__.state && document.getElementById('boot').hidden, null, { timeout: 6000 });
@@ -512,7 +512,7 @@ rep.eq('迁移位置保留', [s.px, s.py], [10, 10]);
 rep.eq('迁移保留旧工具', [s.inv.tool_hoe, s.inv.tool_can, s.inv.basket], [1, 1, 1]);
 rep.eq('迁移后委托 1 解锁', s.quests[1], 'unlocked');
 rep.ok('保留第一版原始存档键', await mig.page.evaluate(() => !!localStorage.getItem('moss-farm-v1')));
-rep.ok('已写入第二版存档键', await mig.page.evaluate(() => !!localStorage.getItem('moss-farm-v2')));
+rep.ok('已写入第二版存档键', await mig.page.evaluate(() => !!window.__MOSS__.saves.read()?.payload));
 rep.ok('迁移后仍可正常游玩（锄地成功）', await (async () => {
   await mig.page.waitForTimeout(300);
   return await mig.page.evaluate(() => {
