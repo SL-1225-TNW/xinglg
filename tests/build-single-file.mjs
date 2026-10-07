@@ -11,6 +11,7 @@ const read = p => fs.readFileSync(path.join(ROOT, p), 'utf8');
 let html = read('index.html');
 const css = read('styles.css');
 const js = read('game.js');
+const saves = read('save-repository.js');
 
 /* 内联脚本里不能出现 </script>，否则浏览器会提前结束标签 */
 if (/<\/script/i.test(js)) {
@@ -23,6 +24,7 @@ if (/<\/style/i.test(css)) {
 }
 
 const before = html;
+html = html.replace('<script src="save-repository.js"></script>', '<script>\n' + saves + '\n</script>');
 html = html.replace('<link rel="stylesheet" href="styles.css">', '<style>\n' + css + '\n</style>');
 html = html.replace('<script src="game.js"></script>', '<script>\n' + js + '\n</script>');
 if (html === before) { console.error('没有匹配到要内联的标签，index.html 结构变了？'); process.exit(1); }

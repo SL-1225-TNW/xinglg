@@ -33,7 +33,10 @@ var VIEW_W = 384;
 var VIEW_H = 256;
 var MIN_TILES_W = 24;   // 视野最少 24×16 格，保证手机上也看得清角色周围
 var MIN_TILES_H = 16;
-var SAVE_KEY = 'moss-farm-v2';
+var SaveRepository = new window.MossSaves.LocalSaveRepository(window.localStorage);
+var SaveCoordinator = null;
+var refreshAccountBoot = null;
+var SAVE_KEY = SaveRepository.key(null);
 var SAVE_KEY_V1 = 'moss-farm-v1';
 var CORRUPT_KEY = 'moss-farm-v2-corrupt';
 var SCHEMA_VERSION = 2;
@@ -534,7 +537,8 @@ function saveNow() {
   if (!state) return;
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(serialize()));
+    var record = SaveRepository.write(serialize());
+    if (SaveCoordinator) SaveCoordinator.saved(record);
     saveFailed = false;
     setSaveStatus('saved');
   } catch (e) {
@@ -848,10 +852,17 @@ var LoadResult = { state: null, notice: '', corrupt: null };
 
 function loadGame() {
   LoadResult = { state: null, notice: '', corrupt: null };
-  var raw2 = readRaw(SAVE_KEY);
+  var raw2 = null;
+  try {
+    SaveRepository.migrateLegacy(normalizeSave, migrateV1);
+    var record = SaveRepository.read();
+    if (record) raw2 = JSON.stringify(record.payload);
+  } catch (error) { LoadResult.notice = error.message; LoadResult.corrupt = SaveRepository.storage.getItem(SAVE_KEY); }
+  if (!raw2 && !SaveRepository.userId) raw2 = readRaw('moss-farm-v2');
   if (raw2) {
     try {
       var parsed = JSON.parse(raw2);
+      if (parsed.version > SCHEMA_VERSION) { LoadResult.future = true; LoadResult.notice = "此存档来自更新版本，请升级游戏；原始进度已保留。"; return LoadResult; }
       var norm = normalizeSave(parsed);
       if (norm) { norm.overloaded = norm.overloaded || countSlots(norm.inventory) > CFG.bagSlots; LoadResult.state = norm; return LoadResult; }
       throw new Error('schema');
@@ -861,7 +872,7 @@ function loadGame() {
       LoadResult.corrupt = raw2;
     }
   }
-  var raw1 = readRaw(SAVE_KEY_V1);
+  var raw1 = SaveRepository.userId ? null : readRaw(SAVE_KEY_V1);
   if (raw1) {
     try {
       var old = JSON.parse(raw1);
@@ -5540,7 +5551,7 @@ function openRestartConfirm() {
       { label: '取消', kind: 'ghost', close: true },
       {
         label: '确认重新开始', kind: 'danger', close: false, onClick: function () {
-          try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+          try { backupCurrentSave("restart"); } catch (e) { toast(e.message); return; }
           state = newGameState();
           initNewGameWorld();
           ensureNpcRuntime();
@@ -5618,12 +5629,35 @@ function pickSaveFile(ta) {
   };
   inp.click();
 }
+function backupCurrentSave(reason) {
+  var raw = SaveRepository.storage.getItem(SaveRepository.key(SaveRepository.userId));
+  if (raw) {
+    SaveRepository.backupRaw(raw, reason);
+    try { SaveRepository.read(); } catch (e) { SaveRepository.storage.removeItem(SaveRepository.key(SaveRepository.userId)); }
+  }
+}
+
+function switchSaveIdentity(userId) {
+  if (state) { saveNow(); if (saveFailed) throw new Error('保存失败，请先导出当前进度'); }
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  clearKeys(); closeWindow(true);
+  state = null;
+  Game.busy = null; Game.fishing = null; Game.particles = []; Game.pondFish = null;
+  Game.shakes = {}; Game.plotSplash = {}; Game.hoverTile = null; Game.selectTile = null;
+  Game.ppos = null; cam.init = false;
+  SaveRepository.setIdentity(userId); SAVE_KEY = SaveRepository.key(userId);
+  CORRUPT_KEY = SAVE_KEY + ':corrupt';
+  $('#boot').hidden = false;
+  if (refreshAccountBoot) refreshAccountBoot();
+}
+
 function importSave(text) {
   var data;
   try { data = JSON.parse(text); }
   catch (e) { toast('导入失败：不是有效的 JSON，当前存档未改变。'); Audio2.play('fail'); return; }
   var norm = normalizeSave(data);
   if (!norm) { toast('导入失败：存档格式不正确，当前存档未改变。'); Audio2.play('fail'); return; }
+  try { backupCurrentSave("import"); } catch (e) { toast("备份失败，未导入：" + e.message); return; }
   state = norm;
   state.overloaded = state.overloaded || countSlots(state.inventory) > CFG.bagSlots;
   ensureNpcRuntime();
@@ -7772,6 +7806,8 @@ function boot() {
 
   function showBoot() {
     $('#boot').hidden = false;
+    actions.innerHTML = '';
+    if (res.future) { note.textContent = res.notice; return; }
     if (res.corrupt) {
       note.className = 'boot-note err';
       note.textContent = '检测到损坏的第二版存档，原始数据已保留。可以尝试读取第一版存档，或重新开始。';
@@ -7809,6 +7845,7 @@ function boot() {
     }
     var b3 = mkBtn('重新开始（清空当前进度）', 'danger', function () {
       if (!window.confirm('确定要清空当前进度重新开始吗？此操作无法撤销。')) return;
+      try { backupCurrentSave("restart"); } catch (e) { note.textContent = e.message; return; }
       startGame(freshGame());
     });
     b3.style.width = '100%';
@@ -7826,6 +7863,7 @@ function boot() {
     return s;
   }
 
+  refreshAccountBoot = function () { res = loadGame(); showBoot(); };
   bindInput();
   showBoot();
   requestAnimationFrame(frame);
@@ -7964,6 +8002,7 @@ window.__MOSS__ = {
   openSettleLog: openSettleLog, settlementPages: settlementPages,
   toolShovel: toolShovel,
   saveNow: saveNow, serialize: serialize,
+  saves: SaveRepository, switchSaveIdentity: switchSaveIdentity, normalizeSave: normalizeSave,
   isSolid: isSolid, findPath: findPath, facingTile: facingTile,
   __npcDialogue: npcDialogue, __talkToNpc: talkToNpc, __giftToNpc: giftToNpc, __heartsText: heartsText, __isGiftable: isGiftable,
   __npcRuntime: npcRuntime, __findNpcAdjacent: findNpcAdjacent,
