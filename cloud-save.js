@@ -155,7 +155,7 @@
       setTimeout(open, 150);
       return;
     }
-    window.__MOSS__.ui.openWindow({
+    window.__MOSS__.openWindow({
       id: 'cloud-account', kind: 'cloud-account', narrow: true, title: '账号与云存档',
       build: function (body) {
         var uid = userId();
