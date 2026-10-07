@@ -1308,14 +1308,14 @@ function onSceneChanged() {
   if (isSolid(state.sceneId, state.player.x, state.player.y)) {
     // 落点被占用时向周围找空位
     var found = false;
-    for (var r = 1; r <= 3 && !found; r++) {
+    for (var r = 1; r <= (state.sceneId === 'city' ? 32 : 3) && !found; r++) {
       for (var dy = -r; dy <= r && !found; dy++) for (var dx = -r; dx <= r && !found; dx++) {
         if (!isSolid(state.sceneId, state.player.x + dx, state.player.y + dy)) {
           state.player.x += dx; state.player.y += dy; found = true;
         }
       }
     }
-    if (!found) { state.player.x = 9; state.player.y = 10; }
+    if (!found) { state.player.x = state.sceneId === 'city' ? 320 : 9; state.player.y = state.sceneId === 'city' ? 470 : 10; }
   }
   syncPlayerPixel();
   Game.hoverTile = null;      // 换场景后旧的悬停格已经没有意义
@@ -1620,11 +1620,11 @@ MAPS.city = (function () {
   // 南门
   road(248, 432, 402, 432, 5); road(300, 392, 300, 466, 4); road(352, 392, 352, 466, 4);
   // 广场：形状刻意不规则，免得看起来像停车场
-  fillRect(m, 286, 308, 356, 346, T_PATH, false);       // 市集广场
-  fillRect(m, 274, 318, 286, 336, T_PATH, false);
-  fillRect(m, 356, 312, 368, 330, T_PATH, false);
-  fillRect(m, 292, 158, 364, 184, T_PATH, false);       // 城堡前庭
-  fillRect(m, 302, 150, 354, 158, T_PATH, false);
+  fillRect(m, 312, 322, 336, 334, T_PATH, false);       // 步行市集：控制广场尺度
+  road(294,338,352,338,3);road(294,312,352,312,3);
+  road(294,312,294,338,3);road(352,312,352,340,3);
+  fillRect(m, 310, 158, 346, 180, T_PATH, false);       // 城堡仪式前庭与街区相接
+  fillRect(m, 316, 150, 340, 158, T_PATH, false);
   fillRect(m, 294, 422, 358, 450, T_PATH, false);       // 城门内广场
   fillRect(m, 358, 430, 370, 442, T_PATH, false);
 
@@ -1644,7 +1644,9 @@ MAPS.city = (function () {
     return [62, 68, 74][Math.abs(seed || 0) % 3];
   }
   function building(id, label, x, y, w, h, theme) {
-    fillRect(m, x, y, x + w - 1, y + h - 1, T_BUILDING, true);
+    // 保留门和任务坐标，只收紧背后的地基；不能有看不见的长条碰撞区。
+    if (theme !== 'castle') { var compactH = Math.min(h, theme === 'library' ? 6 : 4); y += h - compactH; h = compactH; }
+    fillRect(m, x, y, x + w - 1, y + h - 1, T_GRASS, true);
     var door = { x: x + Math.floor(w / 2), y: y + h };
     fillRect(m, door.x, door.y, door.x, Math.min(H - 2, door.y + 2), T_PATH, false);
     CITY_BUILDINGS.push({ id: id, label: label, x: x, y: y, w: w, h: h, kind: theme || 'home', door: door, district: zoneOf(x, y), visualHeight: cityVisualHeight(theme || 'home', CITY_BUILDINGS.length), facadeStyle: CITY_BUILDINGS.length % 4 });
@@ -1673,9 +1675,9 @@ MAPS.city = (function () {
   /* 只做街景的房屋：给出街道密度，不生成室内 */
   function facade(x, y, w, h, kind, label) {
     if (!spotFree(x, y, w, h)) return;
-    fillRect(m, x, y, x + w - 1, y + h - 1, T_BUILDING, true);
+    fillRect(m, x, y, x + w - 1, y + h - 1, T_GRASS, true);
     fillRect(m, x + Math.floor(w / 2), y + h, x + Math.floor(w / 2), Math.min(H - 2, y + h + 1), T_PATH, false);
-    facades.push({ id: 'f' + facades.length, label: label, x: x, y: y, w: w, h: h, kind: kind, noEnter: true, door: { x: x + Math.floor(w / 2), y: y + h }, visualHeight: cityVisualHeight(kind, homeIdx), facadeStyle: homeIdx % 4 });
+    facades.push({ id: 'f' + facades.length, label: label, x: x, y: y, w: w, h: h, kind: kind, noEnter: true, door: { x: x + Math.floor(w / 2), y: y + h }, visualHeight: cityVisualHeight(kind, homeIdx), facadeStyle: homeIdx % 4, district: zoneOf(x,y) });
   }
 
   INTERACTABLES.city = [];
@@ -1703,11 +1705,14 @@ MAPS.city = (function () {
   building('carriage', '南门马车站', 236, 396, 16, 11, 'shop');
 
   /* 住宅：主要沿街区街道成排，少数可以进去 */
-  var homeIdx = 0, ENTERABLE_HOMES = 24, FACADE_HOMES = 150;
+  var homeIdx = 0, ENTERABLE_HOMES = 24;
   /* 一块地能不能盖：主体不能压路、压水、压已有建筑；门前那一格可以是街道，
      这样房子就自然朝着街面开门。 */
   function spotFree(x, y, w, h) {
     if (x < 58 || y < 3 || x + w > W - 3 || y + h > H - 3) return false;
+    // 街头居民的全天活动范围作为小口袋广场保留。
+    var residents=[[300,120],[520,96],[320,462],[336,330],[140,178]];
+    for(var n=0;n<residents.length;n++)if(x<residents[n][0]+5&&x+w>residents[n][0]-3&&y<residents[n][1]+5&&y+h>residents[n][1]-3)return false;
     for (var yy = y; yy < y + h; yy++)
       for (var xx = x; xx < x + w; xx++) {
         if (xx < 0 || yy < 0 || xx >= W || yy >= H) return false;
@@ -1717,27 +1722,64 @@ MAPS.city = (function () {
     return true;
   }
   function placeHome(x, y, w, h) {
-    if (homeIdx >= ENTERABLE_HOMES + FACADE_HOMES) return false;
     if (!spotFree(x, y, w, h)) return false;
     homeIdx++;
     if (homeIdx <= ENTERABLE_HOMES) building('home' + homeIdx, '蔷薇街 ' + homeIdx + ' 号', x, y, w, h, 'home');
     else facade(x, y, w, h, 'home', '蔷薇街 ' + homeIdx + ' 号');
     return true;
   }
-  /* 按街区网格找空地建房：街道和河道会把不规则的地块让出来，
-     剩下的自然形成成排住宅与院落。 */
-  [
+  /* 街区由道路和连续街墙组成，而不是先在草地上撒房子。
+     花园区采用伦敦式排屋与共享庭院；旧城街巷错位；环街连接城堡核心。 */
+  var blocks = [
     { x0: 98, y0: 56, x1: 252, y1: 152 },    // 花园住宅区
     { x0: 80, y0: 160, x1: 222, y1: 292 },   // 西侧旧城
     { x0: 80, y0: 332, x1: 252, y1: 462 },   // 西南工匠区
     { x0: 234, y0: 258, x1: 424, y1: 374 },  // 老市集周边
     { x0: 438, y0: 168, x1: 624, y1: 362 },  // 东侧河岸
     { x0: 432, y0: 40, x1: 624, y1: 174 },   // 东北学院区
-    { x0: 238, y0: 386, x1: 424, y1: 468 }   // 南门驿站
-  ].forEach(function (box) {
-    for (var y = box.y0; y + 7 <= box.y1; y += 26)
-      for (var x = box.x0; x + 8 <= box.x1; x += 14)
-        placeHome(x, y, 8, 7);
+    { x0: 238, y0: 386, x1: 424, y1: 468 },  // 南门驿站
+    { x0: 262, y0: 90, x1: 422, y1: 146 },  // 城堡环街
+    { x0: 224, y0: 190, x1: 430, y1: 250 }, // 内环住宅与商街
+    { x0: 262, y0: 158, x1: 420, y1: 184 }  // 前庭两翼街墙
+  ];
+  // 施工只落在空地，已有店铺、河道与桥保持原位置。
+  function lane(x0,y0,x1,y1,width) {
+    var steps=Math.max(Math.abs(x1-x0),Math.abs(y1-y0),1), half=Math.floor(width/2);
+    for(var i=0;i<=steps;i++){
+      var cx=Math.round(x0+(x1-x0)*i/steps),cy=Math.round(y0+(y1-y0)*i/steps);
+      for(var xx=cx-half;xx<=cx+half;xx++)for(var yy=cy-half;yy<=cy+half;yy++){
+        if(xx>55&&yy>2&&xx<W-2&&yy<H-2&&!m.solid[xx][yy])m.t[xx][yy]=T_PATH;
+      }
+    }
+  }
+  // 围绕城堡的双环与放射路线；边界由河岸和山坡决定，避免整城棋盘格。
+  [[224,188,410,188],[224,188,208,252],[208,252,270,380],[270,380,396,380],
+   [396,380,430,250],[430,250,410,188],[250,148,410,148],
+   [250,148,224,188],[410,148,430,250],[208,252,96,214],[396,380,430,424],
+   [328,152,520,108],[328,152,168,90],[328,188,168,360]].forEach(function(s){lane(s[0],s[1],s[2],s[3],5);});
+  blocks.forEach(function(box,bi){
+    var offset=bi===1?4:0;
+    lane(box.x0-4,box.y0+7,box.x0-4,box.y1,3);
+    lane(box.x1,box.y0+7,box.x1,box.y1,3);
+    for(var sy=box.y0+7;sy<box.y1;sy+=10){
+      lane(box.x0-4,sy,box.x1,sy+(bi===1?4:0),3);
+    }
+    // 每组排屋留一条贯通的侧巷，庭院有出口，不形成封闭的障碍带。
+    for(var sx=box.x0+32;sx<box.x1;sx+=44)lane(sx,box.y0, sx,box.y1,3);
+    lane(box.x0-4,box.y1,320,box.y1,3);
+    for(var y=box.y0;y+4<=box.y1;y+=10){
+      for(var x=box.x0;x+8<=box.x1;x+=9){
+        var hy=y+(bi===1?Math.floor((x-box.x0)/44)%2*2:0);
+        // 共享小花园替代随机空白；每栋门前有连至街面的步道。
+        if((Math.floor((x-box.x0)/9)+Math.floor((y-box.y0)/10)*3)%17===8){
+          if(spotFree(x,hy,8,4)){decor.push({t:'streetTree',x:x+2,y:hy+2});decor.push({t:'flower',x:x+3,y:hy+3});decor.push({t:'bench',x:x+5,y:hy+3});}
+          continue;
+        }
+        if(placeHome(x,hy,8,4)){
+          var doorX=x+4;lane(doorX,hy+4,doorX,y+7+offset,1);
+        }
+      }
+    }
   });
 
   /* 街边设施：让每个街区有自己的样子 */
@@ -1747,7 +1789,21 @@ MAPS.city = (function () {
     m.solid[x][y] = 1;
     decor.push({ t: t, x: x, y: y, v: v || 0 });
   }
+  // 灯柱和花箱只放在侧街边；城市的绿意来自庭院与行道树，而非满地随机植被。
+  blocks.forEach(function(box,bi){
+    for(var sy=box.y0+10;sy<box.y1;sy+=32)for(var sx=box.x0+5;sx<box.x1;sx+=44){
+      if(!m.solid[sx][sy]&&m.t[sx][sy]===T_GRASS){
+        decor.push({t:bi===0?'flower':'tuft',x:sx,y:sy});
+        decor.push({t:'lamp',x:sx+1,y:sy});
+      }
+    }
+  });
   /* 老市集：摊位围着喷泉 */
+  [[309,320],[338,320],[309,328],[338,328],[314,336],[332,336]].forEach(function(p,i){
+    for(var xx=p[0];xx<p[0]+3;xx++)for(var yy=p[1];yy<p[1]+2;yy++)if(m.solid[xx][yy])return;
+    fillRect(m,p[0],p[1],p[0]+2,p[1]+1,T_PATH,true);
+    decor.push({t:'marketStall',x:p[0],y:p[1],v:i%4});
+  });
   [[318, 324], [330, 324]].forEach(function (p) { fixture('fountain', p[0], p[1]); });
   [[294, 312], [294, 338], [352, 314], [352, 340], [312, 310], [338, 344], [276, 326]].forEach(function (p, i) { fixture('stall', p[0], p[1], i); });
   [[300, 322], [300, 332], [348, 322], [348, 332], [320, 312], [320, 342]].forEach(function (p) { fixture('lamp', p[0], p[1]); });
@@ -1772,6 +1828,22 @@ MAPS.city = (function () {
 
   /* 南门：通往芽芽小镇 */
   m.t[320][H - 1] = T_PATH; m.solid[320][H - 1] = 0;
+  // 不规则街区交界处可能形成封闭小院。将无法从南门到达的街景地块
+  // 留作开放绿地，不能保留一扇玩家永远走不到的门。
+  var reachable=new Uint8Array(W*H),queue=new Int32Array(W*H),head=0,tail=1;
+  queue[0]=470*W+320;reachable[queue[0]]=1;
+  while(head<tail){
+    var cell=queue[head++],cx=cell%W,cy=Math.floor(cell/W);
+    [[cx-1,cy],[cx+1,cy],[cx,cy-1],[cx,cy+1]].forEach(function(p){
+      if(p[0]<0||p[1]<0||p[0]>=W||p[1]>=H)return;
+      var next=p[1]*W+p[0];if(!reachable[next]&&!m.solid[p[0]][p[1]]){reachable[next]=1;queue[tail++]=next;}
+    });
+  }
+  facades=facades.filter(function(b){
+    if(reachable[(b.door.y+1)*W+b.door.x])return true;
+    fillRect(m,b.x,b.y,b.x+b.w-1,b.y+b.h-1,T_GRASS,false);
+    decor.push({t:'flower',x:b.x+2,y:b.y+2});return false;
+  });
   return {
     w: W, h: H, t: m.t, solid: m.solid, name: '白蔷薇城',
     exits: [{ x: 320, y: H - 1, to: 'town', tx: 14, ty: 22 }],
@@ -2310,14 +2382,37 @@ function drawCityBuilding(g,bx,by,b){
     }
   }
   // 小屋顶采用山墙剪影，屋檐只略微外挑，不做高耸的大块屋面。
-  drawSteppedGable(g,left-5,roofTop,faceW+10,roofH,palette.roof,palette.edge);
-  px(g,left+faceW-25,roofTop-10,10,18,'#76584A');px(g,left+faceW-28,roofTop-11,16,3,'#A98969');
+  var roofX=left-5,roofW=faceW+10,roofStyle=(b.facadeStyle||0)%4;
+  function roofSurface(atX){
+    if(roofStyle===1)return roofTop+6;
+    if(roofStyle===3)return roofTop+4;
+    return roofTop+Math.floor(Math.abs(atX-(roofX+roofW/2))*roofH/(roofW/2));
+  }
+  function chimney(cx,cw,rise,color){
+    // 底端埋进当地屋面，而非错误地使用屋脊高度。两侧均有连续屋面承托。
+    var bottom=Math.max(roofSurface(cx),roofSurface(cx+cw))+5,top=bottom-rise;
+    px(g,cx,top,cw,rise,color);px(g,cx-2,top-2,cw+4,3,'#A98969');
+    px(g,cx+2,top+4,Math.max(2,cw-4),1,'#B48B72');
+  }
+  if(roofStyle===1){
+    // 低矮四坡屋顶，用后坡色与檐口表现深度。
+    px(g,roofX+8,roofTop+6,roofW-16,roofH-6,palette.roof);
+    px(g,roofX+15,roofTop+3,roofW-30,4,palette.edge);
+    for(var rs=6;rs<roofH;rs+=3){px(g,roofX+Math.max(0,roofH-rs),roofTop+rs,8,3,palette.edge);px(g,roofX+roofW-8-Math.max(0,roofH-rs),roofTop+rs,8,3,palette.edge);}
+  }else if(roofStyle===3){
+    // 连排城市住宅的低折坡屋顶与女儿墙。
+    px(g,roofX+3,roofTop+4,roofW-6,roofH-4,palette.roof);
+    px(g,roofX+9,roofTop,roofW-18,5,palette.edge);
+    px(g,roofX,wallTop-3,roofW,4,'#D7C8AF');
+    drawCityWindow(g,roofX+roofW/2-4,roofTop+7,8,8);
+  }else drawSteppedGable(g,roofX,roofTop,roofW,roofH,palette.roof,palette.edge);
+  if(b.kind!=='workshop')chimney(left+faceW-25,10,18,'#76584A');
   if(b.kind==='shop'){
     px(g,left+5,baseY-31,faceW-15,8,'#A65E65');
     for(var aw=left+8;aw<left+faceW-12;aw+=12){px(g,aw,baseY-31,5,8,'#E5D1B2');}
   }
   if(b.kind==='workshop'){
-    px(g,left+faceW-34,roofTop-20,14,26,'#5E6260');px(g,left+faceW-37,roofTop-21,20,4,'#9B8972');
+    chimney(left+faceW-34,14,26,'#5E6260');
     px(g,left+10,wallTop+5,faceW-30,12,'#4A554E');
   }
   if(b.kind==='library'){
@@ -2326,8 +2421,14 @@ function drawCityBuilding(g,bx,by,b){
   var dx=b.door.x*TILE;
   px(g,dx-9,baseY-24,18,24,'#5D493E');px(g,dx-6,baseY-21,12,21,'#967451');
   // 门牌靠上但不压住窗，住宅外观差异来自屋顶、墙色和入口细节。
-  var signW=Math.min(faceW-8,Math.max(42,Math.ceil(b.label.length*8)+10));
-  px(g,x+w/2-signW/2,wallTop+2,signW,12,'#405247');g.font='8px sans-serif';g.textAlign='center';g.fillStyle='#F0DEB3';g.fillText(b.label,x+w/2,wallTop+11);g.textAlign='left';
+  if(!b.noEnter){
+    var signW=Math.min(faceW-8,Math.max(42,Math.ceil(b.label.length*8)+10));
+    px(g,x+w/2-signW/2,wallTop+2,signW,12,'#405247');g.font='8px sans-serif';g.textAlign='center';g.fillStyle='#F0DEB3';g.fillText(b.label,x+w/2,wallTop+11);g.textAlign='left';
+  }else{
+    if(roofStyle===0){px(g,left+10,wallTop+4,3,wallH-13,'#917B60');px(g,left+faceW-17,wallTop+4,3,wallH-13,'#917B60');}
+    if(roofStyle===2){px(g,dx-16,baseY-30,32,3,'#6D665B');px(g,dx-16,baseY-36,2,6,'#6D665B');px(g,dx+14,baseY-36,2,6,'#6D665B');}
+    px(g,dx+11,baseY-9,10,5,'#AE8163');px(g,dx+12,baseY-12,8,4,'#7C9D66');
+  }
 }
 /* ============================================================
    白蔷薇城室内系统
@@ -3009,16 +3110,19 @@ function drawCityPlan(c){
     if(t===T_PATH){g.fillStyle='#D9CEAE';g.fillRect(ox+x*S,oy+y*S,S,S);}
     else if(t===T_WATER){g.fillStyle='#719DA6';g.fillRect(ox+x*S,oy+y*S,S,S);}
     else if(t===T_BUILDING){g.fillStyle='#9AA08A';g.fillRect(ox+x*S,oy+y*S,S,S);}}
-  CITY_BUILDINGS.forEach(function(b){g.fillStyle=b.id==='castle'?'#687C94':'#837A74';g.fillRect(ox+b.x*S,oy+b.y*S,b.w*S,b.h*S);});
+  map.buildings.forEach(function(b){g.fillStyle=b.id==='castle'?'#687C94':b.noEnter?'#AF9E88':'#837A74';g.fillRect(ox+b.x*S,oy+b.y*S,b.w*S,b.h*S);});
   CITY_DISTRICTS.forEach(function(d){g.font='12px sans-serif';g.textAlign='center';var w=g.measureText(d.name).width+10;var dx=clamp(ox+d.x*S,w/2+2,c.width-w/2-2),dy=clamp(oy+d.y*S,12,c.height-4);g.fillStyle='rgba(30,48,37,.9)';g.fillRect(dx-w/2,dy-7,w,17);g.fillStyle='#EEDDB0';g.fillText(d.name,dx,dy+6);});g.textAlign='left';
   var p=null;if(state.sceneId==='city')p=state.player;else if(state.sceneId.indexOf('city_')===0){var id=state.sceneId.slice(5),b=CITY_BUILDINGS.filter(function(b){return b.id===id;})[0];if(b)p=b.door;}
   if(p){g.fillStyle='#FFF3D6';g.fillRect(ox+p.x*S-S*2,oy+p.y*S-S*2,S*4+2,S*4+2);g.fillStyle='#B24B4C';g.fillRect(ox+p.x*S-S,oy+p.y*S-S,S*2,S*2);}
 }
 /* 街头行人沿主干道来回，不在住宅区里原地打转。 */
 function drawCityCrowd(ents,R){
-  for(var i=0;i<16;i++){
+  var walks=[[98,63,252],[84,167,222],[84,339,252],[238,265,424],
+             [438,175,624],[432,47,624],[238,393,424],[262,97,422]];
+  for(var i=0;i<32;i++){
     var onMain=i%2===0,span=onMain?540:300,x,y;
-    if(onMain){x=Math.round(70+((animalClock*2.2+i*61)%span));y=300+(i%2);}
+    if(i>=16){var route=walks[(i-16)%walks.length],phase=((animalClock*1.4+i*23)%(2*(route[2]-route[0])));x=Math.round(route[0]+Math.min(phase,2*(route[2]-route[0])-phase));y=route[1];}
+    else if(onMain){x=Math.round(70+((animalClock*2.2+i*61)%span));y=300+(i%2);}
     else{x=320+(i%2?4:-4);y=Math.round(150+((animalClock*2.2+i*61)%span));}
     if(x<R.x0-1||x>R.x1+1||y<R.y0-1||y>R.y1+1)continue;
     if(isSolid('city',x,y))continue;
@@ -5707,7 +5811,7 @@ function openWorldMap() {
     });if(!cityView)b.appendChild(wrap);
     var r=WORLD_REGIONS.filter(function(p){return p.id===selected;})[0]||WORLD_REGIONS[0];
     var detail=el('div','panel-box atlas-detail');detail.setAttribute('aria-live','polite');detail.appendChild(el('div','section-title',r.name+' · '+worldRegionStatus(r)));detail.appendChild(el('p',null,r.desc));b.appendChild(detail);
-    if(selected==='city'){var cityPlan=newCanvas(512,384);cityPlan.className='city-plan';cityPlan.setAttribute('aria-label','白蔷薇城城区地图，红点代表当前位置');drawCityPlan(cityPlan);b.appendChild(cityPlan);b.appendChild(el('p','muted','城市共 128×96 格。北部城堡、中央市集、西部住宅、东部学院与工匠街、南部驿站；红点是你的位置。'));}
+    if(selected==='city'){var cityPlan=newCanvas(512,384);cityPlan.className='city-plan';cityPlan.setAttribute('aria-label','白蔷薇城城区地图，红点代表当前位置');drawCityPlan(cityPlan);b.appendChild(cityPlan);b.appendChild(el('p','muted','城市共 640×480 格。城堡双环街连接旧城、花园住宅、市集与河岸；浅色建筑为街景住宅，深色建筑可以进入，红点是你的位置。'));}
     b.appendChild(el('p','muted','虚线边框地点：未解锁或待开放，点击查看详情。实线路：现有农场与小镇连接；虚线路：探索路线示意。森林由小镇北口进入，矿山由森林东北进入；其余待开放区域仍在规划中。M 或 Esc 关闭，地图不能传送。'));
   },actions:[{label:'返回游戏',kind:'primary',close:true}]});
 }
@@ -6601,6 +6705,11 @@ function paintGroundRegion(g, sceneId, rx, ry, rw, rh) {
       g.fillStyle = PAL.grassDark;
       g.fillRect(sx + 4, sy + 9, 1, 4); g.fillRect(sx + 7, sy + 7, 1, 6); g.fillRect(sx + 10, sy + 9, 1, 4);
       if (d.v === 1) { g.fillStyle = '#C8D49A'; g.fillRect(sx + 7, sy + 6, 1, 2); }
+    } else if (d.t === 'streetTree') {
+      // 小型修剪行道树，集中在共享花园，树冠不盖过整栋房屋。
+      px(g,sx+7,sy+3,3,12,'#796049');px(g,sx+2,sy-9,14,15,'#52775A');
+      px(g,sx+4,sy-13,10,17,'#668D65');px(g,sx+5,sy-11,6,3,'#93AC76');
+      px(g,sx+3,sy+13,13,2,'rgba(35,48,35,.18)');
     } else if (d.t === 'flower') {
       g.fillStyle = '#6F9A3C'; g.fillRect(sx + 7, sy + 8, 1, 6);
       g.fillStyle = d.v === 0 ? '#EFD18B' : d.v === 1 ? '#E8A0C0' : '#CFE0E6';
@@ -6623,6 +6732,14 @@ function paintGroundRegion(g, sceneId, rx, ry, rw, rh) {
       g.fillStyle = '#96C2B8'; g.fillRect(sx + 3, sy + 7, 10, 2);
       g.fillStyle = '#B4AFAA'; g.fillRect(sx + 6, sy + 2, 4, 4);
       g.fillStyle = '#BFE0E4'; g.fillRect(sx + 7, sy + 6, 2, 4);
+    } else if (d.t === 'marketStall') {
+      // 双柜台市集棚，尺度能在街头画面中读出来，中央保留通行走廊。
+      var mc=['#A65B52','#5C7C91','#847099','#778D62'][d.v||0];
+      px(g,sx+2,sy+7,44,23,'#8A6B4C');px(g,sx,sy-7,48,16,mc);
+      for(var stripe=3;stripe<48;stripe+=10)px(g,sx+stripe,sy-7,4,16,'#E4D4B6');
+      px(g,sx+2,sy+8,3,23,'#6B5140');px(g,sx+43,sy+8,3,23,'#6B5140');
+      px(g,sx+6,sy+18,35,4,'#C19A69');
+      for(var produce=0;produce<5;produce++)px(g,sx+7+produce*7,sy+14,5,5,produce%2?'#D9A75E':'#90A76B');
     } else if (d.t === 'stall') {                 // 集市摊位：条纹棚顶
       var sc = ['#A6553F', '#4E6B7E', '#7C6B8E', '#6E8A5E'];
       g.fillStyle = '#8A6B4C'; g.fillRect(sx + 1, sy + 9, 14, 5);
@@ -8233,7 +8350,7 @@ window.__MOSS__ = {
   },
   get canvasRect() { var r = canvas.getBoundingClientRect(); return { w: r.width, h: r.height, left: r.left, top: r.top }; },
   get npcRuntime() { return npcRuntime; },
-  livingInfo: function(){return {city:{w:MAPS.city.w,h:MAPS.city.h,buildings:CITY_BUILDINGS,districts:CITY_DISTRICTS},animals:sceneAnimals().map(function(a){return Object.assign({},a);}),forestNodes:EXPLORE_NODES.forest};},
+  livingInfo: function(){return {city:{w:MAPS.city.w,h:MAPS.city.h,buildings:CITY_BUILDINGS,allBuildings:MAPS.city.buildings,districts:CITY_DISTRICTS},animals:sceneAnimals().map(function(a){return Object.assign({},a);}),forestNodes:EXPLORE_NODES.forest};},
   QUEST_SITES: QUEST_SITES,
   TUTORIAL_DONE: TUTORIAL_DONE,
   npcScene: function (id) { return NPCS[id].scene; },
