@@ -2730,11 +2730,20 @@ MAPS.city = (function () {
   });
 
   /* 可进入建筑：每栋按用途有自己的室内 */
+  function cityVisualHeight(theme, seed) {
+    // 记录从地面锚点到最高旗尖的完整投影高度，供视锥裁剪使用。
+    if (theme === 'castle') return 304;
+    if (theme === 'library') return 104;
+    if (theme === 'workshop') return 82;
+    if (theme === 'shop') return 76;
+    // 住宅控制在一到两层；外观高度和地块/碰撞格数彻底分离。
+    return [62, 68, 74][Math.abs(seed || 0) % 3];
+  }
   function building(id, label, x, y, w, h, theme) {
     fillRect(m, x, y, x + w - 1, y + h - 1, T_BUILDING, true);
     var door = { x: x + Math.floor(w / 2), y: y + h };
     fillRect(m, door.x, door.y, door.x, Math.min(H - 2, door.y + 2), T_PATH, false);
-    CITY_BUILDINGS.push({ id: id, label: label, x: x, y: y, w: w, h: h, kind: theme || 'home', door: door, district: zoneOf(x, y) });
+    CITY_BUILDINGS.push({ id: id, label: label, x: x, y: y, w: w, h: h, kind: theme || 'home', door: door, district: zoneOf(x, y), visualHeight: cityVisualHeight(theme || 'home', CITY_BUILDINGS.length), facadeStyle: CITY_BUILDINGS.length % 4 });
     var def = CITY_ROOMS[id] || CITY_ROOMS[theme] || CITY_ROOMS.home;
     var roomId = 'city_' + id, r = mkMap(def.w, def.h, T_PATH);
     fillRect(r, 0, 0, r.w - 1, 0, T_BUILDING, true); fillRect(r, 0, r.h - 1, r.w - 1, r.h - 1, T_BUILDING, true);
@@ -2762,12 +2771,15 @@ MAPS.city = (function () {
     if (!spotFree(x, y, w, h)) return;
     fillRect(m, x, y, x + w - 1, y + h - 1, T_BUILDING, true);
     fillRect(m, x + Math.floor(w / 2), y + h, x + Math.floor(w / 2), Math.min(H - 2, y + h + 1), T_PATH, false);
-    facades.push({ id: 'f' + facades.length, label: label, x: x, y: y, w: w, h: h, kind: kind, noEnter: true, door: { x: x + Math.floor(w / 2), y: y + h } });
+    facades.push({ id: 'f' + facades.length, label: label, x: x, y: y, w: w, h: h, kind: kind, noEnter: true, door: { x: x + Math.floor(w / 2), y: y + h }, visualHeight: cityVisualHeight(kind, homeIdx), facadeStyle: homeIdx % 4 });
   }
 
   INTERACTABLES.city = [];
-  /* 城堡高台 */
-  building('castle', '白蔷薇城堡', 296, 58, 68, 44, 'castle');
+  /* 城堡地基保持紧凑；高耸的塔楼由独立立面图层表现，不占通行格。 */
+  building('castle', '白蔷薇城堡', 312, 58, 32, 10, 'castle');
+  // 地基仍保留建筑碰撞，但不把整块占地染成褐色地砖；石台已由城堡立面绘制。
+  for (var cfx = 312; cfx < 344; cfx++) for (var cfy = 58; cfy < 68; cfy++) m.t[cfx][cfy] = T_GRASS;
+  road(328, 68, 328, 152, 5);            // 大门轴线接入前庭和南北主街
   /* 东北学院区 */
   building('library', '蔷薇图书馆', 440, 70, 26, 18, 'library');
   building('academy', '河岸学院', 560, 58, 34, 22, 'library');
@@ -2819,9 +2831,9 @@ MAPS.city = (function () {
     { x0: 432, y0: 40, x1: 624, y1: 174 },   // 东北学院区
     { x0: 238, y0: 386, x1: 424, y1: 468 }   // 南门驿站
   ].forEach(function (box) {
-    for (var y = box.y0; y + 22 <= box.y1; y += 26)
-      for (var x = box.x0; x + 10 <= box.x1; x += 14)
-        placeHome(x, y, 10, 22);
+    for (var y = box.y0; y + 7 <= box.y1; y += 26)
+      for (var x = box.x0; x + 8 <= box.x1; x += 14)
+        placeHome(x, y, 8, 7);
   });
 
   /* 街边设施：让每个街区有自己的样子 */
@@ -3292,16 +3304,126 @@ function drawAnimal(g,x,y,a){
 }
 function petNearbyAnimal(){var a=sceneAnimals().filter(function(a){return (a.kind==='cat'||a.kind==='dog')&&Math.abs(a.x-state.player.x)+Math.abs(a.y-state.player.y)<1.8;})[0];if(!a)return false;toast(a.kind==='cat'?'小猫眯起眼睛，轻轻蹭了蹭你。':'小狗摇着尾巴，绕着你转了一圈。');Audio2.play('quest');return true;}
 function drawForestStump(g,x,y,n){px(g,x*TILE+4,y*TILE+8,8,6,'#765438');px(g,x*TILE+3,y*TILE+7,10,3,'#BA9468');px(g,x*TILE+6,y*TILE+8,4,1,'#805A3A');if(state.totalDay>n.saved.day){px(g,x*TILE+12,y*TILE+7,1,5,'#537C47');px(g,x*TILE+10,y*TILE+6,5,2,'#9FBD66');}}
+function drawCityWindow(g,x,y,w,h){
+  px(g,x-2,y-2,w+4,h+4,'#8E806E');px(g,x,y,w,h,state.timeMinutes>=CFG.duskStart?'#EACB86':'#7195A0');
+  px(g,x+Math.floor(w/2),y,2,h,'#E6DABC');px(g,x,y+Math.floor(h/2),w,2,'#E6DABC');
+}
+function drawSteppedGable(g,x,y,w,h,color,edge){
+  for(var row=0;row<h;row+=3){var inset=Math.floor((h-row)*w/(2*h));px(g,x+inset,y+row,Math.max(2,w-inset*2),3,color);}
+  px(g,x+Math.floor(w*.18),y+h-3,Math.floor(w*.64),3,edge);
+}
+function drawCastleTower(g,x,bottom,w,total,main){
+  var roofH=main?48:38, shaftH=total-roofH, top=bottom-total;
+  // 墙体逐级收窄，向上产生透视；这部分只占画面像素，不占地图格。
+  for(var band=0;band<5;band++){
+    var bh=Math.ceil(shaftH/5), inset=(4-band)*(main?5:3), by=top+roofH+band*bh;
+    px(g,x+inset,by,w-inset*2,bh+1,band%2?'#D7D1BF':'#E5DECB');
+    px(g,x+w-inset-14,by,14,bh+1,'#B4B6AE');
+    px(g,x+inset+3,by,3,bh+1,'#F3EBD7');
+  }
+  // 竖向壁柱和细长窗强化高度感。
+  var wallX=x+(main?20:10), wallW=w-(main?40:20);
+  for(var pil=0;pil<4;pil++){var px0=wallX+Math.floor((pil+1)*wallW/5);px(g,px0,top+roofH+7,4,shaftH-14,'#B4A98F');px(g,px0+1,top+roofH+7,1,shaftH-14,'#F2EBD8');}
+  for(var wy=top+roofH+18;wy<bottom-20;wy+=38){
+    for(var col=0;col<3;col++)drawCityWindow(g,wallX+10+col*Math.floor((wallW-28)/3),wy,8,24);
+  }
+  px(g,x-4,bottom-8,w+8,8,'#B7AD98');px(g,x-2,bottom-5,w+4,3,'#EEE6D2');
+  // 主塔以平直垛口收顶，再用短脊顶结束轮廓，避免整座城堡像一顶大尖帽。
+  if(main){
+    px(g,x-3,top+roofH-8,w+6,10,'#B9B09E');px(g,x-2,top+roofH-5,w+4,5,'#E9E0CE');
+    for(var crenel=0;crenel<Math.floor(w/16);crenel++)px(g,x+4+crenel*16,top+roofH-14,8,10,'#E2D9C7');
+  }
+  // 上层塔身明显收窄，下层基座、侧影和垛口提供尺度参照，形成仰望的透视感。
+  for(var row=0;row<roofH;row+=3){var inset=Math.floor((roofH-row)*w/(2*roofH));px(g,x+inset,top+row,Math.max(3,w-inset*2),3,row<roofH*.65?'#53677C':'#657B8D');}
+  px(g,x+Math.floor(w*.30),top+roofH-4,Math.floor(w*.40),4,'#394C60');
+  if(!main)for(var mer=0;mer<Math.floor(w/15);mer++)px(g,x+5+mer*15,top+roofH-9,7,8,'#E0D9C8');
+  if(main){
+    px(g,x+w/2-2,top-20,4,21,'#44576B');
+    px(g,x+w/2+2,top-17,28,13,'#A94F55');px(g,x+w/2+2,top-17,14,13,'#E2C7A4');
+    px(g,x+w/2-4,top-3,8,5,'#E4D6B1');
+  }else{
+    px(g,x+w/2-1,top-19,2,20,'#53677C');px(g,x+w/2+1,top-17,15,9,'#B85B5D');
+  }
+}
+function drawWhiteRoseCastle(g,x,baseY,w,b){
+  var cx=x+w/2;
+  // 城堡前庭的落影和台基留在地面层，玩家仍可沿台阶前后通行。
+  px(g,x+20,baseY+5,w-40,10,'rgba(28,35,35,.28)');
+  px(g,x+8,baseY-18,w-16,24,'#A79C87');px(g,x+14,baseY-22,w-28,5,'#E8E0CC');
+  // 低矮横向翼楼：只做城堡的横向基座，主塔的高度来自收窄的垂直立面。
+  var wingX=x+64, wingW=w-128, wingTop=baseY-116;
+  px(g,wingX,wingTop,wingW,94,'#DCD5C2');px(g,wingX+wingW-18,wingTop+8,18,86,'#B5B4AA');
+  px(g,wingX+4,wingTop+6,5,82,'#F1E9D7');px(g,wingX,baseY-28,wingW,8,'#B8AD98');
+  // 两翼分别有低矮山墙和深蓝灰屋顶，避免长条矩形感。
+  var wingGap=18, oneW=Math.floor((wingW-wingGap-18)/2), leftWing=wingX+8, rightWing=wingX+wingW-oneW-8;
+  drawSteppedGable(g,leftWing,wingTop-24,oneW,25,'#566B80','#3E5267');
+  drawSteppedGable(g,rightWing,wingTop-24,oneW,25,'#566B80','#3E5267');
+  for(var wx=wingX+22;wx<wingX+wingW-12;wx+=42){drawCityWindow(g,wx,wingTop+25,9,24);px(g,wx-3,wingTop+22,15,3,'#B9AE99');}
+  // 中央主塔从翼楼后方拔起：细长垛口塔身高于侧翼和副塔，地面占地仍只有 32×10 格。
+  drawCastleTower(g,cx-50,baseY-73,100,208,true);
+  drawCastleTower(g,cx-154,baseY-76,48,125,false);
+  drawCastleTower(g,cx+106,baseY-76,48,125,false);
+  // 拱门、玫瑰徽章和柱廊给正面建立清楚的尺度参照。
+  var doorY=baseY-66;
+  px(g,cx-28,doorY-5,56,68,'#B9AE98');px(g,cx-22,doorY,44,62,'#453D39');
+  px(g,cx-16,doorY+10,32,52,'#765B49');px(g,cx-3,doorY+30,6,32,'#D2B274');
+  px(g,cx-44,doorY-8,7,70,'#EEE6D2');px(g,cx+37,doorY-8,7,70,'#EEE6D2');
+  px(g,cx-16,doorY-31,32,20,'#9B3445');px(g,cx-10,doorY-27,20,12,'#F1D89C');
+  px(g,cx-4,doorY-25,8,8,'#A8404C');
+  // 阶梯近处宽、靠门处窄，制造由前庭仰望主入口的纵深。
+  for(var step=0;step<7;step++){
+    var sw=52+step*16, sy=baseY-5+step*9;
+    px(g,cx-sw/2,sy,sw,8,step%2?'#C7BCA6':'#D8CEBA');px(g,cx-sw/2,sy,sw,2,'#F0E7D4');
+  }
+  g.font='bold 10px sans-serif';g.textAlign='center';
+  px(g,cx-39,baseY-27,78,13,'#405247');g.fillStyle='#F0D990';g.fillText(b.label,cx,baseY-17);g.textAlign='left';
+}
 function drawCityBuilding(g,bx,by,b){
-  var x=bx*TILE,y=by*TILE,w=b.w*TILE,h=b.h*TILE,roof=Math.min(30,Math.floor(h/3));
-  px(g,x+3,y+roof,w-6,h-roof,'#DBD7C3');px(g,x+3,y+h-6,w-6,6,'#AFA48C');
-  px(g,x-2,y,w+4,roof,b.kind==='workshop'?'#566572':'#687E94');px(g,x-2,y+roof-4,w+4,4,'#445A70');
-  for(var ri=0;ri<w;ri+=8)px(g,x+ri,y+2,1,roof-5,'#8395A4');
-  for(var wy=y+roof+7;wy<y+h-17;wy+=22)for(var wx=x+12;wx<x+w-10;wx+=24){px(g,wx-2,wy-2,12,15,'#9A8A73');px(g,wx,wy,8,11,state.timeMinutes>=CFG.duskStart?'#EACB86':'#8EAEB9');px(g,wx+3,wy,1,11,'#E8DEBF');px(g,wx,wy+5,8,1,'#E8DEBF');}
-  if(b.kind==='shop'){px(g,x+10,y+h-25,w-20,8,'#A46E75');for(var ax=12;ax<w-10;ax+=10)px(g,x+ax,y+h-25,4,8,'#E2C6B0');}
-  if(b.kind==='castle'){[0,b.w-3].forEach(function(v){var tx=x+v*TILE;px(g,tx,y-24,3*TILE,b.h*TILE+24,'#D9D4C0');px(g,tx-2,y-29,3*TILE+4,6,'#536B81');for(var i=0;i<3;i++)px(g,tx+5+i*14,y-36,7,9,'#C8C4B3');px(g,tx+18,y-14,10,15,'#6C8697');});}
-  var dx=b.door.x*TILE;px(g,dx+2,(b.door.y-1)*TILE,12,16,'#665449');px(g,dx+4,(b.door.y-1)*TILE+2,8,12,'#8B6B4C');
-  g.font='9px sans-serif';g.textAlign='center';var tw=Math.ceil(g.measureText(b.label).width)+8;px(g,x+w/2-tw/2,y+h-35,tw,13,'#405247');g.fillStyle='#EBDDAD';g.fillText(b.label,x+w/2,y+h-25);g.textAlign='left';
+  var x=bx*TILE,y=by*TILE,w=b.w*TILE,baseY=b.door.y*TILE;
+  if(b.kind==='castle'){drawWhiteRoseCastle(g,x,baseY,w,b);return;}
+  var totalH=b.visualHeight||64, roofH=b.kind==='library'?25:20, wallH=totalH-roofH;
+  var left=x+5, faceW=Math.max(24,w-10), wallTop=baseY-wallH, roofTop=wallTop-roofH;
+  var styles=[
+    {wall:'#D9CFB8',side:'#B7AA91',roof:'#765A51',edge:'#4F4140'},
+    {wall:'#C9CBB8',side:'#A9AE9E',roof:'#4E6472',edge:'#394E5D'},
+    {wall:'#D9C1A5',side:'#B79A7D',roof:'#915D4F',edge:'#70463F'},
+    {wall:'#D0D5D1',side:'#AAB5B7',roof:'#52657B',edge:'#3C4F64'}
+  ];
+  var palette=styles[(b.facadeStyle||0)%styles.length];
+  // 落影按地基绘制；墙身高度取视觉参数，不再取占地 h。
+  px(g,x+8,baseY+3,w-16,6,'rgba(28,35,35,.2)');
+  px(g,left,wallTop,faceW,wallH,palette.wall);px(g,left+faceW-10,wallTop+5,10,wallH-5,palette.side);
+  px(g,left,baseY-8,faceW,8,'#A89B83');px(g,left,baseY-8,faceW,2,'#EEE4D0');
+  // 两层细腰线将立面读成一到两层民居，而不是高层楼体。
+  px(g,left+3,wallTop+Math.floor(wallH*.52),faceW-6,3,'#B6AA93');
+  var floors=b.kind==='library'?3:2, floorGap=Math.max(17,Math.floor((wallH-13)/floors));
+  for(var floor=0;floor<floors;floor++){
+    var wy=wallTop+6+floor*floorGap;
+    if(wy+13>baseY-25)break;
+    for(var col=0;col<Math.max(1,Math.floor((faceW-28)/34));col++){
+      var cols=Math.max(1,Math.floor((faceW-28)/34)), wx=left+14+col*(faceW-28)/cols;
+      drawCityWindow(g,wx,wy,9,13);
+    }
+  }
+  // 小屋顶采用山墙剪影，屋檐只略微外挑，不做高耸的大块屋面。
+  drawSteppedGable(g,left-5,roofTop,faceW+10,roofH,palette.roof,palette.edge);
+  px(g,left+faceW-25,roofTop-10,10,18,'#76584A');px(g,left+faceW-28,roofTop-11,16,3,'#A98969');
+  if(b.kind==='shop'){
+    px(g,left+5,baseY-31,faceW-15,8,'#A65E65');
+    for(var aw=left+8;aw<left+faceW-12;aw+=12){px(g,aw,baseY-31,5,8,'#E5D1B2');}
+  }
+  if(b.kind==='workshop'){
+    px(g,left+faceW-34,roofTop-20,14,26,'#5E6260');px(g,left+faceW-37,roofTop-21,20,4,'#9B8972');
+    px(g,left+10,wallTop+5,faceW-30,12,'#4A554E');
+  }
+  if(b.kind==='library'){
+    px(g,x+w/2-12,wallTop+5,24,4,'#92784F');px(g,x+w/2-2,wallTop+9,4,16,'#B17E49');
+  }
+  var dx=b.door.x*TILE;
+  px(g,dx-9,baseY-24,18,24,'#5D493E');px(g,dx-6,baseY-21,12,21,'#967451');
+  // 门牌靠上但不压住窗，住宅外观差异来自屋顶、墙色和入口细节。
+  var signW=Math.min(faceW-8,Math.max(42,Math.ceil(b.label.length*8)+10));
+  px(g,x+w/2-signW/2,wallTop+2,signW,12,'#405247');g.font='8px sans-serif';g.textAlign='center';g.fillStyle='#F0DEB3';g.fillText(b.label,x+w/2,wallTop+11);g.textAlign='left';
 }
 /* ============================================================
    白蔷薇城室内系统
@@ -8420,6 +8542,20 @@ function drawScene(g, dt) {
   else tX = clamp(ppos.x - VIEW_W / 2, 0, maxX);
   if (maxY === 0) tY = -Math.round((VIEW_H - map.h * TILE) / 2);
   else tY = clamp(ppos.y - VIEW_H / 2 - 4, 0, maxY);
+  // 接近城堡时把角色放到画面下方，给高塔留出上方空间；镜头只做平滑偏置，
+  // 不改变坐标系、碰撞或点击映射，离开前庭后自动回到常规跟随。
+  if (state.sceneId === 'city') {
+    var castle = null;
+    for (var ci = 0; ci < CITY_BUILDINGS.length; ci++) if (CITY_BUILDINGS[ci].id === 'castle') { castle = CITY_BUILDINGS[ci]; break; }
+    if (castle) {
+      var cdx = ppos.x - (castle.door.x * TILE + 8), cdy = ppos.y - (castle.door.y * TILE + 12);
+      var castleFocus = clamp(1 - Math.sqrt(cdx * cdx + cdy * cdy) / Math.max(TILE * 8, VIEW_H * 1.25), 0, 1);
+      if (castleFocus > 0) {
+        var framedY = clamp(ppos.y - VIEW_H + TILE / 2, 0, maxY);
+        tY += (framedY - tY) * castleFocus;
+      }
+    }
+  }
   if (!cam.init) { cam.x = tX; cam.y = tY; cam.init = true; }
   else {
     var f = Math.min(1, dt * 12);
@@ -8515,7 +8651,8 @@ function drawScene(g, dt) {
     }
   }
   (map.buildings || []).forEach(function (b) {
-    if(b.x+b.w<R.x0||b.x>R.x1||b.y+b.h<R.y0||b.y-3>R.y1)return;
+    var visualTop=b.y+b.h-Math.ceil((b.visualHeight||64)/TILE);
+    if(b.x+b.w<R.x0||b.x>R.x1||b.y+b.h<R.y0||visualTop>R.y1)return;
     ents.push({ z: (b.y + b.h) * TILE, f: state.sceneId==='city'?drawCityBuilding:drawHouse, a: state.sceneId==='city'?[b.x,b.y,b]:[b.x, b.y, b.w, b.h, b.kind] });
   });
   (INTERACTABLES[state.sceneId] || []).forEach(function (it) {
