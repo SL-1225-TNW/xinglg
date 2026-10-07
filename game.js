@@ -434,7 +434,7 @@ function newGameState() {
     npcDailyInteractions: {},
     dsMet: false,
     rodLevel: 1,
-    exploration: {forest:false,mine:false,city:false,depth:1,hut:false,tools:false,nodes:{},treasures:{},jobs:{},requestDay:-1},
+    exploration: {forest:false,mine:false,city:false,depth:1,hut:false,tools:false,nodes:{},treasures:{},jobs:{},dailyJobs:{day:-1,ids:[]},storyDone:{},bondDone:{},explorePoints:0,requestDay:-1},
     questProgress: { 1: 'locked', 2: 'locked', 3: 'locked', 4: 'locked' },
     unlockedRecipes: ['chest'],
     bridgeRepaired: false,
@@ -1040,8 +1040,10 @@ for(var depth=1;depth<=3;depth++)[[4,3],[9,8],[15,10],[23,8],[5,14],[11,18],[23,
 function normalizeExploration(raw){
  function num(v,d,min,max){return typeof v==='number'&&isFinite(v)?clamp(v,min,max):d;}
  raw=raw&&typeof raw==='object'?raw:{};
- var e={forest:!!raw.forest,mine:!!raw.mine,city:!!raw.city,depth:clamp(Math.floor(num(raw.depth,1,1,3)),1,3),hut:!!raw.hut,tools:!!raw.tools,nodes:{},treasures:{},jobs:{},requestDay:Math.floor(num(raw.requestDay,-1,-1,1e6))};
+ var e={forest:!!raw.forest,mine:!!raw.mine,city:!!raw.city,depth:clamp(Math.floor(num(raw.depth,1,1,3)),1,3),hut:!!raw.hut,tools:!!raw.tools,nodes:{},treasures:{},jobs:{},dailyJobs:{day:-1,ids:[]},storyDone:{},bondDone:{},explorePoints:clamp(Math.floor(num(raw.explorePoints,0,0,100000)),0,100000),requestDay:Math.floor(num(raw.requestDay,-1,-1,1e6))};
  Object.keys(LIVING_JOBS||{}).forEach(function(id){if(raw.jobs&&Number.isInteger(raw.jobs[id]))e.jobs[id]=Math.max(-1,raw.jobs[id]);});
+ if(raw.dailyJobs&&typeof raw.dailyJobs==='object'){e.dailyJobs.day=Math.floor(num(raw.dailyJobs.day,-1,-1,1e6));if(Array.isArray(raw.dailyJobs.ids))e.dailyJobs.ids=raw.dailyJobs.ids.filter(function(id){return !!LIVING_JOBS[id];}).slice(0,3);}
+ ['storyDone','bondDone'].forEach(function(k){if(raw[k]&&typeof raw[k]==='object')Object.keys(raw[k]).forEach(function(id){if(raw[k][id])e[k][id]=true;});});
  if(!e.forest){e.mine=false;e.hut=false;}if(!e.mine)e.depth=1;
  ['forest_cache','mine_cache'].forEach(function(k){e.treasures[k]=!!(raw.treasures&&raw.treasures[k]);});
  Object.keys(EXPLORE_NODES).forEach(function(sc){Object.keys(EXPLORE_NODES[sc]).forEach(function(k){var n=EXPLORE_NODES[sc][k],key=sc+':'+k,v=raw.nodes&&raw.nodes[key];if(v&&typeof v==='object')e.nodes[key]={hp:clamp(Math.floor(num(v.hp,n.hp,0,n.hp)),0,n.hp),day:Math.floor(num(v.day,0,0,1e6))};});});return e;
@@ -1077,14 +1079,14 @@ function openExploreSite(kind){
  if(kind==='mine'&&e.mine){doSwitchScene('mine1',13,21);return;}
  if(kind==='hut'&&e.hut){openWindow({id:'forest_request',kind:'custom',title:'伐木屋 · 每日委托',build:function(b){b.appendChild(el('p',null,'森林补给：蘑菇 ×5、木材 ×10，奖励 100 金。每天可交付一次。'));b.appendChild(el('p','muted',e.requestDay===state.totalDay?'今天已完成，明天再来。':'今天尚未交付。'));},actions:[{label:'交付补给',kind:'primary',onClick:function(){if(e.requestDay===state.totalDay){toast('今天已经交付过了。');return;}if(payExplore({mushroom:5,wood:10})){e.requestDay=state.totalDay;state.coins+=100;markDirty();refreshHud();saveNow();toast('森林委托完成，获得 100 金。');refreshWindow();}},close:false},{label:'离开',close:true}]});return;}
  if(kind==='tools'&&e.tools){toast('已拥有钢制斧头和镐子。');return;}
- var cfg=configs[kind];openWindow({id:'explore_repair',kind:'custom',title:cfg.title,build:function(b){b.appendChild(el('p',null,cfg.desc));b.appendChild(el('p','muted','需要：'+Object.keys(cfg.cost).map(function(k){return(k==='coins'?'金币':itemName(k))+' ×'+cfg.cost[k];}).join('、')));},actions:[{label:'确认修复 / 升级',kind:'primary',close:false,onClick:function(){if(kind==='forest'&&!state.bridgeRepaired){toast('先完成小镇修桥委托，再开始远行。');return;}if(payExplore(cfg.cost)){e[kind]=true;markDirty();refreshHud();refreshHotbar();saveNow();closeWindow();toast(cfg.title+'完成！');}}},{label:'稍后再来',close:true}]});
+ var cfg=configs[kind];openWindow({id:'explore_repair',kind:'custom',title:cfg.title,build:function(b){b.appendChild(el('p',null,cfg.desc));b.appendChild(el('p','muted','需要：'+Object.keys(cfg.cost).map(function(k){return(k==='coins'?'金币':itemName(k))+' ×'+cfg.cost[k];}).join('、')));},actions:[{label:'确认修复 / 升级',kind:'primary',close:false,onClick:function(){if(kind==='forest'&&!state.bridgeRepaired){toast('先完成小镇修桥委托，再开始远行。');return;}if(payExplore(cfg.cost)){e[kind]=true;e.explorePoints+=(kind==='forest'||kind==='mine'?20:kind==='hut'?10:5);markDirty();refreshHud();refreshHotbar();saveNow();closeWindow();toast(cfg.title+'完成！');}}},{label:'稍后再来',close:true}]});
 }
 function exploreStairs(next){
  var e=exploreState();if(next<=e.depth){doSwitchScene('mine'+next,13,21);return;}
  var cost=next===2?{hardwood:8,copper_ore:8}:{iron_ore:8,coins:250};
- openWindow({id:'mine_stairs',kind:'custom',title:'修复通往第 '+next+' 层的轨道',build:function(b){b.appendChild(el('p',null,'需要：'+Object.keys(cost).map(function(k){return(k==='coins'?'金币':itemName(k))+' ×'+cost[k];}).join('、')+'。修复后永久开放。'));},actions:[{label:'修复轨道',kind:'primary',close:false,onClick:function(){if(payExplore(cost)){e.depth=next;markDirty();saveNow();closeWindow();doSwitchScene('mine'+next,13,21);}}},{label:'返回',close:true}]});
+ openWindow({id:'mine_stairs',kind:'custom',title:'修复通往第 '+next+' 层的轨道',build:function(b){b.appendChild(el('p',null,'需要：'+Object.keys(cost).map(function(k){return(k==='coins'?'金币':itemName(k))+' ×'+cost[k];}).join('、')+'。修复后永久开放。'));},actions:[{label:'修复轨道',kind:'primary',close:false,onClick:function(){if(payExplore(cost)){e.depth=next;e.explorePoints+=15;markDirty();saveNow();closeWindow();doSwitchScene('mine'+next,13,21);}}},{label:'返回',close:true}]});
 }
-function exploreTreasure(id){var e=exploreState();if(e.treasures[id]){toast('这个宝箱已经打开了。');return;}var amount=id==='forest_cache'?120:200;e.treasures[id]=true;state.coins+=amount;markDirty();refreshHud();saveNow();toast('发现隐藏宝箱，获得 '+amount+' 金！');}
+function exploreTreasure(id){var e=exploreState();if(e.treasures[id]){toast('这个宝箱已经打开了。');return;}var amount=id==='forest_cache'?120:200;e.treasures[id]=true;e.explorePoints+=10;state.coins+=amount;markDirty();refreshHud();saveNow();toast('发现隐藏宝箱，获得 '+amount+' 金！');}
 function drawExploreNode(g,x,y,n){
  if(n.type==='tree'){drawTree(g,x,y);if(n.item==='hardwood')px(g,x*TILE+6,y*TILE-3,4,12,'#765438');}
  else if(n.type==='stone'){drawRock(g,x,y);var color=n.item==='copper_ore'?'#D48F58':n.item==='iron_ore'?'#94B5CA':'#C59EEA';px(g,x*TILE+5,y*TILE+6,3,3,color);px(g,x*TILE+10,y*TILE+9,2,3,color);}
@@ -1752,6 +1754,78 @@ var LIVING_JOBS = {
   gardener:{title:'城堡园丁的午餐',cost:{potato:3},reward:{bread:2},coins:45},
   merchant:{title:'市集当日补货',cost:{radish:5,fish_crucian:2},reward:{},coins:145}
 };
+function explorationTier(){
+  var p=exploreState().explorePoints||0;
+  return p>=70?3:p>=35?2:p>=20?1:0;
+}
+function dailyJobsForDay(day){
+  var e=exploreState();
+  var ids=Object.keys(LIVING_JOBS).filter(function(id){
+    var sc=NPCS[id]&&NPCS[id].scene;
+    return sc==='town'||(sc==='forest'&&e.forest)||(sc&&sc.indexOf('city_')===0&&e.city)||(sc&&sc.indexOf('mine')===0&&e.mine);
+  });
+  if(ids.length<3)ids=Object.keys(LIVING_JOBS);
+  var seed=((day*1103515245+12345)>>>0);
+  function next(){seed=(seed*1664525+1013904223)>>>0;return seed;}
+  while(ids.length>3)ids.splice(next()%ids.length,1);
+  return ids;
+}
+function activeDailyJobIds(){
+  var e=exploreState();
+  if(!e.dailyJobs||e.dailyJobs.day!==state.totalDay||!Array.isArray(e.dailyJobs.ids)||e.dailyJobs.ids.length!==3){
+    e.dailyJobs={day:state.totalDay,ids:dailyJobsForDay(state.totalDay)};
+    markDirty();
+  }
+  return e.dailyJobs.ids;
+}
+function dailyJobAvailable(id){return activeDailyJobIds().indexOf(id)>=0;}
+var WORLD_QUESTS=[
+  {id:'forest_marks',title:'雾杉森林的标记',desc:'护林员想确认森林里的补给点，带回一些蘑菇和硬木。',npc:'ranger',minTier:1,need:{mushroom:3,hardwood:2},reward:{coins:120,explorePoints:10},rewardText:'120 金 · 探索度 +10'},
+  {id:'mine_lift',title:'矿山升降轨道',desc:'矿山第二层的轨道需要一批新材料。',npc:'engineer',minDepth:2,need:{copper_ore:5,iron_ore:2},reward:{coins:220,explorePoints:15},rewardText:'220 金 · 探索度 +15'},
+  {id:'city_route',title:'重启白蔷薇邮路',desc:'城市邮局需要木材和面包，才能恢复南门驿路。',npc:'postie',minTier:3,city:true,need:{wood:10,bread:2},reward:{coins:300,explorePoints:10},rewardText:'300 金 · 探索度 +10'}
+];
+var BOND_QUESTS=[
+  {id:'yaya_seedbook',title:'芽芽的种子册',desc:'芽芽想把新一季的种子整理好。',npc:'yaya',minFriendship:25,need:{seed_radish:3},reward:{coins:100,items:{seed_strawberry:2}},rewardText:'100 金 · 草莓种子 ×2'},
+  {id:'aqi_blueprint',title:'阿栎的工具蓝图',desc:'阿栎需要木材和石料来完善新工具蓝图。',npc:'aqi',minFriendship:25,need:{wood:10,stone:5},reward:{coins:160,items:{hardwood:4}},rewardText:'160 金 · 硬木 ×4'},
+  {id:'ds_fishstudy',title:'DS 的鱼类研究',desc:'DS 想记录一条银纹鱼的鳞片。',npc:'ds',minFriendship:25,need:{fish_silver:1},reward:{coins:180,explorePoints:10},rewardText:'180 金 · 探索度 +10'},
+  {id:'ranger_map',title:'松岚的森林地图',desc:'和松岚一起补齐森林深处的地图。',npc:'ranger',minFriendship:50,need:{hardwood:5,mushroom:5},reward:{coins:250,explorePoints:15},rewardText:'250 金 · 探索度 +15'}
+];
+function specialQuestDone(q,kind){var e=exploreState();return !!e[kind==='bond'?'bondDone':'storyDone'][q.id];}
+function specialQuestUnlocked(q,kind){
+  if(kind==='bond')return (state.npcFriendship[q.npc]||0)>=q.minFriendship;
+  if(q.city&&!exploreState().city)return false;
+  if(q.minDepth&&exploreState().depth<q.minDepth)return false;
+  return explorationTier()>=q.minTier;
+}
+function specialQuestReady(q){return Object.keys(q.need).every(function(k){return invCount(k)>=q.need[k];});}
+function specialQuestNeedText(q){return Object.keys(q.need).map(function(k){return itemName(k)+' '+invCount(k)+' / '+q.need[k];});}
+function submitSpecialQuest(q,kind){
+  if(specialQuestDone(q,kind)){toast('这份委托已经完成。');return false;}
+  if(!specialQuestUnlocked(q,kind)){toast('还没有达到解锁条件。');return false;}
+  if(!specialQuestReady(q)){toast('材料还不够。');return false;}
+  var reward=q.reward||{}, items=reward.items||{};
+  if(!Object.keys(items).every(function(k){return bagAccepts(k,items[k]);})){toast('背包放不下奖励。');return false;}
+  Object.keys(q.need).forEach(function(k){invRemove(k,q.need[k]);});
+  Object.keys(items).forEach(function(k){invAdd(k,items[k]);});
+  state.coins+=(reward.coins||0);
+  exploreState()[kind==='bond'?'bondDone':'storyDone'][q.id]=true;
+  exploreState().explorePoints+=reward.explorePoints||0;
+  if(kind==='bond')state.npcFriendship[q.npc]=clamp((state.npcFriendship[q.npc]||0)+5,0,100);
+  markDirty();refreshHud();saveNow();toast('委托完成：'+q.title+'。');return true;
+}
+function renderSpecialQuestCard(b,q,kind){
+  var done=specialQuestDone(q,kind),unlocked=specialQuestUnlocked(q,kind),ready=unlocked&&!done&&specialQuestReady(q);
+  var box=el('div','panel-box '+(done?'done':!unlocked?'locked':''));
+  var head=el('div','row between');head.appendChild(el('div','quest-name',q.title));head.appendChild(el('span','req-chip '+(done?'ok':unlocked?'':'no'),done?'已完成':unlocked?'已解锁':'未解锁'));box.appendChild(head);
+  box.appendChild(el('div','item-desc',q.desc));
+  var reqs=el('div','quest-req');
+  specialQuestNeedText(q).forEach(function(t){var parts=t.split(' '),have=parseInt(parts[parts.length-3],10),need=parseInt(parts[parts.length-1],10);reqs.appendChild(el('span','req-chip '+(have>=need?'ok':'no'),t));});
+  box.appendChild(reqs);
+  box.appendChild(el('div','item-desc','奖励：'+q.rewardText));
+  if(!unlocked)box.appendChild(el('div','item-desc','探索度 / 好感度还不够，继续探索和交流后解锁。'));
+  if(unlocked&&!done){var acts=el('div','item-actions');var btn=mkBtn(ready?'交付委托':'准备材料','sm'+(ready?' primary':''),function(){if(submitSpecialQuest(q,kind)){refreshWindow();}});btn.disabled=!ready;acts.appendChild(btn);box.appendChild(acts);}
+  b.appendChild(box);
+}
 function addResident(id,name,title,scene,x,y,style,colors,lines){
   NPCS[id]={id:id,name:name,title:title,scene:scene,style:style,hair:colors[0],shirt:colors[1],accent:colors[2],skin:'#EDC6A3',
     like:['bread','berry','potato'],dislike:['stone'],
@@ -1802,11 +1876,12 @@ function openCityGate(){
   openWindow({id:'city_gate',kind:'custom',title:'白蔷薇城 · 城市通行证',build:function(b){
     b.appendChild(el('p',null,'城门、市集、住宅、工匠街、学院与蔷薇城堡。办好通行证后可沿南方驿路自由往返。'));
     b.appendChild(el('p','muted','先修好小镇桥梁，再交纳 150 金办证。'));},actions:[
-    {label:'办理通行证 · 150 金',kind:'primary',close:false,onClick:function(){if(!state.bridgeRepaired){toast('先完成修桥委托，再去城市。');return;}if(!payExplore({coins:150}))return;exploreState().city=true;saveNow();closeWindow();toast('已获得通行证，向南走可到白蔷薇城。');}},
+    {label:'办理通行证 · 150 金',kind:'primary',close:false,onClick:function(){if(!state.bridgeRepaired){toast('先完成修桥委托，再去城市。');return;}if(!payExplore({coins:150}))return;exploreState().city=true;exploreState().explorePoints+=25;markDirty();saveNow();closeWindow();toast('已获得通行证，向南走可到白蔷薇城。');}},
     {label:'稍后再来',close:true}]});
 }
 function openResidentJob(id){
   var job=LIVING_JOBS[id];if(!job)return;
+  if(!dailyJobAvailable(id)){openWindow({id:'resident_job',kind:'custom',title:NPCS[id].name+' · 今日安排',build:function(b){b.appendChild(el('p',null,'今天的居民委托由其他人负责。'));b.appendChild(el('p','muted','打开委托日志的“每日”页，可以查看今天的 3 份委托。'));},actions:[{label:'查看每日委托',kind:'primary',close:false,onClick:function(){QUEST_TAB='daily';openQuestLog('board');}},{label:'离开',close:true}]});return;}
   openWindow({id:'resident_job',kind:'custom',title:NPCS[id].name+' · '+job.title,build:function(b){
     b.appendChild(el('p',null,'需求：'+Object.keys(job.cost).map(function(k){return itemName(k)+' ×'+job.cost[k];}).join('、')));
     b.appendChild(el('p',null,'奖励：'+job.coins+' 金'+Object.keys(job.reward).map(function(k){return '、'+itemName(k)+' ×'+job.reward[k];}).join('')));
@@ -5084,63 +5159,56 @@ function openCraft() {
 }
 
 /* --- 任务 --- */
+var QUEST_TAB='main';
+function renderDailyJobCard(b,id){
+  var job=LIVING_JOBS[id],e=exploreState(),done=e.jobs[id]===state.totalDay;
+  var box=el('div','panel-box '+(done?'done':''));
+  var head=el('div','row between');head.appendChild(el('div','quest-name',NPCS[id].name+' · '+job.title));head.appendChild(el('span','req-chip '+(done?'ok':''),done?'今日已完成':'今日可接'));
+  box.appendChild(head);
+  box.appendChild(el('div','item-desc','需求：'+Object.keys(job.cost).map(function(k){return itemName(k)+' ×'+job.cost[k];}).join('、')));
+  box.appendChild(el('div','item-desc','奖励：'+job.coins+' 金'+Object.keys(job.reward).map(function(k){return '、'+itemName(k)+' ×'+job.reward[k];}).join('')));
+  var acts=el('div','item-actions');acts.appendChild(mkBtn(done?'查看进度':'前往交付','sm'+(done?'':' primary'),function(){openResidentJob(id);}));box.appendChild(acts);b.appendChild(box);
+}
 function openQuestLog(site) {
   openWindow({
-    id: 'quest', kind: 'quest', wide: true, title: '委托日志',
-    build: function (b) {
-      if (site === 'board') b.appendChild(el('p', 'muted', '在任务板前可以交付材料。'));
-      else if (site === 'bridge') b.appendChild(el('p', 'muted', '在施工点可以交付修桥材料。'));
-      else b.appendChild(el('p', 'muted', '把材料带到小镇的任务板；修桥的材料要送到东侧小桥的施工点。'));
-      QUESTS.forEach(function (q) {
-        var stt = questState(q.id);
-        var cls = 'quest' + (stt === 'done' ? ' done' : stt === 'locked' ? ' locked' : '');
-        var box = el('div', 'panel-box ' + cls);
-        var head = el('div', 'row between');
-        var nm = el('div', 'quest-name', q.id + '. ' + q.name);
-        var badge = el('span', 'req-chip ' + (stt === 'done' ? 'ok' : stt === 'unlocked' ? '' : 'no'),
-          stt === 'done' ? '已完成' : stt === 'unlocked' ? '进行中' : '未解锁');
-        head.appendChild(nm); head.appendChild(badge);
-        box.appendChild(head);
-        box.appendChild(el('div', 'item-desc', q.desc));
-        if (stt !== 'locked') {
-          var reqs = el('div', 'quest-req');
-          questNeedText(q).forEach(function (t) {
-            var parts = t.split(' ');
-            var have = parseInt(parts[parts.length - 3], 10);
-            var need = parseInt(parts[parts.length - 1], 10);
-            reqs.appendChild(el('span', 'req-chip ' + (have >= need ? 'ok' : 'no'), t));
-          });
-          box.appendChild(reqs);
-          var tgt = questTargetOf(q);
-          if (tgt) {
-            var distLine;
-            if (tgt.scene === state.sceneId) {
-              distLine = '交付点：' + tgt.label + ' · ' + questDistText(tgt.x - state.player.x, tgt.y - state.player.y);
-            } else {
-              var ex = questExitTile();
-              distLine = '交付点：' + tgt.label + '（在' + MAPS[tgt.scene].name + '）' +
-                (ex ? ' · 先往出口走，' + questDistText(ex[0] - state.player.x, ex[1] - state.player.y) : '');
-            }
-            box.appendChild(el('div', 'item-desc', distLine));
-          }
-          box.appendChild(el('div', 'item-desc', '奖励：' + q.rewardText));
-          if (stt === 'unlocked') {
-            var canHere = site && (q.scene === site);
-            var acts = el('div', 'item-actions');
-            var btn = mkBtn(canHere ? '交付材料' : (q.scene === 'bridge' ? '到小桥施工点交付' : '到任务板交付'), canHere ? 'primary' : 'sm', function () {
-              if (submitQuest(q.id)) { refreshWindow(); refreshHotbar(); }
-            });
-            btn.disabled = !canHere;
-            acts.appendChild(btn);
-            box.appendChild(acts);
-          }
-        } else {
-          box.appendChild(el('div', 'item-desc', '完成上一个委托后解锁。'));
-        }
+    id:'quest',kind:'quest',wide:true,title:'委托日志',
+    build:function(b){
+      var tabs=el('div','row quest-tabs');
+      [['main','主线'],['daily','每日'],['explore','探索'],['bond','居民']].forEach(function(t){
+        var btn=mkBtn(t[1],QUEST_TAB===t[0]?'primary':'sm',function(){QUEST_TAB=t[0];renderWindow();});
+        tabs.appendChild(btn);
+      });b.appendChild(tabs);
+      if(QUEST_TAB==='daily'){
+        b.appendChild(el('p','muted','每天从居民委托池抽取 3 份，完成后次日刷新。'));
+        activeDailyJobIds().forEach(function(id){renderDailyJobCard(b,id);});return;
+      }
+      if(QUEST_TAB==='explore'){
+        b.appendChild(el('p','muted','探索度越高，森林、矿山和白蔷薇城会出现新的委托。'));
+        WORLD_QUESTS.forEach(function(q){renderSpecialQuestCard(b,q,'explore');});return;
+      }
+      if(QUEST_TAB==='bond'){
+        b.appendChild(el('p','muted','和居民聊天、送礼提升好感，个人委托会逐步解锁。'));
+        BOND_QUESTS.forEach(function(q){renderSpecialQuestCard(b,q,'bond');});return;
+      }
+      if(site==='board')b.appendChild(el('p','muted','在任务板前可以交付材料。'));
+      else if(site==='bridge')b.appendChild(el('p','muted','在施工点可以交付修桥材料。'));
+      else b.appendChild(el('p','muted','把材料带到小镇的任务板；修桥的材料要送到东侧小桥的施工点。'));
+      QUESTS.forEach(function(q){
+        var stt=questState(q.id),cls='quest'+(stt==='done'?' done':stt==='locked'?' locked':'');
+        var box=el('div','panel-box '+cls),head=el('div','row between');
+        head.appendChild(el('div','quest-name',q.id+'. '+q.name));
+        head.appendChild(el('span','req-chip '+(stt==='done'?'ok':stt==='unlocked'?'':'no'),stt==='done'?'已完成':stt==='unlocked'?'进行中':'未解锁'));
+        box.appendChild(head);box.appendChild(el('div','item-desc',q.desc));
+        if(stt!=='locked'){
+          var reqs=el('div','quest-req');questNeedText(q).forEach(function(t){var parts=t.split(' '),have=parseInt(parts[parts.length-3],10),need=parseInt(parts[parts.length-1],10);reqs.appendChild(el('span','req-chip '+(have>=need?'ok':'no'),t));});box.appendChild(reqs);
+          var tgt=questTargetOf(q);if(tgt){var distLine;if(tgt.scene===state.sceneId)distLine='交付点：'+tgt.label+' · '+questDistText(tgt.x-state.player.x,tgt.y-state.player.y);else{var ex=questExitTile();distLine='交付点：'+tgt.label+'（在'+MAPS[tgt.scene].name+'）'+(ex?' · 先往出口走，'+questDistText(ex[0]-state.player.x,ex[1]-state.player.y):'');}box.appendChild(el('div','item-desc',distLine));}
+          box.appendChild(el('div','item-desc','奖励：'+q.rewardText));
+          if(stt==='unlocked'){var canHere=site&&(q.scene===site),acts=el('div','item-actions'),btn=mkBtn(canHere?'交付材料':(q.scene==='bridge'?'到小桥施工点交付':'到任务板交付'),canHere?'primary':'sm',function(){if(submitQuest(q.id)){refreshWindow();refreshHotbar();}});btn.disabled=!canHere;acts.appendChild(btn);box.appendChild(acts);}
+        }else box.appendChild(el('div','item-desc','完成上一个委托后解锁。'));
         b.appendChild(box);
       });
     },
-    actions: [{ label: '关闭', kind: 'ghost', close: true }]
+    actions:[{label:'关闭',kind:'ghost',close:true}]
   });
 }
 
@@ -5170,6 +5238,7 @@ function openDialogue(id, text, friendshipGain) {
         var d = npcDaily(id);
         var row = el('div', 'row');
         if(LIVING_JOBS[id])row.appendChild(mkBtn('帮忙委托','primary',function(){openResidentJob(id);}));
+        if(BOND_QUESTS.some(function(q){return q.npc===id&&!specialQuestDone(q,'bond')&&specialQuestUnlocked(q,'bond');}))row.appendChild(mkBtn('居民委托','primary',function(){QUEST_TAB='bond';openQuestLog('npc');}));
         if (!d.chat) row.appendChild(mkBtn('再聊一句', 'primary', function () { talkToNpc(id); }));
         if (!d.gift) {
           row.appendChild(mkBtn('赠送礼物', '', function () { view = 'gift'; renderWindow(); }));
