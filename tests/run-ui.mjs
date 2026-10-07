@@ -224,7 +224,7 @@ await closeWin(page);
 await page.evaluate(() => { const s = window.__MOSS__.state; s.structures = [{ id: 's1', device: 'chest', x: 7, y: 8, contents: { wood: 3 } }]; s.nextStructureId = 2; });
 await walkTo(page, 7, 9);
 await faceTowards(page, 7, 8);
-await page.locator('#touchAct').dispatchEvent('pointerdown');
+await page.locator('#touchAct').tap();
 await page.waitForTimeout(250);
 rep.ok('触屏"交互"可打开设备', /木箱/.test(await winTitle(page)));
 await closeWin(page);
