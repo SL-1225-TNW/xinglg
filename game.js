@@ -7380,7 +7380,9 @@ function migrateTravelForOldSaves(s) {
   if (cur) t.discovered[cur.id] = true;
   if (s.sceneId.indexOf('mine') === 0) t.discovered['mine.entrance'] = true;
   // 小镇、河湾、森林、城市：只有真实解锁（有可用入口）才登记
-  if (t.discovered['town.square'] === undefined) t.discovered['town.square'] = true;   // 新档起点邻接、基本通勤
+  // 小镇例外：新档预置可通勤（永久解锁见 7397-7400）。不预置则玩家无法首次抵达
+  // 小镇，也就永远触发不了「首次到访自动登记」，形成死锁。§34.4 要求新档能回家。
+  if (t.discovered['town.square'] === undefined) t.discovered['town.square'] = true;
   if (s.bridgeRepaired) t.discovered['riverside.bank'] = true;
   if (e.forest) t.discovered['forest.gate'] = true;
   if (e.city) t.discovered['city.gate'] = true;
