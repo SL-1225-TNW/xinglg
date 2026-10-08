@@ -158,6 +158,10 @@ var ITEMS = {
   dev_sprinkler:{ name: '竹制洒水器', kind: 'device', device: 'sprinkler', desc: '每天早晨浇灌上下左右四格。' },
   dev_jam:      { name: '果酱罐',   kind: 'device', device: 'jam_jar',   desc: '投入草莓，隔天完成一份莓果酱。' },
   dev_compost:  { name: '堆肥箱',   kind: 'device', device: 'compost',   desc: '投入秸秆与作物残茬，隔天成一箱熟肥；把熟肥撒到田里能补回肥力。' },
+  dev_coop:     { name: '鸡舍',     kind: 'device', device: 'coop',      desc: '三只母鸡。每日要饮水与谷物，第 2 天起每天能捡 1 枚蛋。' },
+  dev_pasture:  { name: '羊圈',     kind: 'device', device: 'pasture',   desc: '两只羊。每日要饮水与牧草，每 3 天能剪 1 份羊毛。' },
+  egg:          { name: '鸡蛋',     kind: 'food',     sell: 12, food: 18, desc: '今早从鸡舍捡的，还带着余温，售价 12 金。' },
+  wool:         { name: '羊毛',     kind: 'material', sell: 30, food: 0,  desc: '剪下来的羊毛，蓬松厚实，售价 30 金。' },
   compost:      { name: '熟肥',     kind: 'material', sell: 2, desc: '由堆肥箱沤出的肥料，给田地补回肥力（每份 +8）。' }
 };
 
@@ -275,7 +279,9 @@ var RECIPES = [
   { id: 'sprinkler', out: 'dev_sprinkler', qty: 1, cost: { wood: 15, stone: 10 },         unlock: 'quest2',     desc: '每天早晨浇灌上下左右四格。' },
   { id: 'jam_jar',   out: 'dev_jam',       qty: 1, cost: { wood: 15, stone: 10 },         unlock: 'friendship', desc: '投入 1 颗草莓，日结算后完成 1 份莓果酱。' },
   { id: 'plain_rice', out: 'rice',         qty: 1, cost: { potato: 2 },                    unlock: 'friendship', desc: '把土豆做成一大碗白米饭——DS 小姐说这是世界上最好的东西。' },
-  { id: 'compost',     out: 'dev_compost', qty: 1, cost: { wood: 12, stone: 8 },           unlock: 'friendship', desc: '沤肥用的木箱：投入 3 份作物，隔天得 1 份熟肥。' }
+  { id: 'compost',     out: 'dev_compost', qty: 1, cost: { wood: 12, stone: 8 },           unlock: 'friendship', desc: '沤肥用的木箱：投入 3 份作物，隔天得 1 份熟肥。' },
+  { id: 'coop',        out: 'dev_coop',    qty: 1, cost: { wood: 20, stone: 6 },           unlock: 'friendship', desc: '挡雨的鸡舍：养三只母鸡，每日喂食后第 2 天起可捡蛋。' },
+  { id: 'pasture',     out: 'dev_pasture', qty: 1, cost: { wood: 18, stone: 4 },           unlock: 'friendship', desc: '围出的羊圈：养两只羊，每日喂食后每 3 天可剪毛。' },
 ];
 
 /* --- 委托 --- */
@@ -5287,6 +5293,10 @@ function pickupStructure(structure) {
   } else if (structure.device === 'jam_jar') {
     if (structure.input > 0) { toast('果酱罐正在加工，等完成并领取后再收起。'); return false; }
     if (structure.ready) { toast('果酱罐里有成品，先领取再收起。'); return false; }
+  } else if (isLivestock(structure.device)) {
+    /* 栏里攒着产出就说明还没收——直接收起会连带把牲畜状态丢掉 */
+    var lc = livestockCare(structure);
+    if (lc.L.pending > 0) { toast('栏里还有' + itemName(lc.cfg.product) + '，先收了再收起' + lc.cfg.name + '。'); return false; }
   }
   if (!bagAccepts(devId, 1)) { toast('背包满了，先整理一下。'); return false; }
   for (var i = 0; i < state.structures.length; i++) {
@@ -5379,6 +5389,201 @@ function openCompost(st) {
     actions: [
       {
         label: '收起堆肥箱', onClick: function () {
+          if (pickupStructure(st)) { closeWindow(); } else { renderWindow(); }
+        }
+      },
+      { label: '关闭', kind: 'ghost', close: true }
+    ]
+  });
+}
+
+/* ---------- 畜养（§32.2「少量畜养」：鸡与羊，蛋与羊毛） ----------
+   设计约束（总规原文）：
+   - 「先做鸡与羊，提供蛋、羊毛、饮水、喂养与有限动物互动」
+   - 「照料短缺先降低产出并明确提示，不在短暂离家后随机处死牲畜」
+   所以缺食缺水只压产蛋率与增重，不设死亡分支；产出物只是物品，
+   卖不掉等于自然损耗，不会变成惩罚性机制。 */
+
+/* 每种牲畜的口粮：沿用堆肥「作物或木材」的消耗口径，
+   不新增饲料物品——新增低价饲料会与磨坊代卖形成套利。 */
+var LIVESTOCK = {
+  coop: {
+    name: '鸡舍', head: 3, food: 2, water: 2,
+    feedList: ['potato', 'radish', 'strawberry'],
+    firstDay: 2,          /* 安置当天不算，第 2 天起开始有产出 */
+    everyDays: 1,         /* 之后每天 1 枚蛋 */
+    product: 'egg',
+    tip: '三只母鸡'
+  },
+  pasture: {
+    name: '羊圈', head: 2, food: 2, water: 2,
+    feedList: ['potato', 'strawberry'],
+    firstDay: 3,          /* 羊毛要长，第 3 天起可剪 */
+    everyDays: 3,
+    product: 'wool',
+    tip: '两只羊'
+  }
+};
+
+/* 结构体没初始化过的字段走这里，避免各入口到处判空 */
+function livestockOf(st) {
+  if (!st.livestock) {
+    st.livestock = { fedDay: -1, wateredDay: -1, pending: 0, lastProductDay: state.totalDay, mood: 0 };
+  }
+  return st.livestock;
+}
+function isLivestock(dev) { return !!LIVESTOCK[dev]; }
+
+/* 今日照料状态：缺料/缺水只影响产出效率 */
+function livestockCare(st) {
+  var cfg = LIVESTOCK[st.device], L = livestockOf(st);
+  var fed = L.fedDay === state.totalDay;
+  var watered = L.wateredDay === state.totalDay;
+  var rate = (fed ? 1 : 0) * (watered ? 1 : 0);
+  var notes = [];
+  if (!fed) notes.push('还没喂食');
+  if (!watered) notes.push('水盆空了');
+  return { cfg: cfg, L: L, fed: fed, watered: watered, rate: rate, notes: notes };
+}
+
+/* 喂食：消耗 2 份口粮。口粮不足也允许「尽力而为」——喂多少算多少，
+   但不足 2 份只按半数效率计，不让玩家卡死在门口。 */
+function livestockFeed(st) {
+  var care = livestockCare(st);
+  if (care.fed) { toast('今天已经喂过了。'); return false; }
+  var given = 0, need = care.cfg.food;
+  for (var i = 0; i < care.cfg.feedList.length && given < need; i++) {
+    var fid = care.cfg.feedList[i];
+    while (given < need && invCount(fid) > 0) { invRemove(fid, 1); given += 1; }
+  }
+  if (given <= 0) { toast('没有可喂的饲料了。'); return false; }
+  care.L.fedDay = state.totalDay;
+  care.L.fedQty = given;
+  if (given < need) toast('只喂了 ' + given + ' 份，还差 ' + (need - given) + ' 份——产出会打折扣。');
+  else toast('喂好了。');
+  Audio2.play('place');
+  return true;
+}
+function livestockWater(st) {
+  var care = livestockCare(st);
+  if (care.watered) { toast('水盆是满的。'); return false; }
+  if (!hasEnergy(1)) return false;
+  state.energy -= 1;
+  care.L.wateredDay = state.totalDay;
+  toast('添了水。');
+  Audio2.play('place');
+  return true;
+}
+
+/* 领取产出：pending 累积到背包（背包满则保留在栏里，不丢失） */
+function livestockClaim(st) {
+  var care = livestockCare(st);
+  if (care.L.pending <= 0) { toast('暂时没有可收的东西。'); return false; }
+  if (!bagAccepts(care.cfg.product, 0)) { toast('背包放不下，先腾出位置。'); return false; }
+  var n = care.L.pending;
+  invAdd(care.cfg.product, n);
+  care.L.pending = 0;
+  toast('收下 ' + n + ' ' + itemName(care.cfg.product) + '。');
+  Audio2.play('pick');
+  markDirty(); refreshHud();
+  return true;
+}
+
+/* 有限动物互动：只给故事反馈，不叠数值奖励（§32.2 原话） */
+var LIVESTOCK_CHAT = [
+  '母鸡们挤过来，围着你的裤脚转了半圈。',
+  '一只鸡歪着头打量你，喉咙里发出咕咕声。',
+  '鸡舍里安静了一会儿，然后响起此起彼伏的啄食声。',
+  '有只羊朝你叫了一声，别的羊跟着应了。',
+  '羊把下巴搁在栅栏上，慢悠悠地看着田那边。',
+  '羊毛蹭着栅栏，沙沙地响。'
+];
+function livestockPet(st) {
+  var care = livestockCare(st);
+  if (care.notes.length) { toast('它们大概没什么精神——' + care.notes.join('、') + '。'); return false; }
+  toast(LIVESTOCK_CHAT[(state.totalDay + st.x + st.y) % LIVESTOCK_CHAT.length]);
+  Audio2.play('place');
+  return true;
+}
+
+/* 日结算：产蛋/剪毛，并明确提示照料短缺造成的损失。
+   结算发生在 state.totalDay 自增之前，所以 state.totalDay 仍是「昨天」，
+   距上次产出的天数要用 totalDay - lastProductDay + 1 才不多算一天。
+
+   产出用「存量 + 小数积累」两段式，而不是每次 Math.round：
+   0.25 份/天四舍五入会变成 0，导致完全不管的鸡永远停产，
+   与 §32.2「照料短缺先降低产出，不在短暂离家后处死牲畜」的意图冲突
+   （停产虽然不杀牲畜，但违背「降低」而非「取消」）。 */
+function livestockDaily(st, summary) {
+  var care = livestockCare(st), cfg = care.cfg;
+  var since = state.totalDay - (care.L.lastProductDay || 0) + 1;
+  if (since < cfg.firstDay) return;                 /* 还没到时候 */
+  var full = Math.floor(since / cfg.everyDays);
+  if (full <= 0) return;
+  /* 三档效率：齐全 1.0 / 缺一项 0.5 / 全缺 0.25 */
+  var rate = care.rate > 0 ? 1 : (care.fed || care.watered ? 0.5 : 0.25);
+  /* 只喂了一半也算数：实际给到的口粮按比例折算，避免注释与行为不一致 */
+  if (care.fed && care.L.fedQty && care.L.fedQty < cfg.food) {
+    rate *= (care.L.fedQty / cfg.food) * 0.5 + 0.5;
+  }
+  care.L.stock = (care.L.stock || 0) + full * rate;
+  var made = Math.floor(care.L.stock);
+  care.L.stock -= made;
+  if (care.notes.length && made < full) {
+    if (!summary.livestockWarn) summary.livestockWarn = [];
+    summary.livestockWarn.push(cfg.name + '：' + care.notes.join('、') + '，少收了一些');
+  }
+  if (made <= 0) {
+    /* 零照料日产不到 1 份，但已经在慢慢攒：只提示，不产 */
+    if (!summary.livestockWarn) summary.livestockWarn = [];
+    summary.livestockWarn.push(cfg.name + '：' + care.notes.join('、') + '，产出在攒着');
+    return;
+  }
+  care.L.pending += made;
+  summary.livestockGained = (summary.livestockGained || 0) + made;
+  care.L.lastProductDay = state.totalDay;
+  /* 互动累积：照料齐全的天数，满了给一句反馈 */
+  care.L.mood = care.rate > 0 ? (care.L.mood || 0) + 1 : 0;
+}
+
+function openLivestock(st) {
+  var cfg = LIVESTOCK[st.device];
+  function statusText() {
+    var care = livestockCare(st);
+    var lines = [];
+    lines.push(cfg.tip + '，照料中。');
+    var since = state.totalDay - (care.L.lastProductDay || 0) + 1;
+    if (care.L.pending > 0) lines.push('栏里有 ' + care.L.pending + ' ' + itemName(cfg.product) + ' 可以收。');
+    else if (since < cfg.firstDay) lines.push('还要 ' + (cfg.firstDay - since) + ' 天开始有产出。');
+    else lines.push(cfg.everyDays === 1 ? '照料齐全的话，明天又会有。' : '照料齐全的话，再过几天可以再剪一次。');
+    if (care.notes.length) lines.push('今天：' + care.notes.join('、') + '——产出会减少，但不会伤到它们。');
+    return lines.join('\n');
+  }
+  openWindow({
+    id: st.device, kind: 'custom', narrow: true, title: cfg.name,
+    build: function (b) {
+      b.appendChild(el('p', null, statusText()));
+      var parts = [];
+      for (var i = 0; i < cfg.feedList.length; i++) {
+        var n = invCount(cfg.feedList[i]);
+        if (n > 0) parts.push(itemName(cfg.feedList[i]) + ' ' + n);
+      }
+      b.appendChild(el('p', 'muted', '可喂：' + (parts.length ? parts.join(' · ') : '（背包里没有饲料）') +
+        ' · 每日需 ' + cfg.food + ' 份 · ' + itemName(cfg.product) + '售价 ' + ITEMS[cfg.product].sell + ' 金'));
+      var row = el('div', 'row');
+      row.appendChild(mkBtn(care.fed ? '今天已喂食' : '喂食', care.fed ? '' : 'primary',
+        function () { livestockFeed(st); refreshWindow(); refreshHotbar(); }));
+      row.appendChild(mkBtn(care.watered ? '水盆已满' : '添水', care.watered ? '' : '',
+        function () { livestockWater(st); refreshWindow(); refreshHotbar(); }));
+      row.appendChild(mkBtn('摸摸', '', function () { livestockPet(st); }));
+      if (care.L.pending > 0) {
+        row.appendChild(mkBtn('收取', 'primary', function () { livestockClaim(st); refreshWindow(); refreshHotbar(); }));
+      }
+      b.appendChild(row);
+    },
+    actions: [
+      {
+        label: '收起' + cfg.name, onClick: function () {
           if (pickupStructure(st)) { closeWindow(); } else { renderWindow(); }
         }
       },
@@ -5586,6 +5791,8 @@ function performSettlement(auto) {
         if (st.input > 0 && !st.ready) { st.ready = true; summary.compost += 1; }
         else if (st.input > 0 && st.ready) summary.compostWaiting += 1;
       }
+      /* 畜养：在 totalDay 递增之前结算，判断的才是「昨天照料得怎么样」 */
+      if (isLivestock(st.device)) livestockDaily(st, summary);
     });
 
     /* 4. 日期 +1 */
@@ -5758,6 +5965,28 @@ function settlementPages(s) {
   }
   if (s.quests && s.quests.length) {
     pages.push(settleStep('quest', '委托进展', s.quests.slice()));
+  }
+  /* 畜养页：有产出或照料提醒时才出现（§32.2「照料短缺先降低产出并明确提示」） */
+  if (s.livestockGained || (s.livestockWarn && s.livestockWarn.length)) {
+    var llines = [];
+    if (s.livestockGained) {
+      var byItem = {};
+      var lstate = {};
+      state.structures.forEach(function (ls) {
+        if (ls.livestock && ls.livestock.pending > 0) {
+          var pid = LIVESTOCK[ls.device] && LIVESTOCK[ls.device].product;
+          if (pid) byItem[pid] = (byItem[pid] || 0) + ls.livestock.pending;
+        }
+      });
+      Object.keys(byItem).forEach(function (pid) {
+        llines.push('栏里攒下 ' + byItem[pid] + ' ' + itemName(pid) + '（' + LIVESTOCK[pid === 'egg' ? 'coop' : 'pasture'].name + '），去设备里收。');
+      });
+    }
+    if (s.livestockWarn) s.livestockWarn.forEach(function (t) { llines.push('· ' + t); });
+    if (llines.length) {
+      llines.push('饿着、渴着只会少收些东西，不会把牲畜弄死——出门前顺手喂一下就好。');
+      pages.push(settleStep('livestock', '畜养', llines));
+    }
   }
   var toRain = s.weatherTo === 'rain';
   var wlines = [];
@@ -8210,6 +8439,7 @@ function openStructure(st) {
   if (st.device === 'chest') { openChest(st); return; }
   if (st.device === 'jam_jar') { openJamJar(st); return; }
   if (st.device === 'compost') { openCompost(st); return; }
+  if (isLivestock(st.device)) { openLivestock(st); return; }
   openWindow({
     id: 'sprinkler', kind: 'custom', narrow: true, title: '竹制洒水器',
     build: function (b) {
@@ -8494,10 +8724,40 @@ var ICON_ART = {
     px(g, 4, 3, 3, 4, '#6E8C46'); px(g, 9, 4, 3, 3, '#7FA054');
     px(g, 6, 2, 4, 3, '#8FAE5E'); px(g, 7, 0, 2, 2, '#A8C66E');
   },
+  /* 鸡舍：木框 + 斜顶 + 门洞 + 一只探头的小鸡 */
+  dev_coop: function (g) {
+    px(g, 2, 5, 12, 8, '#8A5F3C'); px(g, 2, 5, 12, 1, '#A67C4E');
+    px(g, 3, 3, 10, 3, '#6B4A2C'); px(g, 3, 3, 10, 1, '#84603C');
+    px(g, 4, 6, 3, 1, '#C9A227');
+    px(g, 6, 8, 4, 5, '#4E3B22');
+    px(g, 9, 6, 3, 3, '#E8E2D4'); px(g, 12, 7, 1, 1, '#E0A33A');
+    px(g, 12, 9, 1, 1, '#D0492A');
+  },
+  /* 羊圈：浅色栅栏 + 两只蓬松的羊 */
+  dev_pasture: function (g) {
+    px(g, 1, 8, 14, 1, '#7A5C3A'); px(g, 1, 11, 14, 1, '#7A5C3A');
+    px(g, 2, 7, 2, 6, '#8A6A44'); px(g, 7, 7, 2, 6, '#8A6A44'); px(g, 12, 7, 2, 6, '#8A6A44');
+    px(g, 3, 4, 5, 4, '#EDE7DC'); px(g, 3, 5, 5, 1, '#FFFFFF');
+    px(g, 8, 3, 4, 3, '#E4DED2');
+    px(g, 11, 4, 2, 2, '#D8D0C2');
+  },
   compost: function (g) {
     px(g, 3, 6, 10, 8, '#6B4A2C'); px(g, 3, 6, 10, 1, '#87613A');
     px(g, 4, 8, 8, 5, '#4E3B22'); px(g, 5, 9, 6, 1, '#5F4930');
     px(g, 5, 3, 2, 3, '#7FA054'); px(g, 9, 4, 2, 2, '#8FAE5E');
+  },
+  /* 鸡蛋：白壳 + 顶部高光 + 一点暖色斑点 */
+  egg: function (g) {
+    px(g, 5, 3, 6, 3, '#F5F0E4'); px(g, 4, 6, 8, 6, '#EFE8D8');
+    px(g, 5, 12, 6, 2, '#E2D9C4'); px(g, 6, 4, 2, 2, '#FFFFFF');
+    px(g, 9, 8, 2, 2, '#DCCFAE'); px(g, 6, 10, 1, 1, '#DCCFAE');
+  },
+  /* 羊毛：几团白色卷毛 + 一小段棕褐的羊皮边 */
+  wool: function (g) {
+    px(g, 2, 5, 12, 6, '#F2EDE3'); px(g, 3, 3, 4, 4, '#FBF8F1');
+    px(g, 8, 3, 4, 4, '#FBF8F1'); px(g, 11, 6, 3, 3, '#E8E1D3');
+    px(g, 4, 6, 2, 2, '#FFFFFF'); px(g, 9, 6, 2, 2, '#FFFFFF');
+    px(g, 6, 11, 5, 2, '#B98F63'); px(g, 7, 13, 3, 1, '#9A7349');
   },
   hoe: function (g) { ICON_ART.tool_hoe(g); },
   water: function (g) { ICON_ART.tool_can(g); },
@@ -9112,7 +9372,8 @@ function drawHouse(g, bx, by, bw, bh, kind) {
   }
 }
 function drawDevice(g, st, x, y) {
-  var art = { chest: 'dev_chest', sprinkler: 'dev_sprinkler', jam_jar: 'dev_jam', compost: 'dev_compost' }[st.device];
+  var art = { chest: 'dev_chest', sprinkler: 'dev_sprinkler', jam_jar: 'dev_jam', compost: 'dev_compost',
+               coop: 'dev_coop', pasture: 'dev_pasture' }[st.device];
   var c = iconCache[art];
   if (!c) { var tmp = getIcon(art); c = newCanvas(16, 16); c.getContext('2d').drawImage(tmp, 0, 0); iconCache[art] = c; }
   g.drawImage(c, x * TILE, y * TILE);
@@ -9120,6 +9381,18 @@ function drawDevice(g, st, x, y) {
     g.fillStyle = '#EFD18B';
     g.fillRect(x * TILE + 12, y * TILE - 4, 2, 2);
     g.fillRect(x * TILE + 11, y * TILE - 3, 4, 2);
+  }
+  /* 畜养：栏里攒了产出就冒金光；照料短缺时用暗色角标提示（§32.2「明确提示」） */
+  if (isLivestock(st.device)) {
+    var care = livestockCare(st);
+    if (care.L.pending > 0) {
+      g.fillStyle = '#EFD18B';
+      g.fillRect(x * TILE + 12, y * TILE - 4, 2, 2);
+      g.fillRect(x * TILE + 11, y * TILE - 3, 4, 2);
+    } else if (care.notes.length) {
+      g.fillStyle = 'rgba(160,120,90,0.85)';
+      g.fillRect(x * TILE + 2, y * TILE - 3, 3, 3);
+    }
   }
 }
 function drawShipping(g, x, y) {
@@ -10667,6 +10940,30 @@ window.__MOSS__ = {
     slot: function () { var t = TOOLS.filter(function (x) { return x.tool === 'compost'; })[0]; return t ? { slot: t.slot, name: t.name } : null; },
     hasIcon: function () { return typeof ICON_ART.compost === 'function'; },
     sellPrice: function () { return ITEMS.compost.sell; }
+  },
+  /* 畜养系统的验收探针（§32.2）：走真实 API，只读状态，不注入数据 */
+  devLivestock: {
+    cfg: function (dev) { var c = LIVESTOCK[dev]; return c ? { name: c.name, food: c.food, feedList: c.feedList.slice(), firstDay: c.firstDay, everyDays: c.everyDays, product: c.product } : null; },
+    place: function (dev, x, y) { state.selectedDevice = dev === 'coop' ? 'dev_coop' : 'dev_pasture'; return toolPlace(x, y); },
+    craft: function (id) { var r = RECIPES.filter(function (x) { return x.id === id; })[0]; return r ? craft(r) : false; },
+    at: function (x, y) {
+      var st = structureAt(x, y); if (!st) return null;
+      var care = isLivestock(st.device) ? livestockCare(st) : null;
+      return { device: st.device, fed: care ? care.fed : null, watered: care ? care.watered : null,
+               pending: care ? care.L.pending : null, notes: care ? care.notes.slice() : null,
+               lastProductDay: care ? care.L.lastProductDay : null, mood: care ? (care.L.mood || 0) : null,
+               stock: care ? (care.L.stock || 0) : null, fedQty: care ? (care.L.fedQty || 0) : null };
+    },
+    feed: function (x, y) { var st = structureAt(x, y); return st ? livestockFeed(st) : false; },
+    water: function (x, y) { var st = structureAt(x, y); return st ? livestockWater(st) : false; },
+    pet: function (x, y) { var st = structureAt(x, y); return st ? livestockPet(st) : false; },
+    claim: function (x, y) { var st = structureAt(x, y); return st ? livestockClaim(st) : false; },
+    open: function (x, y) { var st = structureAt(x, y); return st ? (openLivestock(st), true) : false; },
+    recipe: function (id) { var r = RECIPES.filter(function (x) { return x.id === id; })[0]; return r ? { id: r.id, out: r.out, qty: r.qty, cost: r.cost, unlock: r.unlock } : null; },
+    sellPrice: function (dev) { var c = LIVESTOCK[dev]; return c ? ITEMS[c.product].sell : 0; },
+    hasIcon: function (id) { return typeof ICON_ART[id] === 'function'; },
+    itemKind: function (id) { return ITEMS[id] ? ITEMS[id].kind : null; },
+    pickup: function (x, y) { var st = structureAt(x, y); return st ? pickupStructure(st) : false; }
   },
   invCount: invCount, itemName: itemName,
   invRemove: invRemove,
