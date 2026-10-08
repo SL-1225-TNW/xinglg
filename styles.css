@@ -540,6 +540,13 @@ button{font-family:inherit}
 .tile-tip.dry .tt-l1{color:#F0C88A}
 .tile-tip.ripe{border-color:#9ed36a}
 .tile-tip.ripe .tt-l0{color:#B6E88A}
+/* 土壤肥力行（§32.2）：三档只用文字表达，不展示具体数值 */
+.tile-tip .tt-fert{color:#9FB88C;align-self:flex-start;max-width:100%}
+.tile-tip .tt-fert.low{color:#E0A15E}
+.tile-tip.fert-low{border-color:#C98A4B}
+/* 预计收获日（§32.2）：缺水时用 warn 色，不给虚假的确定日期 */
+.tile-tip .tt-eta{color:#8FA8B0;align-self:flex-start;max-width:100%;white-space:normal}
+.tile-tip .tt-eta.warn{color:#F0C88A}
 
 /* 种子 / 设备类型选择（内联在快捷栏下方，不暂停游戏时间） */
 .typepick{

@@ -161,11 +161,99 @@ var ITEMS = {
 
 /* --- 作物表 --- */
 var CROPS = {
-  radish:     { id: 'radish',     name: '萝卜', seed: 'seed_radish',     produce: 'radish',     seedPrice: 5,  sell: 18, growDays: 3, regrow: 0, yield: 1 },
-  potato:     { id: 'potato',     name: '土豆', seed: 'seed_potato',     produce: 'potato',     seedPrice: 12, sell: 40, growDays: 5, regrow: 0, yield: 1 },
-  strawberry: { id: 'strawberry', name: '草莓', seed: 'seed_strawberry', produce: 'strawberry', seedPrice: 25, sell: 30, growDays: 6, regrow: 3, yield: 1 }
+  radish:     { id: 'radish',     name: '萝卜', seed: 'seed_radish',     produce: 'radish',     seedPrice: 5,  sell: 9, growDays: 3, regrow: 0, yield: 3 },
+  potato:     { id: 'potato',     name: '土豆', seed: 'seed_potato',     produce: 'potato',     seedPrice: 12, sell: 20, growDays: 5, regrow: 0, yield: 3 },
+  strawberry: { id: 'strawberry', name: '草莓', seed: 'seed_strawberry', produce: 'strawberry', seedPrice: 25, sell: 15, growDays: 6, regrow: 3, yield: 3 }
 };
 var CROP_ORDER = ['radish', 'potato', 'strawberry'];
+
+/* --- 土壤肥力与轮作（§32.2）---
+   设计约束（照总规原文，不自行放宽）：
+   - 肥力按田区记录 0—100，界面只展示「低／适宜／充足」三档 + 实际影响
+   - 连续同类种植缓慢下降；轮作与堆肥恢复
+   - 低肥力影响产量，不突然杀死作物
+   - 首批不做酸碱、十余种元素、虫害概率表
+   - 旧作物迁移时处于正常肥力，历史行为不追溯处罚
+   肥力挂在 state.plots[key] 上，与 water/age 并列，不改动既有字段语义。 */
+var FERT = { MIN: 0, MAX: 100, DEF: 60, LOW: 34, GOOD: 66 };   // DEF=旧档默认（正常，不追溯）
+/* 轮作组：叶菜／根茎／豆类。组间轮换有利，同组连作缓慢下降。 */
+var CROP_GROUPS = {
+  leaf:  { id: 'leaf',  name: '叶菜类', members: ['radish', 'strawberry'] },
+  root:  { id: 'root',  name: '根茎类', members: ['potato'] },
+  legume:{ id: 'legume',name: '豆类',   members: [] }   // 豆类首批暂无作物，占位等后续作物接入
+};
+var CROP_TO_GROUP = {};   // 播种时建立，不硬编码散落
+Object.keys(CROP_GROUPS).forEach(function (g) {
+  CROP_GROUPS[g].members.forEach(function (cid) { CROP_TO_GROUP[cid] = g; });
+});
+
+function plotFertility(p) {
+  if (!p) return FERT.DEF;
+  var v = p.fertility;
+  if (typeof v !== 'number' || !isFinite(v)) return FERT.DEF;
+  return clamp(Math.floor(v), FERT.MIN, FERT.MAX);
+}
+/* 三档显示：只给低／适宜／充足，不暴露数字（§32.2「界面只展示低／适宜／充足和实际影响」） */
+function fertilityTier(v) {
+  var f = (typeof v === 'number') ? v : FERT.DEF;
+  if (f < FERT.LOW)  return { id: 'low',  label: '低',   hint: '产量受影响，轮作或堆肥可恢复' };
+  if (f < FERT.GOOD) return { id: 'good', label: '适宜', hint: '正常生长' };
+  return { id: 'high', label: '充足', hint: '肥力充沛' };
+}
+/* 产量系数：低肥力压产量但绝不死作物（最低 0.5，保底一半） */
+function fertilityYieldFactor(v) {
+  var f = (typeof v === 'number') ? v : FERT.DEF;
+  if (f >= FERT.GOOD) return 1;
+  if (f >= FERT.LOW)  return 0.85;
+  return 0.5;   // 低肥力：产量减半，不枯死
+}
+/* 轮作提示：告诉玩家下一季种什么有帮助（§32.2） */
+function rotationHint(cropId, lastGroup) {
+  if (!CROPS[cropId]) return null;
+  var g = CROP_TO_GROUP[cropId];
+  if (!g) return null;
+  if (!lastGroup) return null;                       // 无历史，不打扰
+  if (g !== lastGroup) return { good: true, text: CROP_GROUPS[g].name + '，与上一季不同组，恢复快' };
+  // 同组连作：找一个不同的组做建议
+  var alt = Object.keys(CROP_GROUPS).filter(function (k) { return k !== g && CROP_GROUPS[k].members.length > 0; });
+  if (alt.length) return { good: false, text: '与上一季同组（' + CROP_GROUPS[g].name + '），改种' + CROP_GROUPS[alt[0]].name + '更有帮助' };
+  return { good: false, text: '与上一季同组（' + CROP_GROUPS[g].name + '），连作会缓慢消耗肥力' };
+}
+/* 采集最近一季的轮作组（从相邻田块历史推断；本项目单块记录足够） */
+function lastRotationGroup(x, y) {
+  var pk = key2(x, y);
+  var p = state.plots[pk];
+  return p && p.lastGroup ? p.lastGroup : null;
+}
+/* 每日肥力变化（§32.2「连续同类种植缓慢下降」「轮作、堆肥恢复」）
+   刻意的缓坡设计：单季连作只掉 2—3 点，玩家要连种好几季才会感到压力，
+   不会因为一次疏忽就毁掉一块地。低肥力只压产量，不会枯死作物。 */
+var FERT_RATE = {
+  sameGroup: -2,    // 同组连作：缓慢下降
+  diffGroup: 1,     // 换组种植：小幅恢复
+  fallow: 3         // 空地休耕：恢复更快
+};
+/* 返回该田块今日肥力变化量（不含堆肥加成）
+   注意：lastGroup 在播种时就写成当前组，所以它代表"本季"，
+   判断连作要看 prevGroup（播种前那一季的组），不能拿 lastGroup 比。 */
+function fertilityDeltaToday(p) {
+  if (!p) return 0;
+  if (!p.crop) return FERT_RATE.fallow;                 // 休耕恢复
+  var g = CROP_TO_GROUP[p.crop];
+  if (!g) return 0;
+  if (!p.prevGroup) return FERT_RATE.sameGroup;          // 没有上一季记录：按新地首次种植处理
+  return (p.prevGroup !== g) ? FERT_RATE.diffGroup : FERT_RATE.sameGroup;
+}
+/* 应用每日肥力变化，返回实际变化量（供结算摘要报告） */
+function applyFertilityDaily(p) {
+  if (!p) return 0;
+  var d = fertilityDeltaToday(p);
+  if (!d) return 0;
+  var before = plotFertility(p);
+  var after = clamp(before + d, FERT.MIN, FERT.MAX);
+  p.fertility = after;
+  return after - before;
+}
 
 var FISHES = [
   { id: 'fish_crucian', name: '小鲫鱼', sell: 20, sunny: 0.60, rain: 0.40, speed: 45 },
@@ -727,7 +815,11 @@ function normalizeSettleHistory(v) {
       weather: e.weather === 'rain' ? 'rain' : 'sun',
       auto: !!e.auto,
       sold: [],
-      matureDetail: []
+      matureDetail: [],
+      // 肥力字段（§32.2）：旧档没有这些，补 0/空数组，不追溯惩罚
+      fertGained: clamp(Math.floor(isFinite(e.fertGained) ? e.fertGained : 0), 0, 9999),
+      fertLost: clamp(Math.floor(isFinite(e.fertLost) ? e.fertLost : 0), 0, 9999),
+      fertLow: []
     };
     if (Array.isArray(e.sold)) {
       for (var j = 0; j < e.sold.length && rec.sold.length < 40; j++) {
@@ -744,6 +836,12 @@ function normalizeSettleHistory(v) {
     if (Array.isArray(e.matureDetail)) {
       for (var m = 0; m < e.matureDetail.length && rec.matureDetail.length < 40; m++) {
         if (typeof e.matureDetail[m] === 'string') rec.matureDetail.push(e.matureDetail[m]);
+      }
+    }
+    if (Array.isArray(e.fertLow)) {
+      // fertLow 存的是 "x,y" 地块键：只收格式合法的，避免脏数据污染回看页
+      for (var f = 0; f < e.fertLow.length && rec.fertLow.length < 40; f++) {
+        if (typeof e.fertLow[f] === 'string' && /^-?\d+,-?\d+$/.test(e.fertLow[f])) rec.fertLow.push(e.fertLow[f]);
       }
     }
     out.push(rec);
@@ -774,14 +872,20 @@ function sanitizePlots(v) {
     var x = parseInt(parts[0], 10), y = parseInt(parts[1], 10);
     if (!isInt(x) || !isInt(y)) continue;
     if (x < 6 || x > 21 || y < 4 || y > 9) continue;
-    var rec = { tilled: true, water: !!p.water, crop: null, age: 0, mature: false, harvested: false, regrow: 0 };
+    var rec = { tilled: true, water: !!p.water, crop: null, age: 0, mature: false, harvested: false, regrow: 0,
+      fertility: FERT.DEF, lastGroup: null, prevGroup: null };
     if (CROPS[p.crop]) {
       rec.crop = p.crop;
       rec.age = clamp(Math.floor(isInt(p.age) ? p.age : 0), 0, CROPS[p.crop].growDays);
       rec.harvested = !!p.harvested;
       rec.regrow = clamp(Math.floor(isInt(p.regrow) ? p.regrow : 0), 0, 9);
       rec.mature = !!p.mature;
+      rec.lastGroup = CROP_TO_GROUP[p.crop] || null;   // 已有作物视为该组上一季，轮作提示才能生效
+      if (CROP_GROUPS[p.prevGroup]) rec.prevGroup = p.prevGroup;
     }
+    // _lowNoted 是运行时提醒状态，不入存档（rec 是新建的白名单对象，天然不含）
+    // 旧档迁移到正常肥力，不追溯历史种植行为（§32.2）
+    if (isInt(p.fertility)) rec.fertility = clamp(p.fertility, FERT.MIN, FERT.MAX);
     out[key2(x, y)] = rec;
   }
   return out;
@@ -4898,7 +5002,8 @@ function toolHoe(tx, ty) {
   state.energy -= CFG.energyCost.hoe;
   state.plots[key2(tx, ty)] = {
     tilled: true, water: isRaining() && state.sceneId === 'farm', crop: null,
-    age: 0, mature: false, harvested: false, regrow: 0
+    age: 0, mature: false, harvested: false, regrow: 0,
+    fertility: FERT.DEF, lastGroup: null, prevGroup: null
   };
   Audio2.play('hoe');
   addParticle(tx, ty, 'soil');
@@ -4918,12 +5023,23 @@ function toolSeed(tx, ty) {
   var seedId = crop.seed;
   if (invCount(seedId) <= 0) { toast('没有' + crop.name + '种子了，去种子铺买一些。'); Audio2.play('fail'); return false; }
   invRemove(seedId, 1);
+  // 轮作提示必须在写入 lastGroup 之前算，否则永远拿不到"上一季"
+  var prevGroup = lastRotationGroup(tx, ty);
+  var rot = rotationHint(cropId, prevGroup);
   p.crop = cropId; p.age = 0; p.mature = false; p.harvested = false; p.regrow = 0;
+  // prevGroup 留档上一季，lastGroup 记本季；每日肥力判断连作只看 prevGroup
+  p.prevGroup = prevGroup || null;
+  p.lastGroup = CROP_TO_GROUP[cropId] || null;
   tutorialEvent('seeded', key2(tx, ty));
   if (p.water) tutorialEvent('watered');
   Audio2.play('hoe');
   addParticle(tx, ty, 'seed');
-  toast(isRaining() ? '播下' + crop.name + '，雨天不用浇水。' : '播下' + crop.name + '，记得浇水。');
+  // 轮作/肥力提示并进播种提示：toast() 只收一个参数，连发两次会互相顶掉
+  var extra = '';
+  var ft = fertilityTier(plotFertility(p));
+  if (ft.id === 'low') extra = '（肥力' + ft.label + '：' + ft.hint + '）';
+  else if (rot) extra = '（' + rot.text + '）';
+  toast((isRaining() ? '播下' + crop.name + '，雨天不用浇水。' : '播下' + crop.name + '，记得浇水。') + extra);
   markDirty(); refreshHud();
   return true;
 }
@@ -4997,19 +5113,26 @@ function toolHarvest(tx, ty) {
     return false;
   }
   var crop = CROPS[p.crop];
-  var prod = crop.produce, y = crop.yield;
+  // 低肥力减产，但保底 1 个：绝不让玩家颗粒无收（§32.2 低肥力不影响存活）
+  var fertV = plotFertility(p);
+  var fFactor = fertilityYieldFactor(fertV);
+  var baseY = crop.yield;
+  var y = Math.max(1, Math.floor(baseY * fFactor));
+  var shortFert = (y < baseY);
+  var prod = crop.produce;
   if (!bagAccepts(prod, y)) { toast('背包满了，先整理一下。'); Audio2.play('fail'); return false; }
   invAdd(prod, y);
   tutorialEvent('harvested');
   tutorialEvent('inspected'); // 提前收获也是已经看过作物生长的实际结果。
   addParticle(tx, ty, 'harvest');
   Audio2.play('harvest');
+  var fertNote = shortFert ? '，这块地肥力' + fertilityTier(fertV).label + '（' + y + '/' + baseY + '）' : '';
   if (crop.regrow > 0) {
     p.harvested = true; p.regrow = 0; p.mature = false; p.age = crop.growDays;
-    toast('收获了' + crop.name + ' ×' + y + '，' + crop.regrow + ' 天后可再收。');
+    toast('收获了' + crop.name + ' ×' + y + fertNote + '，' + crop.regrow + ' 天后可再收。');
   } else {
     p.crop = null; p.age = 0; p.mature = false; p.harvested = false; p.regrow = 0;
-    toast('收获了' + crop.name + ' ×' + y + '，地块保留，需要重新播种。');
+    toast('收获了' + crop.name + ' ×' + y + fertNote + '，地块保留，需要重新播种。');
   }
   markDirty(); refreshHud();
   return true;
@@ -5223,21 +5346,25 @@ function autoSleep() {
 }
 
 function requestSleep() {
-  var unwatered = 0;
-  for (var k in state.plots) {
-    if (!Object.prototype.hasOwnProperty.call(state.plots, k)) continue;
-    var p = state.plots[k];
-    if (p.crop && !p.water && !p.mature) unwatered++;
-  }
+  // 复用 farmOverview，避免这里另算一份与浮层/提示不一致（§32.2）
+  var ov = farmOverview();
   openWindow({
     id: 'sleepconfirm', kind: 'custom', narrow: true, title: '结束今天？',
     build: function (body) {
       body.appendChild(el('p', null, '现在睡觉会推进到' + fmtTime(CFG.dayStart) + '的第二天。'));
-      if (unwatered > 0) {
-        var warn = el('p', 'muted', '还有 ' + unwatered + ' 株作物今天没有浇水，它们今天不会生长（不会枯死）。');
-        body.appendChild(warn);
+      if (ov.needWater > 0) {
+        body.appendChild(el('p', 'muted', '还有 ' + ov.needWater + ' 株作物今天没有浇水，它们今天不会生长（不会枯死）。'));
       } else {
         body.appendChild(el('p', 'muted', '所有作物都浇好水了。'));
+      }
+      if (ov.ripe > 0) {
+        body.appendChild(el('p', 'muted', '有 ' + ov.ripe + ' 株已经成熟，明早可以收获。'));
+      }
+      if (ov.lowFert.length > 0) {
+        body.appendChild(el('p', 'muted', '有 ' + ov.lowFert.length + ' 块地肥力偏低，产量会受影响；轮作或休耕可以恢复。'));
+      }
+      if (ov.seedShort > 0) {
+        body.appendChild(el('p', 'muted', '背包里有 ' + ov.seedShort + ' 种作物缺种子，想种的话记得补货。'));
       }
       body.appendChild(el('p', 'muted', '出货箱里的物品会在睡觉时统一结算。'));
     },
@@ -5290,6 +5417,26 @@ function performSettlement(auto) {
     summary.grew = grewList;
     summary.matured = maturedList.length;
     summary.matureDetail = maturedList;
+
+    /* 1b. 土壤肥力结算：连续同组缓慢下降，换组/休耕恢复（§32.2）
+       放在生长推进之后，这样"今天种了什么"已经写进 p.crop，判连作才准。 */
+    var fertLow = [];
+    var fertGained = 0, fertLost = 0;
+    for (var fk in state.plots) {
+      if (!Object.prototype.hasOwnProperty.call(state.plots, fk)) continue;
+      var fp = state.plots[fk];
+      var delta = applyFertilityDaily(fp);
+      if (delta > 0) fertGained += delta; else fertLost += -delta;
+      if (delta < 0 && fertilityTier(fp.fertility).id === 'low' && !fp._lowNoted) {
+        fp._lowNoted = true;
+        fertLow.push(fk);
+      } else if (delta > 0 && fp._lowNoted) {
+        fp._lowNoted = false;   // 恢复到非低档，不再重复提醒
+      }
+    }
+    summary.fertLow = fertLow;
+    summary.fertGained = fertGained;
+    summary.fertLost = fertLost;
 
     /* 2. 出货箱结算并清空 */
     for (var sid in state.shipping) {
@@ -5363,7 +5510,8 @@ function performSettlement(auto) {
       day: summary.day, income: summary.income, dailyAllowance: summary.dailyAllowance, matured: summary.matured, jam: summary.jam,
       weather: summary.weatherTo, auto: summary.auto,
       sold: summary.sold.map(function (x) { return { id: x.id, name: x.name, qty: x.qty, value: x.value }; }),
-      matureDetail: summary.matureDetail.slice()
+      matureDetail: summary.matureDetail.slice(),
+      fertGained: summary.fertGained || 0, fertLost: summary.fertLost || 0, fertLow: (summary.fertLow || []).slice()
     };
     state.settleHistory = normalizeSettleHistory((state.settleHistory || []).concat([histRec]));
     summary.energy = state.energy;
@@ -5452,6 +5600,24 @@ function settlementPages(s) {
     }
     if (!s.matured) glines.push('还没有作物成熟。');
     pages.push(settleStep('crop', '田里的变化', glines));
+  }
+  /* 土壤肥力单独一页：只在真的有变化时出现，不给玩家塞无意义的空页（§32.2） */
+  if (s.fertGained || s.fertLost || (s.fertLow && s.fertLow.length)) {
+    var flines = [];
+    if (s.fertLost) flines.push('连续种同类的地块消耗了 ' + s.fertLost + ' 点肥力。');
+    if (s.fertGained) flines.push('换组种植和休耕恢复了 ' + s.fertGained + ' 点肥力。');
+    if (s.fertLow && s.fertLow.length) {
+      flines.push('有 ' + s.fertLow.length + ' 块地肥力已经偏低，产量会打折扣：');
+      s.fertLow.forEach(function (k) {
+        var t = k.split(',');
+        var fp = state.plots[k];
+        flines.push('· ' + t[0] + ',' + t[1] + '：肥力' + (fp ? fertilityTier(plotFertility(fp)).label : '低'));
+      });
+      flines.push('低肥力只会减产，不会让作物枯死；改种别组作物或让它休耕几天就能回升。');
+    } else {
+      flines.push('目前所有耕地肥力都还够用。');
+    }
+    pages.push(settleStep('fert', '土壤肥力', flines));
   }
   if (s.jam) {
     pages.push(settleStep('jam', '果酱罐', [
@@ -5555,6 +5721,13 @@ function openSettleLog() {
         add('卖出', r.sold.length ? r.sold.map(function (x) { return x.name + ' ×' + x.qty; }).join('、') : '无');
         add('成熟', r.matured ? (r.matureDetail.join('、') || (r.matured + ' 株')) : '无');
         add('果酱', r.jam ? (r.jam + ' 份') : '无');
+        // 肥力只在真的有变化时记一行（§32.2 不给无意义的空行）
+        if (r.fertGained || r.fertLost) {
+          var fd = [];
+          if (r.fertGained) fd.push('+' + r.fertGained);
+          if (r.fertLost) fd.push('-' + r.fertLost);
+          add('土壤肥力', fd.join(' / ') + (r.fertLow && r.fertLow.length ? '，偏低 ' + r.fertLow.length + ' 块' : ''));
+        }
         box.appendChild(block);
         body.appendChild(box);
       });
@@ -8922,6 +9095,72 @@ function plotWaterText(p) {
   return { t: '需要浇水', ok: false };
 }
 
+/* 预计最早收获日（§32.2）
+   硬约束：作物缺水当天不生长（结算里 continue 掉），所以"还差 N 天"只在
+   持续浇水的前提下成立。这里如实区分两种情形，绝不把还没承诺的未来浇水
+   当成确定事实：
+     watered  今天已浇水 / 雨天 → 给出确定的剩余天数
+     dry      今天没水且无雨 → 说明"若今天不浇水则停一天"，不给虚假的确定日期 */
+function plotHarvestEta(p) {
+  if (!p || !p.crop) return null;
+  var c = CROPS[p.crop];
+  if (!c) return null;
+  var watered = p.water || isRaining();
+  if (p.mature) return { text: '现在就能收获', watered: watered };
+  var need, base;
+  if (p.harvested) {                       // 再生作物：等 regrow
+    need = c.regrow - p.regrow;
+    base = '再生还需 ' + need + ' 天';
+  } else {
+    need = c.growDays - p.age;
+    base = '还需 ' + need + ' 天';
+  }
+  if (need <= 0) return { text: '现在就能收获', watered: watered };
+  if (watered) {
+    return { text: base + '（今天已浇水，保持照料的话）', watered: true };
+  }
+  return { text: base + '，但今天还没浇水：不浇水就不会生长', watered: false, needsWater: true };
+}
+
+/* 农务总览统计（§32.2）
+   纯读取，不改状态。面板与每日提示共用，避免两处逻辑漂移。 */
+function farmOverview() {
+  var needWater = 0, ripe = 0, lowFert = [], growing = 0, fallow = 0;
+  for (var k in state.plots) {
+    if (!Object.prototype.hasOwnProperty.call(state.plots, k)) continue;
+    var p = state.plots[k];
+    if (!p) continue;
+    if (!p.crop) { fallow++; continue; }
+    if (p.mature) { ripe++; continue; }
+    if (p.harvested) { growing++; continue; }
+    growing++;
+    if (!p.water && !isRaining()) needWater++;
+    if (fertilityTier(plotFertility(p)).id === 'low') lowFert.push(k);
+  }
+  // 缺料：背包里没有可用种子
+  var seedShort = 0;
+  Object.keys(CROPS).forEach(function (cid) {
+    var sid = CROPS[cid].seed;
+    if (sid && invCount(sid) < 1) seedShort++;
+  });
+  return {
+    needWater: needWater, ripe: ripe, growing: growing, fallow: fallow,
+    lowFert: lowFert, seedShort: seedShort,
+    any: needWater > 0 || ripe > 0 || seedShort > 0 || lowFert.length > 0
+  };
+}
+/* 一句话总览，给 HUD/提示用 */
+function farmOverviewLine() {
+  var o = farmOverview();
+  if (!o.any) return null;
+  var parts = [];
+  if (o.needWater) parts.push(o.needWater + ' 株缺水');
+  if (o.ripe) parts.push(o.ripe + ' 株可收获');
+  if (o.seedShort) parts.push('种子不足 ' + o.seedShort + ' 种');
+  if (o.lowFert.length) parts.push(o.lowFert.length + ' 块地肥力低');
+  return parts.join(' · ');
+}
+
 function drawCrop(g, x, y, p) {
   var st = cropStage(p);
   if (!st) return;
@@ -9194,12 +9433,27 @@ function updateTileTip(t, ox, oy) {
   } else {
     lines.push('空耕地 · ' + w.t);
   }
-  tip.innerHTML = lines.map(function (s, i) {
+  // 肥力行独立于 tt-lN：只给三档文字与实际影响，不暴露数值（§32.2）
+  var fv = plotFertility(p);
+  var ftier = fertilityTier(fv);
+  var extraHtml = '<span class="tt-fert' + (ftier.id === 'low' ? ' low' : '') + '">肥力 ' +
+    ftier.label + ' · ' + ftier.hint + '</span>';
+  // 预计收获日只在有作物时给；空地显示轮作建议（§32.2）
+  var eta = plotHarvestEta(p);
+  if (eta) {
+    extraHtml += '<span class="tt-eta' + (eta.needsWater ? ' warn' : '') + '">' + eta.text + '</span>';
+  } else if (!p.crop) {
+    // 空地休耕只报恢复速率，不猜玩家下一季种什么（§32.2 不预设未发生的计划）
+    extraHtml += '<span class="tt-eta">休耕中，肥力每日恢复 ' + FERT_RATE.fallow + ' 点</span>';
+  }
+  var bodyHtml = lines.map(function (s, i) {
     var mark = i === 1 ? (w.ok ? '●' : '○') : '';
     return '<span class="tt-l' + i + '">' + mark + ' ' + s + '</span>';
   }).join('');
+  tip.innerHTML = bodyHtml + extraHtml;
   tip.classList.toggle('dry', !w.ok);
   tip.classList.toggle('ripe', !!(p.crop && p.mature));
+  tip.classList.toggle('fert-low', ftier.id === 'low');
   // 锚定在目标格正上方，贴边时收进画面内
   var vw = $('#viewport');
   var rect = { width: vw.clientWidth, height: vw.clientHeight };
@@ -10250,6 +10504,35 @@ window.__MOSS__ = {
     return { ok: pv.ok, reason: pv.reason || '', minutes: pv.minutes == null ? null : pv.minutes, crossesDay: !!pv.crossesDay, arrivalText: pv.arrivalText || '', effectText: pv.effectText || '', landing: pv.landing ? { x: pv.landing.x, y: pv.landing.y } : null };
   },
   travelCommit: function (toId) { return commitTravel(toId); },
+  /* §32.2 土壤肥力/轮作 审计探针：让自动化测试能直接驱动数据层，
+     不必绕 UI 点击。探针只读状态或调用既有函数，不注入任何测试数据。 */
+  devFert: {
+    plotFertility: function (x, y) { return plotFertility(state.plots[key2(x, y)]); },
+    tier: function (x, y) { var t = fertilityTier(plotFertility(state.plots[key2(x, y)])); return { id: t.id, label: t.label, hint: t.hint }; },
+    yieldFactor: function (v) { return fertilityYieldFactor(v); },
+    deltaToday: function (x, y) { return fertilityDeltaToday(state.plots[key2(x, y)]); },
+    applyDaily: function (x, y) { return applyFertilityDaily(state.plots[key2(x, y)]); },
+    rotationHint: function (cropId, prevGroup) { return rotationHint(cropId, prevGroup); },
+    lastGroup: function (x, y) { return lastRotationGroup(x, y); },
+    groups: function () { return CROP_GROUPS; },
+    groupOf: function (cropId) { return CROP_TO_GROUP[cropId] || null; },
+    rate: function () { return FERT_RATE; },
+    def: function () { return FERT.DEF; },
+    min: function () { return FERT.MIN; },
+    max: function () { return FERT.MAX; },
+    eta: function (x, y) { return plotHarvestEta(state.plots[key2(x, y)]); },
+    overview: function () { return farmOverview(); },
+    overviewLine: function () { return farmOverviewLine(); },
+    sanitize: function (plots) { return sanitizePlots(plots); },
+    defOf: function (p) { return plotFertility(p); }
+  },
+  devFarm: {
+    hoe: function (x, y) { return toolHoe(x, y); },
+    seed: function (x, y, cropId) { if (cropId) state.selectedSeed = cropId; return toolSeed(x, y); },
+    harvest: function (x, y) { return toolHarvest(x, y); },
+    water: function (x, y) { return toolWater(x, y); },
+    settle: function (auto) { return performSettlement(!!auto); }
+  },
   travelMinutesDebug: function (a, b) { return travelMinutesBetween(a, b); },
   dayEndDebug: function () { return CFG.dayEnd; },
   travelStateInfo: function () { var t = travelState(); return { current: currentTravelNodeId(), discovered: Object.keys(t.discovered).filter(function (k) { return t.discovered[k]; }), home: t.home, txCount: Object.keys(t.txLog).length }; },
