@@ -1,0 +1,1123 @@
+{
+  "scenes": [
+    {
+      "sid": "farm",
+      "w": 32,
+      "h": 24,
+      "indoor": false,
+      "colors": 72,
+      "n": 56
+    },
+    {
+      "sid": "town",
+      "w": 32,
+      "h": 24,
+      "indoor": false,
+      "colors": 55,
+      "n": 56
+    },
+    {
+      "sid": "riverside",
+      "w": 24,
+      "h": 20,
+      "indoor": false,
+      "colors": 38,
+      "n": 56
+    },
+    {
+      "sid": "forest",
+      "w": 40,
+      "h": 28,
+      "indoor": false,
+      "colors": 64,
+      "n": 56
+    },
+    {
+      "sid": "mine1",
+      "w": 28,
+      "h": 24,
+      "indoor": false,
+      "colors": 22,
+      "n": 56
+    },
+    {
+      "sid": "mine2",
+      "w": 28,
+      "h": 24,
+      "indoor": false,
+      "colors": 18,
+      "n": 56
+    },
+    {
+      "sid": "mine3",
+      "w": 28,
+      "h": 24,
+      "indoor": false,
+      "colors": 21,
+      "n": 56
+    },
+    {
+      "sid": "house",
+      "w": 16,
+      "h": 12,
+      "indoor": true,
+      "colors": 87,
+      "n": 56
+    },
+    {
+      "sid": "city_castle",
+      "w": 34,
+      "h": 24,
+      "indoor": true,
+      "colors": 38,
+      "n": 56
+    },
+    {
+      "sid": "city_library",
+      "w": 30,
+      "h": 20,
+      "indoor": true,
+      "colors": 37,
+      "n": 56
+    },
+    {
+      "sid": "city_academy",
+      "w": 28,
+      "h": 18,
+      "indoor": true,
+      "colors": 38,
+      "n": 56
+    },
+    {
+      "sid": "city_greenhouse",
+      "w": 26,
+      "h": 20,
+      "indoor": true,
+      "colors": 51,
+      "n": 56
+    },
+    {
+      "sid": "city_bakery",
+      "w": 28,
+      "h": 20,
+      "indoor": true,
+      "colors": 47,
+      "n": 56
+    },
+    {
+      "sid": "city_market",
+      "w": 30,
+      "h": 20,
+      "indoor": true,
+      "colors": 33,
+      "n": 56
+    },
+    {
+      "sid": "city_tailor",
+      "w": 24,
+      "h": 18,
+      "indoor": true,
+      "colors": 48,
+      "n": 56
+    },
+    {
+      "sid": "city_bandstand",
+      "w": 14,
+      "h": 11,
+      "indoor": true,
+      "colors": 31,
+      "n": 56
+    },
+    {
+      "sid": "city_teahouse",
+      "w": 14,
+      "h": 11,
+      "indoor": true,
+      "colors": 31,
+      "n": 56
+    },
+    {
+      "sid": "city_keeper",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 27,
+      "n": 56
+    },
+    {
+      "sid": "city_cafe",
+      "w": 26,
+      "h": 18,
+      "indoor": true,
+      "colors": 53,
+      "n": 56
+    },
+    {
+      "sid": "city_smith",
+      "w": 26,
+      "h": 18,
+      "indoor": true,
+      "colors": 38,
+      "n": 56
+    },
+    {
+      "sid": "city_hall",
+      "w": 22,
+      "h": 16,
+      "indoor": true,
+      "colors": 30,
+      "n": 56
+    },
+    {
+      "sid": "city_inn",
+      "w": 30,
+      "h": 20,
+      "indoor": true,
+      "colors": 42,
+      "n": 56
+    },
+    {
+      "sid": "city_post",
+      "w": 26,
+      "h": 18,
+      "indoor": true,
+      "colors": 33,
+      "n": 56
+    },
+    {
+      "sid": "city_carriage",
+      "w": 24,
+      "h": 16,
+      "indoor": true,
+      "colors": 21,
+      "n": 56
+    },
+    {
+      "sid": "city_stable",
+      "w": 22,
+      "h": 14,
+      "indoor": true,
+      "colors": 21,
+      "n": 56
+    },
+    {
+      "sid": "city_quay_store",
+      "w": 36,
+      "h": 20,
+      "indoor": true,
+      "colors": 30,
+      "n": 56
+    },
+    {
+      "sid": "city_sawmill",
+      "w": 34,
+      "h": 22,
+      "indoor": true,
+      "colors": 36,
+      "n": 56
+    },
+    {
+      "sid": "city_foundry",
+      "w": 34,
+      "h": 22,
+      "indoor": true,
+      "colors": 48,
+      "n": 56
+    },
+    {
+      "sid": "city_watermill",
+      "w": 30,
+      "h": 20,
+      "indoor": true,
+      "colors": 44,
+      "n": 56
+    },
+    {
+      "sid": "city_boiler",
+      "w": 26,
+      "h": 18,
+      "indoor": true,
+      "colors": 44,
+      "n": 56
+    },
+    {
+      "sid": "city_shipyard",
+      "w": 30,
+      "h": 20,
+      "indoor": true,
+      "colors": 36,
+      "n": 56
+    },
+    {
+      "sid": "city_uni_main",
+      "w": 36,
+      "h": 24,
+      "indoor": true,
+      "colors": 44,
+      "n": 56
+    },
+    {
+      "sid": "city_uni_wing",
+      "w": 32,
+      "h": 22,
+      "indoor": true,
+      "colors": 37,
+      "n": 56
+    },
+    {
+      "sid": "city_uni_lab",
+      "w": 32,
+      "h": 22,
+      "indoor": true,
+      "colors": 52,
+      "n": 56
+    },
+    {
+      "sid": "city_uni_dorm",
+      "w": 32,
+      "h": 22,
+      "indoor": true,
+      "colors": 37,
+      "n": 56
+    },
+    {
+      "sid": "city_bank",
+      "w": 32,
+      "h": 20,
+      "indoor": true,
+      "colors": 51,
+      "n": 56
+    },
+    {
+      "sid": "city_exchange",
+      "w": 34,
+      "h": 22,
+      "indoor": true,
+      "colors": 46,
+      "n": 56
+    },
+    {
+      "sid": "city_gold",
+      "w": 26,
+      "h": 20,
+      "indoor": true,
+      "colors": 42,
+      "n": 56
+    },
+    {
+      "sid": "city_market_hall",
+      "w": 38,
+      "h": 26,
+      "indoor": true,
+      "colors": 38,
+      "n": 56
+    },
+    {
+      "sid": "city_townhall",
+      "w": 34,
+      "h": 24,
+      "indoor": true,
+      "colors": 52,
+      "n": 56
+    },
+    {
+      "sid": "city_home1",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 26,
+      "n": 56
+    },
+    {
+      "sid": "city_home2",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 28,
+      "n": 56
+    },
+    {
+      "sid": "city_home3",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 28,
+      "n": 56
+    },
+    {
+      "sid": "city_home4",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 28,
+      "n": 56
+    },
+    {
+      "sid": "city_home5",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 26,
+      "n": 56
+    },
+    {
+      "sid": "city_home6",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 28,
+      "n": 56
+    },
+    {
+      "sid": "city_home7",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 27,
+      "n": 56
+    },
+    {
+      "sid": "city_home8",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 27,
+      "n": 56
+    },
+    {
+      "sid": "city_home9",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 26,
+      "n": 56
+    },
+    {
+      "sid": "city_home10",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 27,
+      "n": 56
+    },
+    {
+      "sid": "city_home11",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 27,
+      "n": 56
+    },
+    {
+      "sid": "city_home12",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 27,
+      "n": 56
+    },
+    {
+      "sid": "city_home13",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 28,
+      "n": 56
+    },
+    {
+      "sid": "city_home14",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 28,
+      "n": 56
+    },
+    {
+      "sid": "city_home15",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 28,
+      "n": 56
+    },
+    {
+      "sid": "city_home16",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 28,
+      "n": 56
+    },
+    {
+      "sid": "city_home17",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 28,
+      "n": 56
+    },
+    {
+      "sid": "city_home18",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 28,
+      "n": 56
+    },
+    {
+      "sid": "city_home19",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 28,
+      "n": 56
+    },
+    {
+      "sid": "city_home20",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 28,
+      "n": 56
+    },
+    {
+      "sid": "city_home21",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 28,
+      "n": 56
+    },
+    {
+      "sid": "city_home22",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 28,
+      "n": 56
+    },
+    {
+      "sid": "city_home23",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 28,
+      "n": 56
+    },
+    {
+      "sid": "city_home24",
+      "w": 16,
+      "h": 13,
+      "indoor": true,
+      "colors": 28,
+      "n": 56
+    },
+    {
+      "sid": "city",
+      "w": 640,
+      "h": 480,
+      "indoor": false,
+      "colors": 13,
+      "n": 56
+    }
+  ],
+  "services": [
+    {
+      "room": "bakery",
+      "service": "bakery",
+      "x": 12,
+      "y": 11,
+      "label": "售卖柜",
+      "err": null
+    },
+    {
+      "room": "greenhouse",
+      "service": "greenhouse",
+      "x": 12,
+      "y": 10,
+      "label": "育苗台",
+      "err": null
+    },
+    {
+      "room": "market",
+      "service": "market",
+      "x": 15,
+      "y": 3,
+      "label": "接待处",
+      "err": null
+    },
+    {
+      "room": "cafe",
+      "service": "cafe",
+      "x": 4,
+      "y": 9,
+      "label": "糕点柜",
+      "err": null
+    },
+    {
+      "room": "library",
+      "service": "library",
+      "x": 7,
+      "y": 14,
+      "label": "查阅台",
+      "err": null
+    },
+    {
+      "room": "smith",
+      "service": "smith",
+      "x": 13,
+      "y": 8,
+      "label": "铁砧",
+      "err": null
+    },
+    {
+      "room": "tailor",
+      "service": "tailor",
+      "x": 13,
+      "y": 3,
+      "label": "裁剪台",
+      "err": null
+    },
+    {
+      "room": "inn",
+      "service": "inn",
+      "x": 15,
+      "y": 3,
+      "label": "接待处",
+      "err": null
+    },
+    {
+      "room": "post",
+      "service": "post",
+      "x": 15,
+      "y": 9,
+      "label": "柜台",
+      "err": null
+    },
+    {
+      "room": "castle",
+      "service": "castle",
+      "x": 17,
+      "y": 5,
+      "label": "王座厅",
+      "err": null
+    },
+    {
+      "room": "carriage",
+      "service": "carriage",
+      "x": 12,
+      "y": 9,
+      "label": "售票处",
+      "err": null
+    },
+    {
+      "room": "stable",
+      "service": "stable",
+      "x": 6,
+      "y": 6,
+      "label": "马具架",
+      "err": null
+    },
+    {
+      "room": "park",
+      "service": "park",
+      "x": 6,
+      "y": 5,
+      "label": "亭下服务处",
+      "err": null
+    },
+    {
+      "room": "academy",
+      "service": "academy",
+      "x": 13,
+      "y": 3,
+      "label": "接待处",
+      "err": null
+    },
+    {
+      "room": "hall",
+      "service": "hall",
+      "x": 10,
+      "y": 6,
+      "label": "议事长桌",
+      "err": null
+    },
+    {
+      "room": "home",
+      "service": "home",
+      "x": 8,
+      "y": 9,
+      "label": "起居处",
+      "err": null
+    },
+    {
+      "room": "quay_store",
+      "service": "quay_store",
+      "x": 17,
+      "y": 10,
+      "label": "货栈管事台",
+      "err": null
+    },
+    {
+      "room": "sawmill",
+      "service": "sawmill",
+      "x": 16,
+      "y": 12,
+      "label": "锯台",
+      "err": null
+    },
+    {
+      "room": "foundry",
+      "service": "foundry",
+      "x": 20,
+      "y": 13,
+      "label": "浇铸台",
+      "err": null
+    },
+    {
+      "room": "watermill",
+      "service": "watermill",
+      "x": 14,
+      "y": 11,
+      "label": "石磨盘",
+      "err": null
+    },
+    {
+      "room": "boiler",
+      "service": "boiler",
+      "x": 11,
+      "y": 9,
+      "label": "汽机阀台",
+      "err": null
+    },
+    {
+      "room": "shipyard",
+      "service": "shipyard",
+      "x": 17,
+      "y": 12,
+      "label": "船具工位",
+      "err": null
+    },
+    {
+      "room": "uni_main",
+      "service": "uni_main",
+      "x": 18,
+      "y": 5,
+      "label": "注册讲堂",
+      "err": null
+    },
+    {
+      "room": "uni_wing",
+      "service": "uni_wing",
+      "x": 15,
+      "y": 5,
+      "label": "研讨教室",
+      "err": null
+    },
+    {
+      "room": "uni_lab",
+      "service": "uni_lab",
+      "x": 14,
+      "y": 5,
+      "label": "实验台",
+      "err": null
+    },
+    {
+      "room": "uni_dorm",
+      "service": "uni_dorm",
+      "x": 15,
+      "y": 12,
+      "label": "自习室",
+      "err": null
+    },
+    {
+      "room": "bank",
+      "service": "bank",
+      "x": 16,
+      "y": 5,
+      "label": "银行柜台",
+      "err": null
+    },
+    {
+      "room": "market_hall",
+      "service": "market_hall",
+      "x": 19,
+      "y": 5,
+      "label": "市场管理处",
+      "err": null
+    },
+    {
+      "room": "exchange",
+      "service": "exchange",
+      "x": 17,
+      "y": 9,
+      "label": "成交台",
+      "err": null
+    },
+    {
+      "room": "gold",
+      "service": "gold",
+      "x": 13,
+      "y": 5,
+      "label": "票据所柜台",
+      "err": null
+    },
+    {
+      "room": "townhall",
+      "service": "civic",
+      "x": 17,
+      "y": 5,
+      "label": "市政厅服务台",
+      "err": null
+    }
+  ],
+  "errors": [],
+  "notes": [
+    {
+      "type": "density",
+      "data": [
+        {
+          "room": "tailor",
+          "props": 5,
+          "kinds": 5,
+          "staff": 1,
+          "spots": 1,
+          "w": 24,
+          "h": 18,
+          "area": 432,
+          "density": 296.3
+        },
+        {
+          "room": "sawmill",
+          "props": 9,
+          "kinds": 8,
+          "staff": 1,
+          "spots": 1,
+          "w": 34,
+          "h": 22,
+          "area": 748,
+          "density": 308
+        },
+        {
+          "room": "post",
+          "props": 6,
+          "kinds": 6,
+          "staff": 1,
+          "spots": 1,
+          "w": 26,
+          "h": 18,
+          "area": 468,
+          "density": 328.2
+        },
+        {
+          "room": "foundry",
+          "props": 10,
+          "kinds": 8,
+          "staff": 1,
+          "spots": 1,
+          "w": 34,
+          "h": 22,
+          "area": 748,
+          "density": 342.2
+        },
+        {
+          "room": "greenhouse",
+          "props": 7,
+          "kinds": 6,
+          "staff": 1,
+          "spots": 1,
+          "w": 26,
+          "h": 20,
+          "area": 520,
+          "density": 344.6
+        },
+        {
+          "room": "townhall",
+          "props": 11,
+          "kinds": 8,
+          "staff": 1,
+          "spots": 1,
+          "w": 34,
+          "h": 24,
+          "area": 816,
+          "density": 345.1
+        },
+        {
+          "room": "uni_main",
+          "props": 12,
+          "kinds": 6,
+          "staff": 1,
+          "spots": 1,
+          "w": 36,
+          "h": 24,
+          "area": 864,
+          "density": 355.6
+        },
+        {
+          "room": "uni_wing",
+          "props": 10,
+          "kinds": 7,
+          "staff": 1,
+          "spots": 1,
+          "w": 32,
+          "h": 22,
+          "area": 704,
+          "density": 363.6
+        },
+        {
+          "room": "bakery",
+          "props": 8,
+          "kinds": 8,
+          "staff": 1,
+          "spots": 1,
+          "w": 28,
+          "h": 20,
+          "area": 560,
+          "density": 365.7
+        },
+        {
+          "room": "smith",
+          "props": 7,
+          "kinds": 6,
+          "staff": 1,
+          "spots": 1,
+          "w": 26,
+          "h": 18,
+          "area": 468,
+          "density": 382.9
+        },
+        {
+          "room": "market",
+          "props": 9,
+          "kinds": 8,
+          "staff": 1,
+          "spots": 1,
+          "w": 30,
+          "h": 20,
+          "area": 600,
+          "density": 384
+        },
+        {
+          "room": "library",
+          "props": 9,
+          "kinds": 6,
+          "staff": 1,
+          "spots": 1,
+          "w": 30,
+          "h": 20,
+          "area": 600,
+          "density": 384
+        },
+        {
+          "room": "inn",
+          "props": 9,
+          "kinds": 8,
+          "staff": 1,
+          "spots": 1,
+          "w": 30,
+          "h": 20,
+          "area": 600,
+          "density": 384
+        },
+        {
+          "room": "shipyard",
+          "props": 9,
+          "kinds": 8,
+          "staff": 1,
+          "spots": 1,
+          "w": 30,
+          "h": 20,
+          "area": 600,
+          "density": 384
+        },
+        {
+          "room": "carriage",
+          "props": 6,
+          "kinds": 5,
+          "staff": 0,
+          "spots": 1,
+          "w": 24,
+          "h": 16,
+          "area": 384,
+          "density": 400
+        },
+        {
+          "room": "uni_lab",
+          "props": 11,
+          "kinds": 9,
+          "staff": 1,
+          "spots": 1,
+          "w": 32,
+          "h": 22,
+          "area": 704,
+          "density": 400
+        },
+        {
+          "room": "academy",
+          "props": 8,
+          "kinds": 7,
+          "staff": 0,
+          "spots": 1,
+          "w": 28,
+          "h": 18,
+          "area": 504,
+          "density": 406.3
+        },
+        {
+          "room": "exchange",
+          "props": 12,
+          "kinds": 10,
+          "staff": 1,
+          "spots": 1,
+          "w": 34,
+          "h": 22,
+          "area": 748,
+          "density": 410.7
+        },
+        {
+          "room": "market_hall",
+          "props": 16,
+          "kinds": 8,
+          "staff": 1,
+          "spots": 1,
+          "w": 38,
+          "h": 26,
+          "area": 988,
+          "density": 414.6
+        },
+        {
+          "room": "quay_store",
+          "props": 12,
+          "kinds": 5,
+          "staff": 1,
+          "spots": 1,
+          "w": 36,
+          "h": 20,
+          "area": 720,
+          "density": 426.7
+        },
+        {
+          "room": "watermill",
+          "props": 10,
+          "kinds": 8,
+          "staff": 1,
+          "spots": 1,
+          "w": 30,
+          "h": 20,
+          "area": 600,
+          "density": 426.7
+        },
+        {
+          "room": "uni_dorm",
+          "props": 12,
+          "kinds": 7,
+          "staff": 1,
+          "spots": 1,
+          "w": 32,
+          "h": 22,
+          "area": 704,
+          "density": 436.4
+        },
+        {
+          "room": "castle",
+          "props": 14,
+          "kinds": 7,
+          "staff": 1,
+          "spots": 1,
+          "w": 34,
+          "h": 24,
+          "area": 816,
+          "density": 439.2
+        },
+        {
+          "room": "bank",
+          "props": 11,
+          "kinds": 9,
+          "staff": 1,
+          "spots": 1,
+          "w": 32,
+          "h": 20,
+          "area": 640,
+          "density": 440
+        },
+        {
+          "room": "cafe",
+          "props": 9,
+          "kinds": 7,
+          "staff": 1,
+          "spots": 1,
+          "w": 26,
+          "h": 18,
+          "area": 468,
+          "density": 492.3
+        },
+        {
+          "room": "boiler",
+          "props": 9,
+          "kinds": 7,
+          "staff": 1,
+          "spots": 1,
+          "w": 26,
+          "h": 18,
+          "area": 468,
+          "density": 492.3
+        },
+        {
+          "room": "gold",
+          "props": 10,
+          "kinds": 6,
+          "staff": 1,
+          "spots": 1,
+          "w": 26,
+          "h": 20,
+          "area": 520,
+          "density": 492.3
+        },
+        {
+          "room": "stable",
+          "props": 6,
+          "kinds": 4,
+          "staff": 0,
+          "spots": 1,
+          "w": 22,
+          "h": 14,
+          "area": 308,
+          "density": 498.7
+        },
+        {
+          "room": "hall",
+          "props": 8,
+          "kinds": 6,
+          "staff": 0,
+          "spots": 1,
+          "w": 22,
+          "h": 16,
+          "area": 352,
+          "density": 581.8
+        },
+        {
+          "room": "home",
+          "props": 5,
+          "kinds": 5,
+          "staff": 0,
+          "spots": 1,
+          "w": 16,
+          "h": 13,
+          "area": 208,
+          "density": 615.4
+        },
+        {
+          "room": "park",
+          "props": 5,
+          "kinds": 5,
+          "staff": 0,
+          "spots": 1,
+          "w": 14,
+          "h": 11,
+          "area": 154,
+          "density": 831.2
+        }
+      ]
+    }
+  ]
+}

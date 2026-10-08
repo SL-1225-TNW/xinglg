@@ -114,6 +114,8 @@ var ITEMS = {
   berry:     { name: '野莓',   kind: 'forage', sell: 6, food: 15, desc: '野外浆果，售价 6 金。' },
   bread:     { name: '乡村面包', kind: 'food', sell: 18, food: 25, desc: '面包师烤制的圆面包，打开背包即可食用。' },
   fish_crucian: { name: '小鲫鱼', kind: 'fish', sell: 20, food: 10, desc: '最常见的河鱼，售价 20 金。' },
+  fish_mudCarp: { name: '泥鲤',   kind: 'fish', sell: 55,  food: 12, desc: '爱在雨后浅滩游弋，售价 55 金。' },
+  fish_pike:   { name: '狗鱼',   kind: 'fish', sell: 95,  food: 14, desc: '性子凶的猎手，只在晴天的深潭出没，售价 95 金。' },
   fish_bass:    { name: '河鲈',   kind: 'fish', sell: 35, food: 10, desc: '力气不小的淡水鱼，售价 35 金。' },
   fish_silver:  { name: '银纹鱼', kind: 'fish', sell: 60, food: 10, desc: '银鳞闪烁的稀有鱼，售价 60 金。' },
   fish_koi: { name: '锦鲤', kind: 'fish', sell: 120, food: 15, desc: '需要 2 级鱼竿，售价 120 金。' },
@@ -261,17 +263,23 @@ function applyFertilityDaily(p) {
   return after - before;
 }
 
+/* 钓鱼鱼池：与 ITEMS 里 kind:'fish' 的物品表保持同一套 id，
+   钓到的鱼必须能直接进背包和出货箱，所以两边绝不能各写一份。
+   分层按售价/稀有度：T1 常见、T2 少见、T3 稀有（§32.5「有限鱼种…首批不做几十个隐藏钓率」）。 */
 var FISHES = [
-  { id: 'fish_crucian', name: '小鲫鱼', sell: 20, sunny: 0.60, rain: 0.40, speed: 45 },
-  { id: 'fish_bass',    name: '河鲈',   sell: 35, sunny: 0.30, rain: 0.35, speed: 65 },
-  { id: 'fish_silver',  name: '银纹鱼', sell: 60, sunny: 0.10, rain: 0.25, speed: 85 }
+  /* T1 常见：新河段就能遇到 */
+  { id: 'fish_crucian',  name: '小鲫鱼',   tier: 1, sell: 20,  sunny: 0.55, rain: 0.45, speed: 45,  color: '#9DB7C4' },
+  { id: 'fish_mudCarp',  name: '泥鲤',     tier: 1, sell: 55,  sunny: 0.35, rain: 0.65, speed: 50,  color: '#A8895E' },
+  /* T2 少见：需要特定时段或天气偏好 */
+  { id: 'fish_koi',      name: '锦鲤',     tier: 2, sell: 120, sunny: 0.40, rain: 0.30, speed: 90,  color: '#ECA25C' },
+  { id: 'fish_gold',     name: '金鳞鱼',   tier: 2, sell: 180, sunny: 1.00, rain: 1.30, speed: 95,  color: '#EBD267' },
+  { id: 'fish_pike',     name: '狗鱼',     tier: 2, sell: 95,  sunny: 0.45, rain: 0.15, speed: 75,  color: '#7E9E6B' },
+  /* T3 稀有：只在特定条件出现，首批不做几十个隐藏钓率（§32.5） */
+  { id: 'fish_sturgeon', name: '星纹鲟',   tier: 3, sell: 300, sunny: 1.00, rain: 1.30, speed: 100, color: '#8995C9' },
+  { id: 'fish_king',     name: '蓝冠鱼王', tier: 3, sell: 480, sunny: 1.00, rain: 1.30, speed: 105, color: '#56B9E0' }
 ];
 
 var ROD_LEVELS = [{name:'木制钓竿',price:0},{name:'精工钓竿',price:250},{name:'大师钓竿',price:750}];
-FISHES.push({id:'fish_koi',name:'锦鲤',sell:120,tier:2,sunny:1,rain:1.3,speed:90,color:'#ECA25C'});
-FISHES.push({id:'fish_gold',name:'金鳞鱼',sell:180,tier:2,sunny:1,rain:1.3,speed:95,color:'#EBD267'});
-FISHES.push({id:'fish_sturgeon',name:'星纹鲟',sell:300,tier:3,sunny:1,rain:1.3,speed:100,color:'#8995C9'});
-FISHES.push({id:'fish_king',name:'蓝冠鱼王',sell:480,tier:3,sunny:1,rain:1.3,speed:105,color:'#56B9E0'});
 
 /* --- 制作配方 --- */
 var RECIPES = [
@@ -548,7 +556,158 @@ var Audio2 = (function () {
 })();
 
 /* ============================================================
-   3. 存档、迁移与异常恢复
+   §32.5 养鱼账本：投放 / 容量 / 收获
+   ------------------------------------------------------------
+   原文硬约束：「农场池塘的游鱼首先保留装饰定位；若开放养鱼，另设明确的
+   投放、容量与收获账本。看见几条装饰鱼，不代表已拥有相同数量可出售鱼，
+   不能把既有装饰状态偷偷转换成库存。」
+
+   因此这里是一套全新的、独立于 Game.pondFish 的存档字段 state.fishpond：
+   - Game.pondFish 是纯视觉（注释明写「不写入存档」），本模块一次都不读它
+   - 投放只能从玩家背包里已有的鱼扣，装饰鱼无法凭空变成库存
+   - 账本区分「鱼苗 / 成鱼」两态，只有成鱼可收获——投放当天收不走
+   */
+var FISHPOND_BASE_CAP = 6;
+var FISHPOND_MAX_CAP = 24;
+var FISHPOND_GROW_DAYS = 2;     /* 鱼苗长成成鱼所需天数 */
+var FISHPOND_UPGRADE_STEP = 3;
+var FISHPOND_BASE_UPGRADE = 40;
+
+function newFishpondState() {
+  return { fry: {}, grown: {}, cap: FISHPOND_BASE_CAP, day: 0, watered: true };
+}
+function fishpondOf() {
+  /* 懒初始化：老存档没有这个字段也能正常跑，不依赖 schema 迁移 */
+  if (!state.fishpond) state.fishpond = newFishpondState();
+  var f = state.fishpond;
+  if (!f.fry) f.fry = {};
+  if (!f.grown) f.grown = {};
+  if (typeof f.cap !== 'number' || f.cap < 1) f.cap = FISHPOND_BASE_CAP;
+  if (typeof f.day !== 'number' || f.day < 0) f.day = 0;
+  if (typeof f.watered !== 'boolean') f.watered = true;
+  return f;
+}
+function migrateFishpondForOldSaves(s) {
+  if (!s) return;
+  /* 已有账本一律保留：迁移绝不能把玩家已经投进去的鱼清空 */
+  if (s.fishpond && typeof s.fishpond === 'object') {
+    if (!s.fishpond.fry) s.fishpond.fry = {};
+    if (!s.fishpond.grown) s.fishpond.grown = {};
+    if (typeof s.fishpond.cap !== 'number' || s.fishpond.cap < 1) s.fishpond.cap = FISHPOND_BASE_CAP;
+    if (typeof s.fishpond.growDay !== 'number' || s.fishpond.growDay < 0) s.fishpond.growDay = 0;
+    if (typeof s.fishpond.watered !== 'boolean') s.fishpond.watered = true;
+    return;
+  }
+  s.fishpond = newFishpondState();
+}
+function fishpondSum(bag) {
+  var n = 0;
+  for (var k in bag) if (Object.prototype.hasOwnProperty.call(bag, k)) n += bag[k];
+  return n;
+}
+function fishpondFry() { return fishpondSum(fishpondOf().fry); }
+function fishpondGrown() { return fishpondSum(fishpondOf().grown); }
+function fishpondTotal() { var f = fishpondOf(); return fishpondSum(f.fry) + fishpondSum(f.grown); }
+function fishpondUpgradeCost() {
+  var f = fishpondOf();
+  return f.cap >= FISHPOND_MAX_CAP ? 0 : FISHPOND_BASE_UPGRADE + f.cap * 15;
+}
+function fishSell(id) {
+  /* 售价只认 ITEMS 一处，避免鱼表与物品表两处数字漂移 */
+  var it = ITEMS[id];
+  return it && typeof it.sell === 'number' ? it.sell : 0;
+}
+function fishpondKnown(id) {
+  return FISHES.some(function (f) { return f.id === id; });
+}
+/* 投放：唯一的库存入口。背包里没有的鱼种一律拒绝，杜绝凭空造鱼。 */
+function fishpondStock(id, n) {
+  n = n || 1;
+  var f = fishpondOf();
+  if (!fishpondKnown(id)) { toast('这种鱼放不进池塘。'); return false; }
+  if (invCount(id) < n) { toast('背包里没有那么多鱼苗。'); return false; }
+  if (fishpondTotal() + n > f.cap) {
+    toast('池塘装不下了（上限 ' + f.cap + ' 条），先收获或扩容。');
+    return false;
+  }
+  /* 必须用 invRemove：invAdd 遇到负数会直接 return 0，投苗就变成了凭空复制鱼 */
+  var taken = invRemove(id, n);
+  if (taken !== n) { /* 兜底：万一中途扣不满，退回已扣的部分 */
+    if (taken > 0) invAdd(id, taken);
+    toast('背包里没有那么多鱼苗。'); return false;
+  }
+  f.fry[id] = (f.fry[id] || 0) + n;
+  toast('投放 ' + n + ' 条鱼苗。');
+  Audio2.play('place');
+  markDirty(); refreshHud();
+  return true;
+}
+function fishpondWater() {
+  var f = fishpondOf();
+  if (f.watered) { toast('塘水今天已经换过了。'); return false; }
+  if (state.energy < 3) { toast('体力不够换水了。'); return false; }
+  state.energy -= 3; f.watered = true;
+  toast('把塘水换了一遍。');
+  Audio2.play('water');
+  markDirty(); refreshHud();
+  return true;
+}
+function fishpondRelease() {
+  var f = fishpondOf(), out = [], total = 0;
+  for (var k in f.grown) {
+    if (!Object.prototype.hasOwnProperty.call(f.grown, k)) continue;
+    var n = f.grown[k];
+    if (n > 0) { out.push({ id: k, name: itemName(k), qty: n }); total += n; }
+  }
+  if (!total) { toast('还没有长成的鱼可以收。'); return false; }
+  for (var i = 0; i < out.length; i++) invAdd(out[i].id, out[i].qty);
+  f.grown = {};
+  toast('收获 ' + total + ' 条鱼。');
+  Audio2.play('pick');
+  markDirty(); refreshHud();
+  return true;
+}
+function fishpondUpgrade() {
+  var f = fishpondOf(), cost = fishpondUpgradeCost();
+  if (!cost) { toast('池塘已经扩到最大。'); return false; }
+  if (state.coins < cost) { toast('扩容要 ' + cost + ' 金币。'); return false; }
+  state.coins -= cost; f.cap = Math.min(FISHPOND_MAX_CAP, f.cap + FISHPOND_UPGRADE_STEP);
+  toast('池塘扩容到 ' + f.cap + ' 条。');
+  Audio2.play('place');
+  markDirty(); refreshHud();
+  return true;
+}
+/* 日结算：鱼苗长成成鱼。在 totalDay 自增之前推进，判断的才是「昨天」。
+   用小数存量累积而非 Math.round：没换水只会变慢，不会归零。 */
+function fishpondDaily(summary) {
+  var f = fishpondOf();
+  f.day = state.totalDay;
+  var fry = fishpondFry();
+  /* 结算后才清换水标记：这样本轮用的是「玩家昨天换没换水」 */
+  var hadWater = f.watered;
+  f.watered = false;
+  if (fry <= 0) return;
+  /* §32.5 只要求投放/容量/收获三件事，换水属加分而非门槛：
+     换水当天成长 1.5 天，不换水也照常长 1 天，绝不因没换水卡住玩家的鱼。 */
+  f.growDay = (f.growDay || 0) + (hadWater ? 1.5 : 1);
+  if (f.growDay < FISHPOND_GROW_DAYS) return;
+  for (var k in f.fry) {
+    if (!Object.prototype.hasOwnProperty.call(f.fry, k)) continue;
+    var n = f.fry[k];
+    if (n <= 0) continue;
+    f.grown[k] = (f.grown[k] || 0) + n;
+    f.fry[k] = 0;
+  }
+  f.growDay = 0;
+  if (summary) {
+    if (!summary.pondGrown) summary.pondGrown = [];
+    summary.pondGrown.push(fry);
+    if (!hadWater && !summary.pondSlow) summary.pondSlow = true;
+  }
+}
+
+/* ============================================================
+   4. 存档、迁移与异常恢复
    ============================================================ */
 
 var state = null;
@@ -573,6 +732,7 @@ function newGameState() {
     plots: {},
     resourceNodes: {},
     structures: [],
+    fishpond: newFishpondState(),
     shipping: {},
     houseChest: {},
     tutorial: newTutorial('active'),
@@ -806,6 +966,7 @@ function normalizeSave(raw) {
     });
   }
   migrateTravelForOldSaves(s);
+  migrateFishpondForOldSaves(s);
   return s;
 }
 
@@ -1495,7 +1656,9 @@ function syncPlayerPixel() {
 /* --- 可交互对象 --- */
 var INTERACTABLES = {
   farm: [
-    { id: 'farmhouse', x: 3, y: 4, stand: [[3,5],[2,4],[4,4],[3,3]], kind: 'enterHouse', label: '农舍' }
+    { id: 'farmhouse', x: 3, y: 4, stand: [[3,5],[2,4],[4,4],[3,3]], kind: 'enterHouse', label: '农舍' },
+    /* 池塘：站在北岸即可开养鱼账本（§32.5 投放/容量/收获） */
+    { id: 'pond', x: 26, y: 16, stand: [[26,17],[27,16],[25,16]], kind: 'pond', label: '农场池塘' }
   ],
   town: [
     {id:'forest_gate',x:14,y:1,stand:[[14,2],[13,1],[15,1],[14,1]],kind:'forestGate',label:'雾杉森林入口'},
@@ -5592,6 +5755,65 @@ function openLivestock(st) {
   });
 }
 
+function openFishpond() {
+  function render() {
+    return function (b) {
+      var f = fishpondOf();
+      var fry = fishpondFry(), grown = fishpondGrown(), total = fishpondTotal();
+      b.appendChild(el('p', null, '容量 ' + total + ' / ' + f.cap + '（上限 ' + FISHPOND_MAX_CAP + '）。'));
+      b.appendChild(el('p', 'muted', '苗和成鱼都占容量，收了才腾得出位置。今天' + (f.watered ? '已经换过水' : '还没换水（长得慢，但不会死）') + '。'));
+
+      var list = el('div');
+      var rows = [];
+      for (var k in f.fry) if (Object.prototype.hasOwnProperty.call(f.fry, k) && f.fry[k] > 0) rows.push([k, f.fry[k], '鱼苗']);
+      for (var k2 in f.grown) if (Object.prototype.hasOwnProperty.call(f.grown, k2) && f.grown[k2] > 0) rows.push([k2, f.grown[k2], '成鱼']);
+      if (!rows.length) list.appendChild(el('p', 'muted', '塘里还没有鱼。先从背包里投几条下去。'));
+      rows.forEach(function (r) {
+        var line = el('div', 'row between');
+        line.appendChild(el('span', null, itemName(r[0]) + ' ' + r[2] + ' ×' + r[1]));
+        line.appendChild(el('span', 'req-chip', '售价 ' + fishSell(r[0]) + ' 金'));
+        list.appendChild(line);
+      });
+      b.appendChild(list);
+
+      b.appendChild(el('p', 'muted', '塘里游着的那几条只是装饰鱼，不算你的鱼——投放只从背包里扣。'));
+      var grow = el('div', 'row');
+      FISHES.forEach(function (fs) {
+        var have = invCount(fs.id);
+        if (have <= 0) return;
+        var btn = mkBtn('投放 ' + fs.name + ' ×1（背包 ' + have + '）', '', function () {
+          fishpondStock(fs.id, 1); refreshWindow();
+        });
+        btn.disabled = total >= f.cap;
+        grow.appendChild(btn);
+      });
+      if (!grow.childNodes.length) grow.appendChild(el('span', 'muted', '背包里还没有鱼可以投放。'));
+      b.appendChild(grow);
+
+      var act = el('div', 'row');
+      if (f.watered) {
+        var wb = mkBtn('今天已换水', '', function () { });
+        wb.disabled = true; act.appendChild(wb);
+      } else {
+        act.appendChild(mkBtn('换水（3 体力）', 'primary', function () { fishpondWater(); refreshWindow(); }));
+      }
+      if (grown > 0) act.appendChild(mkBtn('收获 ' + grown + ' 条成鱼', 'primary', function () { fishpondRelease(); refreshWindow(); }));
+      else {
+        var rb = mkBtn('还没有成鱼可收', '', function () { });
+        rb.disabled = true; act.appendChild(rb);
+      }
+      var cost = fishpondUpgradeCost();
+      if (cost) act.appendChild(mkBtn('扩容到 ' + Math.min(FISHPOND_MAX_CAP, f.cap + FISHPOND_UPGRADE_STEP) + ' 条（' + cost + ' 金）', '', function () { fishpondUpgrade(); refreshWindow(); }));
+      b.appendChild(act);
+    };
+  }
+  openWindow({
+    id: 'fishpond', kind: 'custom', narrow: true, title: '池塘账本',
+    build: render(),
+    actions: [{ label: '关闭', kind: 'ghost', close: true }]
+  });
+}
+
 /* --- 制作 --- */
 function recipeUnlocked(r) {
   if (state.unlockedRecipes.indexOf(r.id) >= 0) return true;
@@ -5794,6 +6016,8 @@ function performSettlement(auto) {
       /* 畜养：在 totalDay 递增之前结算，判断的才是「昨天照料得怎么样」 */
       if (isLivestock(st.device)) livestockDaily(st, summary);
     });
+    /* 养鱼账本：同样在 totalDay 自增前结算（§32.5） */
+    fishpondDaily(summary);
 
     /* 4. 日期 +1 */
     state.totalDay += 1;
@@ -5987,6 +6211,20 @@ function settlementPages(s) {
       llines.push('饿着、渴着只会少收些东西，不会把牲畜弄死——出门前顺手喂一下就好。');
       pages.push(settleStep('livestock', '畜养', llines));
     }
+  }
+  /* 养鱼页：苗长成或塘里有鱼时才出现（§32.5 明确投放/容量/收获） */
+  if ((s.pondGrown && s.pondGrown.length) || fishpondTotal() > 0) {
+    var plines = [];
+    if (s.pondGrown && s.pondGrown.length) {
+      s.pondGrown.forEach(function (n) { plines.push('有 ' + n + ' 条鱼苗长成了成鱼，现在可以收了。'); });
+    }
+    var pf = fishpondOf();
+    var pfry = fishpondFry(), pgrown = fishpondGrown();
+    if (pfry) plines.push('塘里还有 ' + pfry + ' 条鱼苗在长（占 ' + fishpondTotal() + ' / ' + pf.cap + ' 的容量）。');
+    if (pgrown) plines.push('成鱼 ' + pgrown + ' 条，收了就能卖。');
+    if (!pf.watered) plines.push('· 今天还没换水：长得慢一些，但不会死。');
+    plines.push('投放只能从背包里已有的鱼扣——塘里游着的那几条是装饰，不代表你有鱼。');
+    pages.push(settleStep('pond', '养鱼', plines));
   }
   var toRain = s.weatherTo === 'rain';
   var wlines = [];
@@ -8475,6 +8713,8 @@ function activateInteractable(it) {
   if(it.kind==='mineStairs'){exploreStairs(it.next);return;}
   if(it.kind==='treasure'){exploreTreasure(it.id);return;}
   if (it.kind === 'tackle') { openTackleShop(); return; }
+  /* §32.5 养鱼账本：点池塘开账本（投放/容量/收获），装饰鱼不参与 */
+  if (it.kind === 'pond') { openFishpond(); return; }
   if (it.kind === 'workshop') { openWorkshop(); return; }
   if (it.kind === 'board') { openQuestLog('board'); return; }
   if (it.kind === 'bridge') {
@@ -8925,7 +9165,9 @@ function pondIsWaterAt(px, py) {
 
 /* 鱼只创建一次并常驻内存：进出场景不叠加、不写入存档 */
 function ensurePondFish() {
-  if (Game.pondFish) return Game.pondFish;
+  /* 用长度判断而不是真值判断：Game.pondFish 清空成 [] 同样是 truthy，
+     若用 if (Game.pondFish) 判断，装饰鱼一旦被清掉就永远不会重建。 */
+  if (Game.pondFish && Game.pondFish.length) return Game.pondFish;
   Game.pondFish = POND_FISH_SEEDS.map(function (s, i) {
     return {
       x: s.x * TILE, y: s.y * TILE, dir: s.dir,
@@ -10914,6 +11156,7 @@ window.__MOSS__ = {
   CITY_BUILDINGS: CITY_BUILDINGS,
   /* npcRuntime 在 loadScene 时填充，用 getter 保证读到的是当前实例 */
   get npcRuntime() { return npcRuntime; },
+  activateInteractable: activateInteractable,
   __drawRoomTo: __drawRoomTo,
   __drawFacadeTo: __drawFacadeTo,
   /* 调试用：直接跳场景（绕过地面寻路，自动化测试与调试用） */
@@ -10942,6 +11185,37 @@ window.__MOSS__ = {
     sellPrice: function () { return ITEMS.compost.sell; }
   },
   /* 畜养系统的验收探针（§32.2）：走真实 API，只读状态，不注入数据 */
+  /* 养鱼账本验收探针（§32.5）：走真实 API，只读状态 */
+  devFishpond: {
+    raw: function () { var f = fishpondOf(); return JSON.parse(JSON.stringify(f)); },
+    counts: function () { return { fry: fishpondFry(), grown: fishpondGrown(), total: fishpondTotal(), cap: fishpondOf().cap }; },
+    stock: function (id, n) { return fishpondStock(id, n || 1); },
+    release: function () { return fishpondRelease(); },
+    water: function () { return fishpondWater(); },
+    upgrade: function () { return fishpondUpgrade(); },
+    upgradeCost: function () { return fishpondUpgradeCost(); },
+    daily: function (sum) { return fishpondDaily(sum || {}); },
+    known: function (id) { return fishpondKnown(id); },
+    species: function () {
+      return FISHES.map(function (f) { return { id: f.id, name: f.name, tier: f.tier, sell: fishSell(f.id) }; });
+    },
+    growDays: function () { return FISHPOND_GROW_DAYS; },
+    migrate: function (s) { migrateFishpondForOldSaves(s); return s; },
+    maxCap: function () { return FISHPOND_MAX_CAP; },
+    baseCap: function () { return FISHPOND_BASE_CAP; },
+    open: function () { openFishpond(); return true; },
+    /* 红线取证：装饰鱼数量与账本/背包必须互不影响 */
+    decorCount: function () { ensurePondFish(); return (Game.pondFish || []).length; },
+    /* 验收辅助：临时清掉装饰鱼，证明它与账本/背包完全无关 */
+    decorClear: function () { var n = Game.pondFish ? Game.pondFish.length : 0; Game.pondFish = []; return n; },
+    /* 红线取证：本模块的账本读取是否碰过装饰鱼 */
+    readsDecor: function () {
+      var body = fishpondOf.toString() + fishpondStock.toString() + fishpondRelease.toString() + fishpondDaily.toString();
+      return /pondFish/.test(body);
+    },
+    saveHasFishpond: function () { return typeof state.fishpond !== 'undefined'; },
+    serialize: function () { return JSON.parse(JSON.stringify(state.fishpond)); }
+  },
   devLivestock: {
     cfg: function (dev) { var c = LIVESTOCK[dev]; return c ? { name: c.name, food: c.food, feedList: c.feedList.slice(), firstDay: c.firstDay, everyDays: c.everyDays, product: c.product } : null; },
     place: function (dev, x, y) { state.selectedDevice = dev === 'coop' ? 'dev_coop' : 'dev_pasture'; return toolPlace(x, y); },
