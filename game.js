@@ -1665,6 +1665,8 @@ var INTERACTABLES = {
     { id: 'shop', x: 8, y: 7, stand: [[8,8],[7,7],[9,7],[8,6]], kind: 'shop', label: '种子铺' },
     { id: 'workshop', x: 20, y: 7, stand: [[20,8],[19,7],[21,7],[20,6]], kind: 'workshop', label: '阿栎木工作坊' },
     { id: 'board', x: 14, y: 9, stand: [[14,10],[13,9],[15,9],[14,8]], kind: 'board', label: '任务板' },
+    /* §32.6 集市：小镇广场上的每周轮换摊位，挨着任务板方便顺路 */
+    { id: 'market', x: 12, y: 13, stand: [[12,14],[11,13],[13,13],[12,12]], kind: 'market', label: '乡村集市' },
     { id: 'bridge', x: 26, y: 9, stand: [[25,9],[25,10]], kind: 'bridge', label: '小桥施工点' }
   ],
   riverside: [{id:'tackle',x:3,y:7,stand:[[3,8],[2,7],[4,7],[3,7]],kind:'tackle',label:'DeepSeek 渔具店'}],
@@ -7512,6 +7514,147 @@ function openWorkshop() {
   });
 }
 
+/* --- §32.6 集市：每周轮换但可预览 ---
+   总规原文：「保留种子店、任务板与原有居民，增加每周轮换但可预览的集市」。
+   注意边界：种子铺的 3 种常售不受轮换影响，集市是小镇上的新增设施。
+   轮换以 7 天为一个周期，周数从 totalDay 推导；本周与下周都可用同一种
+   确定性算法算出，因此「可预览」不需要额外存状态，也不会与实际售卖脱节。 */
+var MARKET_SLOTS = 5;          // 每周上架数量
+var MARKET_GROUPS = [           // 分层：高价好物不会和高价材料挤在同一周
+  { id: 'crop',    label: '时令鲜货', ids: ['radish', 'potato', 'strawberry'] },
+  { id: 'forage',  label: '山野干货', ids: ['berry', 'mushroom'] },
+  { id: 'fish',    label: '河鲜',     ids: ['fish_crucian', 'fish_bass', 'fish_silver', 'fish_mudCarp', 'fish_pike', 'fish_koi', 'fish_gold'] },
+  { id: 'material',label: '器物材料', ids: ['flour', 'bread', 'salt_fish', 'jam', 'copper_ingot', 'iron_ingot'] },
+  { id: 'rare',    label: '珍藏',     ids: ['manuscript', 'field_note', 'translation', 'gem'] }
+];
+
+function marketWeek() {
+  /* 第 1 天算第 1 周，7 天换一次货 */
+  return Math.floor((state.totalDay - 1) / 7) + 1;
+}
+
+function marketSeed(week) {
+  /* 确定性伪随机：同一个周数永远算出同一份货，预览与实际售卖因此必然一致 */
+  var seed = week * 2654435761 % 4294967296;
+  function rnd() { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; }
+  var picked = [];
+  var usedGroup = {};
+  var guard = 0;
+  while (picked.length < MARKET_SLOTS && guard < 200) {
+    guard++;
+    var g = MARKET_GROUPS[Math.floor(rnd() * MARKET_GROUPS.length) % MARKET_GROUPS.length];
+    if (usedGroup[g.id]) continue;             // 同一周同品类只上一次，避免货架全是鱼
+    usedGroup[g.id] = true;
+    var list = g.ids.filter(function (id) { return ITEMS[id] && ITEMS[id].sell > 0; });
+    if (!list.length) continue;
+    var id = list[Math.floor(rnd() * list.length) % list.length];
+    if (picked.indexOf(id) >= 0) continue;
+    picked.push({ id: id, group: g.id, groupLabel: g.label, price: marketPrice(id, week) });
+  }
+  return picked;
+}
+
+/* 集市定价：物品自身售价的 1.6~2.4 倍，按周内位置微调，
+   做成「值得专门去一趟但不会一夜暴富」。 */
+/* 价格必须绑定「正在计算的那一周」，不能读当前周：
+   否则预览下周时会套用本周的浮动系数，预览价与真实成交价必然对不上。 */
+function marketPrice(id, week) {
+  var base = ITEMS[id] && ITEMS[id].sell > 0 ? ITEMS[id].sell : 10;
+  var w = week == null ? marketWeek() : week;
+  var jitter = 1.6 + ((w * 7 + id.length) % 5) * 0.2;   // 1.6 / 1.8 / 2.0 / 2.2 / 2.4
+  return Math.max(5, Math.round(base * jitter));
+}
+
+function marketStockOf(week) {
+  var w = week == null ? marketWeek() : week;
+  var n = Math.floor((w - 1) / 4) + 1;      // 每 4 周档位 +1
+  return { week: w, items: marketSeed(w), tier: n };
+}
+
+function marketBuy(id, qty) {
+  var cur = marketStockOf();
+  var slot = null;
+  for (var i = 0; i < cur.items.length; i++) { if (cur.items[i].id === id) { slot = cur.items[i]; break; } }
+  if (!slot) { toast('本周集市没有这件货了。'); Audio2.play('fail'); return false; }
+  qty = qty || 1;
+  var price = slot.price * qty;
+  if (state.coins < price) { toast('金币不足，还差 ' + (price - state.coins) + ' 金。'); Audio2.play('fail'); return false; }
+  if (!bagAccepts(id, qty)) { toast('背包满了，先整理一下。'); Audio2.play('fail'); return false; }
+  state.coins -= price;
+  invAdd(id, qty);
+  Audio2.play('trade');
+  toast('买到了 ' + qty + ' 份' + ITEMS[id].name + '，花费 ' + price + ' 金。');
+  markDirty(); refreshHud();
+  return true;
+}
+
+function openMarket() {
+  openWindow({
+    id: 'market', kind: 'shop', wide: true, title: '乡村集市',
+    build: function (b) {
+      var cur = marketStockOf();
+      var nxt = marketStockOf(cur.week + 1);
+      var daysLeft = 7 - ((state.totalDay - 1) % 7);
+      b.appendChild(el('p', 'muted', '本周集市（第 ' + cur.week + ' 周）· 金币：' + state.coins +
+        ' 金 · 距下次换货还有 ' + daysLeft + ' 天。'));
+      b.appendChild(el('div', 'section-title', '本周货单 · 第 ' + cur.week + ' 周'));
+      var g = el('div', 'grid');
+      cur.items.forEach(function (it) {
+        var row = el('div', 'shop-row');
+        var ic = el('div', 'item-ico');
+        var cv = getIcon(it.id); if (cv) ic.appendChild(cv);
+        row.appendChild(ic);
+        var main = el('div', 'item-main');
+        main.appendChild(el('div', 'item-name', ITEMS[it.id].name));
+        var d = el('div', 'item-desc', it.groupLabel + ' · 单价 ' + it.price + ' 金 · 日常售价 ' + ITEMS[it.id].sell + ' 金');
+        main.appendChild(d);
+        row.appendChild(main);
+        var acts = el('div', 'item-actions');
+        acts.appendChild(mkBtn('买 1 份', 'sm', function () { marketBuy(it.id, 1); refreshWindow(); refreshHotbar(); }));
+        acts.appendChild(mkBtn('买 3 份 · ' + (it.price * 3) + ' 金', 'sm', function () { marketBuy(it.id, 3); refreshWindow(); refreshHotbar(); }));
+        row.appendChild(acts);
+        g.appendChild(row);
+      });
+      b.appendChild(g);
+      /* 可预览：下周货单一屏可见，玩家能据此决定今天买不买 */
+      b.appendChild(el('div', 'hr'));
+      b.appendChild(el('div', 'section-title', '下周预告 · 第 ' + nxt.week + ' 周'));
+      b.appendChild(el('div', 'muted', '下周一自动换货，现在买还来得及。'));
+      var g2 = el('div', 'grid two');
+      nxt.items.forEach(function (it) {
+        var tile = el('div', 'item-tile');
+        var ic2 = el('div', 'item-ico');
+        var cv2 = getIcon(it.id); if (cv2) ic2.appendChild(cv2);
+        tile.appendChild(ic2);
+        tile.appendChild(el('div', 'item-name', ITEMS[it.id].name));
+        tile.appendChild(el('div', 'item-desc', it.groupLabel + ' · 预计 ' + it.price + ' 金'));
+        g2.appendChild(tile);
+      });
+      b.appendChild(g2);
+      b.appendChild(el('div', 'hr'));
+      b.appendChild(el('div', 'section-title', '出售'));
+      var sellables = invList(state.inventory).filter(function (id) { return isSellable(id) && ITEMS[id].kind !== 'material'; });
+      if (!sellables.length) b.appendChild(el('div', 'empty-note', '背包里没有可以出售的物品。'));
+      else {
+        var g3 = el('div', 'grid two');
+        sellables.forEach(function (id) {
+          var tile = itemTile(id, invCount(id), null, false);
+          var acts = el('div', 'item-actions');
+          acts.appendChild(mkBtn('卖 1 个', 'sm', function () { sellToShop(id, 1); refreshWindow(); refreshHotbar(); }));
+          acts.appendChild(mkBtn('卖全部 · ' + (invCount(id) * sellValue(id)) + ' 金', 'sm', function () { sellToShop(id, invCount(id)); refreshWindow(); refreshHotbar(); }));
+          tile.appendChild(acts);
+          g3.appendChild(tile);
+        });
+        b.appendChild(g3);
+      }
+    },
+    actions: [
+      { label: '出售全部可售物品', onClick: function () { sellAllToShop(); refreshWindow(); refreshHotbar(); } },
+      { label: '关闭', kind: 'ghost', close: true }
+    ]
+  });
+}
+
 function openShop() {
   openWindow({
     id: 'shop', kind: 'shop', wide: true, title: '芽芽种子铺',
@@ -8713,6 +8856,8 @@ function activateInteractable(it) {
   if(it.kind==='mineStairs'){exploreStairs(it.next);return;}
   if(it.kind==='treasure'){exploreTreasure(it.id);return;}
   if (it.kind === 'tackle') { openTackleShop(); return; }
+  /* §32.6 集市：每周轮换且可预览下期货单 */
+  if (it.kind === 'market') { openMarket(); return; }
   /* §32.5 养鱼账本：点池塘开账本（投放/容量/收获），装饰鱼不参与 */
   if (it.kind === 'pond') { openFishpond(); return; }
   if (it.kind === 'workshop') { openWorkshop(); return; }
@@ -11157,6 +11302,21 @@ window.__MOSS__ = {
   /* npcRuntime 在 loadScene 时填充，用 getter 保证读到的是当前实例 */
   get npcRuntime() { return npcRuntime; },
   activateInteractable: activateInteractable,
+  openShop: openShop,
+  devMarket: {
+    week: function () { return marketWeek(); },
+    stock: function (w) { return marketStockOf(w); },
+    cur: function () { return marketStockOf(); },
+    price: function (id) { return marketPrice(id); },
+    buy: function (id, q) { return marketBuy(id, q); },
+    daysLeft: function () { return 7 - ((state.totalDay - 1) % 7); },
+    isListed: function (id, w) {
+      var s = marketStockOf(w);
+      for (var i = 0; i < s.items.length; i++) if (s.items[i].id === id) return true;
+      return false;
+    },
+    open: function () { openMarket(); }
+  },
   __drawRoomTo: __drawRoomTo,
   __drawFacadeTo: __drawFacadeTo,
   /* 调试用：直接跳场景（绕过地面寻路，自动化测试与调试用） */
