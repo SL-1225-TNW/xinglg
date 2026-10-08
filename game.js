@@ -1691,10 +1691,28 @@ var CITY_ARCHETYPES = {
 /* 每个片区一套建筑家族与编号器：相邻建筑在家族内轮换变体，
    但绝不会跨片区借外形，也不会按全局序号循环。 */
 var CITY_ARCHETYPE_CURSOR = {};
+/* 建筑主题 → 原型 id 精确映射。工业与大学片区必须落到各自的专用原型上，
+   否则轮询游标会把它们分配成普通住宅，工厂就没有水轮、烟囱和装卸台，
+   主楼也没有柱廊。theme 优先于游标。 */
+var CITY_ARCHETYPE_BY_THEME = {
+  store: 'ind_longstore', sawmill: 'ind_sawmill', foundry: 'ind_foundry',
+  mill: 'ind_mill', boiler: 'ind_boiler', shed: 'ind_longstore',
+  unimain: 'uni_main', uniwing: 'uni_wing', unilab: 'uni_lab', unidorm: 'uni_dorm',
+  arcaded: 'shop_arcade', civic: 'civic_hall'
+};
 function pickArchetype(districtId, kind) {
   var d = CITY_DISTRICTS.filter(function (x) { return x.id === districtId; })[0];
   var fam = (d && CITY_ARCHETYPES[d.family]) ? d.family : 'oldtown';
+  var want = CITY_ARCHETYPE_BY_THEME[kind];
   var list = CITY_ARCHETYPES[fam];
+  if (want) {
+    for (var i = 0; i < list.length; i++) if (list[i].id === want) return list[i];
+    // 目标原型不在本片区的家族里：跨家族兜底，绝不静默退化成住宅模板。
+    for (var f in CITY_ARCHETYPES) {
+      var alt = CITY_ARCHETYPES[f];
+      for (var j = 0; j < alt.length; j++) if (alt[j].id === want) return alt[j];
+    }
+  }
   var key = districtId + '|' + (kind || 'home');
   var n = CITY_ARCHETYPE_CURSOR[key] = ((CITY_ARCHETYPE_CURSOR[key] || 0) + 1);
   return list[n % list.length];
@@ -1789,10 +1807,26 @@ MAPS.city = (function () {
     if (rf === 'terrace') return 58 + st * 6;
     return 54 + st * 6;
   }
+  /* 地基厚度：住宅保持 4 格不变，工业、市政与大学建筑给足进深，
+     否则 cityVisualHeight 画出的高厂房会被 4 格地基拖回平房高度。 */
+  var CITY_FOUNDATION = {
+    store: 9, sawmill: 10, foundry: 11, mill: 9, boiler: 8, shed: 7,
+    unimain: 12, uniwing: 9, unilab: 10, unidorm: 9,
+    arcaded: 8, civic: 10, library: 6
+  };
+  /* 保留地块：工业、市政与大学的专用建筑必须独占地面。building() 写入的是
+     T_GRASS 而非 solid，后面的住宅网格会把它当成空地重新排屋，导致银行、
+     市场大厅这类地标被住宅挤掉。这里登记保留矩形，自动填充一律绕开。
+     必须早于第一次 building() 调用，因此声明在本函数最前面。 */
+  var CITY_RESERVED = [];
   function building(id, label, x, y, w, h, theme) {
     // 保留门和任务坐标，只收紧背后的地基；不能有看不见的长条碰撞区。
-    if (theme !== 'castle') { var compactH = Math.min(h, theme === 'library' ? 6 : 4); y += h - compactH; h = compactH; }
+    // 地基厚度按用途给足：工业厂房、市政大厅、大学主楼需要更深的基础，
+    // 统一压到 4 格会让所有建筑都退回矮房子的观感。
+    if (theme !== 'castle') { var compactH = Math.min(h, CITY_FOUNDATION[theme] || 4); y += h - compactH; h = compactH; }
     fillRect(m, x, y, x + w - 1, y + h - 1, T_GRASS, true);
+    // 登记保留矩形，供后续住宅网格绕开（见 CITY_RESERVED 处的说明）。
+    CITY_RESERVED.push({ x0: x, y0: y, x1: x + w - 1, y1: y + h - 1 });
     var door = { x: x + Math.floor(w / 2), y: y + h };
     fillRect(m, door.x, door.y, door.x, Math.min(H - 2, door.y + 2), T_PATH, false);
     var district = zoneOf(x, y);
@@ -1851,6 +1885,33 @@ MAPS.city = (function () {
   building('carriage', '南门马车站', 236, 396, 16, 11, 'shop');
   building('stable', '南门马厩', 262, 458, 16, 9, 'workshop');
 
+  /* 东南工业码头：沿下游河弯展开，按卸货→仓储→生产→发货四段排布。
+     每栋都有独立的工业原型与专用室内，不是住宅换色。工业气势来自宽跨厂房、
+     连续屋顶与厚墙，因此这些建筑的占地跨度都明显大于普通店屋。 */
+  building('quay_store', '河岸长条货仓', 442, 330, 34, 10, 'store');      // 仓储段
+  building('sawmill', '东岸锯木厂', 494, 322, 30, 12, 'sawmill');       // 生产段
+  building('foundry', '白蔷薇铸造车间', 540, 360, 32, 13, 'foundry');  // 生产段，砖砌高烟囱
+  building('watermill', '河湾水力磨坊', 498, 400, 24, 11, 'mill');      // 水轮驱动，临河
+  building('boiler', '厂区锅炉房', 552, 412, 22, 10, 'boiler');        // 烟囱锚点
+  building('shipyard', '船具修理棚', 580, 330, 24, 9, 'shed');          // 发货段
+
+  /* 白蔷薇大学：主楼带柱廊与山花，教学侧翼与主庭院构成院落；
+     实验楼用通风窗与侧院，玻璃温室靠北，宿舍围小院。 */
+  building('uni_main', '白蔷薇大学主楼', 452, 46, 30, 14, 'unimain');
+  building('uni_wing', '大学教学楼', 496, 92, 26, 11, 'uniwing');
+  building('uni_lab', '自然史实验楼', 528, 44, 24, 12, 'unilab');
+  building('uni_dorm', '学生宿舍院', 540, 100, 24, 11, 'unidorm');
+
+  /* 市政商业区：巴黎奥斯曼式密集街墙 + 柏林式市民厅。
+     商业区要靠连续立面与公共广场成立，孤立几栋店屋只是村落。
+     arcaded 连续骑楼贴街，exchange/gold 组成金融段，market Hall 带钟楼，
+     银行与市政厅以柱廊立面收口。 */
+  building('bank', '白蔷薇国立银行', 268, 300, 22, 13, 'arcaded');
+  building('exchange', '谷物交易所', 296, 302, 24, 14, 'arcaded');
+  building('gold', '金库与票据所', 324, 300, 22, 13, 'arcaded');
+  building('market_hall', '中央市场大厅', 268, 330, 30, 15, 'civic');
+  building('civic', '市政厅', 352, 328, 24, 14, 'civic');
+
   /* 住宅：主要沿街区街道成排，少数可以进去 */
   var homeIdx = 0, ENTERABLE_HOMES = 24;
   /* 一块地能不能盖：主体不能压路、压水、压已有建筑；门前那一格可以是街道，
@@ -1860,6 +1921,11 @@ MAPS.city = (function () {
     // 街头居民的全天活动范围作为小口袋广场保留。
     var residents=[[300,120],[520,96],[320,462],[336,330],[140,178]];
     for(var n=0;n<residents.length;n++)if(x<residents[n][0]+5&&x+w>residents[n][0]-3&&y<residents[n][1]+5&&y+h>residents[n][1]-3)return false;
+    // 专用地标（工厂、银行、市场大厅、大学主楼）独占地面，住宅网格绕开。
+    for(var rr=0;rr<CITY_RESERVED.length;rr++){
+      var rz=CITY_RESERVED[rr];
+      if(x<=rz.x1&&x+w-1>=rz.x0&&y<=rz.y1&&y+h-1>=rz.y0)return false;
+    }
     for (var yy = y; yy < y + h; yy++)
       for (var xx = x; xx < x + w; xx++) {
         if (xx < 0 || yy < 0 || xx >= W || yy >= H) return false;
@@ -2542,6 +2608,27 @@ var arch=b.archetype||CITY_ARCHETYPES.oldtown[0];
     var bottom=Math.max(roofSurface(cx),roofSurface(cx+cw))+5,top=bottom-rise;
     px(g,cx,top,cw,rise,color);px(g,cx-2,top-2,cw+4,3,'#A98969');
     px(g,cx+2,top+4,Math.max(2,cw-4),1,'#B48B72');
+    // 工业烟囱要能从街区轮廓里读出来：砖砌收分 + 帽檐 + 熏黑顶口，
+    // 否则 17px 的细柱在 16px 瓦片下与民居烟囱无异。
+    if(rise>=24){
+      px(g,cx+1,top+3,cw-2,Math.floor(rise*0.45),'rgba(40,30,26,.28)');
+      px(g,cx-3,top-4,cw+6,3,'#7E6A58');
+      px(g,cx+1,top-1,cw-2,2,'#3A2E2A');
+    }
+  }
+  // 柱廊要读作门廊：基座 + 柱身 + 柱头 + 额枋 + 檐部，缺一层就退回色块。
+  function colonnade(x0,y0,w,h,color){
+    var step=12,cap=Math.floor((w-8)/step);
+    px(g,x0+2,y0+h-3,w-4,3,'#B3A88E');
+    for(var c=0;c<=cap;c++){
+      var cxx=x0+4+c*step;
+      px(g,cxx,y0+4,5,h-7,color);
+      px(g,cxx,y0+1,7,3,'#EFE7D2');
+      px(g,cxx,y0+h-5,7,2,'#CFC3A6');
+      px(g,cxx+1,y0+6,1,h-11,'rgba(120,104,80,.35)');
+    }
+    px(g,x0,y0,w,4,'#EFE7D2');
+    px(g,x0,y0+4,w,2,'rgba(120,104,80,.28)');
   }
   if(roofForm==='hip'){
     // 低矮四坡屋顶，用后坡色与檐口表现深度。
@@ -2573,11 +2660,40 @@ var arch=b.archetype||CITY_ARCHETYPES.oldtown[0];
   for(var ci=0;ci<stacks;ci++)chimney(left+faceW-22-ci*16,9,arch.stack?30:17,palette.edge);
   if(arch.tower)for(var tw=0;tw<arch.tower;tw++){var twi=left+6+tw*Math.floor((faceW-20)/Math.max(1,arch.tower));px(g,twi,roofTop-Math.floor(totalH*0.18),12,Math.floor(totalH*0.2),'#CFC7B2');px(g,twi-2,roofTop-Math.floor(totalH*0.18)-4,16,5,palette.roof);}
   if(arch.spire)px(g,left+faceW/2-3,roofTop-26,6,26,'#C7BFAC');
-  if(arch.colonnade)for(var cc=left+5;cc<left+faceW-8;cc+=11)px(g,cc,baseY-20,5,14,'#E4DCC4');
+  if(arch.colonnade)colonnade(left+4,baseY-30,faceW-8,30,'#E4DCC4');
   if(arch.porch)px(g,left+faceW-26,baseY-13,22,13,'#B9AC92');
-  if(arch.loading)px(g,left+6,baseY-14,20,12,'#6E5C4A');
+  if(arch.loading){
+    // 装卸月台：高出地面的砖台 + 斜坡 + 木托架，码头一眼可辨。
+    px(g,left+4,baseY-13,24,13,'#6E5C4A');
+    px(g,left+4,baseY-13,24,3,'#8A7460');
+    for(var ld=0;ld<4;ld++)px(g,left+5+ld*6,baseY-11,3,4,'#4A3B2E');
+    px(g,left+28,baseY-8,9,8,'#5A4638');
+    px(g,left+37,baseY-15,3,15,'#4A3B2E');
+    px(g,left+40,baseY-15,7,4,'#8A7460');
+  }
   if(arch.kiln)px(g,left+3,wallTop,14,wallH,'#A98A6E');
-  if(arch.waterwheel){var wyc=left+faceW+2;for(var wi=0;wi<8;wi++){var ang=wi/8*Math.PI*2;px(g,wyc+Math.round(Math.cos(ang)*7),baseY-10+Math.round(Math.sin(ang)*10),3,3,'#8A6B48');}}
+  if(arch.waterwheel){
+    // 水轮要够大且明确压在临河侧：双圈轮辋 + 辐条 + 叶片 + 轴承座。
+    var wyc=left+faceW+1,wyh=baseY-4,wyr=17;
+    px(g,wyc-3,wyh-wyr,wyr*2,wyr*2,'rgba(90,68,44,.20)');
+    for(var ring=0;ring<2;ring++){
+      var rr=ring?wyr-4:wyr;
+      for(var seg=0;seg<16;seg++){
+        var a1=seg/16*Math.PI*2,a2=(seg+1)/16*Math.PI*2;
+        px(g,wyc+Math.round(Math.cos(a1)*rr),wyh+Math.round(Math.sin(a1)*rr),
+           Math.max(2,Math.round(Math.abs(Math.cos((a1+a2)/2))*rr*0.8)),
+           Math.max(2,Math.round(Math.abs(Math.sin((a1+a2)/2))*rr*0.8)),'#8A6B48');
+      }
+    }
+    for(var spoke=0;spoke<6;spoke++){
+      var sa=spoke/6*Math.PI*2;
+      px(g,wyc+Math.round(Math.cos(sa)*wyr)-1,wyh+Math.round(Math.sin(sa)*wyr)-1,
+         Math.max(3,Math.round(Math.abs(Math.cos(sa))*wyr)),
+         Math.max(3,Math.round(Math.abs(Math.sin(sa))*wyr)),'#A0784E');
+    }
+    px(g,wyc-4,wyh-3,9,6,'#5E4A38');
+    px(g,wyc+wyr-2,wyh-16,4,32,'#6E5A46');
+  }
   if(arch.open)for(var op=left+4;op<left+faceW-6;op+=7)px(g,op,baseY-14,3,14,'#C7BFAC');
   if(arch.marquee)px(g,left+4,baseY-19,faceW-8,10,'#B8555C');
   if(arch.awning||b.kind==='shop'){
