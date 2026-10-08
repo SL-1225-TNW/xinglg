@@ -74,7 +74,7 @@ var CFG = {
   duskStart: 18 * 60,
   nightStart: 20 * 60,
   dailyAllowance: 50,
-  energyCost: { hoe: 2, water: 2, axe: 4, pickaxe: 4, fish: 4, shovel: 2 },
+  energyCost: { hoe: 2, water: 2, axe: 4, pickaxe: 4, fish: 4, shovel: 2, compost: 2 },
   saveDebounceMs: 750,
   regenFirstDay: 4,            // 第 4/7/10… 天恢复资源
   regenInterval: 3,
@@ -156,7 +156,9 @@ var ITEMS = {
   rice:        { name: '大米饭',   kind: 'food',   sell: 0,  food: 30, desc: '一大碗热腾腾的白米饭。DS 小姐的最爱。' },
   dev_chest:    { name: '木箱',     kind: 'device', device: 'chest',     desc: '20 格储物箱，可随时存取。' },
   dev_sprinkler:{ name: '竹制洒水器', kind: 'device', device: 'sprinkler', desc: '每天早晨浇灌上下左右四格。' },
-  dev_jam:      { name: '果酱罐',   kind: 'device', device: 'jam_jar',   desc: '投入草莓，隔天完成一份莓果酱。' }
+  dev_jam:      { name: '果酱罐',   kind: 'device', device: 'jam_jar',   desc: '投入草莓，隔天完成一份莓果酱。' },
+  dev_compost:  { name: '堆肥箱',   kind: 'device', device: 'compost',   desc: '投入秸秆与作物残茬，隔天成一箱熟肥；把熟肥撒到田里能补回肥力。' },
+  compost:      { name: '熟肥',     kind: 'material', sell: 2, desc: '由堆肥箱沤出的肥料，给田地补回肥力（每份 +8）。' }
 };
 
 /* --- 作物表 --- */
@@ -175,7 +177,7 @@ var CROP_ORDER = ['radish', 'potato', 'strawberry'];
    - 首批不做酸碱、十余种元素、虫害概率表
    - 旧作物迁移时处于正常肥力，历史行为不追溯处罚
    肥力挂在 state.plots[key] 上，与 water/age 并列，不改动既有字段语义。 */
-var FERT = { MIN: 0, MAX: 100, DEF: 60, LOW: 34, GOOD: 66 };   // DEF=旧档默认（正常，不追溯）
+var FERT = { MIN: 0, MAX: 100, DEF: 60, LOW: 34, GOOD: 66, COMPOST_BONUS: 8 };   // DEF=旧档默认（正常，不追溯）
 /* 轮作组：叶菜／根茎／豆类。组间轮换有利，同组连作缓慢下降。 */
 var CROP_GROUPS = {
   leaf:  { id: 'leaf',  name: '叶菜类', members: ['radish', 'strawberry'] },
@@ -272,7 +274,8 @@ var RECIPES = [
   { id: 'chest',     out: 'dev_chest',     qty: 1, cost: { wood: 10 },                  unlock: null,        desc: '20 格储物箱，空箱可随时收起。' },
   { id: 'sprinkler', out: 'dev_sprinkler', qty: 1, cost: { wood: 15, stone: 10 },         unlock: 'quest2',     desc: '每天早晨浇灌上下左右四格。' },
   { id: 'jam_jar',   out: 'dev_jam',       qty: 1, cost: { wood: 15, stone: 10 },         unlock: 'friendship', desc: '投入 1 颗草莓，日结算后完成 1 份莓果酱。' },
-  { id: 'plain_rice', out: 'rice',         qty: 1, cost: { potato: 2 },                    unlock: 'friendship', desc: '把土豆做成一大碗白米饭——DS 小姐说这是世界上最好的东西。' }
+  { id: 'plain_rice', out: 'rice',         qty: 1, cost: { potato: 2 },                    unlock: 'friendship', desc: '把土豆做成一大碗白米饭——DS 小姐说这是世界上最好的东西。' },
+  { id: 'compost',     out: 'dev_compost', qty: 1, cost: { wood: 12, stone: 8 },           unlock: 'friendship', desc: '沤肥用的木箱：投入 3 份作物，隔天得 1 份熟肥。' }
 ];
 
 /* --- 委托 --- */
@@ -426,7 +429,8 @@ var TOOLS = [
   { slot: 6, id: 'pick',    name: '镐子',   tool: 'pickaxe' },
   { slot: 7, id: 'rod',     name: '钓竿',   tool: 'fish', locked: true },
   { slot: 8, id: 'place',   name: '设备',   tool: 'place' },
-  { slot: 9, id: 'shovel',  name: '小铲子', tool: 'shovel' }
+  { slot: 9, id: 'shovel',  name: '小铲子', tool: 'shovel' },
+  { slot: 10, id: 'compost', name: '施肥',   tool: 'compost' }
 ];
 
 /* ============================================================
@@ -910,12 +914,12 @@ function sanitizeStructures(v) {
     var s = v[i];
     if (!s || typeof s !== 'object') continue;
     var d = s.device;
-    if (['chest', 'sprinkler', 'jam_jar'].indexOf(d) < 0) continue;
+    if (['chest', 'sprinkler', 'jam_jar', 'compost'].indexOf(d) < 0) continue;
     var x = s.x, y = s.y;
     if (!isInt(x) || !isInt(y)) continue;
     var rec = { id: s.id || ('s' + i), device: d, x: x, y: y };
     if (d === 'chest') rec.contents = sanitizeInv(s.contents);
-    if (d === 'jam_jar') {
+    if (d === 'jam_jar' || d === 'compost') {
       rec.input = isInt(s.input) ? s.input : 0;
       rec.startDay = isInt(s.startDay) ? s.startDay : 0;
       rec.ready = !!s.ready;
@@ -3443,6 +3447,40 @@ function openCityService(it) {
       });
       if (any) b.appendChild(row);
       b.appendChild(el('p', 'muted', any ? '温室代为育苗，收成可以换成分发袋里的种子。' : '背包里没有可以育苗的收成。'));
+
+      /* 堆肥订单：温室兼卖沤肥服务，也回收熟肥（§32.2 堆肥闭环） */
+      b.appendChild(el('p', null, '另有一桩沤肥生意：温室后院有现成的堆肥堆。'));
+      var crow = el('div', 'row'), cAny = false;
+      if (invCount('radish') + invCount('potato') + invCount('strawberry') + invCount('wood') >= 3) {
+        cAny = true;
+        crow.appendChild(mkBtn('沤一箱肥（3 份作物/木材 → 1 份熟肥）· 体力 6', '', function () {
+          /* 配比与堆肥箱一致：优先用收成，不够再补木材 */
+          var FEED = ['radish', 'potato', 'strawberry', 'wood'], need = [[]], left = 3;
+          for (var fi = 0; fi < FEED.length && left > 0; fi++) {
+            var take = Math.min(left, invCount(FEED[fi]));
+            if (take > 0) { need.push([FEED[fi], take]); left -= take; }
+          }
+          if (left > 0) { toast('材料不够：还需要 ' + left + ' 份作物或木材。'); return; }
+          cityWork({
+            need: need, out: 'compost', qty: 1, energy: 6, minutes: 60,
+            done: '芙洛在后院翻好了一箱肥'
+          });
+        }));
+      }
+      if (invCount('compost') > 0) {
+        cAny = true;
+        crow.appendChild(mkBtn('卖出熟肥 ×' + invCount('compost') + ' · ' + (invCount('compost') * ITEMS.compost.sell) + ' 金', '', function () {
+          var n = invCount('compost');
+          invRemove('compost', n); state.coins += n * ITEMS.compost.sell;
+          markDirty(); refreshHud(); saveNow(); refreshWindow();
+          toast('温室收下 ' + n + ' 份熟肥，得 ' + (n * ITEMS.compost.sell) + ' 金。');
+        }));
+      }
+      if (cAny) b.appendChild(crow);
+      b.appendChild(el('p', 'muted', cAny
+        ? '熟肥售价 ' + ITEMS.compost.sell + ' 金一份；在田里按快捷栏第 10 格「施肥」使用，一份补 8 点肥力。'
+        : '沤肥需要 3 份作物或木材，温室也按市价回收做好的熟肥。'));
+
       appendCityStoryCard(b,'seedbank');
     }, actions: [{ label: '离开', close: true }] });
     return;
@@ -4976,7 +5014,7 @@ function useTool(tool, tx, ty, opts) {
   if (d > (tool === 'fish' ? 3 : 1)) { toast(tool === 'fish' ? '站在岸边，点击 3 格以内的水面抛竿。' : '走近一点。'); return false; }
   if (sceneSwitch.busy || Game.busy) return false;
   if (Game.fishing && Game.fishing.active) return false;
-  if (state.sceneId !== 'farm' && (tool === 'hoe' || tool === 'seed' || tool === 'water' || tool === 'shovel')) {
+  if (state.sceneId !== 'farm' && (tool === 'hoe' || tool === 'seed' || tool === 'water' || tool === 'shovel' || tool === 'compost')) {
     toast('这里没有可以耕种的土地。');
     return false;
   }
@@ -4986,6 +5024,7 @@ function useTool(tool, tx, ty, opts) {
     case 'seed': return toolSeed(tx, ty);
     case 'shovel': return toolShovel(tx, ty);
     case 'water': return toolWater(tx, ty);
+    case 'compost': return toolCompost(tx, ty);
     case 'harvest': return toolHarvest(tx, ty);
     case 'axe': return toolNode(tx, ty, 'tree');
     case 'pickaxe': return toolNode(tx, ty, 'stone');
@@ -5095,6 +5134,26 @@ function toolWater(tx, ty) {
   Audio2.play('water');
   addParticle(tx, ty, 'water');
   markDirty(); refreshHud();
+  return true;
+}
+function toolCompost(tx, ty) {
+  if (state.sceneId !== 'farm') { toast('这里没有耕地。'); return false; }
+  if (!inPlantArea(tx, ty)) { toast('这里没有耕地。'); return false; }
+  var p = state.plots[key2(tx, ty)];
+  if (!p) { toast('这里还没有翻过土。'); return false; }
+  if (invCount('compost') <= 0) { toast('没有熟肥了，先用堆肥箱沤一箱。'); return false; }
+  if (!hasEnergy(CFG.energyCost.compost)) return false;
+  var before = plotFertility(p);
+  if (before >= FERT.MAX) { toast('这块地肥力已经满了，撒下去也是浪费。'); return false; }
+  if (!bagAccepts('compost', 0)) { toast('背包放不下。'); return false; }
+  state.energy -= CFG.energyCost.compost;
+  invRemove('compost', 1);
+  p.fertility = Math.min(FERT.MAX, before + FERT.COMPOST_BONUS);
+  Game.plotSplash[key2(tx, ty)] = { t: 0.7, max: 0.7 };
+  Audio2.play('harvest');
+  addParticle(tx, ty, 'water');
+  markDirty(); refreshHud();
+  toast('给这块地撒了熟肥，肥力 ' + before + ' → ' + p.fertility + '。');
   return true;
 }
 function toolHarvest(tx, ty) {
@@ -5209,7 +5268,8 @@ function toolPlace(tx, ty) {
   }
   invRemove(devId, 1);
   delete state.plots[key2(tx, ty)]; // 空耕地可放设备；去掉其水分、生长记录。
-  state.structures.push({ id: 's' + state.nextStructureId, device: ITEMS[devId].device, x: tx, y: ty, contents: {} });
+  state.structures.push({ id: 's' + state.nextStructureId, device: ITEMS[devId].device, x: tx, y: ty, contents: {},
+    input: 0, startDay: 0, ready: false });
   state.nextStructureId += 1;
   Audio2.play('place');
   addParticle(tx, ty, 'place');
@@ -5261,6 +5321,70 @@ function jamClaim(structure) {
   toast('领取了 1 份莓果酱，售价 ' + ITEMS.jam.sell + ' 金。');
   markDirty(); refreshHud();
   return true;
+}
+
+function compostLoad(structure) {
+  if (structure.input > 0 || structure.ready) { toast('堆肥箱正忙，先把上一箱处理完。'); return false; }
+  var FEED = ['radish', 'potato', 'strawberry', 'wood'];
+  var have = [];
+  for (var i = 0; i < FEED.length; i++) { var n = invCount(FEED[i]); if (n > 0) have.push([FEED[i], n]); }
+  var need = 3;
+  var total = 0; for (i = 0; i < have.length; i++) total += have[i][1];
+  if (total < need) { toast('材料不够：需要 ' + need + ' 份作物或木材（现有 ' + total + '）。'); return false; }
+  var left = need;
+  for (i = 0; i < have.length && left > 0; i++) { var take = Math.min(left, have[i][1]); invRemove(have[i][0], take); left -= take; }
+  structure.input = need;
+  structure.startDay = state.totalDay;
+  structure.ready = false;
+  Audio2.play('place');
+  toast('投入 ' + need + ' 份材料沤肥，明天来取。');
+  markDirty(); refreshHud();
+  return true;
+}
+function compostClaim(structure) {
+  if (!structure.ready) { toast('还没有可领取的熟肥。'); return false; }
+  if (!bagAccepts('compost', 1)) { toast('背包满了，熟肥先留在箱里。'); Audio2.play('fail'); return false; }
+  structure.ready = false; structure.input = 0; structure.startDay = 0;
+  invAdd('compost', 1);
+  Audio2.play('harvest');
+  toast('领取了 1 份熟肥，售价 ' + ITEMS.compost.sell + ' 金。');
+  markDirty(); refreshHud();
+  return true;
+}
+function openCompost(st) {
+  function statusText() {
+    if (st.ready) return '有 1 份熟肥可以领取。';
+    if (st.input > 0) return '正在沤肥，第 ' + (st.startDay + 1) + ' 天早晨完成。';
+    return '空闲，投入 3 份作物或木材后隔天得 1 份熟肥。';
+  }
+  openWindow({
+    id: 'compost', kind: 'compost', narrow: true, title: '堆肥箱',
+    build: function (b) {
+      b.appendChild(el('p', null, statusText()));
+      var FEED = ['radish', 'potato', 'strawberry', 'wood'];
+      var parts = [];
+      for (var i = 0; i < FEED.length; i++) { var n = invCount(FEED[i]); if (n > 0) parts.push(itemName(FEED[i]) + ' ' + n); }
+      b.appendChild(el('p', 'muted', '可用材料：' + (parts.length ? parts.join(' · ') : '没有作物或木材，先去田里收一收。')));
+      var row = el('div', 'row');
+      if (st.input > 0 || st.ready) {
+        row.appendChild(mkBtn('不能投入（先处理完上一箱）', '', function () {}));
+        row.lastChild.disabled = true;
+      } else {
+        row.appendChild(mkBtn('投入 3 份材料', 'primary', function () { compostLoad(st); refreshWindow(); refreshHotbar(); }));
+      }
+      if (st.ready) row.appendChild(mkBtn('领取熟肥', 'primary', function () { compostClaim(st); refreshWindow(); refreshHotbar(); }));
+      b.appendChild(row);
+      b.appendChild(el('p', 'muted', '把熟肥拿到田里，在作物上使用可补回肥力。'));
+    },
+    actions: [
+      {
+        label: '收起堆肥箱', onClick: function () {
+          if (pickupStructure(st)) { closeWindow(); } else { renderWindow(); }
+        }
+      },
+      { label: '关闭', kind: 'ghost', close: true }
+    ]
+  });
 }
 
 /* --- 制作 --- */
@@ -5389,6 +5513,8 @@ function performSettlement(auto) {
     quests: [],
     energy: 0,
     jamWaiting: 0,
+    compost: 0,
+    compostWaiting: 0,
     fallback: false
   };
   try {
@@ -5450,11 +5576,16 @@ function performSettlement(auto) {
     state.shipping = {};
     state.coins += summary.income;
 
-    /* 3. 果酱罐加工 */
+    /* 3. 果酱罐加工 + 堆肥箱沤肥 */
     state.structures.forEach(function (st) {
-      if (st.device !== 'jam_jar') return;
-      if (st.input > 0 && !st.ready) { st.ready = true; summary.jam += 1; }
-      else if (st.input > 0 && st.ready) summary.jamWaiting += 1;
+      if (st.device === 'jam_jar') {
+        if (st.input > 0 && !st.ready) { st.ready = true; summary.jam += 1; }
+        else if (st.input > 0 && st.ready) summary.jamWaiting += 1;
+      }
+      if (st.device === 'compost') {
+        if (st.input > 0 && !st.ready) { st.ready = true; summary.compost += 1; }
+        else if (st.input > 0 && st.ready) summary.compostWaiting += 1;
+      }
     });
 
     /* 4. 日期 +1 */
@@ -6668,7 +6799,7 @@ function refreshHotbar() {
     b.setAttribute('aria-pressed', state.selectedTool === t.tool ? 'true' : 'false');
     var n = el('span', 'slot-num', String(t.slot));
     b.appendChild(n);
-    var toolArt = { hoe: 'tool_hoe', water: 'tool_can', harvest: 'basket', axe: 'tool_axe', pickaxe: 'tool_pick', fish: 'tool_rod', shovel: 'tool_shovel' };
+    var toolArt = { compost: 'compost', hoe: 'tool_hoe', water: 'tool_can', harvest: 'basket', axe: 'tool_axe', pickaxe: 'tool_pick', fish: 'tool_rod', shovel: 'tool_shovel' };
     var ic = getIcon(t.tool === 'seed' ? ('seed_' + state.selectedSeed) : t.tool === 'place' ? state.selectedDevice : toolArt[t.tool]);
     if (ic) b.appendChild(ic);
     if (t.tool === 'seed') {
@@ -6700,7 +6831,7 @@ function showTypePicker(kind) {
   box.id = 'typePick';
   var list = kind === 'seed'
     ? CROP_ORDER.map(function (c) { return { id: 'seed_' + c, val: c, name: CROPS[c].name }; })
-    : ['dev_chest', 'dev_sprinkler', 'dev_jam'].map(function (d) { return { id: d, val: d, name: ITEMS[d].name }; });
+    : ['dev_chest', 'dev_sprinkler', 'dev_jam', 'dev_compost'].map(function (d) { return { id: d, val: d, name: ITEMS[d].name }; });
   box.appendChild(el('span', 'typepick-label', kind === 'seed' ? '选择种子' : '选择设备'));
   list.forEach(function (o) {
     var cur = kind === 'seed' ? state.selectedSeed : state.selectedDevice;
@@ -8055,6 +8186,11 @@ function interact() {
   var st = structureAt(f[0], f[1]) || (structureAt(p.x, p.y) ? structureAt(p.x, p.y) : null);
   if (st) { openStructure(st); return true; }
   // 手上拿着小铲子时，E 也当作"铲除"用，不用先回去按数字键 9。
+  // 拿着熟肥时，E 也当作"施肥"用，不用先回去按数字键 10。
+  if (state.selectedTool === 'compost') {
+    if (useTool('compost', f[0], f[1])) return true;
+    if ((f[0] !== p.x || f[1] !== p.y) && useTool('compost', p.x, p.y)) return true;
+  }
   if (state.selectedTool === 'shovel') {
     if (useTool('shovel', f[0], f[1])) return true;
     if ((f[0] !== p.x || f[1] !== p.y) && useTool('shovel', p.x, p.y)) return true;
@@ -8073,6 +8209,7 @@ function structureAt(x, y) {
 function openStructure(st) {
   if (st.device === 'chest') { openChest(st); return; }
   if (st.device === 'jam_jar') { openJamJar(st); return; }
+  if (st.device === 'compost') { openCompost(st); return; }
   openWindow({
     id: 'sprinkler', kind: 'custom', narrow: true, title: '竹制洒水器',
     build: function (b) {
@@ -8350,6 +8487,17 @@ var ICON_ART = {
     px(g, 3, 5, 10, 9, '#8A5F3C'); px(g, 3, 5, 10, 1, '#A67C4E');
     px(g, 4, 8, 8, 4, '#B0304A'); px(g, 5, 12, 6, 1, '#6B4A2C');
     px(g, 6, 2, 4, 3, '#9AA7AD'); px(g, 7, 0, 2, 2, '#C9D3D8');
+  },
+  dev_compost: function (g) {
+    px(g, 2, 7, 12, 7, '#7A5C3A'); px(g, 2, 7, 12, 1, '#96703F');
+    px(g, 3, 9, 10, 4, '#4E3B22'); px(g, 3, 9, 10, 1, '#5F4930');
+    px(g, 4, 3, 3, 4, '#6E8C46'); px(g, 9, 4, 3, 3, '#7FA054');
+    px(g, 6, 2, 4, 3, '#8FAE5E'); px(g, 7, 0, 2, 2, '#A8C66E');
+  },
+  compost: function (g) {
+    px(g, 3, 6, 10, 8, '#6B4A2C'); px(g, 3, 6, 10, 1, '#87613A');
+    px(g, 4, 8, 8, 5, '#4E3B22'); px(g, 5, 9, 6, 1, '#5F4930');
+    px(g, 5, 3, 2, 3, '#7FA054'); px(g, 9, 4, 2, 2, '#8FAE5E');
   },
   hoe: function (g) { ICON_ART.tool_hoe(g); },
   water: function (g) { ICON_ART.tool_can(g); },
@@ -8964,11 +9112,11 @@ function drawHouse(g, bx, by, bw, bh, kind) {
   }
 }
 function drawDevice(g, st, x, y) {
-  var art = { chest: 'dev_chest', sprinkler: 'dev_sprinkler', jam_jar: 'dev_jam' }[st.device];
+  var art = { chest: 'dev_chest', sprinkler: 'dev_sprinkler', jam_jar: 'dev_jam', compost: 'dev_compost' }[st.device];
   var c = iconCache[art];
   if (!c) { var tmp = getIcon(art); c = newCanvas(16, 16); c.getContext('2d').drawImage(tmp, 0, 0); iconCache[art] = c; }
   g.drawImage(c, x * TILE, y * TILE);
-  if (st.device === 'jam_jar' && st.ready) {
+  if ((st.device === 'jam_jar' || st.device === 'compost') && st.ready) {
     g.fillStyle = '#EFD18B';
     g.fillRect(x * TILE + 12, y * TILE - 4, 2, 2);
     g.fillRect(x * TILE + 11, y * TILE - 3, 4, 2);
@@ -9494,7 +9642,7 @@ function drawClawd(g, fx, fy, opt) {
   }
   var swing = opt.swing || 0;
   if (swing > 0) {
-    var toolIcons = { hoe: 'tool_hoe', water: 'tool_can', axe: 'tool_axe', pickaxe: 'tool_pick', fish: 'tool_rod', harvest: 'basket', shovel: 'tool_shovel' };
+    var toolIcons = { compost: 'compost', hoe: 'tool_hoe', water: 'tool_can', axe: 'tool_axe', pickaxe: 'tool_pick', fish: 'tool_rod', harvest: 'basket', shovel: 'tool_shovel' };
     var art = toolIcons[opt.tool];
     if (opt.tool === 'seed') art = CROPS[state.selectedSeed].seed;
     if (opt.tool === 'place') art = state.selectedDevice;
@@ -10506,6 +10654,27 @@ window.__MOSS__ = {
   travelCommit: function (toId) { return commitTravel(toId); },
   /* §32.2 土壤肥力/轮作 审计探针：让自动化测试能直接驱动数据层，
      不必绕 UI 点击。探针只读状态或调用既有函数，不注入任何测试数据。 */
+  /* 堆肥系统的验收探针：走真实 API，不注入状态 */
+  devCompost: {
+    place: function (x, y) { state.selectedDevice = 'dev_compost'; return toolPlace(x, y); },
+    craft: function () { var r = RECIPES.filter(function (x) { return x.id === 'compost'; })[0]; return r ? craft(r) : false; },
+    load: function (x, y) { var st = structureAt(x, y); return st ? compostLoad(st) : false; },
+    claim: function (x, y) { var st = structureAt(x, y); return st ? compostClaim(st) : false; },
+    apply: function (x, y) { return toolCompost(x, y); },
+    at: function (x, y) { var st = structureAt(x, y); return st ? { device: st.device, input: st.input, startDay: st.startDay, ready: !!st.ready } : null; },
+    recipe: function () { var r = RECIPES.filter(function (x) { return x.id === 'compost'; })[0]; return r ? { id: r.id, out: r.out, qty: r.qty, cost: r.cost, unlock: r.unlock } : null; },
+    bonus: function () { return FERT.COMPOST_BONUS; },
+    slot: function () { var t = TOOLS.filter(function (x) { return x.tool === 'compost'; })[0]; return t ? { slot: t.slot, name: t.name } : null; },
+    hasIcon: function () { return typeof ICON_ART.compost === 'function'; },
+    sellPrice: function () { return ITEMS.compost.sell; }
+  },
+  invCount: invCount, itemName: itemName,
+  invRemove: invRemove,
+  invAdd: invAdd,
+  structureAt: structureAt,
+  craft: craft,
+  TOOLS: TOOLS,
+  FERT: FERT,
   devFert: {
     plotFertility: function (x, y) { return plotFertility(state.plots[key2(x, y)]); },
     tier: function (x, y) { var t = fertilityTier(plotFertility(state.plots[key2(x, y)])); return { id: t.id, label: t.label, hint: t.hint }; },
