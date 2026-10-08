@@ -124,6 +124,31 @@ var ITEMS = {
   mushroom: {name:'林间蘑菇',kind:'forage',sell:12,food:15,desc:'探索获得，可出售，售价 12 金。'},
   copper_ore: {name:'铜矿石',kind:'material',sell:16,food:0,desc:'探索获得，可出售，售价 16 金。'},
   iron_ore: {name:'铁矿石',kind:'material',sell:30,food:0,desc:'探索获得，可出售，售价 30 金。'},
+  /* ---- 城市产业链中间品：工业 6 栋 / 大学 4 栋 / 金融 5 栋的玩法载体 ----
+     定价按"原料 < 加工件 < 制成品"递增，形成可反复倒手的链条，
+     同时给探索与农耕一条新的变现出口。 */
+  coal:          { name: '煤块',       kind: 'material', sell: 12, food: 0, desc: '锅炉房烧的燃料，铸铁与蒸汽都靠它，售价 12 金。' },
+  charcoal:      { name: '木炭',       kind: 'material', sell: 18, food: 0, desc: '闷烧的炭，熔炉开一次要用掉整整一筐，售价 18 金。' },
+  timber:        { name: '原木',       kind: 'material', sell: 20, food: 0, desc: '锯木厂进场的整料，一根能剖出十几块板材，售价 20 金。' },
+  plank:         { name: '板材',       kind: 'material', sell: 34, food: 0, desc: '锯好的成品木料，家具和船骨都用它，售价 34 金。' },
+  copper_ingot:  { name: '铜锭',       kind: 'material', sell: 55, food: 0, desc: '熔炉炼出的铜条，铸件与铜制器械的半成品，售价 55 金。' },
+  iron_ingot:    { name: '铁锭',       kind: 'material', sell: 80, food: 0, desc: '出炉的生铁，钢制工具的真正起点，售价 80 金。' },
+  steel_ingot:   { name: '钢锭',       kind: 'material', sell: 150, food: 0, desc: '百炼而出的钢，刃口才配得上，售价 150 金。' },
+  cast_gear:     { name: '铸齿轮',     kind: 'material', sell: 95, food: 0, desc: '水轮和汽机都要它，缺一枚整条线都得停，售价 95 金。' },
+  ironclad:      { name: '铁甲板',     kind: 'material', sell: 320, food: 0, desc: '船坞专用的装甲板，一艘船要钉掉十几块，售价 320 金。' },
+  flour:         { name: '面粉',       kind: 'material', sell: 26, food: 0, desc: '水轮磨出来的麦粉，交易所和面包房都抢着要，售价 26 金。' },
+  grain:         { name: '小麦',       kind: 'material', sell: 7, food: 0, desc: '磨坊门前麦仓里的麦斗，一斗换四袋粉，售价 7 金。' },
+  bread_batch:   { name: '长列黑麦面包', kind: 'food', sell: 40, food: 45, desc: '商用大份，一条够工棚吃一天，售价 40 金。' },
+  salt_fish:     { name: '盐渍鲱鱼',   kind: 'food', sell: 45, food: 30, desc: '船坞的粗口粮，耐放，售价 45 金。' },
+  /* 学术：修业产出，可交易也用于研究 */
+  manuscript:    { name: '手抄本',     kind: 'material', sell: 70, food: 0, desc: '讲堂和研讨室里一笔一笔抄出来的，售价 70 金。' },
+  field_note:    { name: '考察笔记',   kind: 'material', sell: 90, food: 0, desc: '实验楼里记下的标本与数据，最受研究同行看重，售价 90 金。' },
+  translation:   { name: '译稿',       kind: 'material', sell: 130, food: 0, desc: '把旧语文献译成的白蔷薇文，图书馆按页付酬，售价 130 金。' },
+  /* 金融：票据可兑付，是这条链的价值载体 */
+  bill:          { name: '商业票据',   kind: 'material', sell: 60, food: 0, desc: '国立银行开的期票，到期前可在银行兑成金币，售价 60 金。' },
+  share_cert:    { name: '交易所股票', kind: 'material', sell: 110, food: 0, desc: '谷物交易所的份额凭证，随行情涨落，售价 110 金。' },
+  warehouse_deed:{ name: '货栈契据',   kind: 'material', sell: 190, food: 0, desc: '码头货栈的长期租约，押给银行能换一大笔款，售价 190 金。' },
+  bond:          { name: '市政公债',   kind: 'material', sell: 160, food: 0, desc: '市政厅为市政工程发行的债券，年息一分，售价 160 金。' },
   gem: {name:'紫晶',kind:'material',sell:100,food:0,desc:'探索获得，可出售，售价 100 金。'},
   jam:       { name: '莓果酱', kind: 'craft', sell: 50, food: 25, desc: '果酱罐熬制的果酱，售价 50 金。' },
   wood:      { name: '木材',   kind: 'material', sell: 3, desc: '砍伐获得，可制作、交付或卖给木匠，售价 3 金。' },
@@ -1066,12 +1091,13 @@ for(var depth=1;depth<=3;depth++)[[4,3],[9,8],[15,10],[23,8],[5,14],[11,18],[23,
 function normalizeExploration(raw){
  function num(v,d,min,max){return typeof v==='number'&&isFinite(v)?clamp(v,min,max):d;}
  raw=raw&&typeof raw==='object'?raw:{};
- var e={forest:!!raw.forest,mine:!!raw.mine,city:!!raw.city,depth:clamp(Math.floor(num(raw.depth,1,1,3)),1,3),hut:!!raw.hut,tools:!!raw.tools,nodes:{},treasures:{},jobs:{},dailyJobs:{day:-1,ids:[]},storyDone:{},bondDone:{},journalChoices:{},cityStories:{},cityReputation:Math.floor(num(raw.cityReputation,0,0,9999)),smithCoupon:!!raw.smithCoupon,explorePoints:clamp(Math.floor(num(raw.explorePoints,0,0,100000)),0,100000),requestDay:Math.floor(num(raw.requestDay,-1,-1,1e6))};
+ var e={forest:!!raw.forest,mine:!!raw.mine,city:!!raw.city,depth:clamp(Math.floor(num(raw.depth,1,1,3)),1,3),hut:!!raw.hut,tools:!!raw.tools,nodes:{},treasures:{},jobs:{},dailyJobs:{day:-1,ids:[]},storyDone:{},bondDone:{},journalChoices:{},cityStories:{},cityReputation:Math.floor(num(raw.cityReputation,0,0,9999)),smithCoupon:!!raw.smithCoupon,explorePoints:clamp(Math.floor(num(raw.explorePoints,0,0,100000)),0,100000),requestDay:Math.floor(num(raw.requestDay,-1,-1,1e6)),bankDeposit:Math.floor(num(raw.bankDeposit,0,0,1e9)),bankDay:Math.floor(num(raw.bankDay,-1,-1,1e6)),grainIndex:clamp(Math.floor(num(raw.grainIndex,0,-5,5)),-5,5),millDay:Math.floor(num(raw.millDay,-1,-1,1e6)),millStock:clamp(Math.floor(num(raw.millStock,0,0,6)),0,6),taxPaid:!!raw.taxPaid,pledges:[]};
  Object.keys(LIVING_JOBS||{}).forEach(function(id){if(raw.jobs&&Number.isInteger(raw.jobs[id]))e.jobs[id]=Math.max(-1,raw.jobs[id]);});
  (CITY_STORY_QUESTS||[]).forEach(function(q){var st=raw.cityStories&&raw.cityStories[q.id];if(st==='accepted'||st==='done')e.cityStories[q.id]=st;});
  if(raw.dailyJobs&&typeof raw.dailyJobs==='object'){e.dailyJobs.day=Math.floor(num(raw.dailyJobs.day,-1,-1,1e6));if(Array.isArray(raw.dailyJobs.ids))e.dailyJobs.ids=raw.dailyJobs.ids.filter(function(id){return !!LIVING_JOBS[id];}).slice(0,3);}
  ['storyDone','bondDone'].forEach(function(k){if(raw[k]&&typeof raw[k]==='object')Object.keys(raw[k]).forEach(function(id){if(raw[k][id])e[k][id]=true;});});
  if(raw.journalChoices&&typeof raw.journalChoices==='object')Object.keys(raw.journalChoices).forEach(function(id){var v=raw.journalChoices[id];if(v&&Number.isInteger(v.day)&&Number.isInteger(v.option))e.journalChoices[id]={day:Math.max(-1,v.day),option:v.option};});
+ if(Array.isArray(raw.pledges))e.pledges=raw.pledges.filter(function(p){return p&&ITEMS[p.id]&&Number.isFinite(p.amt)&&p.amt>0;}).slice(0,20).map(function(p){return{id:p.id,amt:Math.floor(p.amt),day:Math.max(-1,Math.floor(num(p.day,-1,-1,1e6)))};});
  if(!e.forest){e.mine=false;e.hut=false;}if(!e.mine)e.depth=1;
  ['forest_cache','mine_cache'].forEach(function(k){e.treasures[k]=!!(raw.treasures&&raw.treasures[k]);});
  Object.keys(EXPLORE_NODES).forEach(function(sc){Object.keys(EXPLORE_NODES[sc]).forEach(function(k){var n=EXPLORE_NODES[sc][k],key=sc+':'+k,v=raw.nodes&&raw.nodes[key];if(v&&typeof v==='object')e.nodes[key]={hp:clamp(Math.floor(num(v.hp,n.hp,0,n.hp)),0,n.hp),day:Math.floor(num(v.day,0,0,1e6))};});});return e;
@@ -1572,8 +1598,9 @@ var CITY_ROOMS = {
     spots: [{ x: 13, y: 3, kind: 'cityService', service: 'academy', label: '接待处', stand: [[13, 4], [10, 3], [17, 3]] }],
     staff: []
   },
-  /* 居民议事厅：长桌、席位与公文箱 */
-  civic: {
+  /* 居民议事厅：长桌、席位与公文箱（注意：键名是 hall，不是 civic——
+     civic 专指市政厅，见下方另一处定义；两处若重名会被后者静默覆盖） */
+  hall: {
     w: 22, h: 16, floor: 'wood',
     props: [
       { t: 'longTable', x: 6, y: 5, w: 10, h: 4 },
@@ -1600,6 +1627,317 @@ var CITY_ROOMS = {
     ],
     spots: [{ x: 8, y: 9, kind: 'cityService', service: 'home', label: '起居处', stand: [[8, 10], [8, 7], [5, 9], [11, 9]] }],
     staff: []
+  },
+
+  /* ---- 东南工业码头：卸货→仓储→生产→发货 四段式专用厂房 ----
+     每间都按工序排布动线：重货靠门、原料进料口在中段、成品堆到装卸侧。
+     复用 forge/anvil/toolWall/crates/dock/barrel 等既有道具，不新造素材。 */
+
+  /* 河岸长条货仓：长跨度开间，货架阵列贯通到装卸门 */
+  quay_store: {
+    w: 36, h: 20, floor: 'plank',
+    props: [
+      { t: 'genericShelf', x: 3, y: 2, w: 3, h: 8 },
+      { t: 'genericShelf', x: 8, y: 2, w: 3, h: 8 },
+      { t: 'genericShelf', x: 13, y: 2, w: 3, h: 8 },
+      { t: 'genericShelf', x: 18, y: 2, w: 3, h: 8 },
+      { t: 'genericShelf', x: 23, y: 2, w: 3, h: 8 },
+      { t: 'crates', x: 3, y: 13, w: 6, h: 3 },
+      { t: 'crates', x: 11, y: 13, w: 6, h: 3 },
+      { t: 'crates', x: 19, y: 13, w: 6, h: 3 },
+      { t: 'barrel', x: 28, y: 2, w: 2, h: 2 },
+      { t: 'barrel', x: 31, y: 3, w: 2, h: 2 },
+      { t: 'dock', x: 28, y: 13, w: 5, h: 4 },
+      { t: 'ledgerDesk', x: 30, y: 8, w: 4, h: 2 }
+    ],
+    spots: [{ x: 17, y: 10, kind: 'cityService', service: 'quay_store', label: '货栈管事台', stand: [[17, 11], [13, 10], [21, 10], [17, 7]] }],
+    staff: ['steward']
+  },
+
+  /* 东岸锯木厂：原木垛进料，锯台居中，木料成品靠装卸门 */
+  sawmill: {
+    w: 34, h: 22, floor: 'plank',
+    props: [
+      { t: 'dock', x: 3, y: 2, w: 6, h: 4 },
+      { t: 'anvil', x: 14, y: 8, w: 4, h: 3 },
+      { t: 'toolWall', x: 21, y: 2, w: 6, h: 2 },
+      { t: 'genericShelf', x: 26, y: 3, w: 3, h: 6 },
+      { t: 'crates', x: 12, y: 16, w: 8, h: 3 },
+      { t: 'crates', x: 22, y: 16, w: 7, h: 3 },
+      { t: 'barrel', x: 3, y: 16, w: 2, h: 2 },
+      { t: 'toolRack', x: 29, y: 9, w: 4, h: 2 },
+      { t: 'longTable', x: 14, y: 3, w: 8, h: 2 }
+    ],
+    spots: [{ x: 16, y: 12, kind: 'cityService', service: 'sawmill', label: '锯台', stand: [[16, 13], [16, 9], [12, 12], [20, 12]] }],
+    staff: ['carpenter']
+  },
+
+  /* 白蔷薇铸造车间：熔炉与铁砧成对，冷却槽与模具架围出浇铸区 */
+  foundry: {
+    w: 34, h: 22, floor: 'stone',
+    props: [
+      { t: 'forge', x: 3, y: 2, w: 5, h: 4 },
+      { t: 'forge', x: 10, y: 2, w: 5, h: 4 },
+      { t: 'anvil', x: 17, y: 9, w: 4, h: 3 },
+      { t: 'toolWall', x: 24, y: 2, w: 7, h: 2 },
+      { t: 'trough', x: 3, y: 12, w: 6, h: 2 },
+      { t: 'crates', x: 17, y: 16, w: 7, h: 3 },
+      { t: 'barrel', x: 27, y: 12, w: 2, h: 2 },
+      { t: 'barrel', x: 30, y: 13, w: 2, h: 2 },
+      { t: 'genericShelf', x: 24, y: 16, w: 3, h: 4 },
+      { t: 'roundTable', x: 12, y: 12, w: 4, h: 3 }
+    ],
+    spots: [{ x: 20, y: 13, kind: 'cityService', service: 'foundry', label: '浇铸台', stand: [[20, 14], [20, 10], [16, 13], [24, 13]] }],
+    staff: ['smith']
+  },
+
+  /* 河湾水力磨坊：磨盘、石磨与水槽沿中轴，水轮驱动一侧 */
+  watermill: {
+    w: 30, h: 20, floor: 'stone',
+    props: [
+      { t: 'kneadTable', x: 11, y: 8, w: 6, h: 3 },
+      { t: 'trough', x: 11, y: 14, w: 7, h: 2 },
+      { t: 'genericShelf', x: 3, y: 2, w: 3, h: 6 },
+      { t: 'genericShelf', x: 3, y: 10, w: 3, h: 5 },
+      { t: 'crates', x: 21, y: 2, w: 6, h: 3 },
+      { t: 'barrel', x: 21, y: 7, w: 2, h: 2 },
+      { t: 'barrel', x: 24, y: 8, w: 2, h: 2 },
+      { t: 'flourSacks', x: 24, y: 13, w: 3, h: 3 },
+      { t: 'dock', x: 25, y: 15, w: 3, h: 3 },
+      { t: 'toolRack', x: 7, y: 16, w: 4, h: 2 }
+    ],
+    spots: [{ x: 14, y: 11, kind: 'cityService', service: 'watermill', label: '石磨盘', stand: [[14, 12], [14, 8], [10, 11], [18, 11]] }],
+    staff: ['miller']
+  },
+
+  /* 厂区锅炉房：锅炉与汽管沿墙，煤堆与压力表在炉前 */
+  boiler: {
+    w: 26, h: 18, floor: 'stone',
+    props: [
+      { t: 'forge', x: 4, y: 3, w: 5, h: 5 },
+      { t: 'forge', x: 11, y: 3, w: 5, h: 5 },
+      { t: 'toolWall', x: 18, y: 2, w: 6, h: 2 },
+      { t: 'crates', x: 4, y: 12, w: 6, h: 3 },
+      { t: 'barrel', x: 13, y: 12, w: 2, h: 2 },
+      { t: 'barrel', x: 16, y: 13, w: 2, h: 2 },
+      { t: 'anvil', x: 19, y: 9, w: 4, h: 3 },
+      { t: 'trough', x: 11, y: 15, w: 5, h: 2 },
+      { t: 'noticeBoard', x: 19, y: 15, w: 4, h: 2 }
+    ],
+    spots: [{ x: 11, y: 9, kind: 'cityService', service: 'boiler', label: '汽机阀台', stand: [[11, 10], [11, 6], [7, 9], [15, 9]] }],
+    staff: ['stoker']
+  },
+
+  /* 船具修理棚：船架、龙骨、工棚工具与待修船具 */
+  shipyard: {
+    w: 30, h: 20, floor: 'plank',
+    props: [
+      { t: 'dock', x: 3, y: 2, w: 6, h: 5 },
+      { t: 'anvil', x: 15, y: 9, w: 4, h: 3 },
+      { t: 'toolWall', x: 22, y: 2, w: 6, h: 2 },
+      { t: 'toolRack', x: 11, y: 2, w: 5, h: 2 },
+      { t: 'crates', x: 12, y: 15, w: 7, h: 3 },
+      { t: 'crates', x: 21, y: 15, w: 6, h: 3 },
+      { t: 'barrel', x: 3, y: 14, w: 2, h: 2 },
+      { t: 'longTable', x: 15, y: 3, w: 8, h: 2 },
+      { t: 'genericShelf', x: 25, y: 9, w: 3, h: 5 }
+    ],
+    spots: [{ x: 17, y: 12, kind: 'cityService', service: 'shipyard', label: '船具工位', stand: [[17, 13], [17, 9], [13, 12], [21, 12]] }],
+    staff: ['carpenter']
+  },
+
+  /* ---- 白蔷薇大学：正殿讲授、侧翼研讨、实验实证、宿舍生活 ----
+     沿用学院既有的长桌、讲台、书架与标本柜语汇，四间各不相同。 */
+
+  /* 大学主楼：讲堂与注册台，正中长桌成列，两侧书架 */
+  uni_main: {
+    w: 36, h: 24, floor: 'tile',
+    props: [
+      { t: 'counterFront', x: 15, y: 2, w: 8, h: 2 },
+      { t: 'roundTable', x: 14, y: 13, w: 5, h: 3 },
+      { t: 'roundTable', x: 21, y: 13, w: 5, h: 3 },
+      { t: 'roundTable', x: 14, y: 18, w: 5, h: 3 },
+      { t: 'roundTable', x: 21, y: 18, w: 5, h: 3 },
+      { t: 'bookshelf', x: 3, y: 2, w: 3, h: 9 },
+      { t: 'bookshelf', x: 8, y: 2, w: 3, h: 9 },
+      { t: 'bookshelf', x: 27, y: 2, w: 3, h: 9 },
+      { t: 'bookshelf', x: 32, y: 2, w: 3, h: 9 },
+      { t: 'mapCabinet', x: 3, y: 15, w: 5, h: 3 },
+      { t: 'desk', x: 27, y: 17, w: 5, h: 2 },
+      { t: 'statue', x: 17, y: 8, w: 3, h: 4 }
+    ],
+    spots: [{ x: 18, y: 5, kind: 'cityService', service: 'uni_main', label: '注册讲堂', stand: [[18, 6], [18, 9], [14, 5], [22, 5]] }],
+    staff: ['professor']
+  },
+
+  /* 教学楼：研讨教室与图书资料室 */
+  uni_wing: {
+    w: 32, h: 22, floor: 'plank',
+    props: [
+      { t: 'receptionDesk', x: 13, y: 2, w: 6, h: 2 },
+      { t: 'longTable', x: 12, y: 8, w: 9, h: 2 },
+      { t: 'longTable', x: 12, y: 12, w: 9, h: 2 },
+      { t: 'bookshelf', x: 3, y: 2, w: 3, h: 8 },
+      { t: 'bookshelf', x: 8, y: 2, w: 3, h: 8 },
+      { t: 'bookshelf', x: 23, y: 2, w: 3, h: 8 },
+      { t: 'archiveShelf', x: 26, y: 13, w: 4, h: 5 },
+      { t: 'desk', x: 3, y: 14, w: 5, h: 2 },
+      { t: 'ladder', x: 6, y: 10, w: 2, h: 4 },
+      { t: 'readingTable', x: 23, y: 16, w: 5, h: 2 }
+    ],
+    spots: [{ x: 15, y: 5, kind: 'cityService', service: 'uni_wing', label: '研讨教室', stand: [[15, 6], [15, 3], [11, 5], [19, 5]] }],
+    staff: ['lecturer']
+  },
+
+  /* 自然史实验楼：标本柜、器械台、解剖台与记录桌 */
+  uni_lab: {
+    w: 32, h: 22, floor: 'stone',
+    props: [
+      { t: 'receptionDesk', x: 13, y: 2, w: 6, h: 2 },
+      { t: 'desk', x: 11, y: 9, w: 7, h: 2 },
+      { t: 'desk', x: 11, y: 13, w: 7, h: 2 },
+      { t: 'archiveShelf', x: 3, y: 2, w: 4, h: 6 },
+      { t: 'archiveShelf', x: 3, y: 10, w: 4, h: 5 },
+      { t: 'bookshelf', x: 24, y: 2, w: 3, h: 7 },
+      { t: 'mapCabinet', x: 25, y: 11, w: 5, h: 3 },
+      { t: 'kneadTable', x: 20, y: 16, w: 6, h: 3 },
+      { t: 'trough', x: 20, y: 6, w: 5, h: 2 },
+      { t: 'toolRack', x: 8, y: 17, w: 4, h: 2 },
+      { t: 'statue', x: 13, y: 17, w: 3, h: 3 }
+    ],
+    spots: [{ x: 14, y: 5, kind: 'cityService', service: 'uni_lab', label: '实验台', stand: [[14, 6], [14, 3], [10, 5], [18, 5]] }],
+    staff: ['researcher']
+  },
+
+  /* 学生宿舍院：四间卧室围着小院起居处 */
+  uni_dorm: {
+    w: 32, h: 22, floor: 'plank',
+    props: [
+      { t: 'bed', x: 3, y: 3, w: 4, h: 3 },
+      { t: 'bed', x: 9, y: 3, w: 4, h: 3 },
+      { t: 'bed', x: 20, y: 3, w: 4, h: 3 },
+      { t: 'bed', x: 26, y: 3, w: 4, h: 3 },
+      { t: 'wardrobe', x: 3, y: 9, w: 3, h: 3 },
+      { t: 'wardrobe', x: 27, y: 9, w: 3, h: 3 },
+      { t: 'table', x: 12, y: 9, w: 5, h: 2 },
+      { t: 'roundTable', x: 13, y: 14, w: 5, h: 3 },
+      { t: 'bookshelf', x: 6, y: 14, w: 3, h: 5 },
+      { t: 'bookshelf', x: 22, y: 14, w: 3, h: 5 },
+      { t: 'fireplace', x: 14, y: 19, w: 3, h: 3 },
+      { t: 'chest', x: 20, y: 18, w: 2, h: 2 }
+    ],
+    spots: [{ x: 15, y: 12, kind: 'cityService', service: 'uni_dorm', label: '自习室', stand: [[15, 13], [15, 9], [11, 12], [19, 12]] }],
+    staff: ['student']
+  },
+
+  /* ---- 市政商业区：连续骑楼金融街 + 公共大厅 ----
+     银行/交易所/金库三间共用骑楼立面语汇，靠柜台与账台区分职能；
+     市场大厅开敞通层，市政厅为议事与公示。 */
+
+  /* 国立银行：柜台、账台与金库门 */
+  bank: {
+    w: 32, h: 20, floor: 'tile',
+    props: [
+      { t: 'counterFront', x: 13, y: 2, w: 8, h: 2 },
+      { t: 'ledgerDesk', x: 3, y: 2, w: 6, h: 3 },
+      { t: 'ledgerDesk', x: 22, y: 2, w: 6, h: 3 },
+      { t: 'chest', x: 26, y: 8, w: 3, h: 3 },
+      { t: 'chest', x: 26, y: 13, w: 3, h: 3 },
+      { t: 'desk', x: 4, y: 12, w: 5, h: 2 },
+      { t: 'table', x: 4, y: 16, w: 5, h: 2 },
+      { t: 'bookshelf', x: 11, y: 8, w: 3, h: 5 },
+      { t: 'mapCabinet', x: 15, y: 8, w: 5, h: 3 },
+      { t: 'banner', x: 12, y: 2, w: 2, h: 2 },
+      { t: 'statue', x: 13, y: 13, w: 3, h: 4 }
+    ],
+    spots: [{ x: 16, y: 5, kind: 'cityService', service: 'bank', label: '银行柜台', stand: [[16, 6], [16, 3], [12, 5], [20, 5]] }],
+    staff: ['banker']
+  },
+
+  /* 中央市场大厅：开敞通层，摊位列与收货口 */
+  market_hall: {
+    w: 38, h: 26, floor: 'tile',
+    props: [
+      { t: 'orderBoard', x: 3, y: 2, w: 6, h: 5 },
+      { t: 'receptionDesk', x: 16, y: 2, w: 7, h: 2 },
+      { t: 'basket', x: 5, y: 10, w: 4, h: 2 },
+      { t: 'basket', x: 11, y: 10, w: 4, h: 2 },
+      { t: 'basket', x: 17, y: 10, w: 4, h: 2 },
+      { t: 'basket', x: 23, y: 10, w: 4, h: 2 },
+      { t: 'basket', x: 29, y: 10, w: 4, h: 2 },
+      { t: 'counterFront', x: 5, y: 16, w: 9, h: 2 },
+      { t: 'counterFront', x: 16, y: 16, w: 9, h: 2 },
+      { t: 'counterFront', x: 27, y: 16, w: 9, h: 2 },
+      { t: 'crates', x: 3, y: 21, w: 6, h: 3 },
+      { t: 'crates', x: 11, y: 21, w: 6, h: 3 },
+      { t: 'crates', x: 19, y: 21, w: 6, h: 3 },
+      { t: 'barrel', x: 33, y: 20, w: 2, h: 2 },
+      { t: 'noticeBoard', x: 31, y: 3, w: 5, h: 3 },
+      { t: 'sign', x: 16, y: 22, w: 3, h: 2 }
+    ],
+    spots: [{ x: 19, y: 5, kind: 'cityService', service: 'market_hall', label: '市场管理处', stand: [[19, 6], [19, 3], [15, 5], [23, 5]] }],
+    staff: ['clerk']
+  },
+
+  /* 谷物交易所：报价板、成交台与样品柜 */
+  exchange: {
+    w: 34, h: 22, floor: 'tile',
+    props: [
+      { t: 'orderBoard', x: 13, y: 2, w: 8, h: 6 },
+      { t: 'counterFront', x: 13, y: 10, w: 8, h: 2 },
+      { t: 'ledgerDesk', x: 3, y: 2, w: 6, h: 3 },
+      { t: 'ledgerDesk', x: 24, y: 2, w: 6, h: 3 },
+      { t: 'archiveShelf', x: 4, y: 8, w: 5, h: 5 },
+      { t: 'genericShelf', x: 25, y: 8, w: 3, h: 6 },
+      { t: 'flourSacks', x: 5, y: 16, w: 3, h: 3 },
+      { t: 'flourSacks', x: 10, y: 16, w: 3, h: 3 },
+      { t: 'baskets', x: 19, y: 15, w: 3, h: 2 },
+      { t: 'barrel', x: 19, y: 18, w: 2, h: 2 },
+      { t: 'roundTable', x: 25, y: 16, w: 5, h: 3 },
+      { t: 'bench', x: 3, y: 18, w: 4, h: 2 }
+    ],
+    spots: [{ x: 17, y: 9, kind: 'cityService', service: 'exchange', label: '成交台', stand: [[17, 10], [17, 13], [13, 9], [21, 9]] }],
+    staff: ['broker']
+  },
+
+  /* 金库与票据所：重门、账柜与银箱 */
+  gold: {
+    w: 26, h: 20, floor: 'stone',
+    /* 金库不走银行那套办公陈设：没有木桌与锦旗，改成保险柜墙 + 金属检验台 + 金锭托盘 */
+    props: [
+      { t: 'vaultDoor', x: 10, y: 1, w: 6, h: 2 },
+      { t: 'chest', x: 3, y: 3, w: 3, h: 3 },
+      { t: 'chest', x: 20, y: 3, w: 3, h: 3 },
+      { t: 'vaultDoor', x: 2, y: 8, w: 3, h: 4 },
+      { t: 'vaultDoor', x: 21, y: 8, w: 3, h: 4 },
+      { t: 'archiveShelf', x: 3, y: 14, w: 4, h: 5 },
+      { t: 'archiveShelf', x: 19, y: 14, w: 4, h: 5 },
+      { t: 'ingotRack', x: 9, y: 8, w: 8, h: 3 },
+      { t: 'ledgerDesk', x: 8, y: 13, w: 5, h: 3 },
+      { t: 'vaultCage', x: 16, y: 13, w: 4, h: 4 }
+    ],
+    spots: [{ x: 13, y: 5, kind: 'cityService', service: 'gold', label: '票据所柜台', stand: [[13, 6], [13, 3], [9, 5], [17, 5]] }],
+    staff: ['vaultkeeper']
+  },
+
+  /* 市政厅：议事长桌、公示板与公印台 */
+  townhall: {
+    w: 34, h: 24, floor: 'tile',
+    props: [
+      { t: 'receptionDesk', x: 14, y: 2, w: 7, h: 2 },
+      { t: 'longTable', x: 11, y: 12, w: 12, h: 3 },
+      { t: 'counterFront', x: 11, y: 8, w: 12, h: 2 },
+      { t: 'noticeBoard', x: 3, y: 2, w: 5, h: 4 },
+      { t: 'noticeBoard', x: 26, y: 2, w: 5, h: 4 },
+      { t: 'bookshelf', x: 3, y: 9, w: 3, h: 8 },
+      { t: 'bookshelf', x: 28, y: 9, w: 3, h: 8 },
+      { t: 'throne', x: 15, y: 18, w: 4, h: 3 },
+      { t: 'statue', x: 8, y: 17, w: 3, h: 4 },
+      { t: 'statue', x: 23, y: 17, w: 3, h: 4 },
+      { t: 'mapCabinet', x: 15, y: 5, w: 5, h: 3 }
+    ],
+    spots: [{ x: 17, y: 5, kind: 'cityService', service: 'civic', label: '市政厅服务台', stand: [[17, 6], [17, 3], [13, 5], [21, 5]] }],
+    staff: ['clerk']
   }
 };
 /* 白蔷薇城：640×480 格，环绕古老城堡生长起来的中叶山谷城市。
@@ -1910,7 +2248,7 @@ MAPS.city = (function () {
   building('exchange', '谷物交易所', 296, 302, 24, 14, 'arcaded');
   building('gold', '金库与票据所', 324, 300, 22, 13, 'arcaded');
   building('market_hall', '中央市场大厅', 268, 330, 30, 15, 'civic');
-  building('civic', '市政厅', 352, 328, 24, 14, 'civic');
+  building('townhall', '市政厅', 352, 328, 24, 14, 'civic');
 
   /* 住宅：主要沿街区街道成排，少数可以进去 */
   var homeIdx = 0, ENTERABLE_HOMES = 24;
@@ -2238,6 +2576,70 @@ postResident('tailor','city_tailor',13,5);
 postResident('innkeeper','city_inn',15,4);
 postResident('steward','city_castle',17,7);
 
+/* ── 新增 15 栋的驻场 NPC ────────────────────────────────────────────────
+   此前 CITY_ROOMS.<room>.staff 只声明了名字，NPCS 表里没有对应条目、
+   也没调用 addResident/postResident，所以这些房间一个人都没有。
+   坐标取自各房间 spot 的 stand 位附近，并给每人 4 段作息，让 NPC 会走动。
+   style 复用现有 5 种（baker/postie/ranger/engineer/scholar），不新增绘制分支。*/
+function postStaff(residentId, name, title, style, lines, scene, xy) {
+  addResident(residentId, name, title, scene, xy[0], xy[1], style,
+    ['#' + ['4A3B34', '3E4A56', '5C4736'][style === 'scholar' ? 0 : style === 'engineer' ? 1 : 2],
+     '#' + ['8E7F6E', '6E7C8A', '9C8464'][style === 'scholar' ? 0 : style === 'engineer' ? 1 : 2],
+     '#D9C7A4'],
+    lines);
+  postResident(residentId, scene, xy[0], xy[1]);
+}
+/* 工业带 */
+postStaff('boilerman', '炭七', '锅炉工', 'engineer',
+  ['炉温我盯着，你别往炉门里伸手。', '一天烧掉两车煤，城里的煤商却总说没货。'], 'city_boiler', [11, 10]);
+postStaff('sawyer',    '老槐', '锯木工', 'ranger',
+  ['原木要顺着年轮锯，横着锯只会得到一地碎末。', '工坊那边的订单堆成山，木料却总不够。'], 'city_sawmill', [16, 13]);
+postStaff('smith_f',   '铁青', '铸铁匠', 'engineer',
+  ['炉火纯青时打出的铁，敲起来声音是亮的。', '矿石炼成锭，十炉里能成七炉就不错了。'], 'city_foundry', [20, 14]);
+postStaff('miller',    '白溪', '磨坊主', 'baker',
+  ['磨好的面粉要当天用完，隔一夜就结块。', '溪水一停，磨盘就跟着停，城里的人也得饿。'], 'city_watermill', [14, 12]);
+postStaff('shipwright', '舵生', '船匠', 'ranger',
+  ['船板要选最直的纹路，弯一点下水就裂。', '码头那几艘船等着换板，木料却在半路。'], 'city_shipyard', [17, 13]);
+postStaff('quay_steward', '岸正', '货栈管事', 'merchant',
+  ['货到就点数，点完就入库，库满了就得等下一船。', '码头上最贵的不是货，是等货的时间。'], 'city_quay_store', [17, 11]);
+/* 学院四栋 */
+postStaff('professor', '砚秋', '大学教授', 'scholar',
+  ['学问不是背出来的，是问出来的。', '这堂课讲完，你去实验楼把结论验一遍。'], 'city_uni_main', [18, 6]);
+postStaff('lecturer',  '允之', '讲席讲师', 'scholar',
+  ['讲义我整理了三版，最后一版才是能用的。', '听不懂就问，问到我答不上来才算真学。'], 'city_uni_wing', [15, 6]);
+postStaff('researcher','墨笙', '研究员', 'scholar',
+  ['标本要编号、日期、地点，缺一样都不算数。', '外考察的名额有限，先去把考察笔记交齐。'], 'city_uni_lab', [14, 6]);
+postStaff('student',   '砚白', '书院学员', 'scholar',
+  ['课是难，但熬过去就顺了。', '我打算住书院，省下每天来回的路。'], 'city_uni_dorm', [15, 13]);
+/* 金融与市政 */
+postStaff('banker',    '金簿', '银行襄理', 'merchant',
+  ['活期随时取，定期要等到期，这是规矩。', '利息按日算，推门进来系统自己会结给你看。'], 'city_bank', [16, 6]);
+postStaff('broker',    '行情', '交易所经纪', 'merchant',
+  ['买涨卖跌，最忌讳的是急着定。', '行情每天一刷新，你盯得再紧也慢不过人心。'], 'city_exchange', [20, 12]);
+postStaff('vaultkeeper','金库', '金库看守', 'engineer',
+  ['库门三道锁，两道是铁的，一道是规矩。', '金子放久了也会变轻，是心理作用。'], 'city_gold', [13, 6]);
+postStaff('market_clerk','账房', '市集账房', 'merchant',
+  ['秤在这儿，价签也在这儿，缺一样我都不认。', '大宗采买要填单，散客去柜台那边。'], 'city_market_hall', [19, 6]);
+postStaff('civic_clerk','文书', '市政文书', 'scholar',
+  ['公债凭票领取，税要按季度缴，逾期有滞纳。', '市政的每一笔钱都该有出处，你也可以来查。'], 'city_townhall', [17, 11]);
+
+/* 夜间也留在各自岗位，保证玩家任何时段进屋都看得到人 */
+['boilerman','sawyer','smith_f','miller','shipwright','quay_steward','professor','lecturer',
+ 'researcher','student','banker','broker','vaultkeeper','market_clerk','civic_clerk'
+].forEach(function (id) {
+  var n = NPCS[id]; if (!n) return;
+  var ax = n.schedule[0].x, ay = n.schedule[0].y;
+  var bx = Math.max(3, ax - 5), by = Math.max(3, ay + 4);
+  CITY_STAFF_ROUTINES[id] = [
+    [360, 540, ax, ay],          // 早班：岗位
+    [540, 660, bx, by],          // 上午：巡视/取货
+    [660, 1020, ax, ay],         // 午后：回岗位
+    [1020, 1320, bx, ay]         // 傍晚：整理
+  ];
+  /* postResident 已在上面读过旧表，这里补一次让新作息真正写进 NPCS */
+  postResident(id, n.scene, ax, ay);
+});
+
 function openCityGate(){
   if(exploreState().city){doSwitchScene('city',320,470);return;}
   openWindow({id:'city_gate',kind:'custom',title:'白蔷薇城 · 城市通行证',build:function(b){
@@ -2315,10 +2717,498 @@ var CITY_INFO = {
   post: { name: '驿站邮局', who: '邮递员小翎在分信柜前', desc: '整面墙的分信柜塞满信件，邮袋堆在柜台边，公告板上贴着今日告示。' },
   carriage: { name: '南门马车站', who: '马车夫守着售票处', desc: '装卸台上堆着待发的货，售票处可以直达各街区。' },
   castle: { name: '白蔷薇城堡 · 王座厅', who: '管家塞琳在核对清单', desc: '大理石地面通向王座，四壁挂着旧挂毯，长毯一直铺到大门。' },
-  home: { name: '住处', who: '这里住着一位城市居民', desc: '一张床、一个衣柜和一张餐桌——城里大多数人的家就是这样。' }
+  home: { name: '住处', who: '这里住着一位城市居民', desc: '一张床、一个衣柜和一张餐桌——城里大多数人的家就是这样。' },
+  quay_store: { name: '河岸长条货仓', who: '货栈管事格林在核对着货单', desc: '通长开间里货架一路排到河门，每一格都写着入库的批次号，吊臂正把最后一批麻袋从驳船吊上来。' },
+  sawmill: { name: '东岸锯木厂', who: '老木工海恩守着锯台', desc: '原木垛从北侧滑道滚进来，锯台把整木剖成板材，锯末铺了满地，成品板料靠南门码好等着装车。' },
+  foundry: { name: '白蔷薇铸造车间', who: '铸工加尔在浇铸台边', desc: '两座熔炉同时开着，火光把半间屋子烤得发红，砂型排在铁砧之间，冷却槽里的水还冒着白气。' },
+  watermill: { name: '河湾水力磨坊', who: '磨坊主莉安守着石磨', desc: '水轮从侧渠引水推动磨盘，磨碎的麦粉落进筛网，面袋在墙角堆到房梁，房外就是那条全年不冻的引水渠。' },
+  boiler: { name: '厂区锅炉房', who: '司炉工多恩守着汽机阀台', desc: '锅炉日夜烧着，汽管沿墙爬向全厂，压力表指针抖得厉害，煤堆和出渣口就在炉前。' },
+  shipyard: { name: '船具修理棚', who: '船匠佩里在船架边', desc: '两条船架并排立着，龙骨下面堆着新刨的船板，工具墙上挂满船钉和绳索，棚顶飘着桐油味。' },
+  uni_main: { name: '白蔷薇大学 · 正殿', who: '院长薇拉在注册台后', desc: '穹顶下的长桌成列排开，讲台正对全场，四壁书架顶到屋顶，中央立着奠基人的石像。' },
+  uni_wing: { name: '白蔷薇大学 · 教学楼', who: '讲师莫兰在推开教室门', desc: '两张长桌供研讨，资料室的书架和梯子沿墙排开，抄本的墨味混着窗缝进来的风。' },
+  uni_lab: { name: '自然史实验楼', who: '研究员艾德在记录台边', desc: '标本柜从地面排到齐眉，解剖台和器械台亮着铜件，墙上是整幅的山谷地质图，玻璃瓶里泡着各种标本。' },
+  uni_dorm: { name: '白蔷薇大学 · 宿舍院', who: '舍监布兰奇在院中值夜', desc: '四间卧室围着起居的壁炉，书桌和书架挤在窗边，墙上的告示钉着社团招新和讲堂时刻表。' },
+  bank: { name: '白蔷薇国立银行 · 营业厅', who: '柜员霍兰守着柜台', desc: '大理石柜台隔开内外两侧，后房是账台与票据柜，两只铁箱就锁在门边，账本上的数字一天比一天厚。' },
+  exchange: { name: '谷物交易所 · 报价大厅', who: '经纪人费尔在成交台后', desc: '报价板挂满了当日的麦价、燕价和运费，成交台前挤着议价的人，角落里的样品袋按产地分堆码着。' },
+  gold: { name: '金库与票据所', who: '库管薇妮守着票据所柜台', desc: '外间清点票据，内间才是金库——两只银箱一左一右，账柜锁着上一季的全部存契。' },
+  market_hall: { name: '中央市场大厅', who: '管理员克洛在管理处窗口', desc: '通高的交易层里五条摊位列排开，订单板钉满当日的货源，收货口那边堆着刚卸下来的筐和桶，人声从早上吵到打烊。' },
+  civic: { name: '市政厅', who: '书记官南德在服务台后', desc: '议事长桌居中，两侧公示板贴着本月的税册和工程告示，墙上的市徽下压着历任市长的名录。' }
 };
 function openCityService(it) {
   var s = it.service, info = CITY_INFO[s] || CITY_INFO.home;
+
+  /* ============ 城市产业链工具 ============
+     下面 15 个地标服务共用三个小工具，保持与既有服务一致的
+     "扣材料 / 扣体力 / 推进时间 / 给产出" 事务模型。 */
+
+  /* 完成一次加工：扣料、扣体力、耗时、结算、存档 */
+  function cityWork(opts) {
+    var need = opts.need || [];
+    var outQty = opts.qty || 1;
+    for (var i = 0; i < need.length; i++) {
+      if (invCount(need[i][0]) < need[i][1]) {
+        toast('材料不够：' + itemName(need[i][0]) + ' ×' + need[i][1] + '（现有 ' + invCount(need[i][0]) + '）。');
+        return false;
+      }
+    }
+    if (state.energy < (opts.energy || 0)) { toast('太累了，体力不足。'); return false; }
+    /* 先确认产物放得下，再扣材料/体力/时间，避免"料被扣光却没拿到东西" */
+    if (!bagAccepts(opts.out, outQty)) { toast('背包满了，产物放不下。'); return false; }
+    for (i = 0; i < need.length; i++) invRemove(need[i][0], need[i][1]);
+    state.energy -= (opts.energy || 0);
+    state.timeMinutes = Math.min(CFG.dayEnd, state.timeMinutes + (opts.minutes || 30));
+    invAdd(opts.out, outQty);
+    markDirty(); refreshHud(); saveNow(); refreshWindow();
+    toast((opts.done || '完成了') + '，获得 ' + itemName(opts.out) + ' ×' + outQty + '。');
+    return true;
+  }
+  /* 列出背包里某组材料，供"卖 X"按钮用 */
+  function sellRow(b, ids, markup) {
+    var row = el('div', 'row'), any = false;
+    ids.forEach(function (id) {
+      var n = invCount(id);
+      if (!n) return;
+      any = true;
+      var p = Math.round((ITEMS[id].sell || 0) * markup);
+      row.appendChild(mkBtn('卖出 ' + itemName(id) + ' ×' + n + ' · ' + (p * n) + ' 金', '', function () {
+        invRemove(id, n); state.coins += p * n;
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('结算 ' + itemName(id) + ' ×' + n + '，得 ' + (p * n) + ' 金。');
+      }));
+    });
+    if (any) b.appendChild(row);
+    return any;
+  }
+
+  /* 主体：牌示 + 背包内可用材料一览 */
+  function workWindow(id, title, desc, who, recipeRows, sellIds, sellNote) {
+    openWindow({ id: 'city_' + id, kind: 'custom', title: title, build: function (b) {
+      b.appendChild(el('p', null, desc));
+      b.appendChild(el('p', 'muted', who + '。'));
+      recipeRows(b);
+      b.appendChild(el('hr'));
+      b.appendChild(el('p', 'strong', '代收外货'));
+      if (!sellRow(b, sellIds, 1.15)) b.appendChild(el('p', 'muted', '背包里没有这里收的货。'));
+      else b.appendChild(el('p', 'muted', sellNote || '按高于镇价 15% 结算。'));
+    }, actions: [{ label: '离开', close: true }] });
+  }
+
+  /* ---------- 工业：锅炉房（燃料是第一道关口）---------- */
+  if (s === 'boiler') {
+    workWindow('boiler', info.name, info.desc, info.who, function (b) {
+      b.appendChild(el('p', 'strong', '司炉作业'));
+      b.appendChild(el('p', 'muted', '整个厂区的蒸汽都从这里出。烧煤火力足，但要人守着；烧柴省煤，管事不太满意。'));
+      var row = el('div', 'row');
+      row.appendChild(mkBtn('烧煤两时辰 → 煤块 ×4 · 体力 12', '', function () {
+        if (cityWork({ need: [['wood', 2]], out: 'coal', qty: 4, energy: 12, minutes: 120, done: '炉火烧了两个时辰' })) { }
+      }));
+      row.appendChild(mkBtn('投木一炉 → 木炭 ×3 · 体力 8', '', function () {
+        cityWork({ need: [['wood', 2]], out: 'charcoal', qty: 3, energy: 8, minutes: 90, done: '闷出一炉木炭' });
+      }));
+      b.appendChild(row);
+    }, ['iron_ore', 'copper_ore', 'gem'], '矿料按矿价加 15% 收。');
+    return;
+  }
+
+  /* ---------- 工业：锯木厂（原木→板材）---------- */
+  if (s === 'sawmill') {
+    workWindow('sawmill', info.name, info.desc, info.who, function (b) {
+      b.appendChild(el('p', 'strong', '锯台作业'));
+      b.appendChild(el('p', 'muted', '整木推上锯台，按尺寸剖成板材。剖得越厚越费体力，但成品更值钱。'));
+      var row = el('div', 'row');
+      row.appendChild(mkBtn('细剖 ×6 板材 · 木材 2 · 体力 10', '', function () {
+        cityWork({ need: [['wood', 2]], out: 'plank', qty: 6, energy: 10, minutes: 60, done: '锯出一批细板' });
+      }));
+      row.appendChild(mkBtn('厚剖 ×3 板材 · 木材 3 · 体力 16', '', function () {
+        cityWork({ need: [['wood', 3]], out: 'plank', qty: 3, energy: 16, minutes: 75, done: '剖出几块厚板' });
+      }));
+      b.appendChild(row);
+    }, ['wood', 'mushroom', 'berry'], '林料与山货顺带收购。');
+    return;
+  }
+
+  /* ---------- 工业：铸造车间（矿→锭→铸件，本链核心）---------- */
+  if (s === 'foundry') {
+    workWindow('foundry', info.name, info.desc, info.who, function (b) {
+      b.appendChild(el('p', 'strong', '熔铸作业'));
+      b.appendChild(el('p', 'muted', '开炉要炭，铸铁要矿，钢还得回炉百炼——越往下一道，炉温越高，代价也越大。'));
+      var r1 = el('div', 'row');
+      r1.appendChild(mkBtn('熔铜 → 铜锭 ×3 · 铜矿 3 + 炭 1 · 体力 14', '', function () {
+        cityWork({ need: [['copper_ore', 3], ['charcoal', 1]], out: 'copper_ingot', qty: 3, energy: 14, minutes: 90, done: '铜液浇成锭' });
+      }));
+      r1.appendChild(mkBtn('熔铁 → 铁锭 ×2 · 铁矿 3 + 炭 1 · 体力 18', '', function () {
+        cityWork({ need: [['iron_ore', 3], ['charcoal', 1]], out: 'iron_ingot', qty: 2, energy: 18, minutes: 90, done: '铁水浇成锭' });
+      }));
+      b.appendChild(r1);
+      var r2 = el('div', 'row');
+      r2.appendChild(mkBtn('百炼成钢 ×1 · 铁锭 2 + 炭 1 · 体力 26', '', function () {
+        cityWork({ need: [['iron_ingot', 2], ['charcoal', 1]], out: 'steel_ingot', qty: 1, energy: 26, minutes: 120, done: '炉火里炼出钢锭' });
+      }));
+      r2.appendChild(mkBtn('浇铸齿轮 ×2 · 铁锭 1 + 铜锭 1 · 体力 22', '', function () {
+        cityWork({ need: [['iron_ingot', 1], ['copper_ingot', 1]], out: 'cast_gear', qty: 2, energy: 22, minutes: 90, done: '砂型里铸出齿轮' });
+      }));
+      b.appendChild(r2);
+    }, ['copper_ore', 'iron_ore'], '矿石常年收购，量大从优。');
+    return;
+  }
+
+  /* ---------- 工业：河湾水力磨坊（水轮磨面，磨坊自收自产小麦）---------- */
+  if (s === 'watermill') {
+    workWindow('watermill', info.name, info.desc, info.who, function (b) {
+      var ex = exploreState();
+      /* 磨坊自有麦仓：每日首次推门补一袋，取走即空，次日再补 */
+      if (ex.millDay !== state.totalDay) { ex.millDay = state.totalDay; ex.millStock = 6; saveNow(); }
+      b.appendChild(el('p', 'strong', '磨坊作业'));
+      b.appendChild(el('p', 'muted', '水轮一开就不用停，磨到天黑。'));
+      b.appendChild(el('p', null, '门前麦仓：' + (ex.millStock || 0) + ' 斗小麦（每日补一次，最多 6 斗）。'));
+      var r1 = el('div', 'row');
+      r1.appendChild(mkBtn('磨面 ×4 · 麦 2 · 体力 10 · 一个半时辰', '', function () {
+        if ((ex.millStock || 0) < 2) { toast('麦仓空了，明天再来。'); return; }
+        var okMill = ex.millStock - 2; /* 先确认产物体积，再扣麦 */
+        if (!bagAccepts('flour', 4)) { toast('背包满了，面粉放不下。'); return; }
+        ex.millStock = okMill;
+        cityWork({ out: 'flour', qty: 4, energy: 10, minutes: 90, done: '水轮磨出四袋面' });
+      }));
+      r1.appendChild(mkBtn('加磨一整夜 → 面粉 ×10 · 麦 4 · 体力 24', '', function () {
+        if ((ex.millStock || 0) < 4) { toast('麦仓不够，明日再来。'); return; }
+        if (!bagAccepts('flour', 10)) { toast('背包满了，面粉放不下。'); return; }
+        ex.millStock -= 4;
+        cityWork({ out: 'flour', qty: 10, energy: 24, minutes: 240, done: '水轮磨了一夜' });
+      }));
+      b.appendChild(r1);
+      b.appendChild(el('p', 'muted', '磨好的面粉可直接送往交易所或中央市场出手。'));
+    }, ['flour', 'potato', 'grain'], '面粉与粗粮代为转卖。');
+    return;
+  }
+
+  /* ---------- 工业：船具修理棚（板材+铁→铁甲板/船具）---------- */
+  if (s === 'shipyard') {
+    workWindow('shipyard', info.name, info.desc, info.who, function (b) {
+      b.appendChild(el('p', 'strong', '船坞作业'));
+      b.appendChild(el('p', 'muted', '修船要钉得密，铁甲板一艘就废掉十几块料。船匠只接做好的活，不收散件。'));
+      var row = el('div', 'row');
+      row.appendChild(mkBtn('铆铁甲板 ×1 · 铁锭 2 + 板材 2 · 体力 30', '', function () {
+        cityWork({ need: [['iron_ingot', 2], ['plank', 2]], out: 'ironclad', qty: 1, energy: 30, minutes: 150, done: '船匠铆完一块装甲' });
+      }));
+      row.appendChild(mkBtn('赶制船板 ×8 · 原木 3 · 体力 12', '', function () {
+        cityWork({ need: [['timber', 3]], out: 'plank', qty: 8, energy: 12, minutes: 60, done: '赶出八块船板' });
+      }));
+      b.appendChild(row);
+    }, ['fish_bass', 'fish_silver', 'salt_fish'], '船上带的粗口粮也收。');
+    return;
+  }
+
+  /* ---------- 工业：河岸长条货仓（整条链的集散地，溢价收货）---------- */
+  if (s === 'quay_store') {
+    workWindow('quay_store', info.name, info.desc, info.who, function (b) {
+      b.appendChild(el('p', 'strong', '堆栈代管'));
+      b.appendChild(el('p', 'muted', '管事按整批结算，不零卖。工业品、板材、铸件在这里出手价比城里高一成，因为下游都从这里进货。'));
+      b.appendChild(el('p', 'muted', '（仓储本身不加工：把成品送来换钱即可。）'));
+    }, ['plank', 'cast_gear', 'steel_ingot', 'ironclad', 'flour', 'coal', 'charcoal', 'bread_batch', 'salt_fish'], '工业品代存代销，溢价 15%。');
+    return;
+  }
+
+  /* ---------- 大学：正殿（注册/修业/讲授，手抄本主产线）---------- */
+  if (s === 'uni_main') {
+    workWindow('uni_main', info.name, info.desc, info.who, function (b) {
+      b.appendChild(el('p', 'strong', '注册与修业'));
+      b.appendChild(el('p', 'muted', '入学先交束脩，抄讲义按页计酬。讲席不同，出手的东西也不同。'));
+      var r1 = el('div', 'row');
+      r1.appendChild(mkBtn('听讲并抄录 → 手抄本 ×1 · 体力 14', '', function () {
+        cityWork({ out: 'manuscript', qty: 1, energy: 14, minutes: 120, done: '抄完一册讲义' });
+      }));
+      r1.appendChild(mkBtn('通宵精抄 → 手抄本 ×2 · 体力 26', '', function () {
+        cityWork({ out: 'manuscript', qty: 2, energy: 26, minutes: 180, done: '熬夜抄出两册' });
+      }));
+      b.appendChild(r1);
+      var r2 = el('div', 'row');
+      r2.appendChild(mkBtn('旁听进阶课 · 60 金 · 体力 20', '', function () {
+        if (state.energy < 20) { toast('太累了，体力不足。'); return; }
+        if (!bagAccepts('translation', 1)) { toast('背包满了，放不下译稿。'); return; }
+        if (!payExplore({ coins: 60 })) return;
+        state.energy -= 20; state.timeMinutes = Math.min(CFG.dayEnd, state.timeMinutes + 150);
+        invAdd('translation', 1); markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('进阶课结业，院长给了你一份译稿。');
+      }));
+      b.appendChild(r2);
+    }, ['manuscript', 'field_note'], '讲义与笔记可转卖给其他学生。');
+    return;
+  }
+
+  /* ---------- 大学：教学楼（研讨，译稿主产线）---------- */
+  if (s === 'uni_wing') {
+    workWindow('uni_wing', info.name, info.desc, info.who, function (b) {
+      b.appendChild(el('p', 'strong', '研讨与译介'));
+      b.appendChild(el('p', 'muted', '译古文献最费工夫，但也是最拿得出手的成果——图书馆按页付酬，一页抵十册抄本。'));
+      var row = el('div', 'row');
+      row.appendChild(mkBtn('校订译稿 ×1 · 手抄本 2 · 体力 24', '', function () {
+        cityWork({ need: [['manuscript', 2]], out: 'translation', qty: 1, energy: 24, minutes: 150, done: '校出一份译稿' });
+      }));
+      row.appendChild(mkBtn('通译一卷 ×1 · 手抄本 4 · 体力 40', '', function () {
+        cityWork({ need: [['manuscript', 4]], out: 'translation', qty: 1, energy: 40, minutes: 240, done: '译完一整卷' });
+      }));
+      b.appendChild(row);
+    }, ['manuscript', 'translation'], '同门之间可互相传抄。');
+    return;
+  }
+
+  /* ---------- 大学：实验楼（考察笔记主产线，兼收标本）---------- */
+  if (s === 'uni_lab') {
+    workWindow('uni_lab', info.name, info.desc, info.who, function (b) {
+      b.appendChild(el('p', 'strong', '实证与考察'));
+      b.appendChild(el('p', 'muted', '光看书不够，得下矿坑、上山崖。实地记录的考察笔记比任何抄本都值钱。'));
+      var r1 = el('div', 'row');
+      r1.appendChild(mkBtn('室内标本整理 → 考察笔记 ×1 · 体力 12', '', function () {
+        cityWork({ out: 'field_note', qty: 1, energy: 12, minutes: 90, done: '整理出一册考察笔记' });
+      }));
+      r1.appendChild(mkBtn('随队出外考察 → 考察笔记 ×2 · 体力 30', '', function () {
+        cityWork({ out: 'field_note', qty: 2, energy: 30, minutes: 240, done: '实地考察带回两册笔记' });
+      }));
+      b.appendChild(r1);
+      b.appendChild(el('p', 'muted', '标本与矿石也可在此寄售。'));
+    }, ['iron_ore', 'copper_ore', 'gem', 'mushroom'], '标本与矿样由实验室按研究价收。');
+    return;
+  }
+
+  /* ---------- 大学：宿舍院（休整回体力，兼卖旧讲义）---------- */
+  if (s === 'uni_dorm') {
+    openWindow({ id: 'city_uni_dorm', kind: 'custom', title: info.name, build: function (b) {
+      b.appendChild(el('p', null, info.desc));
+      b.appendChild(el('p', 'muted', info.who + '。住一晚不要钱，舍监只要求你天黑前别把院子弄得像被抄了。'));
+      var row = el('div', 'row');
+      row.appendChild(mkBtn('歇一夜 · 恢复 45 点体力 · 费一夜', '', function () {
+        if (state.energy >= CFG.maxEnergy) { toast('现在并不累。'); return; }
+        var got = Math.min(45, CFG.maxEnergy - state.energy);
+        state.energy += got;
+        state.timeMinutes = Math.min(CFG.dayEnd, state.timeMinutes + 60);
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('睡了一觉，恢复 ' + got + ' 点体力。');
+      }));
+      b.appendChild(row);
+      b.appendChild(el('hr'));
+      b.appendChild(el('p', 'strong', '转卖旧讲义'));
+      if (!sellRow(b, ['manuscript', 'field_note'], 0.75)) b.appendChild(el('p', 'muted', '你手上没有可以转手的笔记。'));
+      else b.appendChild(el('p', 'muted', '旧讲义在这里只能按七五折出手，抄得越多亏得越多。'));
+    }, actions: [{ label: '离开', close: true }] });
+    return;
+  }
+
+  /* ---------- 金融：国立银行（存贷/兑付，本线枢纽）---------- */
+  if (s === 'bank') {
+    openWindow({ id: 'city_bank', kind: 'custom', title: info.name, build: function (b) {
+      var ex = exploreState();
+      /* --- 推门先结息：整日利息按 1% 累进，封顶 100 日，避免多年不归一次爆息 --- */
+      var dep = Math.max(0, Math.floor(ex.bankDeposit || 0));
+      var since = Math.max(0, Math.floor(ex.bankDay == null ? state.totalDay : ex.bankDay));
+      var days = Math.max(0, state.totalDay - since);
+      if (dep > 0 && days > 0) {
+        var cap = Math.min(days, 100);
+        var interest = Math.floor(dep * 0.01 * cap);
+        ex.bankDeposit = dep + interest;
+        ex.bankDay = state.totalDay;
+        dep = ex.bankDeposit;
+        markDirty(); saveNow();
+        b.appendChild(el('p', 'req-chip ok', '结算 ' + cap + ' 日利息 ' + interest + ' 金。'));
+      } else if (dep > 0 && ex.bankDay == null) {
+        ex.bankDay = state.totalDay; saveNow();
+      }
+      b.appendChild(el('p', null, info.desc));
+      b.appendChild(el('p', 'muted', info.who + '。'));
+      b.appendChild(el('p', 'strong', '存单与兑付'));
+      b.appendChild(el('p', null, '活期存金：' + dep + ' 金（日息一分，累计至第 ' + (ex.bankDay == null ? state.totalDay : ex.bankDay) + ' 日）。'));
+      var r1 = el('div', 'row');
+      r1.appendChild(mkBtn('存入 100 金', '', function () {
+        if (!payExplore({ coins: 100 })) return;
+        ex.bankDeposit = (ex.bankDeposit || 0) + 100;
+        if (ex.bankDay == null) ex.bankDay = state.totalDay;
+        markDirty(); saveNow(); refreshWindow();
+        toast('存入 100 金。');
+      }));
+      r1.appendChild(mkBtn('取出全部 ' + dep + ' 金', '', function () {
+        if (!dep) { toast('存折是空的。'); return; }
+        state.coins += dep; ex.bankDeposit = 0; ex.bankDay = state.totalDay;
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('取出 ' + dep + ' 金。');
+      }));
+      b.appendChild(r1);
+      b.appendChild(el('hr'));
+      b.appendChild(el('p', 'strong', '票据兑付'));
+      var bills = ['bill', 'share_cert', 'warehouse_deed', 'bond'];
+      var any = false, row2 = el('div', 'row');
+      bills.forEach(function (id) {
+        var n = invCount(id); if (!n) return; any = true;
+        var p = Math.round((ITEMS[id].sell || 0) * 1.45);
+        row2.appendChild(mkBtn('兑付 ' + itemName(id) + ' ×' + n + ' → ' + (p * n) + ' 金', '', function () {
+          invRemove(id, n); state.coins += p * n;
+          markDirty(); refreshHud(); saveNow(); refreshWindow();
+          toast('银行按票面另加贴水，兑得 ' + (p * n) + ' 金。');
+        }));
+      });
+      if (!any) b.appendChild(el('p', 'muted', '你手上没有可兑付的票据。'));
+      else b.appendChild(row2);
+      b.appendChild(el('hr'));
+      b.appendChild(el('p', 'strong', '抵押借款'));
+      b.appendChild(el('p', 'muted', '典当契据或公债可当场支现款；赎当须按本金加一成息银，原物归还。'));
+      var r3 = el('div', 'row');
+      [['warehouse_deed', 500], ['bond', 420]].forEach(function (pair) {
+        var id = pair[0], amt = pair[1];
+        r3.appendChild(mkBtn('典当' + itemName(id) + ' → 支取 ' + amt + ' 金', '', function () {
+          if (!invCount(id)) { toast('你手上没有' + itemName(id) + '。'); return; }
+          invRemove(id, 1);
+          if (!ex.pledges) ex.pledges = [];
+          ex.pledges.push({ id: id, amt: amt, day: state.totalDay });
+          state.coins += amt;
+          markDirty(); refreshHud(); saveNow(); refreshWindow();
+          toast('典当' + itemName(id) + '，支取 ' + amt + ' 金。');
+        }));
+      });
+      b.appendChild(r3);
+      /* --- 赎当：取出典当时仍在库中的那一件 --- */
+      if (ex.pledges && ex.pledges.length) {
+        b.appendChild(el('p', 'strong', '在押之物'));
+        var prow = el('div', 'row');
+        ex.pledges.forEach(function (p, i) {
+          var due = p.amt + Math.floor(p.amt * 0.1);
+          prow.appendChild(mkBtn('赎回' + itemName(p.id) + ' · ' + due + ' 金', '', function () {
+            if (!bagAccepts(p.id, 1)) { toast('背包满了，放不下赎物。'); return; }
+            if (!payExplore({ coins: due })) return;
+            invAdd(p.id, 1);
+            ex.pledges.splice(i, 1);
+            markDirty(); refreshHud(); saveNow(); refreshWindow();
+            toast('赎回了' + itemName(p.id) + '。');
+          }));
+        });
+        b.appendChild(prow);
+      }
+    }, actions: [{ label: '离开', close: true }] });
+    return;
+  }
+
+  /* ---------- 金融：谷物交易所（行情涨跌，粮食变现主口）---------- */
+  if (s === 'exchange') {
+    openWindow({ id: 'city_exchange', kind: 'custom', title: info.name, build: function (b) {
+      b.appendChild(el('p', null, info.desc));
+      b.appendChild(el('p', 'muted', info.who + '。'));
+      b.appendChild(el('p', 'strong', '今日行情'));
+      var ex = exploreState();
+      if (typeof ex.grainIndex !== 'number') ex.grainIndex = 0;
+      var idx = ex.grainIndex;
+      b.appendChild(el('p', null, '粮价指数：' + (idx >= 0 ? '涨 ' + idx : '跌 ' + (-idx)) + ' 成（连续查价会推动行情）。'));
+      var quotes = [['flour', '面粉'], ['potato', '土豆'], ['strawberry', '草莓'], ['jam', '莓果酱'], ['bread_batch', '长列黑麦面包']];
+      var row = el('div', 'row'), any = false;
+      quotes.forEach(function (q) {
+        var id = q[0], n = invCount(id); if (!n) return; any = true;
+        var base = ITEMS[id].sell || 0;
+        var p = Math.max(1, Math.round(base * (1.25 + idx * 0.04)));
+        row.appendChild(mkBtn('卖出 ' + q[1] + ' ×' + n + ' → ' + (p * n) + ' 金', '', function () {
+          invRemove(id, n); state.coins += p * n;
+          markDirty(); refreshHud(); saveNow(); refreshWindow();
+          toast('按当日行情卖出' + itemName(id) + '，得 ' + (p * n) + ' 金。');
+        }));
+      });
+      if (!any) b.appendChild(el('p', 'muted', '背包里没有可以上市的粮食。'));
+      else b.appendChild(row);
+      b.appendChild(el('hr'));
+      b.appendChild(el('p', 'strong', '行情看盘'));
+      b.appendChild(el('p', 'muted', '打听行情要花一点时间，但能看出明天涨还是跌。'));
+      var r2 = el('div', 'row');
+      r2.appendChild(mkBtn('看盘 · 费半个时辰', '', function () {
+        state.timeMinutes = Math.min(CFG.dayEnd, state.timeMinutes + 30);
+        var d = Math.floor(Math.random() * 3) - 1;
+        ex.grainIndex = Math.max(-5, Math.min(5, ex.grainIndex + d));
+        markDirty(); saveNow(); refreshWindow();
+        toast(d > 0 ? '南线减产，明日看涨。' : d < 0 ? '外地粮车到了，明日看跌。' : '市面平稳，行情未动。');
+      }));
+      b.appendChild(r2);
+      b.appendChild(el('hr'));
+      b.appendChild(el('p', 'strong', '发行份额'));
+      b.appendChild(el('p', 'muted', '拿工业品和粮食作保，可以认购交易所股票。'));
+      var r3 = el('div', 'row');
+      r3.appendChild(mkBtn('认购股票 ×1 · 200 金 + 面粉 2', '', function () {
+        if (invCount('flour') < 2) { toast('需要面粉 ×2 作保。'); return; }
+        if (!bagAccepts('share_cert', 1)) { toast('背包满了，放不下股票。'); return; }
+        if (!payExplore({ coins: 200 })) return;
+        invRemove('flour', 2); invAdd('share_cert', 1);
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('认购成功，拿到一份交易所股票。');
+      }));
+      b.appendChild(r3);
+    }, actions: [{ label: '离开', close: true }] });
+    return;
+  }
+
+  /* ---------- 金融：金库与票据所（票据发行，全线起点）---------- */
+  if (s === 'gold') {
+    workWindow('gold', info.name, info.desc, info.who, function (b) {
+      b.appendChild(el('p', 'strong', '票据与存契'));
+      b.appendChild(el('p', 'muted', '库管只认实物作保：工业品押得出期票，粮食押得出货栈契据。'));
+      var r1 = el('div', 'row');
+      r1.appendChild(mkBtn('开商业票据 ×1 · 铜锭 2 · 体力 10', '', function () {
+        cityWork({ need: [['copper_ingot', 2]], out: 'bill', qty: 1, energy: 10, minutes: 60, done: '开出一张商业票据' });
+      }));
+      r1.appendChild(mkBtn('立货栈契据 ×1 · 板材 4 · 体力 12', '', function () {
+        cityWork({ need: [['plank', 4]], out: 'warehouse_deed', qty: 1, energy: 12, minutes: 60, done: '立下一份货栈契据' });
+      }));
+      b.appendChild(r1);
+    }, ['bill', 'share_cert'], '旧票据在这里贴现，按九折。');
+    return;
+  }
+
+  /* ---------- 金融：中央市场大厅（零售，食品与消耗品补给）---------- */
+  if (s === 'market_hall') {
+    openWindow({ id: 'city_market_hall', kind: 'custom', title: info.name, build: function (b) {
+      b.appendChild(el('p', null, info.desc));
+      b.appendChild(el('p', 'muted', info.who + '。'));
+      b.appendChild(el('p', 'strong', '大宗采购'));
+      var r1 = el('div', 'row');
+      r1.appendChild(mkBtn('长列黑麦面包 ×3 · 100 金', '', function () {
+        if (!bagAccepts('bread_batch', 3)) { toast('背包满了。'); return; }
+        if (payExplore({ coins: 100 })) { invAdd('bread_batch', 3); markDirty(); refreshHud(); saveNow(); refreshWindow(); toast('买下三条商用面包。'); }
+      }));
+      r1.appendChild(mkBtn('盐渍鲱鱼 ×2 · 80 金', '', function () {
+        if (!bagAccepts('salt_fish', 2)) { toast('背包满了。'); return; }
+        if (payExplore({ coins: 80 })) { invAdd('salt_fish', 2); markDirty(); refreshHud(); saveNow(); refreshWindow(); toast('买下两桶盐渍鲱鱼。'); }
+      }));
+      b.appendChild(r1);
+      b.appendChild(el('hr'));
+      b.appendChild(el('p', 'strong', '代客分销'));
+      b.appendChild(el('p', 'muted', '把小宗货交给市场代销，价钱比镇上高，但比货栈低。'));
+      if (!sellRow(b, ['plank', 'flour', 'bread_batch', 'salt_fish', 'charcoal', 'coal'], 1.3))
+        b.appendChild(el('p', 'muted', '背包里没有可代销的货。'));
+      else b.appendChild(el('p', 'muted', '代销按高于镇价 30% 结算。'));
+    }, actions: [{ label: '离开', close: true }] });
+    return;
+  }
+
+  /* ---------- 金融：市政厅（税册、公债、公告）---------- */
+  if (s === 'civic') {
+    openWindow({ id: 'city_civic', kind: 'custom', title: info.name, build: function (b) {
+      b.appendChild(el('p', null, info.desc));
+      b.appendChild(el('p', 'muted', info.who + '。'));
+      b.appendChild(el('p', 'strong', '市政工程公债'));
+      b.appendChild(el('p', 'muted', '本季修河堤与铺南街，公债随时可兑，年息一分。'));
+      var r1 = el('div', 'row');
+      r1.appendChild(mkBtn('认购公债 ×1 · 150 金', '', function () {
+        if (!bagAccepts('bond', 1)) { toast('背包满了。'); return; }
+        if (payExplore({ coins: 150 })) { invAdd('bond', 1); markDirty(); refreshHud(); saveNow(); refreshWindow(); toast('认购一份市政公债。'); }
+      }));
+      b.appendChild(r1);
+      b.appendChild(el('hr'));
+      b.appendChild(el('p', 'strong', '税册与公示'));
+      var ex = exploreState();
+      var tax = Math.round((state.coins + ex.bankDeposit) * 0.02);
+      b.appendChild(el('p', null, '本季应缴人头税约 ' + tax + ' 金。'));
+      var r2 = el('div', 'row');
+      r2.appendChild(mkBtn('缴纳税金 · ' + tax + ' 金', '', function () {
+        if (!payExplore({ coins: tax })) return;
+        ex.taxPaid = true;
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('税已缴清，书记官在回执上盖了印。');
+      }));
+      b.appendChild(r2);
+    }, actions: [{ label: '离开', close: true }] });
+    return;
+  }
   if (s === 'bakery') { openWindow({ id: 'bread_shop', kind: 'custom', title: info.name, build: function (b) { b.appendChild(el('p', null, '乡村面包 · 30 金一个，食用恢复 25 点体力。')); b.appendChild(el('p', 'muted', info.desc)); }, actions: [{ label: '买一个面包 · 30 金', close: false, onClick: function () { if (!bagAccepts('bread', 1)) { toast('背包满了。'); return; } if (payExplore({ coins: 30 })) { invAdd('bread', 1); markDirty(); refreshHud(); toast('买到了一个热面包。'); } } }, { label: '离开', close: true }] }); return; }
   if (s === 'smith') { openWindow({id:'city_smith',kind:'custom',title:info.name,build:function(b){b.appendChild(el('p',null,info.desc));b.appendChild(el('p','muted',info.who+'。'));appendCityStoryCard(b,'forge');},actions:[{label:exploreState().tools?'查看工具状态':'查看钢制工具升级',kind:'primary',close:false,onClick:function(){closeWindow();openExploreSite('tools');}},{label:'离开',close:true}]});return; }
   /* 茶室：付钱坐下喝茶，回体力并花掉一点时间 */
@@ -2656,8 +3546,21 @@ var arch=b.archetype||CITY_ARCHETYPES.oldtown[0];
     px(g,roofX+roofW/2-9,roofTop+roofH-8,18,8,'#A9C4C6');
   }else drawSteppedGable(g,roofX,roofTop,roofW,roofH,palette.roof,palette.edge);
   // 烟囱数量来自家族：厂房的烟囱多且高，门楼与教堂没有。
+  // 横向位置按 faceW 比例排布：建筑从 13 格（议事厅）到 30 格（中央市场）跨度近一倍，
+  // 固定像素偏移会让宽建筑的烟囱掉到墙外、窄建筑挤在墙沿，故按宽度百分比贴到右侧留白内。
   var stacks=arch.chimney||0;
-  for(var ci=0;ci<stacks;ci++)chimney(left+faceW-22-ci*16,9,arch.stack?30:17,palette.edge);
+  if(stacks>0){
+    var stackW=faceW>=90?11:9;                 // 大跨度厂房加宽烟囱身
+    var rise=arch.stack?30:17;
+    // 右起第一个烟囱距右墙 12%~18%，后续向左等距展开，整体不越过左墙 + 8px
+    var inset=Math.max(10,Math.round(faceW*0.14));
+    var step=stackW+Math.max(5,Math.round(faceW*0.045));
+    for(var ci=0;ci<stacks;ci++){
+      var cx=left+faceW-inset-ci*step;
+      if(cx-stackW<left+8)break;              // 排不下就停，绝不越出墙体左缘
+      chimney(cx,stackW,rise,palette.edge);
+    }
+  }
   if(arch.tower)for(var tw=0;tw<arch.tower;tw++){var twi=left+6+tw*Math.floor((faceW-20)/Math.max(1,arch.tower));px(g,twi,roofTop-Math.floor(totalH*0.18),12,Math.floor(totalH*0.2),'#CFC7B2');px(g,twi-2,roofTop-Math.floor(totalH*0.18)-4,16,5,palette.roof);}
   if(arch.spire)px(g,left+faceW/2-3,roofTop-26,6,26,'#C7BFAC');
   if(arch.colonnade)colonnade(left+4,baseY-30,faceW-8,30,'#E4DCC4');
@@ -2701,7 +3604,7 @@ var arch=b.archetype||CITY_ARCHETYPES.oldtown[0];
     for(var aw=left+8;aw<left+faceW-12;aw+=12)px(g,aw,baseY-31,5,8,'#E5D1B2');
   }
   if(b.kind==='workshop'){
-    chimney(left+faceW-34,14,26,'#5E6260');
+    chimney(left+faceW-Math.max(24,Math.round(faceW*0.20)),14,26,'#5E6260');
     px(g,left+10,wallTop+5,faceW-30,12,'#4A554E');
   }
   if(b.kind==='library'){
@@ -2974,6 +3877,174 @@ var CITY_PROPS = {
     pb(g, r, 21, H - 12, 15, 12, '#B08A5E'); pb(g, r, 21, H - 12, 15, 2, '#C4A57C');
     pb(g, r, 23, H - 8, 11, 1, '#7E5C40');
     if (W > 40) { pb(g, r, 38, H - 20, 16, 20, '#9C8256'); pb(g, r, 38, H - 20, 16, 2, '#B08A5E'); }
+  },
+  /* ---------- 金融 / 市政 专用家具 ----------
+     这一批是白蔷薇城 15 栋（银行、交易所、金库、中央市场、市政厅、书院校区、
+     码头货栈）此前引用却在 CITY_PROPS 里查不到的类型。查表渲染 CITY_PROPS[p.t]
+     时找不到就静默跳过，于是这些房间的家具整体消失，看上去"空、且都一样"。
+     补齐后各栋按自身职能摆出不同的陈设。                                  */
+  desk: function (g, r) {                              /* 银行/金库：胡桃木办公桌 */
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 12, W, H - 12, '#6B4A32');
+    pb(g, r, 0, 12, W, 3, '#8C6544');
+    pb(g, r, 0, H - 10, W, 4, '#4E3624');
+    pb(g, r, 3, 4, W - 6, 8, '#C9B48A');               /* 后档板 */
+    for (var i = 4; i < W - 6; i += 12) pb(g, r, i, 5, 2, 6, '#A08A62');
+    pb(g, r, W / 2 - 7, 16, 14, 9, '#F3EBD4');          /* 账簿 */
+    pb(g, r, W / 2 - 5, 17, 10, 6, '#E2D5B4');
+    pb(g, r, 6, 18, 8, 6, '#8FA9B4');                   /* 墨水瓶 */
+    pb(g, r, W - 15, 18, 7, 5, '#B98A4E');             /* 印泥盒 */
+  },
+  table: function (g, r) {                              /* 素面长条木桌 */
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 10, W, 5, '#8A6B4C');
+    pb(g, r, 0, 10, W, 2, '#A9855C');
+    pb(g, r, 0, 15, W, 4, '#7A5C3E');
+    for (var lx = 3; lx < W - 6; lx += Math.max(12, Math.floor((W - 8) / 4)))
+      pb(g, r, lx, 19, 4, Math.max(6, H - 26), '#6B4A32');
+  },
+  banner: function (g, r) {                             /* 悬挂锦旗：徽记用对角菱 */
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, W, 3, '#5A4A3A');
+    pb(g, r, 1, 3, W - 2, H - 8, '#7C2B36');           /* 旗面 */
+    pb(g, r, 1, 3, W - 2, 2, '#A04050');
+    pb(g, r, W / 2 - 1, 3, 2, H - 8, '#E0C073');       /* 中脊 */
+    var cx = W / 2, cy = 3 + (H - 8) / 2;
+    pb(g, r, cx - 7, cy - 7, 14, 14, '#E8D9A8');       /* 菱形徽记 */
+    pb(g, r, cx - 4, cy - 4, 8, 8, '#7C2B36');
+    pb(g, r, cx - 1, cy - 1, 2, 2, '#E8D9A8');
+    pb(g, r, 1, H - 5, W - 2, 2, '#5A1F26');           /* 下摆 */
+  },
+  statue: function (g, r) {                             /* 石雕：基座 + 披风人形 */
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, W / 2 - 13, H - 12, 26, 12, '#9E9A90');   /* 基座 */
+    pb(g, r, W / 2 - 15, H - 14, 30, 3, '#B4B0A6');
+    pb(g, r, W / 2 - 8, H - 34, 16, 22, '#BDB9AF');    /* 躯干 */
+    pb(g, r, W / 2 - 9, H - 34, 3, 20, '#A5A199');     /* 侧影 */
+    pb(g, r, W / 2 - 6, H - 44, 12, 11, '#C9C5BB');    /* 头 */
+    pb(g, r, W / 2 - 6, H - 34, 12, 4, '#8E8A80');     /* 肩线 */
+    pb(g, r, W / 2 - 10, H - 30, 4, 14, '#B0ACA2');    /* 手臂 */
+    pb(g, r, W / 2 + 6, H - 30, 4, 14, '#B0ACA2');
+    pb(g, r, W / 2 - 8, H - 12, 16, 3, '#8C8880');     /* 基座铭牌 */
+  },
+  throne: function (g, r) {                             /* 市政厅议事主座 */
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, W / 2 - 16, 0, 32, H, '#6B2E3A');         /* 高背 */
+    pb(g, r, W / 2 - 14, 2, 28, H - 4, '#8A3B48');
+    pb(g, r, W / 2 - 11, 6, 22, H - 10, '#A04A57');
+    pb(g, r, W / 2 - 8, 10, 16, H - 18, '#C0A15E');    /* 座面绒垫 */
+    pb(g, r, W / 2 - 6, H - 12, 12, 4, '#D8BC78');
+    pb(g, r, W / 2 - 2, 14, 4, H - 30, '#E0C073');     /* 竖脊 */
+    pb(g, r, W / 2 - 14, 8, 3, H - 12, '#E0C073');
+    pb(g, r, W / 2 + 11, 8, 3, H - 12, '#E0C073');
+  },
+  genericShelf: function (g, r) {                       /* 货栈通用货架：层板 + 货箱 */
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, W, H, '#7A5C3E');
+    pb(g, r, 2, 2, W - 4, H - 4, '#5E4630');
+    var rows = 3, rh = Math.floor((H - 4) / rows);
+    for (var s = 0; s < rows; s++) {
+      var y = 2 + s * rh;
+      pb(g, r, 2, y + rh - 3, W - 4, 3, '#8A6B4C');
+      var x = 5, seed = s * 13 + 3;
+      while (x < W - 8) {
+        var bw = 5 + ((seed + x) % 4);
+        pb(g, r, x, y + rh - 12, bw, 9,
+          ['#A9855C', '#9C8256', '#B08A5E', '#8C6544'][(seed + x) % 4]);
+        pb(g, r, x + 1, y + rh - 11, bw - 2, 2, '#C4A57C');
+        x += bw + 2;
+      }
+    }
+  },
+  bench: function (g, r) {                              /* 木长凳：等货的人坐的 */
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 8, W, 5, '#8A6B4C');
+    pb(g, r, 0, 8, W, 2, '#A9855C');
+    pb(g, r, 0, 13, W, 3, '#7A5C3E');
+    for (var lx = 3; lx < W - 5; lx += Math.max(14, Math.floor((W - 8) / 3)))
+      pb(g, r, lx, 16, 5, Math.max(6, H - 22), '#6B4A32');
+  },
+  basket: function (g, r) {                             /* 单个货筐（baskets 的单数别名） */
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 2, H - 18, W - 4, 16, '#A9855C');
+    pb(g, r, 1, H - 20, W - 2, 3, '#C4A57C');
+    for (var i = 3; i < W - 4; i += 4) pb(g, r, i, H - 17, 2, 14, '#8A6B4C');
+    pb(g, r, 2, H - 17, W - 4, 2, '#8A6B4C');
+    /* 筐里露出的果子 */
+    pb(g, r, 4, H - 21, 5, 4, '#C4693C');
+    pb(g, r, 9, H - 22, 5, 5, '#D4813F');
+    pb(g, r, 14, H - 21, 4, 4, '#C4693C');
+  },
+  sign: function (g, r) {                               /* 挂牌：市场/柜面标识 */
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, W / 2 - 2, 0, 4, 7, '#5A4A3A');           /* 吊杆 */
+    pb(g, r, 2, 7, W - 4, Math.min(H - 9, 14), '#8A6B4C');
+    pb(g, r, 3, 8, W - 6, Math.min(H - 12, 12), '#9C8256');
+    pb(g, r, 5, 11, W - 10, 2, '#E0C073');
+    pb(g, r, 5, 15, Math.max(4, W - 20), 2, '#C4A57C');
+  },
+  vaultDoor: function (g, r) {                           /* 金库钢门：厚重门板 + 转轮 */
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, W, H, '#4A4E52');
+    pb(g, r, 2, 2, W - 4, H - 4, '#5E646A');
+    pb(g, r, 4, 4, W - 8, 3, '#787F86');               /* 上框 */
+    pb(g, r, 4, H - 7, W - 8, 3, '#787F86');
+    pb(g, r, 2, 2, 3, H - 4, '#787F86');
+    pb(g, r, W - 5, 2, 3, H - 4, '#787F86');
+    var cx = W / 2, cy = H / 2;
+    pb(g, r, cx - 3, cy - 9, 6, 18, '#8A9096');      /* 转轮轴 */
+    pb(g, r, cx - 9, cy - 3, 18, 6, '#8A9096');
+    pb(g, r, cx - 7, cy - 1, 14, 2, '#A8AFB5');
+    pb(g, r, cx - 1, cy - 7, 2, 14, '#A8AFB5');
+    pb(g, r, cx - 3, cy - 3, 6, 6, '#C0A15E');         /* 锁芯 */
+    pb(g, r, cx - 1, cy - 1, 2, 2, '#E0C073');
+    pb(g, r, W - 8, cy - 2, 4, 4, '#B0B6BC');         /* 铰链 */
+  },
+  ingotRack: function (g, r) {                           /* 金锭托盘：分级码放金条 */
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, W, H, '#4A4E52');
+    pb(g, r, 2, 2, W - 4, H - 4, '#565C61');
+    var rows = 2, rh = Math.floor((H - 6) / rows);
+    for (var s = 0; s < rows; s++) {
+      var y = 4 + s * rh;
+      pb(g, r, 4, y + rh - 5, W - 8, 3, '#787F86');   /* 层板 */
+      var x = 8, n = 0;
+      while (x < W - 16 && n < 5) {
+        var iw = 13 + (n % 2) * 3;
+        /* 金条：梯形块 + 顶部高光 */
+        pb(g, r, x, y + rh - 15, iw, 10, '#B8862F');
+        pb(g, r, x + 1, y + rh - 15, iw - 2, 2, '#E0B450');
+        pb(g, r, x + 1, y + rh - 6, iw - 2, 2, '#8A6220');
+        pb(g, r, x + 2, y + rh - 14, iw - 4, 3, '#D6A63C');
+        x += iw + 5; n++;
+      }
+    }
+  },
+  vaultCage: function (g, r) {                            /* 铁栅笼：栅格 + 挂锁 */
+    pshadow(g, r);
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, W, 4, '#5E646A');
+    pb(g, r, 0, H - 4, W, 4, '#5E646A');
+    pb(g, r, 0, 0, 4, H, '#5E646A');
+    pb(g, r, W - 4, 0, 4, H, '#5E646A');
+    for (var bx = 5; bx < W - 5; bx += 7) {            /* 竖栅 */
+      pb(g, r, bx, 3, 3, H - 6, '#787F86');
+      pb(g, r, bx, 3, 1, H - 6, '#A8AFB5');
+    }
+    pb(g, r, 3, Math.floor(H / 2) - 1, W - 6, 3, '#787F86');
+    pb(g, r, 3, Math.floor(H / 2) - 2, W - 6, 1, '#A8AFB5');
+    pb(g, r, W / 2 - 4, Math.floor(H / 2) - 4, 8, 9, '#C0A15E');  /* 挂锁 */
+    pb(g, r, W / 2 - 2, Math.floor(H / 2) - 2, 4, 5, '#8A6220');
+    pb(g, r, W / 2 - 1, Math.floor(H / 2) - 1, 2, 3, '#E0C073');
   },
   /* ---------- 茶室 ---------- */
   roundTable: function (g, r) {
@@ -3402,6 +4473,42 @@ function cityRoomCanvas(map) {
 /* g 已带相机变换，这里按地图原点直接贴整张烘焙画布。 */
 function drawCityInterior(g, map) {
   g.drawImage(cityRoomCanvas(map), 0, 0);
+}
+/* 测试探针：把某房间定义直接画进调用方的 ctx（绕过 map 缓存，便于做像素差分） */
+function __drawRoomTo(g, def) {
+  g.imageSmoothingEnabled = false;
+  var fl = CITY_FLOORS[def.floor] || CITY_FLOORS.wood;
+  fl(g, { w: def.w, h: def.h });
+  var wall = CITY_WALL[def.floor] || CITY_WALL.wood;
+  px(g, 0, 0, def.w * TILE, 4, wall);
+  px(g, 0, def.h * TILE - 6, def.w * TILE, 6, wall);
+  px(g, 0, 0, 4, def.h * TILE, wall);
+  px(g, def.w * TILE - 4, 0, 4, def.h * TILE, wall);
+  px(g, 0, 4, def.w * TILE, 2, 'rgba(255,255,255,.10)');
+  (def.props || []).forEach(function (p) {
+    var f = CITY_PROPS[p.t];
+    if (f) f(g, p);
+  });
+}
+/* 测试探针：把单栋建筑外观画进调用方 ctx，原点即建筑左上角。
+   画布高 = 视觉高度 + 屋脊 + 烟囱余量，保证屋顶之上不会被裁掉。
+   供像素测试判定"烟囱是否越出立面"，避免依赖游戏相机与视口裁剪。 */
+function __drawFacadeTo(g, b, padTop, padSide) {
+  /* cityVisualHeight 定义在 MAPS.city 的 IIFE 内部，此处不可见；
+     building() 注册时已把结果存进 b.visualHeight，直接用它。
+     注意 drawCityBuilding 以「地块左上角 + 门的 y」定位，建筑自 baseY 向上生长，
+     所以要先按真实坐标画，再把整栋平移到留白画布内。 */
+  var vh = b.visualHeight || 64;
+  var faceW = b.w * TILE;
+  padTop = padTop || 0; padSide = padSide || 0;
+  var W = faceW + padSide * 2;
+  var H = vh + 160 + padTop;
+  g.save();
+  /* 平移量：水平把地块左缘对到 padSide，垂直把 baseY 对到 H-20（留 20px 地面） */
+  g.translate(padSide - b.x * TILE, H - 20 - b.door.y * TILE);
+  drawCityBuilding(g, b.x, b.y, b);
+  g.restore();
+  return { w: W, h: H, faceW: faceW, padSide: padSide, baseRow: H - 20 };
 }
 function drawCityPlan(c){
   var g=c.getContext('2d'),map=MAPS.city;g.fillStyle='#99AC80';g.fillRect(0,0,c.width,c.height);
@@ -5818,7 +6925,7 @@ function openQuestLog(site) {
         activeDailyJobIds().forEach(function(id){renderDailyJobCard(b,id);});return;
       }
       if(QUEST_TAB==='explore'){
-        b.appendChild(el('p','muted','当前探索度：'+(exploreState().explorePoints||0)+' · 探索等级 '+explorationTier()+' / 3。探索度越高，森林、矿山和白蔷薇城会出现新的委托。'));
+        b.appendChild(el('p','muted','当前探索度：'+(exploreState().explorePoints||0)+' · 探索等级 Lv '+(explorationTier()+1)+' / 3。探索度越高，森林、矿山和白蔷薇城会出现新的委托。'));
         WORLD_QUESTS.forEach(function(q){renderSpecialQuestCard(b,q,'explore');});
         appendCityStoryLog(b);return;
       }
@@ -5879,7 +6986,7 @@ function openFieldJournal(){
     left.appendChild(el('p','forest-journal-quote','“把走过的路写下来，下一次就不会迷路。”'));
     var meta=el('div','forest-journal-meta');
     meta.appendChild(el('strong',null,'第 '+state.totalDay+' 天'));
-    meta.appendChild(el('span',null,'探索度 '+(exploreState().explorePoints||0)+' · Lv '+explorationTier()));
+    meta.appendChild(el('span',null,'探索度 '+(exploreState().explorePoints||0)+' · Lv '+(explorationTier()+1)));
     left.appendChild(meta);
     var nav=el('div','forest-journal-nav');
     Object.keys(JOURNAL_PAGES).forEach(function(id){
@@ -8637,6 +9744,16 @@ UI.refreshReel = function () {
 window.__MOSS__ = {
   get state() { return state; },
   CFG: CFG, ITEMS: ITEMS, CROPS: CROPS, QUESTS: QUESTS, RECIPES: RECIPES, FISHES: FISHES, NPCS: NPCS,
+  MAPS: MAPS, INTERACTABLES: INTERACTABLES, CITY_ROOMS: CITY_ROOMS, CITY_INFO: CITY_INFO,
+  CITY_BUILDINGS: CITY_BUILDINGS,
+  /* npcRuntime 在 loadScene 时填充，用 getter 保证读到的是当前实例 */
+  get npcRuntime() { return npcRuntime; },
+  __drawRoomTo: __drawRoomTo,
+  __drawFacadeTo: __drawFacadeTo,
+  /* 调试用：直接跳场景（绕过地面寻路，自动化测试与调试用） */
+  devSwitchScene: function (to, tx, ty) { state.sceneId = to; state.player.x = tx; state.player.y = ty; state.player.face = 'down'; syncPlayerPixel(); onSceneChanged(); },
+  /* openCityService 收的是 interactable 对象（读 it.service），不是 service 字符串 */
+  devOpenService: function (service) { openCityService({ kind: 'cityService', service: service }); },
   get game() { return Game; },
   get ui() { return UI; },
   get cam() { return cam; },
@@ -8650,7 +9767,6 @@ window.__MOSS__ = {
     };
   },
   get canvasRect() { var r = canvas.getBoundingClientRect(); return { w: r.width, h: r.height, left: r.left, top: r.top }; },
-  get npcRuntime() { return npcRuntime; },
   livingInfo: function(){return {city:{w:MAPS.city.w,h:MAPS.city.h,buildings:CITY_BUILDINGS,allBuildings:MAPS.city.buildings,districts:CITY_DISTRICTS,archetypes:CITY_ARCHETYPES},animals:sceneAnimals().map(function(a){return Object.assign({},a);}),forestNodes:EXPLORE_NODES.forest};},
   QUEST_SITES: QUEST_SITES,
   TUTORIAL_DONE: TUTORIAL_DONE,
@@ -8681,6 +9797,7 @@ window.__MOSS__ = {
   __npcRuntime: npcRuntime, __findNpcAdjacent: findNpcAdjacent,
   __isWater: isWater, __toolFish: toolFish,
   exploreState:exploreState, exploreNode:exploreNode, openExploreSite:openExploreSite, exploreStairs:exploreStairs, exploreTreasure:exploreTreasure, doSwitchScene:doSwitchScene,
+  explorationTier:explorationTier, WORLD_QUESTS:WORLD_QUESTS, openFieldJournal:openFieldJournal,
   openTackleShop: openTackleShop, upgradeRod: upgradeRod, fishPool: fishPool, pickFish: pickFish, openDsEncounter: openDsEncounter,
   tileToScreen: function (tx, ty) {
     var r = canvas.getBoundingClientRect();
