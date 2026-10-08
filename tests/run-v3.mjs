@@ -11,15 +11,26 @@ const log = (...a) => console.log('  ·', ...a);
 const SHOT = p => p;
 
 /* 从画布上按世界格取一块像素，用来判断“画面里到底有没有画出来”。
-   注意要减掉摄像机偏移，否则取到的是别的格子。 */
+   注意三点：
+   1) 要减掉摄像机偏移，否则取到的是别的格子；
+   2) 画布是自适应的，地图比视口小时摄像机有居中负偏移，边界要按实际缓冲区算；
+   3) resizeCanvas 会按 zoom × dpr 放大缓冲区，getImageData 取的是物理缓冲区，
+      所以世界坐标必须乘上这个倍率，否则整块取样会整体偏移一个格子。
+   早期版本把这三点都写死成 384×256，导致自适应布局后全部取错格子。 */
 async function tileHasPixels(page, tx, ty) {
   return page.evaluate(([x, y]) => {
     const c = document.getElementById('world');
     const g = c.getContext('2d');
-    const cam = window.__MOSS__.cam;
-    const sx = Math.round(x * 16 - cam.x), sy = Math.round(y * 16 - cam.y);
-    if (sx < 0 || sy < 0 || sx > 368 || sy > 240) return null;
-    const d = g.getImageData(sx, sy, 16, 16).data;
+    const M = window.__MOSS__;
+    const cam = M.cam;
+    const dpr = window.devicePixelRatio || 1;
+    const zoom = (M.game && M.game.zoom) || 1;
+    const scale = zoom * dpr;
+    const side = Math.max(4, Math.round(16 * scale));
+    const sx = Math.round((x * 16 - cam.x) * scale);
+    const sy = Math.round((y * 16 - cam.y) * scale);
+    if (sx < 0 || sy < 0 || sx > c.width - side || sy > c.height - side) return null;
+    const d = g.getImageData(sx, sy, side, side).data;
     let green = 0, red = 0, yellow = 0, white = 0, lum = 0, n = 0;
     for (let i = 0; i < d.length; i += 4) {
       const r = d[i], gg = d[i + 1], b = d[i + 2], a = d[i + 3];
@@ -500,14 +511,19 @@ await page.waitForTimeout(600);
 rep.ok('关闭窗口后鱼恢复游动', Math.abs(await page.evaluate(() => window.__MOSS__.game.pondFish[0].x) - posB) > 2);
 // 画面证据：鱼确实画在池塘里
 const pondInk = await page.evaluate(() => {
-  const g = document.getElementById('world').getContext('2d');
+  const c = document.getElementById('world');
+  const g = c.getContext('2d');
   const r = window.__MOSS__.cam;
   const fish = window.__MOSS__.game.pondFish;
+  const dpr = window.devicePixelRatio || 1;
+  const zoom = (window.__MOSS__.game && window.__MOSS__.game.zoom) || 1;
+  const scale = zoom * dpr, box = Math.max(6, Math.round(13 * scale));
   let painted = 0;
   for (const f of fish) {
-    const sx = Math.round(f.x - r.x), sy = Math.round(f.y - r.y);
-    if (sx < 0 || sy < 0 || sx > 384 || sy > 256) continue;
-    const d = g.getImageData(Math.max(0, sx - 6), Math.max(0, sy - 6), 13, 13).data;
+    // 与 tileHasPixels 同理：鱼坐标是世界像素，取样要按 zoom × dpr 换算到物理缓冲区
+    const sx = Math.round((f.x - r.x) * scale), sy = Math.round((f.y - r.y) * scale);
+    if (sx < 0 || sy < 0 || sx > c.width - box || sy > c.height - box) continue;
+    const d = g.getImageData(sx, sy, box, box).data;
     // 找与水色明显不同的像素
     for (let i = 0; i < d.length; i += 4) {
       const R = d[i], G = d[i + 1], B = d[i + 2];
@@ -522,14 +538,18 @@ await page.screenshot({ path: '../output/playwright/v3-c1-pond.png' });
 await page.evaluate(() => { window.__MOSS__.state.timeMinutes = 21 * 60; });
 await page.waitForTimeout(500);
 const nightInk = await page.evaluate(() => {
-  const g = document.getElementById('world').getContext('2d');
+  const c = document.getElementById('world');
+  const g = c.getContext('2d');
   const r = window.__MOSS__.cam;
   const fish = window.__MOSS__.game.pondFish;
+  const dpr = window.devicePixelRatio || 1;
+  const zoom = (window.__MOSS__.game && window.__MOSS__.game.zoom) || 1;
+  const scale = zoom * dpr, box = Math.max(6, Math.round(13 * scale));
   let painted = 0;
   for (const f of fish) {
-    const sx = Math.round(f.x - r.x), sy = Math.round(f.y - r.y);
-    if (sx < 0 || sy < 0 || sx > 384 || sy > 256) continue;
-    const d = g.getImageData(Math.max(0, sx - 6), Math.max(0, sy - 6), 13, 13).data;
+    const sx = Math.round((f.x - r.x) * scale), sy = Math.round((f.y - r.y) * scale);
+    if (sx < 0 || sy < 0 || sx > c.width - box || sy > c.height - box) continue;
+    const d = g.getImageData(sx, sy, box, box).data;
     for (let i = 0; i < d.length; i += 4) {
       const R = d[i], G = d[i + 1], B = d[i + 2];
       if (Math.abs(R - 121) > 30 || Math.abs(G - 169) > 30) { painted++; break; }
