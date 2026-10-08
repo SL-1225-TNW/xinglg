@@ -39,6 +39,7 @@ try {
   const before = await p.evaluate(() => ({ t: __MOSS__.state.timeMinutes, e: __MOSS__.state.energy, c: __MOSS__.state.coins }));
   await p.keyboard.press('m');
   await p.getByRole('button', { name: /^芽芽小镇，已开放/ }).click();
+  await p.waitForFunction(() => document.querySelector('.travel-panel .primary'));
   const panelText = await p.locator('.travel-panel').innerText();
   check('传送面板显示耗时', panelText.includes('10'), true);
   await p.getByRole('button', { name: '传送过去', exact: true }).click();
@@ -140,8 +141,11 @@ try {
   await p.evaluate(() => { __MOSS__.devSwitchScene('mine2', 13, 21); });
   info = await p.evaluate(() => __MOSS__.travelStateInfo());
   check('到访二层后登记矿内层站', info.discovered.includes('mine.level2'), true);
+  const notVisited3 = await p.evaluate(() => __MOSS__.travelPreview('mine.level3'));
+  check('修复但未到访三层仍不可传送', notVisited3.ok, false);
+  await p.evaluate(() => { __MOSS__.devSwitchScene('mine3', 13, 21); __MOSS__.devSwitchScene('mine2', 13, 21); });
   const pv3 = await p.evaluate(() => __MOSS__.travelPreview('mine.level3'));
-  check('修复后三层可传送', pv3.ok, true);
+  check('修复且到访后三层可传送', pv3.ok, true);
   check('矿内安全层为 0 分钟', pv3.minutes, 0);
 
   /* --- §33.4 0 分钟移动不恢复体力 --- */
