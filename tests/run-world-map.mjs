@@ -25,7 +25,16 @@ try{
  await p.evaluate(()=>{const s=__MOSS__.state;s.sceneId='house';s.player={x:7,y:10,face:'up'};s.bridgeRepaired=true;__MOSS__.startGame(s);});
  await p.keyboard.press('m');check('室内归属农场',await p.locator('.atlas-place.here').innerText(),'苔芽农场 · 你在这里');
  check('修桥后河湾开放状态正确',await p.getByRole('button',{name:/^溪畔河湾，已开放/}).count(),1);
- check('修桥后河湾成为可传送地点',await p.getByRole('button',{name:/^溪畔河湾，已开放，可传送/}).count(),1);
+ // 现代存档：解锁不等于已登记。河湾要真实到访后才是可传送地点（§33.2）
+ check('修桥后河湾未到访前不可传送',await p.getByRole('button',{name:/^溪畔河湾，已开放，可传送/}).count(),0);
+ await p.getByRole('button',{name:/^溪畔河湾，已开放/}).click();
+ check('未登记时给出首次到访说明',(await p.locator('.travel-panel').innerText()).includes('首次到访'),true);
+ await p.evaluate(()=>{__MOSS__.devSwitchScene('riverside',2,8);__MOSS__.closeWindow();});
+ await p.evaluate(()=>{__MOSS__.devSwitchScene('house',7,10);__MOSS__.closeWindow();});
+ await p.keyboard.press('m');
+ await p.getByRole('button',{name:/^溪畔河湾，已开放/}).click();
+ check('真实到访后河湾成为可传送地点',await p.getByRole('button',{name:/^溪畔河湾，已开放，可传送/}).count(),1);
+ check('当前位置永远不显示为可传送',await p.locator('.atlas-place.here').innerText(),'苔芽农场 · 你在这里');
  check('桌面无报错',desktop.errors,[]);
 }finally{await desktop.browser.close();}
 const mobile=await launch({viewport:{width:844,height:390},touch:true});
