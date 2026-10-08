@@ -24,7 +24,8 @@ try{
  check('暂停菜单可打开地图',await p.evaluate(()=>__MOSS__.ui.window.id),'worldmap');await p.keyboard.press('Escape');
  await p.evaluate(()=>{const s=__MOSS__.state;s.sceneId='house';s.player={x:7,y:10,face:'up'};s.bridgeRepaired=true;__MOSS__.startGame(s);});
  await p.keyboard.press('m');check('室内归属农场',await p.locator('.atlas-place.here').innerText(),'苔芽农场 · 你在这里');
- check('修桥后河湾开放状态正确',await p.getByRole('button',{name:'溪畔河湾，已开放',exact:true}).count(),1);
+ check('修桥后河湾开放状态正确',await p.getByRole('button',{name:/^溪畔河湾，已开放/}).count(),1);
+ check('修桥后河湾成为可传送地点',await p.getByRole('button',{name:/^溪畔河湾，已开放，可传送/}).count(),1);
  check('桌面无报错',desktop.errors,[]);
 }finally{await desktop.browser.close();}
 const mobile=await launch({viewport:{width:844,height:390},touch:true});

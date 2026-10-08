@@ -501,6 +501,9 @@ function newGameState() {
   s.inventory.basket = 1;
   s.inventory.tool_shovel = 1;
   Object.keys(NPCS).forEach(function(id){s.npcFriendship[id]=0;});
+  /* 第七版：农场从新档已知，小镇作为相邻生活节点一并登记（§33.2）。
+     其余地点必须真实到访后自动登记，不因为地图上见过就解锁。 */
+  s.travel = { discovered: { 'farm.home': true, 'town.square': true }, home: 'farm.home', txLog: {} };
   return s;
 }
 
@@ -566,6 +569,7 @@ function serialize() {
     settings: state.settings,
     migratedFrom: state.migratedFrom,
     overloaded: state.overloaded,
+    travel: state.travel,
     savedAt: Date.now()
   };
 }
@@ -690,6 +694,20 @@ function normalizeSave(raw) {
     showHelpOnce: raw.settings && raw.settings.showHelpOnce === false ? false : true
   };
   s.migratedFrom = typeof raw.migratedFrom === 'string' ? raw.migratedFrom : null;
+  /* 第七版 §33.2：旧档只给农场、当前安全地点，以及已经真实开放且有
+     可用入口的基础场景建立兼容登记，视作居民已知公共站。
+     只显示过的葡萄园和磨坊不因此变成可传送。 */
+  if (raw.travel && typeof raw.travel === 'object' && raw.travel.discovered && typeof raw.travel.discovered === 'object') {
+    s.travel = {
+      discovered: { 'farm.home': true },
+      home: typeof raw.travel.home === 'string' ? raw.travel.home : 'farm.home',
+      txLog: (raw.travel.txLog && typeof raw.travel.txLog === 'object') ? raw.travel.txLog : {}
+    };
+    Object.keys(raw.travel.discovered).forEach(function (k) {
+      if (raw.travel.discovered[k] === true) s.travel.discovered[k] = true;
+    });
+  }
+  migrateTravelForOldSaves(s);
   return s;
 }
 
@@ -1325,6 +1343,7 @@ function doSwitchScene(to, tx, ty) {
     syncPlayerPixel();
     updateNpcPositions(true);
     onSceneChanged();
+    registerArrival(to);      // 第七版 §33.2：首次抵达自动登记公共站
     saveNow();
     setTimeout(function () { fade.classList.remove('on'); sceneSwitch.busy = false; }, 30);
   }, 200);
@@ -7210,7 +7229,339 @@ function openPause() {
   });
 }
 
-/* 全境地图只展示区域与规划路线，开放状态直接读取真实进度，不提供传送。 */
+/* ============================================================
+   第七版 §33／§34.2：地点登记与快速传送
+   ------------------------------------------------------------
+   地点、像素场景与交通站分开标识：locationId 稳定且不改名，
+   sceneId 是当前代码里的场景，travelNodeId 是可传送的公共落点。
+   看见地名、可步行进入、已到访、公共传送已登记、私人许可
+   是五种不同状态，这里分别记录，互不代替。 */
+
+var REGION_WHITE_ROSE = 'world.imperial_region.white_rose';
+
+/* 传送耗时初值（§33.3）：省内公共节点免费、无冷却、无每日次数，
+   但仍推进少量世界时间，避免一个上午巡完所有岗位。 */
+var TRAVEL_MIN = {
+  sameCityDistrict: 0,   // 同一城市已发现公共街区
+  mineLevelShortcut: 0, // 已修复且已到访的安全层站
+  adjacent: 10,         // 农场↔小镇等相邻生活节点
+  provinceShort: 30,    // 一般省内地点
+  provinceLong: 60,
+  provinceRemote: 90,   // 省内偏远公共节点（上限）
+  dailyAllowance: 50    // 现有每日补助（尚不随传送发放，§10.6 待办）
+};
+
+/* 每个公共传送站记录多个候选落点；排除建筑、家具、水面、作物、
+   设备、NPC 当前占位与碰撞格（§33.6）。safe 是首选入口。 */
+var TRAVEL_NODES = [
+  {
+    id: 'farm.home', locationId: 'white_rose.valley.farm', sceneId: 'farm',
+    name: '苔芽农场', region: 'valley', kind: 'home',
+    safe: [[31, 10], [30, 10], [31, 9], [30, 9]],
+    desc: '山谷西北角的家。农舍、田地与池塘，是旅途的起点。'
+  },
+  {
+    id: 'town.square', locationId: 'white_rose.valley.town', sceneId: 'town',
+    name: '芽芽小镇', region: 'valley', kind: 'town',
+    safe: [[14, 10], [13, 10], [15, 10], [14, 9]],
+    desc: '通往山谷各处的乡村集市。种子铺、任务板与村民都在这里。'
+  },
+  {
+    id: 'riverside.bank', locationId: 'white_rose.southwest.riverside', sceneId: 'riverside',
+    name: '溪畔河湾', region: 'southwest', kind: 'village',
+    safe: [[2, 8], [3, 8], [1, 8], [0, 8]],
+    desc: '小桥另一侧的钓鱼河岸。完成修桥委托后开放。'
+  },
+  {
+    id: 'forest.gate', locationId: 'white_rose.east.forest', sceneId: 'forest',
+    name: '雾杉森林', region: 'east', kind: 'wilderness',
+    safe: [[14, 2], [13, 2], [15, 2], [14, 1]],
+    desc: '从小镇北口进入。硬木、蘑菇、林间湖、伐木屋与隐藏宝箱；东北通往旧矿山。'
+  },
+  {
+    id: 'mine.entrance', locationId: 'white_rose.northeast.old_mine', sceneId: 'mine1',
+    name: '旧矿山', region: 'northeast', kind: 'mine',
+    safe: [[13, 21], [12, 21], [14, 21], [13, 20]],
+    desc: '从森林东北进入，共三层：铜矿、铁矿、紫晶。修复轨道逐层深入。'
+  },
+  {
+    id: 'city.gate', locationId: 'white_rose.centre.white_rose_city', sceneId: 'city',
+    name: '白蔷薇城', region: 'centre', kind: 'city',
+    safe: [[330, 470], [330, 468], [330, 472], [326, 470]],
+    desc: '从小镇南口办理通行证后进入。640×480 格城市：城堡高台、西侧旧城、花园住宅区、老市集、工匠区、河岸、学院区与南门驿站。'
+  }
+];
+
+/* 矿内层站是工程捷径：只有已修复轨道且真实到访过的层才能传送，
+   0 分钟，但不能直达未知或危险工作面（§33.3、§34.4）。
+   与普通节点同一结构：显式给出 sceneId 与安全落点。 */
+var MINE_LEVEL_NODES = {
+  mine2: {
+    id: 'mine.level2', locationId: 'white_rose.northeast.old_mine.level2', sceneId: 'mine2',
+    name: '旧矿山 · 第二层', region: 'northeast', kind: 'mineLevel',
+    safe: [[13, 21], [12, 21], [14, 21], [13, 20]],
+    desc: '含水矿带：铁矿、地下水道与泵房。修复二层轨道后开放。'
+  },
+  mine3: {
+    id: 'mine.level3', locationId: 'white_rose.northeast.old_mine.level3', sceneId: 'mine3',
+    name: '旧矿山 · 第三层', region: 'northeast', kind: 'mineLevel',
+    safe: [[13, 21], [12, 21], [14, 21], [13, 20]],
+    desc: '晶脉与旧作业面：紫晶与富矿点。修复三层轨道后开放。'
+  }
+};
+
+/* 站内路线耗时：按 §33.3 的分类给出两两之间的初值。
+   同一城市公共街区 0，矿内安全层 0，相邻生活节点 10，
+   一般省内 30—60，偏远公共节点最多 90。 */
+var TRAVEL_PAIRS = {
+  'farm.home|town.square': TRAVEL_MIN.adjacent,
+  'town.square|riverside.bank': TRAVEL_MIN.adjacent,
+  'farm.home|riverside.bank': TRAVEL_MIN.provinceShort,
+  'town.square|forest.gate': TRAVEL_MIN.provinceShort,
+  'farm.home|forest.gate': TRAVEL_MIN.provinceShort,
+  'riverside.bank|forest.gate': TRAVEL_MIN.provinceLong,
+  'farm.home|city.gate': TRAVEL_MIN.provinceLong,
+  'town.square|city.gate': TRAVEL_MIN.provinceLong,
+  'riverside.bank|city.gate': TRAVEL_MIN.provinceLong,
+  'forest.gate|mine.entrance': TRAVEL_MIN.provinceShort,
+  'city.gate|mine.entrance': TRAVEL_MIN.provinceRemote,
+  'farm.home|mine.entrance': TRAVEL_MIN.provinceLong
+};
+
+/* 节点 → 稳定地点 ID 的映射；WORLD_REGIONS 的 id 仍是代码内部旧 ID，
+   通过这张表对齐，不重命名既有代码，也不让存档身份随显示名变化。 */
+var NODE_BY_ID = {};
+TRAVEL_NODES.forEach(function (n) { NODE_BY_ID[n.id] = n; });
+var NODE_BY_SCENE = {};
+TRAVEL_NODES.forEach(function (n) { NODE_BY_SCENE[n.sceneId] = n; });
+
+function travelNodeById(id) {
+  if (!id) return null;
+  if (NODE_BY_ID[id]) return NODE_BY_ID[id];
+  for (var k in MINE_LEVEL_NODES) {
+    if (Object.prototype.hasOwnProperty.call(MINE_LEVEL_NODES, k) && MINE_LEVEL_NODES[k].id === id) return MINE_LEVEL_NODES[k];
+  }
+  return null;
+}
+
+/* 存档里的传送登记：已发现并可作为公共落点使用的节点。
+   新档从农场开始；小镇在首次到访后自动登记（§33.2）。 */
+function travelState() {
+  if (!state.travel) state.travel = { discovered: { 'farm.home': true }, home: 'farm.home', txLog: {} };
+  var t = state.travel;
+  if (!t.discovered) t.discovered = { 'farm.home': true };
+  if (!t.home) t.home = 'farm.home';
+  if (!t.txLog) t.txLog = {};
+  return t;
+}
+
+/* 首次抵达自动登记站点，不额外收解锁费，也不要求反复按 E 激活。 */
+function registerArrival(sceneId) {
+  var t = travelState();
+  var node = NODE_BY_SCENE[sceneId];
+  if (node && !t.discovered[node.id]) { t.discovered[node.id] = true; markDirty(); return node.id; }
+  if (sceneId === 'mine2' && exploreState().depth >= 2 && !t.discovered['mine.level2']) { t.discovered['mine.level2'] = true; markDirty(); return 'mine.level2'; }
+  if (sceneId === 'mine3' && exploreState().depth >= 3 && !t.discovered['mine.level3']) { t.discovered['mine.level3'] = true; markDirty(); return 'mine.level3'; }
+  return null;
+}
+
+/* 旧档兼容登记（§33.2）：只给农场、当前安全地点，以及已经真实开放
+   且有可用入口的基础场景建立登记。只显示过的葡萄园和磨坊不因此可传送。
+   显式接收目标状态，避免依赖全局 state 的赋值顺序。 */
+function migrateTravelForOldSaves(s) {
+  if (!s) return;
+  if (!s.travel) s.travel = { discovered: { 'farm.home': true }, home: 'farm.home', txLog: {} };
+  var t = s.travel;
+  if (!t.discovered) t.discovered = { 'farm.home': true };
+  if (!t.txLog) t.txLog = {};
+  var e = s.exploration || {};
+  if (s.sceneId === 'house') t.discovered['farm.home'] = true;
+  var cur = NODE_BY_SCENE[s.sceneId];
+  if (cur) t.discovered[cur.id] = true;
+  if (s.sceneId.indexOf('mine') === 0) t.discovered['mine.entrance'] = true;
+  // 小镇、河湾、森林、城市：只有真实解锁（有可用入口）才登记
+  if (t.discovered['town.square'] === undefined) t.discovered['town.square'] = true;   // 新档起点邻接、基本通勤
+  if (s.bridgeRepaired) t.discovered['riverside.bank'] = true;
+  if (e.forest) t.discovered['forest.gate'] = true;
+  if (e.city) t.discovered['city.gate'] = true;
+  if (e.mine) {
+    t.discovered['mine.entrance'] = true;
+    if (e.depth >= 2) t.discovered['mine.level2'] = true;
+    if (e.depth >= 3) t.discovered['mine.level3'] = true;
+  }
+  if (!t.home) t.home = 'farm.home';
+  if (!t.discovered[t.home]) t.home = 'farm.home';
+}
+
+/* 解锁依据（§3.4、§33.2）：读真实进度，不因为在地图上见过就解锁。 */
+function travelNodeUnlocked(n) {
+  if (!n) return false;
+  if (n.id === 'farm.home') return true;
+  if (n.id === 'town.square') return true;
+  if (n.id === 'riverside.bank') return !!state.bridgeRepaired;
+  if (n.id === 'forest.gate') return !!exploreState().forest;
+  if (n.id === 'city.gate') return !!exploreState().city;
+  if (n.id === 'mine.entrance') return !!exploreState().mine;
+  if (n.id === 'mine.level2') return !!exploreState().mine && exploreState().depth >= 2;
+  if (n.id === 'mine.level3') return !!exploreState().mine && exploreState().depth >= 3;
+  return false;
+}
+
+/* 未解锁时给出具体条件，不写“未知错误”。 */
+function travelLockReason(n) {
+  if (!n) return '地点不存在。';
+  if (n.id === 'riverside.bank' && !state.bridgeRepaired) return '未解锁 · 完成小镇东侧修桥委托';
+  if (n.id === 'forest.gate' && !exploreState().forest) return '未解锁 · 小镇北口清理倒木（木材 15 + 80 金）';
+  if (n.id === 'city.gate' && !exploreState().city) return '未解锁 · 小镇南口办理通行证（150 金）';
+  if (n.id === 'mine.entrance' && !exploreState().mine) return '未解锁 · 森林东北修复矿山（木材 20 + 石头 10）';
+  if (n.id === 'mine.level2') return '未解锁 · 修复二层轨道后到访';
+  if (n.id === 'mine.level3') return '未解锁 · 修复三层轨道后到访';
+  return '未解锁';
+}
+
+/* 场景 → 传送节点：房间与矿层按所属地点归并，城区内部统一归到城市站点。 */
+var SCENE_TO_NODE = {
+  farm: 'farm.home', house: 'farm.home',
+  town: 'town.square',
+  riverside: 'riverside.bank',
+  forest: 'forest.gate',
+  city: 'city.gate',
+  mine1: 'mine.entrance', mine2: 'mine.level2', mine3: 'mine.level3'
+};
+
+/* 当前所在场景对应的传送节点；房间内部按所属地点归并。 */
+function currentTravelNodeId() {
+  var sid = state.sceneId;
+  if (sid.indexOf('city_') === 0) return 'city.gate';   // 城市内部房间归到城市公共站
+  return SCENE_TO_NODE[sid] || '';
+}
+
+/* 站内耗时。同一城市公共街区与矿内安全层为 0；其余走成对初值。
+   未制作的路线不收费、不推进时间后再宣布目的地不存在。 */
+function travelMinutesBetween(fromId, toId) {
+  if (!fromId || !toId) return 0;
+  if (fromId === toId) return 0;
+  var a = fromId, b = toId;
+  var pairKey = a < b ? a + '|' + b : b + '|' + a;
+  if (TRAVEL_PAIRS[pairKey] != null) return TRAVEL_PAIRS[pairKey];
+  var na = travelNodeById(fromId), nb = travelNodeById(toId);
+  if (!na || !nb) return 0;
+  /* 矿内已修复且已到访的安全层站之间是工程捷径，0 分钟（§33.3）：
+     不要求每天重新走完整的三层空巷，也不能直达未知工作面。 */
+  if ((na.kind === 'mineLevel' || na.kind === 'mine') && (nb.kind === 'mineLevel' || nb.kind === 'mine')) return TRAVEL_MIN.mineLevelShortcut;
+  if (na.region === nb.region) return 0;
+  return TRAVEL_MIN.provinceRemote;
+}
+
+/* ============================================================
+   第七版 §33：快速传送（本次只做省内公共节点）
+   传送使用统一事务 ID：检查目标与通路 → 生成预览 → 确认时重新核对
+   → 应用时间和场景变化 → 标记已完成并保存。
+   连续点、读档、失败重试与前后台切换不重复结算。 */
+
+var TRAVEL_TX_SEQ = 0;
+function nextTravelTxId() { TRAVEL_TX_SEQ += 1; return 'tx_' + Date.now().toString(36) + '_' + TRAVEL_TX_SEQ; }
+
+/* 落点解析：排除碰撞格、建筑、家具、水面与 NPC 当前占位。
+   没有安全落点就拒绝出发，不先扣时间再把角色卡在墙里。 */
+function resolveSafeLanding(n) {
+  var map = MAPS[n.sceneId];
+  if (!map) return null;
+  var cands = (n.safe || []).slice();
+  for (var i = 0; i < cands.length; i++) {
+    var c = cands[i], x = c[0], y = c[1];
+    if (x < 0 || y < 0 || x >= map.w || y >= map.h) continue;
+    if (isSolid(n.sceneId, x, y)) continue;
+    if (npcOccupies(n.sceneId, x, y)) continue;
+    return { x: x, y: y };
+  }
+  // 预设入口都被占：在有限范围找可走格
+  var base = (n.safe && n.safe[0]) || [1, 1];
+  for (var r = 1; r <= 6; r++) {
+    for (var dy = -r; dy <= r; dy++) for (var dx = -r; dx <= r; dx++) {
+      var x2 = base[0] + dx, y2 = base[1] + dy;
+      if (x2 < 0 || y2 < 0 || x2 >= map.w || y2 >= map.h) continue;
+      if (isSolid(n.sceneId, x2, y2)) continue;
+      if (npcOccupies(n.sceneId, x2, y2)) continue;
+      return { x: x2, y: y2 };
+    }
+  }
+  return null;
+}
+function npcOccupies(sceneId, x, y) {
+  if (!npcRuntime) return false;
+  for (var id in npcRuntime) {
+    if (!Object.prototype.hasOwnProperty.call(npcRuntime, id)) continue;
+    var n = NPCS[id];
+    if (!n || n.scene !== sceneId) continue;
+    var r = npcRuntime[id];
+    if (r && Math.round(r.x) === x && Math.round(r.y) === y) return true;
+  }
+  return false;
+}
+
+/* 传送预览：显示现在时间、到达时间、是否跨日、落点与用途。
+   阅读地图不走时；0 分钟街区传送不恢复体力、不触发新一天。 */
+function travelPreview(toId) {
+  var to = travelNodeById(toId);
+  if (!to) return { ok: false, reason: '地点不存在。' };
+  var fromId = currentTravelNodeId();
+  if (fromId === toId) return { ok: false, reason: '你已经在' + to.name + '。' };
+  if (!travelNodeUnlocked(to)) return { ok: false, reason: travelLockReason(to) };
+  var t = travelState();
+  if (!t.discovered[toId]) return { ok: false, reason: '尚未登记 · 首次到访后自动登记' };
+  var minutes = travelMinutesBetween(fromId, toId);
+  var land = resolveSafeLanding(to);
+  if (!land) return { ok: false, reason: '当前没有安全落点（入口被占），请稍后再试。' };
+  var startMin = state.timeMinutes;
+  var endMin = startMin + minutes;
+  var crossesDay = endMin >= CFG.dayEnd;
+  return {
+    ok: true, node: to, minutes: minutes, landing: land,
+    fromName: (travelNodeById(fromId) || {}).name || '当前位置',
+    startMin: startMin, endMin: endMin,
+    arrivalText: crossesDay ? '次日 ' + fmtTime(endMin - CFG.dayEnd + CFG.dayStart) : fmtTime(endMin),
+    crossesDay: crossesDay,
+    zeroMinutes: minutes === 0,
+    effectText: minutes === 0 ? '0 分钟 · 不恢复体力、不刷新商店与矿脉'
+      : (crossesDay ? '将跨过日终（22:00），需要在安全处过夜' : '推进 ' + minutes + ' 游戏分钟')
+  };
+}
+
+/* 确认时重新核对一次，避免用过期预览结算。 */
+function commitTravel(toId) {
+  var pv = travelPreview(toId);
+  if (!pv.ok) { toast(pv.reason); return false; }
+  if (state.energy <= 0 && !pv.zeroMinutes) {
+    // 体力不足不禁止传送；只是提示，避免玩家被困在场景里
+  }
+  var txId = nextTravelTxId();
+  var log = travelState().txLog;
+  if (log[txId]) return false;   // 同一事务不重复结算
+  var node = pv.node;
+  // 先算时间再切场景，避免半途失败留下半个事务
+  if (pv.crossesDay) {
+    // 跨日需要走既有日终结算接口，不自创第二套睡觉逻辑（§33.4）
+    toast('这段行程会跨过日终（22:00），需要先在安全处结束今天。');
+    return false;
+  }
+  state.timeMinutes = Math.min(CFG.dayEnd, pv.endMin);
+  state.sceneId = node.sceneId;
+  state.player.x = pv.landing.x;
+  state.player.y = pv.landing.y;
+  state.player.face = 'down';
+  syncPlayerPixel();
+  updateNpcPositions(true);
+  onSceneChanged();
+  registerArrival(node.sceneId);
+  log[txId] = { to: toId, day: state.totalDay, minutes: pv.minutes };
+  markDirty();
+  saveNow();
+  toast('已抵达 ' + node.name + '（' + (pv.minutes === 0 ? '0 分钟' : pv.minutes + ' 分钟') + '）');
+  return true;
+}
+
+/* 全境地图只展示区域与规划路线；开放状态读取真实进度。 */
 var WORLD_REGIONS = [
   {id:'farm',name:'苔芽农场',x:18,y:21,desc:'山谷西北角的家。农舍、田地与池塘，是旅途的起点。'},
   {id:'town',name:'芽芽小镇',x:26,y:48,desc:'通往山谷各处的乡村集市。现有种子铺、任务板与村民就在这里。'},
@@ -7256,26 +7607,108 @@ function openWorldMap() {
   var current=state.sceneId==='house'?'farm':state.sceneId.indexOf('mine')===0?'pass':state.sceneId.indexOf('city_')===0?'city':state.sceneId;
   var selected=current;
   var cityView=current==='city';
+  var selDistrict = cityView ? CITY_DISTRICTS[0].id : null;
+  /* 城市内街区落点：同城内公共街区 0 分钟，直接传送到已发现公共落点，
+     不把玩家放进未获准进入的内室（§32.7、§33.3）。 */
+  var districtLanding = {
+    station: [330, 470], castle: [320, 258], park: [342, 150], garden: [158, 158],
+    oldtown: [148, 306], craft: [160, 410], commerce: [330, 362], university: [526, 186],
+    industry: [522, 468], workers: [344, 458]
+  };
   openWindow({id:'worldmap',kind:'custom',wide:true,title:'蔷薇谷 · 全境地图',build:function(b){
-    b.appendChild(el('p','muted','西北的家，中央的城。沿山谷逐步探索，前往白蔷薇城。'));
-    if(selected==='city'){
+    b.appendChild(el('p','muted','西北的家，中央的城。按 M 或点手机地图按钮，选中已登记的公共地点即可快速传送。'));
+    if(current==='city'){
+      /* 城市／全境切换由 cityView 决定，不随当前选中的地点变化；
+         否则选过别的地点后就没有办法切回城区图。 */
       var mapTabs=el('div','row');
       mapTabs.appendChild(mkBtn('全境总图',cityView?'ghost':'primary',function(){cityView=false;renderWindow();}));
       mapTabs.appendChild(mkBtn('白蔷薇城区',cityView?'primary':'ghost',function(){cityView=true;renderWindow();}));b.appendChild(mapTabs);
     }
     var wrap=el('div','world-atlas');var c=newCanvas(640,400);c.setAttribute('aria-hidden','true');drawWorldAtlas(c);wrap.appendChild(c);
     WORLD_REGIONS.forEach(function(r){var status=worldRegionStatus(r),here=r.id===current;
-      var button=el('button','atlas-place'+(here?' here':'')+(status!=='已开放'?' planned':'')+(selected===r.id?' chosen':''),r.name+(here?' · 你在这里':''));
-      button.title=r.name+' · '+status;
-      button.type='button';button.style.left=r.x+'%';button.style.top=r.y+'%';button.setAttribute('aria-label',r.name+'，'+status+(here?'，当前位置':''));button.setAttribute('aria-pressed',selected===r.id?'true':'false');
-      button.onclick=function(){selected=r.id;renderWindow();};wrap.appendChild(button);
+      var node=regionTravelNode(r.id);
+      var canTravel=!!node&&travelNodeUnlocked(node)&&travelState().discovered[node.id]&&currentTravelNodeId()!==node.id;
+      var button=el('button','atlas-place'+(here?' here':'')+(status!=='已开放'?' planned':'')+(selected===r.id?' chosen':'')+(canTravel?' travelable':''),r.name+(here?' · 你在这里':''));
+      button.title=r.name+' · '+status+(canTravel?' · 可快速传送':'');
+      button.type='button';button.style.left=r.x+'%';button.style.top=r.y+'%';button.setAttribute('aria-label',r.name+'，'+status+(here?'，当前位置':'')+(canTravel?'，可传送':''));button.setAttribute('aria-pressed',selected===r.id?'true':'false');
+      button.onclick=function(){selected=r.id;if(selected!=='city')cityView=false;renderWindow();};wrap.appendChild(button);
     });if(!cityView)b.appendChild(wrap);
     var r=WORLD_REGIONS.filter(function(p){return p.id===selected;})[0]||WORLD_REGIONS[0];
-    var detail=el('div','panel-box atlas-detail');detail.setAttribute('aria-live','polite');detail.appendChild(el('div','section-title',r.name+' · '+worldRegionStatus(r)));detail.appendChild(el('p',null,r.desc));b.appendChild(detail);
-    if(selected==='city'){var cityPlan=newCanvas(512,384);cityPlan.className='city-plan';cityPlan.setAttribute('aria-label','白蔷薇城城区地图，红点代表当前位置');drawCityPlan(cityPlan);b.appendChild(cityPlan);b.appendChild(el('p','muted','城市共 640×480 格。城堡双环街连接旧城、花园住宅、市集与河岸；浅色建筑为街景住宅，深色建筑可以进入，红点是你的位置。'));}
-    b.appendChild(el('p','muted','虚线边框地点：未解锁或待开放，点击查看详情。实线路：现有农场与小镇连接；虚线路：探索路线示意。森林由小镇北口进入，矿山由森林东北进入；其余待开放区域仍在规划中。M 或 Esc 关闭，地图不能传送。'));
+    var detail=el('div','panel-box atlas-detail');detail.setAttribute('aria-live','polite');
+    detail.appendChild(el('div','section-title',r.name+' · '+worldRegionStatus(r)));
+    detail.appendChild(el('p',null,r.desc));
+    var node=regionTravelNode(r.id);
+    if(node){
+      var pv=travelPreview(node.id);
+      detail.appendChild(buildTravelPanel(node,pv));
+    } else {
+      /* 规划中或没有实际场景的地点：明确说明，不给可按的传送按钮 */
+      var planned=el('div','travel-panel');
+      planned.appendChild(el('div','travel-blocked','内容待开放 · 没有可执行的传送按钮'));
+      planned.appendChild(el('p','muted',r.name+' 目前仍在规划中。按 M 或手机地图按钮不会把它变成可传送地点。'));
+      detail.appendChild(planned);
+    }
+    b.appendChild(detail);
+    if(current==='city'&&cityView){
+      var cityPlan=newCanvas(512,384);cityPlan.className='city-plan';cityPlan.setAttribute('aria-label','白蔷薇城城区地图，红点代表当前位置');drawCityPlan(cityPlan);b.appendChild(cityPlan);
+      b.appendChild(el('p','muted','城市共 640×480 格。城堡双环街连接旧城、花园住宅、市集与河岸；浅色建筑为街景住宅，深色建筑可以进入，红点是你的位置。'));
+      /* 城内公共街区：0 分钟移动，不把逛城市变成交通税 */
+      var grid=el('div','district-grid');
+      CITY_DISTRICTS.forEach(function(d){
+        var inCity=currentTravelNodeId()==='city.gate';
+        var same=inCity&&d.id===selDistrict;
+        var land=districtLanding[d.id];
+        var btn=el('button','district-chip'+(same?' on':''),d.name);
+        btn.type='button';
+        btn.setAttribute('aria-pressed',same?'true':'false');
+        btn.title=same?'当前位置所在街区':(inCity?'0 分钟前往 '+d.name:'先前往白蔷薇城');
+        btn.onclick=function(){
+          if(!inCity){toast('先传送到白蔷薇城，再在城区内移动。');return;}
+          selDistrict=d.id;
+          if(state.sceneId!=='city'){state.sceneId='city';}
+          state.player.x=land[0];state.player.y=land[1];state.player.face='down';
+          syncPlayerPixel();updateNpcPositions(true);onSceneChanged();markDirty();saveNow();
+          toast('已抵达 '+d.name+'（0 分钟）');
+          closeWindow();
+        };
+        grid.appendChild(btn);
+      });
+      b.appendChild(grid);
+    }
+    b.appendChild(el('p','muted','虚线边框地点：未解锁或待开放，点击查看详情。实线路：现有农场与小镇连接；虚线路：探索路线示意。森林由小镇北口进入，矿山由森林东北进入。快速传送免费、无冷却，不需要先走到驿站；矿内只有已修复且到访过的安全层可直达。'));
   },actions:[{label:'返回游戏',kind:'primary',close:true}]});
 }
+
+/* WORLD_REGIONS 的旧 ID → 传送节点。规划中地点返回 null，不给假按钮。 */
+function regionTravelNode(regionId) {
+  var map = {
+    farm: 'farm.home', town: 'town.square', riverside: 'riverside.bank',
+    forest: 'forest.gate', city: 'city.gate', pass: 'mine.entrance'
+  };
+  return map[regionId] ? travelNodeById(map[regionId]) : null;
+}
+
+/* 传送面板：显示落点、耗时与可用状态；不可用时给出具体解锁条件。 */
+function buildTravelPanel(node, pv) {
+  var box = el('div', 'travel-panel');
+  if (!pv.ok) {
+    box.appendChild(el('div', 'travel-blocked', pv.reason));
+    if (node && travelNodeUnlocked(node) && !travelState().discovered[node.id]) {
+      box.appendChild(el('p', 'muted', '首次到访该地点后会自动登记为公共站。'));
+    }
+    return box;
+  }
+  box.appendChild(el('p', null, '落点：' + node.name + ' 公共入口 · 用途：' + (node.desc || '').slice(0, 18) + '…'));
+  box.appendChild(el('div', 'travel-line', '现在 ' + fmtTime(pv.startMin) + ' → 到达 ' + pv.arrivalText));
+  box.appendChild(el('div', 'travel-cost ' + (pv.zeroMinutes ? 'free' : ''), pv.effectText));
+  var go = mkBtn('传送过去', 'primary', function () {
+    if (commitTravel(node.id)) closeWindow();
+  });
+  go.type = 'button';
+  box.appendChild(go);
+  return box;
+}
+
 
 function openHelp() {
   openWindow({
@@ -7292,7 +7725,7 @@ function openHelp() {
         ['B', '背包'],
         ['C', '制作'],
         ['J', '委托日志'],
-        ['M', '全境地图'],
+        ['M', '全境地图 / 快速传送'],
         ['Esc', '关闭窗口 / 暂停菜单']
       ].forEach(function (p) {
         var r = el('div', 'kbd-row');
@@ -9727,6 +10160,9 @@ function bindInput() {
   $('#touchBag').onclick = function () { UI.window && UI.window.id === 'bag' ? closeWindow() : openBag(); };
   $('#touchCraft').onclick = function () { UI.window && UI.window.id === 'craft' ? closeWindow() : openCraft(); };
   $('#touchQuest').onclick = function () { UI.window && UI.window.id === 'quest' ? closeWindow() : openQuestLog(null); };
+  // 第七版 §33.1：手机常驻地图按钮，直接打开全境地图并快速传送
+  var touchMapEl = $('#touchMap');
+  if (touchMapEl) touchMapEl.onclick = function () { UI.window && UI.window.id === 'worldmap' ? closeWindow() : openWorldMap(); };
 
   var reel = $('#reel');
   reel.addEventListener('pointerdown', function (e) {
@@ -9804,7 +10240,28 @@ window.__MOSS__ = {
   __drawRoomTo: __drawRoomTo,
   __drawFacadeTo: __drawFacadeTo,
   /* 调试用：直接跳场景（绕过地面寻路，自动化测试与调试用） */
-  devSwitchScene: function (to, tx, ty) { state.sceneId = to; state.player.x = tx; state.player.y = ty; state.player.face = 'down'; syncPlayerPixel(); onSceneChanged(); },
+  devSwitchScene: function (to, tx, ty) { state.sceneId = to; state.player.x = tx; state.player.y = ty; state.player.face = 'down'; syncPlayerPixel(); onSceneChanged(); registerArrival(to); },
+  /* 第七版快速传送的验收探针：真实走预览→确认事务，不注入状态 */
+  travelNodes: TRAVEL_NODES.map(function (n) { return { id: n.id, name: n.name, sceneId: n.sceneId, locationId: n.locationId }; }),
+  travelPreview: function (toId) {
+    var pv = travelPreview(toId);
+    return { ok: pv.ok, reason: pv.reason || '', minutes: pv.minutes == null ? null : pv.minutes, crossesDay: !!pv.crossesDay, arrivalText: pv.arrivalText || '', effectText: pv.effectText || '', landing: pv.landing ? { x: pv.landing.x, y: pv.landing.y } : null };
+  },
+  travelCommit: function (toId) { return commitTravel(toId); },
+  travelMinutesDebug: function (a, b) { return travelMinutesBetween(a, b); },
+  dayEndDebug: function () { return CFG.dayEnd; },
+  travelStateInfo: function () { var t = travelState(); return { current: currentTravelNodeId(), discovered: Object.keys(t.discovered).filter(function (k) { return t.discovered[k]; }), home: t.home, txCount: Object.keys(t.txLog).length }; },
+  travelLandingWalkable: function (nodeId) {
+    var n = travelNodeById(nodeId); if (!n) return false;
+    var l = resolveSafeLanding(n);
+    return !!(l && !isSolid(n.sceneId, l.x, l.y));
+  },
+  isSolidTest: function (sceneId, x, y) { return isSolid(sceneId, x, y); },
+  travelStateLog: function () { return travelState().txLog; },
+  ensureTravel: function () { return travelState(); },
+  freshState: function () { return newGameState(); },
+  normalizeSaveForTest: function (raw) { return normalizeSave(raw); },
+  closeWindow: function () { closeWindow(); },
   /* openCityService 收的是 interactable 对象（读 it.service），不是 service 字符串 */
   devOpenService: function (service) { openCityService({ kind: 'cityService', service: service }); },
   get game() { return Game; },
@@ -9895,7 +10352,7 @@ window.__MOSS__ = {
     saveNow();
     return true;
   },
-  startGame: function (s) { var r = loadGame(); state = s || r.state || newGameState(); if (!state.resourceNodes || !Object.keys(state.resourceNodes).length) initNewGameWorld(); Game.ppos = { x: state.player.x * TILE + 8, y: state.player.y * TILE + 12 }; ensureNpcRuntime(); updateNpcPositions(true); $('#boot').hidden = true; resizeCanvas(); refreshHotbar(); onSceneChanged(); }
+  startGame: function (s) { var r = loadGame(); state = s || r.state || newGameState(); if (!state.resourceNodes || !Object.keys(state.resourceNodes).length) initNewGameWorld(); migrateTravelForOldSaves(state); Game.ppos = { x: state.player.x * TILE + 8, y: state.player.y * TILE + 12 }; ensureNpcRuntime(); updateNpcPositions(true); $('#boot').hidden = true; resizeCanvas(); refreshHotbar(); onSceneChanged(); }
 };
 
 var _toast = toast;

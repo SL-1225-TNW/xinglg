@@ -386,10 +386,24 @@ button{font-family:inherit}
 .atlas-place.here{background:#344f3e;color:#fff0bc;border-color:#e4c77d}
 .atlas-place.planned{border-style:dashed;background:#d9d3b9;color:#5f6453}
 .atlas-place.chosen,.atlas-place:focus-visible{outline:2px solid #b88c4b;outline-offset:2px}
+.atlas-place.travelable{border-color:#3f6d4a;box-shadow:0 0 0 2px #7fb06955,0 2px 0 #0003}
+.atlas-place.travelable::after{content:'⇄';margin-left:3px;font-size:11px;opacity:.85}
 .atlas-detail p{margin:0;line-height:1.6}
+/* 第七版 §33：传送面板与城内街区落点 */
+.travel-panel{margin-top:10px;padding:10px 12px;background:#f3ecd6;border:1px solid #a99b74;border-radius:5px;display:flex;flex-direction:column;gap:7px}
+.travel-panel p{margin:0}
+.travel-line{font-size:14px;color:#33452f;font-variant-numeric:tabular-nums}
+.travel-cost{font-size:13px;color:#5c6a4e}
+.travel-cost.free{color:#2f6b3d;font-weight:600}
+.travel-blocked{font-size:13px;color:#8a5a2b;background:#f0e2c4;border:1px dashed #b08d55;border-radius:4px;padding:7px 9px}
+.travel-panel .btn{align-self:flex-start;min-height:40px;padding:8px 18px}
+.district-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:6px;margin:10px 0 4px}
+.district-chip{padding:9px 8px;font:inherit;font-size:12px;background:#eee4c8;color:#354a37;border:1px solid #897e5c;border-radius:4px;cursor:pointer;min-height:40px}
+.district-chip.on{background:#344f3e;color:#fff0bc;border-color:#e4c77d}
+.district-chip:hover,.district-chip:focus-visible{outline:2px solid #b88c4b;outline-offset:1px}
 .city-plan{display:block;width:min(100%,640px);height:auto;align-self:center;border:2px solid #897e5c;image-rendering:pixelated;border-radius:4px}
 #quickFood{align-self:flex-start;pointer-events:auto}
-@media(max-width:520px){.atlas-place{font-size:10px;padding:3px 4px}.world-atlas{min-height:230px;aspect-ratio:auto}.atlas-place.here{max-width:94px;white-space:normal}}
+@media(max-width:520px){.atlas-place{font-size:10px;padding:3px 4px}.world-atlas{min-height:230px;aspect-ratio:auto}.atlas-place.here{max-width:94px;white-space:normal}.district-grid{grid-template-columns:repeat(2,1fr)}.district-chip{font-size:11px;padding:8px 4px}}
 .win-head{
   flex:0 0 auto;
   display:flex;align-items:center;gap:10px;
