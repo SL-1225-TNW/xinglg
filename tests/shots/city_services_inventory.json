@@ -1,0 +1,549 @@
+{
+  "roomKeys": [
+    "bakery",
+    "greenhouse",
+    "market",
+    "cafe",
+    "library",
+    "smith",
+    "tailor",
+    "inn",
+    "post",
+    "castle",
+    "carriage",
+    "stable",
+    "academy",
+    "hall",
+    "home",
+    "quay_store",
+    "sawmill",
+    "foundry",
+    "watermill",
+    "boiler",
+    "shipyard",
+    "uni_main",
+    "uni_wing",
+    "uni_lab",
+    "uni_dorm",
+    "bank",
+    "market_hall",
+    "exchange",
+    "gold",
+    "townhall"
+  ],
+  "buildings": [
+    {
+      "id": "castle",
+      "name": "",
+      "kind": "castle",
+      "w": 32,
+      "h": 10,
+      "service": null
+    },
+    {
+      "id": "library",
+      "name": "",
+      "kind": "library",
+      "w": 26,
+      "h": 6,
+      "service": null
+    },
+    {
+      "id": "academy",
+      "name": "",
+      "kind": "academy",
+      "w": 34,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "greenhouse",
+      "name": "",
+      "kind": "greenhouse",
+      "w": 22,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "bakery",
+      "name": "",
+      "kind": "shop",
+      "w": 16,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "market",
+      "name": "",
+      "kind": "shop",
+      "w": 20,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "tailor",
+      "name": "",
+      "kind": "shop",
+      "w": 17,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "cafe",
+      "name": "",
+      "kind": "shop",
+      "w": 17,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "smith",
+      "name": "",
+      "kind": "workshop",
+      "w": 19,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "hall",
+      "name": "",
+      "kind": "civic",
+      "w": 19,
+      "h": 10,
+      "service": null
+    },
+    {
+      "id": "inn",
+      "name": "",
+      "kind": "home",
+      "w": 20,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "post",
+      "name": "",
+      "kind": "shop",
+      "w": 19,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "carriage",
+      "name": "",
+      "kind": "shop",
+      "w": 16,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "stable",
+      "name": "",
+      "kind": "workshop",
+      "w": 16,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "quay_store",
+      "name": "",
+      "kind": "store",
+      "w": 34,
+      "h": 9,
+      "service": null
+    },
+    {
+      "id": "sawmill",
+      "name": "",
+      "kind": "sawmill",
+      "w": 30,
+      "h": 10,
+      "service": null
+    },
+    {
+      "id": "foundry",
+      "name": "",
+      "kind": "foundry",
+      "w": 32,
+      "h": 11,
+      "service": null
+    },
+    {
+      "id": "watermill",
+      "name": "",
+      "kind": "mill",
+      "w": 24,
+      "h": 9,
+      "service": null
+    },
+    {
+      "id": "boiler",
+      "name": "",
+      "kind": "boiler",
+      "w": 22,
+      "h": 8,
+      "service": null
+    },
+    {
+      "id": "shipyard",
+      "name": "",
+      "kind": "shed",
+      "w": 24,
+      "h": 7,
+      "service": null
+    },
+    {
+      "id": "uni_main",
+      "name": "",
+      "kind": "unimain",
+      "w": 30,
+      "h": 12,
+      "service": null
+    },
+    {
+      "id": "uni_wing",
+      "name": "",
+      "kind": "uniwing",
+      "w": 26,
+      "h": 9,
+      "service": null
+    },
+    {
+      "id": "uni_lab",
+      "name": "",
+      "kind": "unilab",
+      "w": 24,
+      "h": 10,
+      "service": null
+    },
+    {
+      "id": "uni_dorm",
+      "name": "",
+      "kind": "unidorm",
+      "w": 24,
+      "h": 9,
+      "service": null
+    },
+    {
+      "id": "bank",
+      "name": "",
+      "kind": "arcaded",
+      "w": 22,
+      "h": 8,
+      "service": null
+    },
+    {
+      "id": "exchange",
+      "name": "",
+      "kind": "arcaded",
+      "w": 24,
+      "h": 8,
+      "service": null
+    },
+    {
+      "id": "gold",
+      "name": "",
+      "kind": "arcaded",
+      "w": 22,
+      "h": 8,
+      "service": null
+    },
+    {
+      "id": "market_hall",
+      "name": "",
+      "kind": "civic",
+      "w": 30,
+      "h": 10,
+      "service": null
+    },
+    {
+      "id": "townhall",
+      "name": "",
+      "kind": "civic",
+      "w": 24,
+      "h": 10,
+      "service": null
+    },
+    {
+      "id": "home1",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home2",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home3",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home4",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home5",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home6",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home7",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home8",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home9",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home10",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home11",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home12",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home13",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home14",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home15",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home16",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home17",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home18",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home19",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home20",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home21",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home22",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home23",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "home24",
+      "name": "",
+      "kind": "home",
+      "w": 8,
+      "h": 4,
+      "service": null
+    }
+  ],
+  "services": [],
+  "recipes": [
+    {
+      "out": "dev_chest",
+      "cost": {
+        "wood": 10
+      },
+      "station": null
+    },
+    {
+      "out": "dev_sprinkler",
+      "cost": {
+        "wood": 15,
+        "stone": 10
+      },
+      "station": null
+    },
+    {
+      "out": "dev_jam",
+      "cost": {
+        "wood": 15,
+        "stone": 10
+      },
+      "station": null
+    },
+    {
+      "out": "rice",
+      "cost": {
+        "potato": 2
+      },
+      "station": null
+    }
+  ],
+  "items": [
+    "tool_hoe",
+    "tool_can",
+    "tool_axe",
+    "tool_pick",
+    "tool_rod",
+    "basket",
+    "tool_shovel",
+    "seed_radish",
+    "seed_potato",
+    "seed_strawberry",
+    "radish",
+    "potato",
+    "strawberry",
+    "berry",
+    "bread",
+    "fish_crucian",
+    "fish_bass",
+    "fish_silver",
+    "fish_koi",
+    "fish_gold",
+    "fish_sturgeon",
+    "fish_king",
+    "hardwood",
+    "mushroom",
+    "copper_ore",
+    "iron_ore",
+    "coal",
+    "charcoal",
+    "timber",
+    "plank",
+    "copper_ingot",
+    "iron_ingot",
+    "steel_ingot",
+    "cast_gear",
+    "ironclad",
+    "flour",
+    "grain",
+    "bread_batch",
+    "salt_fish",
+    "manuscript",
+    "field_note",
+    "translation",
+    "bill",
+    "share_cert",
+    "warehouse_deed",
+    "bond",
+    "gem",
+    "jam",
+    "wood",
+    "stone",
+    "rice",
+    "dev_chest",
+    "dev_sprinkler",
+    "dev_jam"
+  ]
+}
