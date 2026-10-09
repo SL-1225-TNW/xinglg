@@ -608,8 +608,9 @@ p = await pos(page);
 rep.ok('池塘不可通过（或被挡住）', !(p[0] >= 26 && p[0] <= 30 && p[1] >= 17 && p[1] <= 21), JSON.stringify(p));
 rep.ok('相机被限制在地图内', await page.evaluate(() => {
   const M = window.__MOSS__;
-  return M.cam.x >= 0 && M.cam.x <= 32 * 16 - 384
-    && M.cam.y >= 0 && M.cam.y <= 24 * 16 - 256;
+  const limits = M.cameraLimits;
+  return M.cam.x >= limits.minX - 0.01 && M.cam.x <= limits.maxX + 0.01
+    && M.cam.y >= limits.minY - 0.01 && M.cam.y <= limits.maxY + 0.01;
 }));
 
 console.log('\n控制台错误：', errors.length);
