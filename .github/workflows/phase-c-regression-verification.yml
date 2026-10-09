@@ -1,0 +1,39 @@
+name: Phase C regression verification
+
+on:
+  push:
+    branches:
+      - codex/phase-c-regression-check
+
+permissions:
+  contents: read
+
+jobs:
+  regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Playwright
+        run: npm install --no-save playwright
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build standalone game
+        run: node tests/build-single-file.mjs
+      - name: Main 14-day regression
+        run: node tests/run-main.mjs
+      - name: Stage B regression
+        run: node tests/run-v7-stageB.mjs
+      - name: Audit regressions
+        run: node tests/run-v7-audit-regressions.mjs
+      - name: Responsive layout
+        run: node tests/run-responsive-layout.mjs
+      - name: Single-file smoke test
+        run: node tests/run-single-file-smoke.mjs
+      - name: Phase C mill tests
+        run: node tests/run-phase-c-mill.mjs
+      - name: Phase C meadow tests
+        run: node tests/run-phase-c-meadow.mjs
