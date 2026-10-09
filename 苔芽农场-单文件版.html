@@ -1430,6 +1430,59 @@ var NPCS = {
       50: '我决定把每天摸鱼的时间减少十分钟，为你腾出说话的机会。',
       75: '你是我在这个山谷里第一个让我想按时出现的人。这句话我只说一次。'
     }
+  },
+  /* 风铃磨坊与麦田村（§31.1）：有名字、工作与行动安排的当地人物 */
+  martin: {
+    id: 'martin', name: '马丁', title: '磨坊师', scene: 'millvillage',
+    hair: '#4C4038', shirt: '#8C6239', accent: '#D8C7A4', skin: '#D9AE86',
+    like: ['flour', 'grain'], dislike: [],
+    schedule: [
+      { from: 360,  to: 600,  x: 13, y: 16 },
+      { from: 600,  to: 1140, x: 11, y: 16 },
+      { from: 1140, to: 1320, x: 16, y: 19 }
+    ],
+    lines: [
+      '水轮停一天，麦田村就得用石磨手磨一整夜。你要是听见村东头有磨盘声，那就是我在还债。',
+      '来水不稳的时候，我先顾磨坊还是先顾麦田，这事我一个人说了不算。',
+      '磨坊的轴是橡木的。上一任轴裂了，村里凑不齐钱，只能先拿布裹着。',
+      '一斗麦换四袋粉，价钱是村里议过的，不是马丁一个人定的。',
+      '你要是肯听我把来水量讲完，我请你吃刚出笼的麦饼。'
+    ],
+    rainLines: [
+      '下雨天来水足，水轮转得比平时快。麦子却是收不成了。',
+      '这种雨最会挑时候。水够了，麦子还在地里泡着。'
+    ],
+    heartLines: {
+      25: '你肯听我讲水轮，这村子就你一个。',
+      50: '以后分水的事，你替我说两句，比我自己喊十句管用。',
+      75: '我这条命搭在这台轮子上。你说往哪边修，我就往哪边修。'
+    }
+  },
+  councilor: {
+    id: 'councilor', name: '柯里', title: '村议事员', scene: 'millvillage',
+    hair: '#6E5B4A', shirt: '#3F4A55', accent: '#B9C4CE', skin: '#F2CCA9',
+    like: ['flour', 'potato'], dislike: [],
+    schedule: [
+      { from: 360,  to: 660,  x: 18, y: 23 },
+      { from: 660,  to: 1140, x: 19, y: 19 },
+      { from: 1140, to: 1320, x: 18, y: 23 }
+    ],
+    lines: [
+      '议事屋的告示你随便看。不过要递正经提议，得先说清楚谁受益、谁吃亏。',
+      '磨坊和麦田抢水，这事吵了三个冬天。今年得有个说法。',
+      '我们不管大公领的账，只管这个村子的渠、路和粮仓。',
+      '要是有人只顾自己那几块地，别让他进议事屋的门。',
+      '你要是有法子让大家都不吃亏，告示牌正对着门，写得清楚点。'
+    ],
+    rainLines: [
+      '雨天大家都不出门，正好把账算清楚。',
+      '下雨天议不出结果，只有闸口那声水响是真的。'
+    ],
+    heartLines: {
+      25: '你说话算话，这比什么头衔都管用。',
+      50: '村里有人开始问你意见了。我会记着。',
+      75: '议事屋的门随时给你开着。这不是客气话。'
+    }
   }
 };
 
@@ -2211,7 +2264,7 @@ for(var floor=1;floor<=3;floor++){
   })(floor);
 }
 MAPS.town.exits.push({x:14,y:0,to:'forest',tx:14,ty:26});
-var SCENE_ORDER = ['farm', 'town', 'riverside', 'house','forest','mine1','mine2','mine3'];
+var SCENE_ORDER = ['farm', 'town', 'millvillage', 'riverside', 'house','forest','mine1','mine2','mine3'];
 var EXPLORE_NODES={forest:{},mine1:{},mine2:{},mine3:{}};
 [[6,12],[9,16],[18,18],[24,20],[33,18],[36,23],[8,22],[20,3]].forEach(function(p){EXPLORE_NODES.forest[key2(p[0],p[1])]={type:'tree',item:'hardwood',qty:4,hp:4};});
 [[11,9],[5,16],[17,8],[25,16],[31,19],[35,9],[6,24],[22,23]].forEach(function(p){EXPLORE_NODES.forest[key2(p[0],p[1])]={type:'forage',item:'mushroom',qty:2,hp:1};});
@@ -2231,6 +2284,20 @@ function normalizeExploration(raw){
  e.mineSurvey={};var works=raw.mineWorks||{};
  e.mineWorks={west:works.west===true,east:works.east===true,pump:works.pump===true,inspected:works.pump===true&&works.inspected===true};
  if(e.mineWorks.pump)e.mineWorks.west=e.mineWorks.east=true;
+ /* 阶段 C 风铃磨坊与麦田村：工程状态与三节点任务进度都随存档保存 */
+ var mw=raw.millWorks||{};
+ e.millWorks={inspected:!!mw.inspected,repaired:!!mw.repaired,checked:!!mw.checked,
+   waterTo:mw.waterTo==='field'?'field':'mill',wheelTurns:Math.floor(num(mw.wheelTurns,0,0,1e6)),
+   plan:mw.plan==='channel'?'channel':(mw.plan==='axle'?'axle':''),
+   wateredDays:Math.floor(num(mw.wateredDays,0,0,1e4)),
+   wateredLastDay:Math.floor(num(mw.wateredLastDay,-1,-1,1e6)),
+   waterSetDay:Math.floor(num(mw.waterSetDay,-1,-1,1e6))};
+ var mt=raw.millTask||{};
+ e.millTask={step:clamp(Math.floor(num(mt.step,0,0,3)),0,3),cause:mt.cause==='channel'?'channel':(mt.cause==='axle'?'axle':''),
+   plan:mt.plan==='channel'?'channel':(mt.plan==='axle'?'axle':''),delivered:Math.floor(num(mt.delivered,0,0,1e6))};
+ /* 任务进度与工程状态必须自洽：没有修好就不可能已验收 */
+ if(!e.millWorks.repaired){e.millWorks.inspected=false;if(e.millTask.step>1)e.millTask.step=1;}
+ if(e.millTask.step>=2&&!e.millWorks.repaired)e.millTask.step=1;
  Object.keys(raw.mineSurvey||{}).forEach(function(k){var parts=k.split(':'),v=raw.mineSurvey[k];if(/^mine[123]$/.test(parts[0])&&EXPLORE_NODES[parts[0]][parts[1]]&&v&&Number.isFinite(v.seenDay))e.mineSurvey[k]={seenDay:clamp(Math.floor(v.seenDay),1,1e6)};});
  Object.keys(LIVING_JOBS||{}).forEach(function(id){if(raw.jobs&&Number.isInteger(raw.jobs[id]))e.jobs[id]=Math.max(-1,raw.jobs[id]);});
  (CITY_STORY_QUESTS||[]).forEach(function(q){var st=raw.cityStories&&raw.cityStories[q.id];if(st==='accepted'||st==='done')e.cityStories[q.id]=st;});
@@ -2288,6 +2355,102 @@ function drawExploreNode(g,x,y,n){
  else{px(g,x*TILE+4,y*TILE+9,3,5,'#F1DFC4');px(g,x*TILE+1,y*TILE+6,9,4,'#B87759');px(g,x*TILE+3,y*TILE+5,5,2,'#DDA27B');px(g,x*TILE+12,y*TILE+10,2,4,'#EADBBE');px(g,x*TILE+10,y*TILE+8,5,3,'#9E6952');}
 }
 
+
+/* --- 风铃磨坊与麦田村（第七版 §31.1 P1，阶段 C 首个常驻地点） ---
+   水轮、磨坊机房、粮仓、村庄小广场与农田水渠组成一个真实生活空间：
+   上游来水经过分水闸，一路供磨坊、一路灌进麦田，两处共用有限的来水。
+   玩家在「磨粉 / 灌溉」之间做真实取舍，而不是点一次拿钱。 */
+MAPS.millvillage = (function () {
+  var m = mkMap(40, 28, T_GRASS);
+  // 主河道：自西北向东南，各段在转角处重叠，避免看起来是一堆断条
+  fillRect(m, 0, 6, 14, 7, T_WATER, true);
+  fillRect(m, 14, 7, 22, 9, T_WATER, true);
+  fillRect(m, 22, 9, 30, 11, T_WATER, true);
+  fillRect(m, 30, 11, 39, 13, T_WATER, true);
+  // 分水渠：自河道南引，横穿磨坊门前，再南下接麦田
+  fillRect(m, 12, 10, 16, 10, T_WATER, true);
+  fillCol(m, 16, 11, 20, T_WATER, true);
+  // 麦田灌溉支渠（南北向）
+  fillCol(m, 29, 16, 24, T_WATER, true);
+  // 东西主路 y=18..19
+  fillRect(m, 0, 18, 39, 19, T_PATH, false);
+  // 村庄小广场 x15..23 y17..23
+  fillRect(m, 15, 17, 23, 23, T_PATH, false);
+  // 广场到磨坊的支路
+  fillCol(m, 12, 11, 19, T_PATH, false);
+  // 麦田间的小径
+  fillCol(m, 29, 18, 27, T_PATH, false);
+  fillCol(m, 24, 20, 24, T_PATH, false);
+  fillRow(m, 24, 33, 24, T_PATH, false);
+  // 跨河小桥（磨坊西侧入口）
+  fillRect(m, 6, 6, 7, 7, T_BRIDGEFIXED, false);
+  fillRect(m, 18, 8, 19, 9, T_BRIDGEFIXED, false);
+  fillRect(m, 27, 11, 28, 12, T_BRIDGEFIXED, false);
+  // 建筑：磨坊机房 / 粮仓 / 议事屋 / 农具棚
+  fillRect(m, 10, 12, 14, 15, T_BUILDING, true);    // 磨坊机房
+  fillRect(m, 20, 14, 23, 16, T_BUILDING, true);    // 粮仓
+  fillRect(m, 17, 20, 19, 22, T_BUILDING, true);    // 村议事屋
+  fillRect(m, 31, 17, 33, 19, T_BUILDING, true);    // 农具棚
+  return {
+    w: m.w, h: m.h, t: m.t, solid: m.solid,
+    name: '麦田村',
+    exits: [
+      { x: 0, y: 18, to: 'town', tx: 30, ty: 10 },
+      { x: 0, y: 19, to: 'town', tx: 30, ty: 11 }
+    ],
+    plantArea: null,
+    /* 麦田：不是耕地系统，而是由水闸状态驱动的可视田块 */
+    wheatFields: [
+      { x0: 25, y0: 17, x1: 30, y1: 17 },
+      { x0: 25, y0: 20, x1: 28, y1: 21 },
+      { x0: 31, y0: 21, x1: 36, y1: 22 }
+    ],
+    buildings: [
+      { x: 10, y: 12, w: 5, h: 4, kind: 'mill' },
+      { x: 20, y: 14, w: 4, h: 3, kind: 'granary' },
+      { x: 17, y: 20, w: 3, h: 3, kind: 'council' },
+      { x: 31, y: 17, w: 3, h: 3, kind: 'toolshed' }
+    ]
+  };
+})();
+
+/* 水轮：由分水闸状态决定是否转动，故障链修好后场景真的会变 */
+function millWorks() {
+  var e = exploreState();
+  if (!e.millWorks) e.millWorks = { inspected: false, repaired: false, checked: false, delivered: false, waterTo: 'mill', wheelTurns: 0, wateredDays: 0, wateredLastDay: -1 };
+  return e.millWorks;
+}
+
+function drawMillWheel(g, x, y, spinning) {
+  var cx = x * TILE + 8, cy = y * TILE + 8;
+  px(g, cx - 12, cy - 12, 24, 24, spinning ? '#7A5A3C' : '#6A5340');
+  px(g, cx - 10, cy - 10, 20, 20, PAL.waterDark);
+  px(g, cx - 10, cy - 10, 20, 7, spinning ? '#4E7E85' : '#4A6B70');
+  for (var i = 0; i < 10; i++) {
+    var a = (spinning ? Game.animT * 0.9 : 0) + i * Math.PI / 5;
+    var dx = Math.round(Math.cos(a) * 8), dy = Math.round(Math.sin(a) * 8);
+    px(g, cx + dx - 1, cy + dy - 1, 3, 3, spinning ? '#A8763F' : '#7C6248');
+  }
+  px(g, cx - 2, cy - 2, 4, 4, '#E4D9B8');
+  // 支架
+  px(g, cx - 13, cy + 11, 26, 2, '#5C4634');
+}
+function drawWheatField(g, f, ripe, watered) {
+  var col = ripe ? '#D9B24A' : watered ? '#93A94F' : '#8B7B45';
+  for (var y = f.y0; y <= f.y1; y++) {
+    for (var x = f.x0; x <= f.x1; x++) {
+      if (isSolid('millvillage', x, y)) continue;
+      var bx = x * TILE, by = y * TILE;
+      var sway = (Math.floor(Game.animT * 2 + x * 7 + y * 3) % 3) - 1;
+      px(g, bx + 2, by + 6, 12, 6, watered ? '#7E6B3C' : '#6E5F38');
+      for (var s = 0; s < 4; s++) {
+        var sx = bx + 2 + s * 3;
+        px(g, sx, by + 2 + sway, 2, ripe ? 7 : 5, col);
+        if (ripe) px(g, sx, by + 1 + sway, 2, 3, '#E7C766');
+      }
+    }
+  }
+}
 
 /* --- 农舍室内：16×12，家具各自占格并参与碰撞 --- */
 var HOUSE_FURNITURE = [
@@ -2517,6 +2680,14 @@ var INTERACTABLES = {
     { id: 'bridge', x: 26, y: 9, stand: [[25,9],[25,10]], kind: 'bridge', label: '小桥施工点' }
   ],
   riverside: [{id:'tackle',x:3,y:7,stand:[[3,8],[2,7],[4,7],[3,7]],kind:'tackle',label:'DeepSeek 渔具店'}],
+  /* 风铃磨坊与麦田村：水闸 / 水轮 / 粮仓 / 议事告示 / 交货点 */
+  millvillage: [
+    {id:'mill_gate',x:16,y:10,stand:[[16,11],[15,10],[17,10],[16,9]],kind:'millGate',label:'分水闸'},
+    {id:'mill_wheel',x:9,y:13,stand:[[9,14],[8,13],[10,13],[9,12]],kind:'millWheel',label:'水轮与磨坊机房'},
+    {id:'mill_granary',x:22,y:17,stand:[[22,18],[21,17],[23,17],[22,16]],kind:'millGranary',label:'粮仓'},
+    {id:'mill_board',x:20,y:21,stand:[[20,22],[19,21],[21,21],[20,20]],kind:'millBoard',label:'议事屋告示'},
+    {id:'mill_deliver',x:26,y:19,stand:[[26,20],[25,19],[27,19],[26,18]],kind:'millDeliver',label:'交货台'}
+  ],
   forest: [{id:'mine_gate',x:30,y:4,stand:[[30,5],[29,4],[31,4]],kind:'mineGate',label:'旧矿山入口'},{id:'lumber_hut',x:23,y:10,stand:[[23,11],[22,10],[24,10]],kind:'lumberHut',label:'伐木屋'},{id:'forest_cache',x:37,y:25,stand:[[37,24],[36,25],[38,25]],kind:'treasure',label:'林间宝箱'}],
   mine1: [{id:'stairs2',x:22,y:3,stand:[[22,4],[21,3],[23,3]],kind:'mineStairs',next:2,label:'二层轨道'}],
   mine2: [{id:'stairs3',x:22,y:3,stand:[[22,4],[21,3],[23,3]],kind:'mineStairs',next:3,label:'三层轨道'},
@@ -8403,6 +8574,331 @@ function openMineWork(it) {
     }},{label:'稍后再来',close:true}]
   });
 }
+/* ============================================================
+   第七版 §31.1 阶段 C：风铃磨坊与麦田村
+   ------------------------------------------------------------
+   核心活动是可重复且有取舍的，不是点一次拿钱：
+   分水闸决定有限的来水给磨坊还是给麦田，两边真的争同一份水。
+   任务链按 §31.1 的三节点：故障调查 → 选择修理方案 → 检验供水与交货。
+   所有设施都要站在旁边按 E，时间走同一套 canSpendGameMinutes。 */
+
+var MILL_QUEST = [
+  { id: 'inspect', title: '一、水轮停了', desc: '水轮已经停转两天，麦田村靠石磨手磨。站到机房旁，查清是轴裂还是缺水。' },
+  { id: 'repair',  title: '二、换轴还是改渠', desc: '查清原因后，在磨坊机房与村议事屋之间选一条修法：换橡木轴，或改分水渠降低水压。' },
+  { id: 'deliver', title: '三、检验供水并交货', desc: '修好后到分水闸检验供水，再到交货台交出第一袋面粉，村里的粮仓才算真能续上。' }
+];
+
+function millTaskState() {
+  var e = exploreState();
+  if (!e.millTask) e.millTask = { step: 0, cause: '', plan: '', delivered: 0 };
+  return e.millTask;
+}
+
+/* 站在设施旁才能操作，和矿山工程同一口径 */
+function millAtSite(it) {
+  return state.sceneId === 'millvillage' && it.stand.some(function (p) { return p[0] === state.player.x && p[1] === state.player.y; });
+}
+
+/* --- 分水闸：磨坊与麦田共用有限的来水 --- */
+function openMillGate(it) {
+  var w = millWorks(), t = millTaskState();
+  var toMill = w.waterTo === 'mill';
+  var rainy = isRaining();
+  var flow = rainy ? 1.5 : 1;
+  openWindow({
+    id: 'millgate', kind: 'custom', title: '分水闸',
+    build: function (b) {
+      b.appendChild(el('p', null, '渠水从北面来，先经这道闸再分成两路：一路进磨坊水轮，一路灌进南面的麦田。'));
+      b.appendChild(el('p', 'muted', '今天的来水' + (rainy ? '因为下雨偏足（×1.5）。' : '是平常水平。') + '水轮' + (toMill ? '开着的，麦田这三天是缺水状态。' : '关着，麦田在长，麦子却没人磨。')));
+      if (t.step >= 2 && w.repaired) {
+        b.appendChild(el('p', w.waterTo === 'mill' ? 'req-chip ok' : 'req-chip',
+          w.waterTo === 'mill' ? '当前：全力供水磨坊。麦田缺水，今天的产量按缺水计。' : '当前：全力供水麦田。磨坊今天只能低速运转，出粉减半。'));
+      }
+      b.appendChild(el('p', 'muted', '这次调闸记在今天的账上，收成差别会在第二天结算时体现；不是点一下就立刻改写存量。'));
+    },
+    actions: [
+      { label: '开闸向磨坊', close: false, onClick: function () {
+        if (!millAtSite(it)) { toast('请在分水闸旁操作。'); return; }
+        if (w.waterTo === 'mill') { toast('闸已经朝这个方向了。'); return; }
+        if (!canSpendGameMinutes(20)) return;
+        if (!hasEnergy(2)) return;
+        spendGameMinutes(20); state.energy -= 2;
+        w.waterTo = 'mill'; w.waterSetDay = state.totalDay;
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('闸口转向磨坊。水轮吃满水，麦田这三天缺水。');
+      } },
+      { label: '开闸向麦田', close: false, onClick: function () {
+        if (!millAtSite(it)) { toast('请在分水闸旁操作。'); return; }
+        if (w.waterTo === 'field') { toast('闸已经朝这个方向了。'); return; }
+        if (!canSpendGameMinutes(20)) return;
+        if (!hasEnergy(2)) return;
+        spendGameMinutes(20); state.energy -= 2;
+        w.waterTo = 'field'; w.waterSetDay = state.totalDay;
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('闸口转向麦田。麦子缓过劲来，磨坊今天只能出半粉。');
+      } },
+      { label: '离开', close: true }
+    ]
+  });
+}
+
+/* --- 水轮与磨坊机房：可重复的磨粉活动，带真实取舍 --- */
+function openMillWheel(it) {
+  var w = millWorks(), t = millTaskState();
+  var broken = t.step < 2 || !w.repaired;
+  var full = w.waterTo === 'mill';
+  openWindow({
+    id: 'millwheel', kind: 'custom', title: '水轮与磨坊机房',
+    build: function (b) {
+      if (broken) {
+        b.appendChild(el('p', null, '水轮停着，轴上缠着一圈布。机房地上摊着拆下来的旧零件。'));
+        b.appendChild(el('p', 'muted', t.step === 0 ? '先查清停转的原因，才谈得上修。' : '原因已知，去决定修法。'));
+      } else {
+        b.appendChild(el('p', null, full ? '水轮满速转着，磨盘下有细粉往外落。' : '水轮只转半速——闸门分去了大半水，够用但不快。'));
+        b.appendChild(el('p', 'muted', '一斗小麦磨成四袋面粉。批量越大越省时间，但要先有麦子。'));
+      }
+    },
+    actions: broken ? millWheelBrokenActions(it, w, t) : [
+      { label: '磨四袋（1 斗麦 · 40 分钟 · 6 体力）', close: false, onClick: function () { doMill(it, 1, 4, 40, 6); } },
+      { label: '磨十二袋（3 斗麦 · 90 分钟 · 14 体力）', close: false, onClick: function () { doMill(it, 3, 12, 90, 14); } },
+      { label: '关闭', close: true }
+    ]
+  });
+}
+
+/* 故障链的可选动作随调查进度变化，避免"什么都没查也能直接修" */
+function millWheelBrokenActions(it, w, t) {
+  if (t.step === 0) {
+    return [
+      { label: '拆开轴套看看（30 分钟 · 3 体力）', close: false, onClick: function () { millInvestigate(it, 'axle'); closeWindow(); } },
+      { label: '去看分水渠的坡度（30 分钟 · 3 体力）', close: false, onClick: function () { millInvestigate(it, 'channel'); closeWindow(); } },
+      { label: '关闭', close: true }
+    ];
+  }
+  if (t.step === 1) {
+    return [
+      { label: '方案一：换新橡木轴', close: false, onClick: function () { millRepair(it, 'axle'); } },
+      { label: '方案二：改分水渠降压', close: false, onClick: function () { millRepair(it, 'channel'); } },
+      { label: '关闭', close: true }
+    ];
+  }
+  return [{ label: '关闭', close: true }];
+}
+
+/* 磨粉：闸门朝向直接改变产量，来水不足时批量出粉打折。
+   先验时、再扣料，符合第 15.1 节“不把分钟截到日终”。 */
+function doMill(it, grainQty, flourQty, minutes, energy) {
+  if (!millAtSite(it)) { toast('请在水轮旁操作。'); return; }
+  if (invCount('grain') < grainQty) {
+    toast('麦子不够：需要 ' + grainQty + ' 斗小麦（现有 ' + invCount('grain') + '）。可以去粮仓配货，或向村里收。');
+    return;
+  }
+  var w = millWorks();
+  if (w.waterTo !== 'mill') {
+    flourQty = Math.ceil(flourQty / 2);          // 水给了麦田，磨坊只能出半粉
+    minutes = Math.round(minutes * 0.8);
+  }
+  if (!canSpendGameMinutes(minutes)) return;
+  if (!hasEnergy(energy)) return;
+  // 模拟扣除麦子后判断产物放不放得下，避免"料被扣光却没拿到东西"
+  var after = Object.assign({}, state.inventory);
+  after.grain = (after.grain || 0) - grainQty;
+  if (!canAccept(after, 'flour', flourQty)) { toast('背包满了，面粉放不下。'); return; }
+  invRemove('grain', grainQty);
+  invAdd('flour', flourQty);
+  state.energy -= energy;
+  spendGameMinutes(minutes);
+  w.wheelTurns = (w.wheelTurns || 0) + flourQty;
+  var t = millTaskState();
+  if (t.step === 2 && !w.inspected) { /* 修好后第一次磨粉会在验收处被记下 */ }
+  markDirty(); refreshHud(); saveNow(); refreshWindow();
+  toast('磨出面粉 ×' + flourQty + (w.waterTo !== 'mill' ? '（水不够，只出了半粉）' : ''));
+}
+
+/* --- 粮仓：粮食配货，可以买入小麦（让磨坊成为真实循环） --- */
+function openMillGranary(it) {
+  openWindow({
+    id: 'millgranary', kind: 'custom', title: '粮仓',
+    build: function (b) {
+      b.appendChild(el('p', null, '柯里管着村里的粮仓。仓里的麦子按斗记，出仓要过秤。'));
+      b.appendChild(el('p', 'muted', '一斗小麦 12 金，可磨成四袋面粉（卖 26 金/袋）。买来的麦子不占田，但价格随村里存货浮动。'));
+      var e = exploreState();
+      var price = 12 + (e.grainIndex || 0) * 2;
+      if (price < 6) price = 6;
+      b.appendChild(el('p', null, '当前麦价：' + price + ' 金 / 斗' + ((e.grainIndex || 0) < 0 ? '（今年歉收，麦价偏高）' : (e.grainIndex > 0 ? '（今年丰收，麦价偏低）' : ''))));
+      b.appendChild(el('p', 'muted', '你背包里现有小麦 ' + invCount('grain') + ' 斗、面粉 ' + invCount('flour') + ' 袋。'));
+    },
+    actions: [
+      { label: '买 2 斗麦子', close: false, onClick: function () {
+        if (!millAtSite(it)) { toast('请在粮仓旁操作。'); return; }
+        var e = exploreState(), price = Math.max(6, 12 + (e.grainIndex || 0) * 2), qty = 2;
+        if (!canSpendGameMinutes(15)) return;
+        if (!payExplore({ coins: price * qty })) return;
+        invAdd('grain', qty);
+        spendGameMinutes(15);
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('购入小麦 ×' + qty + '，花费 ' + (price * qty) + ' 金。');
+      } },
+      { label: '卖出 1 袋面粉（18 金）', close: false, onClick: function () {
+        if (!millAtSite(it)) { toast('请在粮仓旁操作。'); return; }
+        if (invCount('flour') < 1) { toast('没有面粉可卖。'); return; }
+        if (!canSpendGameMinutes(10)) return;
+        invRemove('flour', 1);
+        state.coins += 18;
+        spendGameMinutes(10);
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('卖出面粉 ×1，获得 18 金。');
+      } },
+      { label: '关闭', close: true }
+    ]
+  });
+}
+
+/* --- 议事屋告示：三节点任务链 --- */
+function openMillBoard(it) {
+  var t = millTaskState();
+  openWindow({
+    id: 'millboard', kind: 'custom', title: '议事屋告示',
+    build: function (b) {
+      var cur = MILL_QUEST[Math.min(t.step, MILL_QUEST.length - 1)];
+      b.appendChild(el('div', 'section-title', cur.title));
+      b.appendChild(el('p', null, cur.desc));
+      if (t.cause) b.appendChild(el('p', 'muted', '已查明原因：' + (t.cause === 'axle' ? '橡木轴疲劳开裂' : '分水渠坡太陡，水压长期偏高') + '。'));
+      if (t.plan) b.appendChild(el('p', 'muted', '已选修法：' + (t.plan === 'axle' ? '换新橡木轴' : '改渠降压') + '。'));
+      if (t.step < MILL_QUEST.length) {
+        b.appendChild(el('p', 'req-chip', '进度：第 ' + (t.step + 1) + ' / ' + MILL_QUEST.length + ' 步'));
+      } else {
+        b.appendChild(el('p', 'req-chip ok', '村子的粮仓已经续上了。这件事记在柯里的议事记录里。'));
+      }
+    },
+    actions: [{ label: '关闭', close: true }]
+  });
+}
+
+/* --- 第一节点：故障调查。站在机房旁查，结论决定后面能选修法 --- */
+function millInvestigate(it, cause) {
+  if (!millAtSite(it)) { toast('请在磨坊机房旁查看。'); return; }
+  if (!canSpendGameMinutes(30)) return;
+  if (!hasEnergy(3)) return;
+  state.energy -= 3;
+  spendGameMinutes(30);
+  var t = millTaskState();
+  t.cause = cause;
+  t.step = 1;
+  markDirty(); refreshHud(); saveNow();
+  toast('查明原因：' + (cause === 'axle' ? '橡木轴疲劳开裂' : '分水渠坡太陡，水压长期偏高') + '。去磨坊机房商量修法吧。');
+}
+
+/* --- 第二节点：选择修理方案。两条路材料、工时与后果都不同 --- */
+function millRepair(it, plan) {
+  if (!millAtSite(it)) { toast('请在磨坊机房旁操作。'); return; }
+  var cost = plan === 'axle' ? { wood: 12 } : { wood: 8, stone: 10 };
+  var minutes = plan === 'axle' ? 150 : 180;
+  var energy = plan === 'axle' ? 16 : 18;
+  var desc = plan === 'axle'
+    ? '换一根新橡木轴：材料少、见效快，但只是治标，渠里的水压问题还在。'
+    : '改分水渠降压：材料和工时更多，但以后不用年年换轴。';
+  openWindow({
+    id: 'millrepair', kind: 'custom', title: '选择修法',
+    build: function (b) {
+      b.appendChild(el('p', null, desc));
+      b.appendChild(el('p', 'muted', plan === 'axle'
+        ? '需要：木材 ×12 · 150 分钟 · 16 体力。'
+        : '需要：木材 ×8、石头 ×10 · 180 分钟 · 18 体力。'));
+      b.appendChild(el('p', 'muted', '两条路都会让水轮重新转起来，账不一样，以后麦田的水压也不一样。'));
+    },
+    actions: [
+      { label: '就按这条修', kind: 'primary', close: false, onClick: function () {
+        if (!canSpendGameMinutes(minutes)) return;
+        if (!payExplore(cost)) return;
+        if (!hasEnergy(energy)) return;
+        state.energy -= energy;
+        spendGameMinutes(minutes);
+        var w = millWorks(), t = millTaskState();
+        w.repaired = true; w.plan = plan;
+        t.plan = plan; t.step = 2;
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast(plan === 'axle' ? '新轴装好，水轮重新转起来。' : '分水渠改宽降压，水轮重新转起来，而且不容易再坏。');
+      } },
+      { label: '再想想', close: true }
+    ]
+  });
+}
+
+/* --- 第三节点：检验供水并交货。磨出的粉真的交给村子 --- */
+function openMillDeliver(it) {
+  var w = millWorks(), t = millTaskState();
+  var need = 6;
+  var ready = t.step >= 2 && w.repaired;
+  openWindow({
+    id: 'milldeliver', kind: 'custom', title: '交货台',
+    build: function (b) {
+      if (!ready) {
+        b.appendChild(el('p', null, '台上摆着空麻袋和一副旧秤。村子在等面粉，可水轮还没转起来。'));
+        b.appendChild(el('p', 'muted', '先按议事屋告示走完调查与修理，再来交货。'));
+        return;
+      }
+      b.appendChild(el('p', null, '柯里在这里收货，交货要当面过秤，收下就记进村里的粮仓账。'));
+      b.appendChild(el('p', null, '本次需要面粉 ×' + need + '，你现有 ' + invCount('flour') + ' 袋。'));
+      b.appendChild(el('p', 'muted', '交完这次，水轮与分水闸记为已验收，告示完成第三步。'));
+    },
+    actions: !ready ? [{ label: '关闭', close: true }] : [
+      { label: '交货：面粉 ×' + need, kind: 'primary', close: false, onClick: function () {
+        if (!millAtSite(it)) { toast('请在交货台旁操作。'); return; }
+        if (invCount('flour') < need) { toast('面粉不够，需要 ' + need + ' 袋（现有 ' + invCount('flour') + '）。'); return; }
+        if (!canSpendGameMinutes(30)) return;
+        if (!hasEnergy(4)) return;
+        invRemove('flour', need);
+        state.energy -= 4;
+        spendGameMinutes(30);
+        w.inspected = true;
+        t.delivered = (t.delivered || 0) + need;
+        if (t.step === 2) t.step = 3;
+        state.coins += 120;
+        state.npcFriendship.councilor = (state.npcFriendship.councilor || 0) + 15;
+        state.npcFriendship.martin = (state.npcFriendship.martin || 0) + 10;
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('交货完成。村子付 120 金，柯里与马丁都记下了这件事。');
+      } },
+      { label: '关闭', close: true }
+    ]
+  });
+}
+
+/* 麦田村场景实体：麦田随闸门与成熟度变化，水轮随闸门与修复状态转不转。
+   状态来自真实存档，不是固定贴图（§30.3 第 5 条：至少有随进度变化的状态）。 */
+function drawMillVillage(ents, R, g) {
+  var map = MAPS.millvillage, w = millWorks();
+  var millSide = w.waterTo === 'mill';
+  var spinning = w.repaired && millSide;
+  var watered = w.waterTo === 'field';
+  /* 麦子按"真正进过水的日子"累积，缺水时停滞，不会突然枯死。
+     必须按世界日期计天，不能每帧累加——否则一进村就熟。 */
+  if (w.wateredDays == null) { w.wateredDays = 0; w.wateredLastDay = state.totalDay; }
+  if (watered && state.totalDay > w.wateredLastDay) {
+    w.wateredDays += state.totalDay - w.wateredLastDay;
+    w.wateredLastDay = state.totalDay;
+  }
+  if (!watered) w.wateredLastDay = Math.max(w.wateredLastDay || 0, state.totalDay);
+  var ripe = w.wateredDays >= 4;
+  (map.wheatFields || []).forEach(function (f) {
+    /* 视野 R 用的是格坐标，不能再乘 TILE，否则整片麦田会被误判成视野外 */
+    if (f.x1 < R.x0 || f.x0 > R.x1 || f.y1 < R.y0 || f.y0 > R.y1) return;
+    drawWheatField(g, f, ripe, watered);
+  });
+  // 水轮实体
+  if (w.repaired) {
+    ents.push({ z: 11 * TILE + TILE, f: function (gg, x, y) { drawMillWheel(gg, x, y, spinning); }, a: [12, 11] });
+  }
+  // 分水闸外观：朝哪边开一目了然
+  ents.push({ z: 10 * TILE + TILE, f: function (gg, x, y) {
+    px(gg, x * TILE + 1, y * TILE + 2, 14, 3, '#8B7355');
+    px(gg, x * TILE + 1, y * TILE + 11, 14, 3, '#8B7355');
+    px(gg, x * TILE + (millSide ? 5 : 10), y * TILE + 5, 1, 6, '#C9B47E');
+    px(gg, x * TILE + 4, y * TILE + 6, 8, 2, '#B0553F');
+  }, a: [16, 10] });
+}
+
 function openWorkRecords(initial) {
   clearKeys();var tab=initial==='mine'?'mine':'farm',selected=null;
   openWindow({id:'workrecords',kind:'custom',wide:true,title:'农务与矿山记录',build:function(b){
@@ -8559,6 +9055,12 @@ var TRAVEL_NODES = [
     name: '白蔷薇城', region: 'centre', kind: 'city',
     safe: [[330, 470], [330, 468], [330, 472], [326, 470]],
     desc: '从小镇南口办理通行证后进入。640×480 格城市：城堡高台、西侧旧城、花园住宅区、老市集、工匠区、河岸、学院区与南门驿站。'
+  },
+  {
+    id: 'mill.square', locationId: 'white_rose.southeast.mill_village', sceneId: 'millvillage',
+    name: '风铃磨坊与麦田村', region: 'southeast', kind: 'village',
+    safe: [[16, 18], [15, 18], [17, 18], [16, 17]],
+    desc: '河流穿过麦田与古老水磨坊的村落。水轮、粮仓、分水闸和议事屋都在这里。'
   }
 ];
 
@@ -8595,7 +9097,14 @@ var TRAVEL_PAIRS = {
   'riverside.bank|city.gate': TRAVEL_MIN.provinceLong,
   'forest.gate|mine.entrance': TRAVEL_MIN.provinceShort,
   'city.gate|mine.entrance': TRAVEL_MIN.provinceRemote,
-  'farm.home|mine.entrance': TRAVEL_MIN.provinceLong
+  'farm.home|mine.entrance': TRAVEL_MIN.provinceLong,
+  /* 阶段 C：麦田村在小镇东南，经主路可达 */
+  'town.square|mill.square': TRAVEL_MIN.adjacent,
+  'farm.home|mill.square': TRAVEL_MIN.provinceShort,
+  'riverside.bank|mill.square': TRAVEL_MIN.provinceShort,
+  'mill.square|forest.gate': TRAVEL_MIN.provinceShort,
+  'mill.square|city.gate': TRAVEL_MIN.provinceLong,
+  'mill.square|mine.entrance': TRAVEL_MIN.provinceLong
 };
 /* 表内书写方向不影响往返查找。 */
 Object.keys(TRAVEL_PAIRS).forEach(function (key) {
@@ -8706,6 +9215,7 @@ function travelNodeUnlocked(n) {
   if (n.id === 'forest.gate') return !!exploreState().forest;
   if (n.id === 'city.gate') return !!exploreState().city;
   if (n.id === 'mine.entrance') return !!exploreState().mine;
+  if (n.id === 'mill.square') return true;   // 麦田村沿小镇主路开放，先到访再登记
   if (n.id === 'mine.level2') return !!exploreState().mine && exploreState().depth >= 2;
   if (n.id === 'mine.level3') return !!exploreState().mine && exploreState().depth >= 3;
   return false;
@@ -8730,6 +9240,7 @@ var SCENE_TO_NODE = {
   riverside: 'riverside.bank',
   forest: 'forest.gate',
   city: 'city.gate',
+  millvillage: 'mill.square',
   mine1: 'mine.entrance', mine2: 'mine.level2', mine3: 'mine.level3'
 };
 
@@ -8887,7 +9398,7 @@ var WORLD_REGIONS = [
   {id:'forest',name:'雾杉森林',x:55,y:81,desc:'从小镇北口进入。硬木、蘑菇、林间湖、伐木屋与隐藏宝箱；东北通往旧矿山。'},
   {id:'city',name:'白蔷薇城',x:57,y:47,desc:'从小镇南口办理通行证后进入。640×480 格城市：城堡高台、西侧旧城、花园住宅区、老市集、工匠区、河岸、学院区与南门驿站。'},
   {id:'pass',name:'旧矿山',x:80,y:22,desc:'从森林东北进入，共三层：铜矿、铁矿、紫晶。修复轨道逐层深入，原路返回森林。'},
-  {id:'mill',name:'风铃磨坊',x:81,y:67,desc:'河流穿过麦田与古老水磨坊，连接山谷东南部的乡野。'}
+  {id:'mill',name:'风铃磨坊与麦田村',x:81,y:67,desc:'河流穿过麦田与古老水磨坊的村落。水轮、粮仓、分水闸与议事屋都在这里；磨坊与麦田共用有限的来水。'}
 ];
 function worldRegionStatus(r) {
   if (r.id === 'farm' || r.id === 'town') return '已开放';
@@ -8895,6 +9406,8 @@ function worldRegionStatus(r) {
   if(r.id==='forest')return exploreState().forest?'已开放':'未解锁 · 小镇北口清理倒木';
   if(r.id==='city')return exploreState().city?'已开放':'未解锁 · 小镇南口办理通行证';
   if(r.id==='pass')return exploreState().mine?'已开放':'未解锁 · 森林东北修复矿山';
+  /* 阶段 C：麦田村经小镇主路抵达，修好水轮并交货后记为已开放 */
+  if(r.id==='mill')return exploreState().millWorks&&exploreState().millWorks.inspected?'已开放':'可前往 · 水轮待修复';
   return '待开放';
 }
 function drawWorldAtlas(c) {
@@ -8995,7 +9508,7 @@ function openWorldMap() {
 function regionTravelNode(regionId) {
   var map = {
     farm: 'farm.home', town: 'town.square', riverside: 'riverside.bank',
-    forest: 'forest.gate', city: 'city.gate', pass: 'mine.entrance'
+    forest: 'forest.gate', city: 'city.gate', pass: 'mine.entrance', mill: 'mill.square'
   };
   return map[regionId] ? travelNodeById(map[regionId]) : null;
 }
@@ -9271,6 +9784,11 @@ function activateInteractable(it) {
   if(it.kind==='lumberHut'){openExploreSite('hut');return;}
   if(it.kind==='mineStairs'){exploreStairs(it.next);return;}
   if(it.kind==='mineWork'){openMineWork(it);return;}
+  if(it.kind==='millGate'){openMillGate(it);return;}
+  if(it.kind==='millWheel'){openMillWheel(it);return;}
+  if(it.kind==='millGranary'){openMillGranary(it);return;}
+  if(it.kind==='millBoard'){openMillBoard(it);return;}
+  if(it.kind==='millDeliver'){openMillDeliver(it);return;}
   if(it.kind==='treasure'){exploreTreasure(it.id);return;}
   if (it.kind === 'tackle') { openTackleShop(); return; }
   if (it.kind === 'workshop') { openWorkshop(); return; }
@@ -10787,6 +11305,7 @@ function drawFishingHud(g) {
 }
 
 function drawScene(g, dt) {
+  Game.animT = (Game.animT || 0) + (dt || 0) / 1000;
   var map = MAPS[state.sceneId];
   var ppos = Game.ppos;
   var maxX = Math.max(0, map.w * TILE - VIEW_W);
@@ -10921,6 +11440,14 @@ function drawScene(g, dt) {
     } else if(it.kind==='treasure'){ents.push({z:it.y*TILE+TILE,f:function(g,x,y){px(g,x*TILE+2,y*TILE+5,12,9,'#895F38');px(g,x*TILE+2,y*TILE+5,12,3,'#BD9257');px(g,x*TILE+7,y*TILE+7,2,4,'#E5C775');},a:[it.x,it.y]});
     } else if(it.kind==='mineStairs'||it.kind==='mineGate'||it.kind==='forestGate'){ents.push({z:it.y*TILE+TILE,f:function(g,x,y){px(g,x*TILE,y*TILE,16,16,'#544A3D');px(g,x*TILE+3,y*TILE+2,10,14,'#272C32');for(var i=0;i<4;i++)px(g,x*TILE+4,y*TILE+5+i*3,8,1,'#A8A18C');},a:[it.x,it.y]});
     } else if(it.kind==='cityGate'){ents.push({z:it.y*TILE+TILE,f:drawCityGateSite,a:[it.x,it.y]});
+    } else if(it.kind==='millWheel'||it.kind==='millGranary'||it.kind==='millBoard'||it.kind==='millDeliver'){
+      /* 麦田村设施统一画成可辨识的小道具；水轮本体与闸口在 drawMillVillage 里画 */
+      ents.push({z:it.y*TILE+TILE,f:function(g,x,y,kind){
+        if(kind==='millGranary'){px(g,x*TILE+2,y*TILE+6,12,8,'#9C7B4E');px(g,x*TILE+2,y*TILE+4,12,3,'#7A5C39');px(g,x*TILE+6,y*TILE+8,4,2,'#D9C07A');}
+        else if(kind==='millBoard'){px(g,x*TILE+3,y*TILE+3,3,11,'#6B5236');px(g,x*TILE+6,y*TILE+4,7,6,'#E3D7B6');px(g,x*TILE+7,y*TILE+6,4,1,'#8C6F4A');}
+        else if(kind==='millDeliver'){px(g,x*TILE+2,y*TILE+8,12,5,'#8B7355');px(g,x*TILE+3,y*TILE+5,4,4,'#D9C89E');px(g,x*TILE+9,y*TILE+5,4,4,'#CBB88C');}
+        else {px(g,x*TILE+3,y*TILE+6,10,8,'#7A5A3C');px(g,x*TILE+5,y*TILE+8,6,5,'#B08A55');}
+      },a:[it.x,it.y,it.kind]});
     } else if (it.kind === 'board') {
       ents.push({ z: it.y * TILE + TILE, f: drawBoard, a: [it.x, it.y] });
     }
@@ -10969,6 +11496,7 @@ function drawScene(g, dt) {
   ents.sort(function (a, b) { return a.z - b.z; });
   sceneAnimals().forEach(function(a){if(a.x>=R.x0-1&&a.x<=R.x1+1&&a.y>=R.y0-1&&a.y<=R.y1+1)ents.push({z:a.y*TILE+TILE,f:drawAnimal,a:[a.x,a.y,a]});});
   if(state.sceneId==='city')drawCityCrowd(ents,R);
+  if(state.sceneId==='millvillage')drawMillVillage(ents,R,g);
   if(state.sceneId.indexOf('city_')===0)drawCityInterior(g,map);
   ents.sort(function(a,b){return a.z-b.z;});
   ents.forEach(function (e) { e.f(g, e.a[0], e.a[1], e.a[2], e.a[3], e.a[4]); });
@@ -11612,6 +12140,27 @@ window.__MOSS__ = {
   freshState: function () { return newGameState(); },
   normalizeSaveForTest: function (raw) { return normalizeSave(raw); },
   closeWindow: function () { closeWindow(); },
+  syncPlayer: function () { syncPlayerPixel(); onSceneChanged(); },
+  invCount: function (id) { return invCount(id); },
+  wheatFieldsDebug: function () { return (MAPS.millvillage.wheatFields || []).map(function (f) { return { x0: f.x0, y0: f.y0, x1: f.x1, y1: f.y1 }; }); },
+  millWaterDays: function () { var w = millWorks(); return { wateredDays: w.wateredDays || 0, waterTo: w.waterTo }; },
+  sceneSize: function () { var m = MAPS[state.sceneId]; return { w: m.w, h: m.h, name: m.name }; },
+  npcInfo: function (id) { return NPCS[id] ? { name: NPCS[id].name, title: NPCS[id].title, scene: NPCS[id].scene } : null; },
+  millInfo: function () { var t = millTaskState(), w = millWorks(); return { step: t.step, cause: t.cause, plan: t.plan, delivered: t.delivered, repaired: w.repaired, inspected: w.inspected, waterTo: w.waterTo, wheelTurns: w.wheelTurns }; },
+  devOpenMill: function (kind) {
+    var list = INTERACTABLES.millvillage || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].kind === kind) {
+        if (kind === 'millGate') openMillGate(list[i]);
+        else if (kind === 'millWheel') openMillWheel(list[i]);
+        else if (kind === 'millGranary') openMillGranary(list[i]);
+        else if (kind === 'millBoard') openMillBoard(list[i]);
+        else openMillDeliver(list[i]);
+        return true;
+      }
+    }
+    return false;
+  },
   /* openCityService 收的是 interactable 对象（读 it.service），不是 service 字符串 */
   devOpenService: function (service) { openCityService({ kind: 'cityService', service: service }); },
   get game() { return Game; },
