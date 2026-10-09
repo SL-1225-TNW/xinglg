@@ -24,16 +24,23 @@ jobs:
       - name: Build standalone game
         run: node tests/build-single-file.mjs
       - name: Main 14-day regression
+        if: always()
         run: node tests/run-main.mjs
       - name: Stage B regression
+        if: always()
         run: node tests/run-v7-stageB.mjs
       - name: Audit regressions
+        if: always()
         run: node tests/run-v7-audit-regressions.mjs
       - name: Responsive layout
+        if: always()
         run: node tests/run-responsive-layout.mjs
       - name: Single-file smoke test
+        if: always()
         run: node tests/run-single-file-smoke.mjs
       - name: Phase C mill tests
+        if: always()
         run: node tests/run-phase-c-mill.mjs
       - name: Phase C meadow tests
+        if: always()
         run: node tests/run-phase-c-meadow.mjs
