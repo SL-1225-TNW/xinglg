@@ -164,7 +164,7 @@ try {
   await page.locator('.shop-row').filter({ hasText: '草莓种子' }).getByRole('button', { name: '买 1 份', exact: true }).click();
   eq((await snap(page)).inv.seed_strawberry, 2, '用初始金币实际买两份草莓种子');
   await closeWin(page); await go('farm'); await plant(str, '草莓'); await care();
-  await mature(rad); await harvest(rad); eq((await snap(page)).inv.radish, 8, '收获八颗萝卜');
+  await mature(rad); await harvest(rad); eq((await snap(page)).inv.radish, 16, '八株萝卜按当前肥力收获 16 个');
   await quest(1, '第一份收成'); await quest(2, '木匠的准备');
   await collect(25, 15); await mature(pot); await harvest(pot);
   eq((await snap(page)).inv.potato, 2, '收获两颗土豆');
