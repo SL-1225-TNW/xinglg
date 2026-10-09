@@ -1,0 +1,50 @@
+name: Verify game and save flows
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright test dependency
+        run: npm install --no-save --no-package-lock playwright@1.51.0
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Check source syntax
+        run: |
+          node --check game.js
+          for file in tests/*.mjs; do node --check "$file"; done
+      - name: Build the offline single-file game
+        run: node tests/build-single-file.mjs
+      - name: Verify mill and meadow
+        run: |
+          node tests/run-phase-c-mill.mjs
+          node tests/run-phase-c-meadow.mjs
+      - name: Verify wetland, professional routes, and frontier chapter
+        run: node tests/run-phase-cde.mjs
+      - name: Verify Stage B and save regressions
+        run: |
+          node tests/run-v7-stageB.mjs
+          node tests/run-v7-audit-regressions.mjs
+      - name: Verify main gameplay and responsive layout
+        run: |
+          node tests/run-main.mjs
+          node tests/run-responsive-layout.mjs
+      - name: Smoke test the single-file build
+        run: node tests/run-single-file-smoke.mjs
