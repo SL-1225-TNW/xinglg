@@ -2,7 +2,15 @@
 
 定性方法：运行时实证（浏览器实跑触发后的副作用），不用符号计数。
 基线脚本：`tests/probe-phase-b-runtime.mjs`（22 项断言）
-盘点日期：**基线 22/22 通过，空白 0。B 阶段已全部落地。**
+盘点日期：**基线 22/22 通过，空白 0。B 阶段已全部落地并验收。**
+
+本轮额外修复（不属于 §32 功能缺口，是实测暴露的真实缺陷）：
+
+| 项 | 现象 | 根因 | 修法 |
+|---|---|---|---|
+| 居民日程落点 | 10 个 NPC 站在家具/建筑里 | `addResident` 默认日程盲加 `x+2`/`y+2`，而锅炉、货箱、柜台都占格 | 新增 `nearestWalkable` 螺旋吸附，三段日程全部校验 |
+| 锅炉工 | 站在 `city_boiler` 的货箱上（4,12,6×3） | 岗位点 + 偏移落在 crates 上 | 同上 |
+| 学院教师 | 初始点 (520,96) 在 `uni_wing` 教学楼内（496,94,26×9） | 基线坐标直接指向楼体 | 同上；城市场景搜索半径给到 30 |
 
 判定铁律：先回答「正确行为是什么」再写断言；符号存在 ≠ 功能可用。
 
@@ -56,7 +64,39 @@
 - 高级课程、邻里事件、邮务（§32.6 提到，规模大，留待后续）
 - 城市内部房间细节（§32.7 说「优先填充用途与内部」，56 座已有，需单独盘点）
 
-## 已知既有失败（与 B 阶段无关）
+## 本轮新增的探针修正（探针错，代码对）
 
-`lint-self.mjs` 报 fertility/gatherExplore 等孤儿引用；`run-ui/run-edge/run-guide/run-main`
-等脚本在 HEAD 上即 exit≠0。已用 `git show HEAD:game.js` 对照确认为既有状态，非本次引入。
+4. **「每个片区都有多种建筑家族且不跨区借用」**
+   把 theme 精确映射和轮换游标混为一谈。`game.js:2346` 注释约束的是**游标不跨借**；
+   `pickArchetype` 明确允许目标原型不在本片区家族时跨家族兜底，「绝不静默退化成住宅模板」。
+   `civic_hall` 落在 `garden` 片区即此例，总规 §32.7 也要求「公共大厅无需爵位」。
+   已拆成两条断言：游标轮换不跨借 + theme 映射优先于片区家族。
+
+5. **`openQuestLog()` 缺参数**
+   函数签名是 `openQuestLog(site)`，`site` 决定交付按钮文案。0 参不崩但语义不清，
+   已显式传 `undefined`。
+
+## 验收状态（合并 origin/main 后重跑）
+
+| 脚本 | 结果 |
+|---|---|
+| `probe-phase-b-runtime.mjs` | 22/22，空白 0 |
+| `run-living-world.mjs` | 52 PASS / 0 FAIL，exit=0 |
+| `probe-kitchen.mjs` | 19/0 |
+| `audit-compost-e2e.mjs` | 28 |
+| `audit-livestock-e2e.mjs` | 41 |
+| `audit-fishpond-e2e.mjs` | 51 |
+| `audit-market-e2e.mjs` | 29 |
+| `audit-fertility-e2e.mjs` | 全通过 |
+| `audit-town-square.mjs` | 全通过 |
+| `苔芽农场-单文件版.html` | 独立加载 boot ok，零 pageerror |
+
+`lint-self.mjs` 孤儿引用已清零（补导出 nearestWalkable / houseFurniture /
+plotFertility / rotationHint / fertilityTier / fertilityYieldFactor）。
+
+### 剩余非阻塞项
+
+`run-ui.mjs` 有 2 项失败：快捷栏 10 格 vs 期望 9 格。与 B 阶段无关，
+快捷栏格子数属 UI 规格，需确认总规口径后再改（改代码还是改断言）。
+`lint-self.mjs` 另有一条 E 级告警：`pose(scene,...)` 直接写 `state.sceneId`
+未还原——属误报，`pose` 是每次都显式传入完整 scene/player 的摆位工具函数。
