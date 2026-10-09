@@ -35,9 +35,10 @@ try {
   eq('扩展地点交互点与室内返程落点均在地图内', await evaluate(() => {
     const maps = __MOSS__.MAPS, regions = __MOSS__.extendedRegionByScene, interactions = __MOSS__.INTERACTABLES;
     const badPoints = Object.entries(interactions).flatMap(([scene, list]) => list.filter(it => ['extendedGate','extendedDoor','extendedLife'].includes(it.kind) && (!maps[scene] || it.x < 0 || it.y < 0 || it.x >= maps[scene].w || it.y >= maps[scene].h)).map(it => scene + ':' + it.label));
+    const badWorksites = Object.entries(interactions).flatMap(([scene, list]) => list.filter(it => it.kind === 'extendedLife' && maps[scene] && [[it.x,it.y],[it.x+1,it.y],[it.x-1,it.y],[it.x,it.y+1],[it.x,it.y-1]].every(([x,y]) => x < 0 || y < 0 || x >= maps[scene].w || y >= maps[scene].h || maps[scene].solid[x][y] === 1)).map(it => scene + ':' + it.label));
     const badExits = Object.entries(regions).flatMap(([scene]) => (maps[scene].exits || []).filter(exit => !maps[exit.to] || exit.tx < 0 || exit.ty < 0 || exit.tx >= maps[exit.to].w || exit.ty >= maps[exit.to].h).map(exit => scene + '→' + exit.to));
-    return [badPoints, badExits];
-  }), [[], []]);
+    return [badPoints, badWorksites, badExits];
+  }), [[], [], []]);
 
   // Wetland: register, survey, collect separate source samples, verify cause, repair habitat.
   await evaluate(() => { __MOSS__.state.bridgeRepaired = true; __MOSS__.state.energy = 100; __MOSS__.state.timeMinutes = 450; });
@@ -54,7 +55,7 @@ try {
   await pose('wetland', 26, 19); await panel('openWetlandSite', 'wetland_sample'); await click('采集封存水样 ×1 · 15分钟');
   await pose('wetland', 33, 15); await panel('openWetlandSite', 'wetland_outfall'); await click('采集封存水样 ×1 · 15分钟');
   eq('上游和溢流口各记一份样本', await evaluate(() => [__MOSS__.wetlandLifeState().upstreamSample, __MOSS__.wetlandLifeState().outfallSample, __MOSS__.wetlandLifeState().waterSamples]), [true, true, 2]);
-  await pose('wetland_observation', 12, 7); await panel('openWetlandSite', 'wetland_cause');
+  await pose('wetland_observation', 9, 6); await panel('openWetlandSite', 'wetland_cause');
   await click('辨认水草样本 · 芦苇 ×1');
   await click('对照水样与旧水道图 · 30分钟');
   eq('原因由两个点位与调查共同确认', await evaluate(() => [__MOSS__.wetlandLifeState().causeFound, __MOSS__.state.inventory.marsh_sample, __MOSS__.professionalLifeState().access.clinic]), [true, 1, true]);
@@ -80,7 +81,8 @@ try {
   await pose('clinic_archive', 8, 7); await panel('openProfessionSite', 'archive'); await click('核对湿地水草样本 · 15分钟');
   eq('档案核验样本来源后才开放诊断', await evaluate(() => __MOSS__.professionalLifeState().clinic.sampleVerified), true);
   await pose('clinic_ward', 9, 7); await panel('openProfessionSite', 'clinic'); await click('签收医舍葡萄汁运单 · 运单 ×1'); await click('辨认药材并建立病历 · 15分钟'); await click('配制草药包 ×2 · 芦苇样本与葡萄汁'); await click('照护病人并记录复诊 · 草药包 ×1');
-  eq('诊断、签收、配药、照护分别记账', await evaluate(() => [__MOSS__.professionalLifeState().clinic.diagnosed, __MOSS__.professionalLifeState().clinic.receivedJuice, __MOSS__.professionalLifeState().clinic.medicine, __MOSS__.professionalLifeState().clinic.patientDay]), [true, true, 1, __MOSS__.state.totalDay + 1]);
+  const followUpDay = await evaluate(() => __MOSS__.state.totalDay + 1);
+  eq('诊断、签收、配药、照护分别记账', await evaluate(() => [__MOSS__.professionalLifeState().clinic.diagnosed, __MOSS__.professionalLifeState().clinic.receivedJuice, __MOSS__.professionalLifeState().clinic.medicine, __MOSS__.professionalLifeState().clinic.patientDay]), [true, true, 1, followUpDay]);
   await night(); await pose('clinic_ward', 9, 7); await panel('openProfessionSite', 'clinic'); await click('复诊并更新病历 · 10分钟');
   eq('隔夜复诊后病历结案', await evaluate(() => __MOSS__.professionalLifeState().clinic.recovered), true);
 
@@ -113,11 +115,11 @@ try {
   eq('训练记录满足委任且小队受12人上限', await evaluate(() => [__MOSS__.militaryLifeState().qualification, __MOSS__.militaryLifeState().unit.count, __MOSS__.militaryLifeState().commandLimit]), [2, 8, 12]);
   await pose('border_depot', 8, 7); await panel('openMilitarySite', 'supply'); await click('用机构军费10金领巡防口粮 ×4');
   eq('机构军费与个人金币分账', await evaluate(() => [__MOSS__.militaryLifeState().institutionFund, __MOSS__.state.inventory.military_rations]), [90, 4]);
-  await pose('border_barracks', 14, 9); await panel('openMilitarySite', 'campaign'); await click('签收七日巡防委任 · 开始任务');
+  await pose('border_barracks', 16, 7); await panel('openMilitarySite', 'campaign'); await click('签收七日巡防委任 · 开始任务');
   await pose('cloud_pass', 17, 17); await panel('openMilitarySite', 'pass_route'); await click('沿山脊巡查 · 记录高处桥面 · 20分钟');
   eq('侦察后部队真实部署在关口且保留审计路簿', await evaluate(() => [__MOSS__.militaryLifeState().unit.scene, __MOSS__.state.inventory.route_evidence]), ['pass', 2]);
-  await night(); await pose('border_barracks', 14, 9); await panel('openMilitarySite', 'campaign'); await click('准备医疗护送 · 草药包 ×1／口粮 ×2');
-  await night(); await pose('border_barracks', 14, 9); await panel('openMilitarySite', 'campaign'); await click('掩护居民与医帐撤离 · 规则裁判');
+  await night(); await pose('border_barracks', 16, 7); await panel('openMilitarySite', 'campaign'); await click('准备医疗护送 · 草药包 ×1／口粮 ×2');
+  await night(); await pose('border_barracks', 16, 7); await panel('openMilitarySite', 'campaign'); await click('掩护居民与医帐撤离 · 规则裁判');
   const battle = await evaluate(() => __MOSS__.militaryLifeState().campaign.battle);
   ok('裁判给出固定种子和三个阶段', battle && battle.version === 1 && battle.seed > 0 && battle.phases.length === 3);
   ok('伤亡人数守恒、无永久删除人员', battle.wounded.own <= battle.initial.own && battle.final.own + battle.wounded.own === battle.initial.own);
@@ -137,10 +139,11 @@ try {
   await night(); await pose('neighbor_exchange', 8, 7); await panel('openNeighborSite', 'neighbor_exchange'); await click('隔夜后交换签章 · 完成邻领章节');
   eq('隔夜签章只批准互市，不会凭空结算货物', await evaluate(() => [__MOSS__.militaryLifeState().neighbor.settled, __MOSS__.militaryLifeState().neighbor.tradeReceived, __MOSS__.militaryLifeState().neighbor.localContract]), [true, false, false]);
   await pose('port_office', 10, 6); await panel('openProfessionSite', 'port'); await click('装运葡萄汁至邻领互市行栈 · 葡萄汁 ×1');
-  eq('互市货物必须经河港装运', await evaluate(() => [__MOSS__.professionalLifeState().port.shipment, __MOSS__.state.inventory.cargo_manifest, __MOSS__.state.inventory.grape_juice]), ['neighbor', 1, 0]);
+  eq('互市货物必须经河港装运', await evaluate(() => [__MOSS__.professionalLifeState().port.shipment, __MOSS__.state.inventory.cargo_manifest, __MOSS__.state.inventory.grape_juice||0]), ['neighbor', 1, 0]);
   await pose('neighbor_exchange', 8, 7); await panel('openNeighborSite', 'neighbor_exchange'); await click('签收互市葡萄汁运单 · 运单 ×1'); await click('结清已签收的互市货单 · 35金');
   eq('边城签收真实运单后才结清合同', await evaluate(() => [__MOSS__.militaryLifeState().neighbor.tradeReceived, __MOSS__.militaryLifeState().neighbor.localContract, __MOSS__.state.inventory.neighbor_seal]), [true, true, 1]);
-  await pose('border_barracks', 14, 9); await panel('openMilitarySite', 'campaign'); await click('复核互市道路护送 · 固定裁判复盘');
+  await night();
+  await pose('border_barracks', 16, 7); await panel('openMilitarySite', 'campaign'); await click('复核互市道路护送 · 固定裁判复盘');
   eq('第二场护送行动也生成独立可审计战斗记录', await evaluate(() => [__MOSS__.militaryLifeState().battleRecords.length, __MOSS__.militaryLifeState().battleRecords[1].audit.phases.length, __MOSS__.militaryLifeState().unit.count + __MOSS__.militaryLifeState().unit.wounded]), [2, 3, 8]);
   await pose('border_barracks', 14, 6); await panel('openMilitarySite', 'appointment'); await click('接受驻地连队代理委任 · 上限40人');
   eq('完成七日巡防和邻领协定才扩大委任', await evaluate(() => [__MOSS__.militaryLifeState().rank, __MOSS__.militaryLifeState().commandLimit]), ['captain', 40]);

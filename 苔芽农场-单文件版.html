@@ -13145,7 +13145,7 @@ addExtendedRoom('wetland_observation','芦苇湿地 · 观测屋',18,13,'wetland
   {x:2,y:2,w:4,h:2,type:'shelf'},{x:10,y:2,w:5,h:2,type:'notice'},{x:3,y:7,w:5,h:1,type:'table'},{x:11,y:7,w:4,h:2,type:'sacks'}
 ],'wetland');
 extendedSite('wetland_observation',8,6,'水鸟与栖息地记录板','wetland_observe');
-extendedSite('wetland_observation',12,7,'水草样本与封存台','wetland_cause');
+extendedSite('wetland_observation',9,6,'水草样本与封存台','wetland_cause');
 var WETLAND_NODE=addExtendedNode('wetland.marsh','white_rose.southwest.reed_marsh','wetland','芦苇湿地','southwest','marsh',[[3,17],[4,17],[3,18]],'栈道、浅滩与观察屋。记录水鸟、采样并与巡护员共同恢复栖息地。','wetland');
 EXTENDED_REGION_BY_SCENE.wetland='wetland';EXTENDED_REGION_BY_SCENE.wetland_observation='wetland';
 appendTravelPairs(WETLAND_NODE.id,[['riverside.bank',10],['town.square',30],['farm.home',60],['meadow.pasture',30]]);
@@ -13248,13 +13248,6 @@ extendedAddResident('port_leon','莱昂','渡船船长','port_lockhouse',9,6,'po
 extendedAddResident('port_mia','米娅','仓库管理员','port_office',10,6,'merchant',['#795B48','#C5A870','#65786D'],['少了两箱货，先查封签和装卸簿，再选追索或补运。两种方案的账都留在运单上。','石料和医舍药包用不同货位，批次到港后才能签收。']);
 extendedAddResident('quarry_marl','玛尔','采场工头','quarry',17,17,'engineer',['#5E5D58','#9D8D78','#6C7570'],['裂隙沿东侧工作面延伸。先测量并支护，再决定采灰岩还是先让开危险段。','原石不算验收料，测量棚要切割、编号后才可交工程。']);
 extendedAddResident('water_engineer','诺娅','水务工程师','waterworks_control',8,6,'engineer',['#486975','#C6C0A9','#7D916D'],['读完水尺还要问麦田、牧场和航船。优先灌溉会减少通航水深；保航则要推迟农田供水。','采场石料到货且河港运单核验后，闸件才能封存并开始试运行。']);
-extendedAddResident('pass_surveyor','伊万','山口测绘员','cloud_pass',14,12,'scholar',['#625347','#73818B','#C6B17B'],['关口开放给商旅通行；军事巡查必须有委任、路线记录和明确任务。','记录桥面与补给点，不要把路线传闻写成邻领的敌对行动。']);
-extendedAddResident('camp_captain','诺亚','驻地巡防官','border_barracks',9,6,'engineer',['#4F5960','#7D796B','#C2A65F'],['公共工程记录可以申请巡路登记；真正带队需要训练和正式委任。','队伍在营地集合后才算到岗，玩家传送不会替部队移动。']);
-extendedAddResident('camp_quartermaster','芙蕾','军需官','border_depot',13,7,'merchant',['#725A48','#9D835B','#6C8187'],['机构军费单独记账，口粮和装备按编制领用。','缺货就延后行动或选另一条方案，不会从私人金币自动补账。']);
-extendedAddResident('camp_medic','艾达','巡防医师','border_camp',23,18,'scholar',['#566A69','#E1DCCB','#A86065'],['伤员进入名册与医帐，隔夜后可以治疗。战损不会把人员从存档里抹掉。','补给桥护送需要先核实路况和物资，再让指挥部签发行动。']);
-extendedAddResident('oldroad_archivist','赛芙','古道档案员','oldroad_survey',13,7,'scholar',['#60534C','#B4A88E','#71818A'],['一块界碑不够判断边界；要比对石刻、路宽和双方维护记录。','有争议的路段先共同复测，记录证据来源与不确定性。']);
-extendedAddResident('neighbor_liaison','阿丽娅','邻领联络官','neighbor_office',14,7,'scholar',['#675453','#997478','#D0B77C'],['商旅可以通行，争议应交给双方联络处核对。','临时协定会注明复核日，不会自行变成永久边界。']);
-extendedAddResident('neighbor_trader','塔林','互市行栈商人','neighbor_exchange',12,7,'merchant',['#705744','#879073','#C1A55E'],['边城互市只收有签章的货单，货物得从河港实际运来。','医药与农产可以先试签一季合同，再按交货结果续约。']);
 
 /* 湿地与职业工作台：每次工作先验证地点、时间、体力、材料和背包，再一次性结算。 */
 function extendedGateAllowed(key){var p=professionalLifeState(),w=wetlandLifeState(),e=exploreState(),m=militaryLifeState();
@@ -13431,6 +13424,14 @@ addExtendedRoom('neighbor_exchange','北境边城 · 互市行栈',18,13,'neighb
  ['old_road','oldroad_survey',10,12,'进入古道调查站'],['neighbor_border','neighbor_office',12,10,'进入领地联络处'],
  ['neighbor_border','neighbor_exchange',27,10,'进入互市行栈']
 ].forEach(function(p){extendedDoor(p[0],p[1],p[2],p[3],p[4]);});
+
+extendedAddResident('pass_surveyor','伊万','山口测绘员','cloud_pass',14,12,'scholar',['#625347','#73818B','#C6B17B'],['关口开放给商旅通行；军事巡查必须有委任、路线记录和明确任务。','记录桥面与补给点，不要把路线传闻写成邻领的敌对行动。']);
+extendedAddResident('camp_captain','诺亚','驻地巡防官','border_barracks',9,6,'engineer',['#4F5960','#7D796B','#C2A65F'],['公共工程记录可以申请巡路登记；真正带队需要训练和正式委任。','队伍在营地集合后才算到岗，玩家传送不会替部队移动。']);
+extendedAddResident('camp_quartermaster','芙蕾','军需官','border_depot',13,7,'merchant',['#725A48','#9D835B','#6C8187'],['机构军费单独记账，口粮和装备按编制领用。','缺货就延后行动或选另一条方案，不会从私人金币自动补账。']);
+extendedAddResident('camp_medic','艾达','巡防医师','border_camp',23,18,'scholar',['#566A69','#E1DCCB','#A86065'],['伤员进入名册与医帐，隔夜后可以治疗。战损不会把人员从存档里抹掉。','补给桥护送需要先核实路况和物资，再让指挥部签发行动。']);
+extendedAddResident('oldroad_archivist','赛芙','古道档案员','oldroad_survey',13,7,'scholar',['#60534C','#B4A88E','#71818A'],['一块界碑不够判断边界；要比对石刻、路宽和双方维护记录。','有争议的路段先共同复测，记录证据来源与不确定性。']);
+extendedAddResident('neighbor_liaison','阿丽娅','邻领联络官','neighbor_office',14,7,'scholar',['#675453','#997478','#D0B77C'],['商旅可以通行，争议应交给双方联络处核对。','临时协定会注明复核日，不会自行变成永久边界。']);
+extendedAddResident('neighbor_trader','塔林','互市行栈商人','neighbor_exchange',12,7,'merchant',['#705744','#879073','#C1A55E'],['边城互市只收有签章的货单，货物得从河港实际运来。','医药与农产可以先试签一季合同，再按交货结果续约。']);
 fillRect(MAPS.forest,30,3,36,5,T_PATH,false);
 [['forest',36,4,'cloud_pass','云峰山口巡路入口'],['cloud_pass',22,21,'border_camp','进入边境营地'],
  ['cloud_pass',35,15,'old_road','古道调查线路'],['old_road',34,17,'neighbor','邻领边城通路']
@@ -13443,7 +13444,7 @@ extendedSite('neighbor_exchange',8,7,'互市合同与航运转介','neighbor_exc
 extendedSite('border_barracks',8,6,'巡防登记、训练与委任','military:registration');
 extendedSite('border_barracks',8,9,'操练场训练簿','military:training');
 extendedSite('border_barracks',14,6,'小队编制与任务简报','military:appointment');
-extendedSite('border_barracks',14,9,'云峰关口七日任务简报','military:campaign');
+extendedSite('border_barracks',16,7,'云峰关口七日任务简报','military:campaign');
 extendedSite('border_depot',8,7,'机构军费与军需账','military:supply');
 extendedSite('border_camp',19,17,'伤员帐与复原登记','military:medical');
 extendedSite('oldroad_survey',8,7,'古道测绘与证据簿','oldroad_station');
@@ -13540,7 +13541,7 @@ function resolveFrontierBattle(spec){var m=militaryLifeState();if(!m.registered|
   var input=Object.assign({own:[{id:u.id,type:'guard',count:u.count,training:u.training,equipment:u.equipment,morale:u.morale,supply:u.supply,discipline:u.discipline}],enemy:[{id:'unidentified_raiders',type:'scout',count:14,training:2,equipment:1,morale:68,supply:65,discipline:70}],commandLimit:m.commandLimit,alliedSupport:18,seed:1,terrain:'ridge',objective:'protect_civilians'},spec||{});
   return battleJudge(input);
 }
-function militarySiteButton(b,site,label,opts,apply){b.appendChild(mkBtn(label,'',function(){var point=site==='campaign'?{scene:'border_barracks',x:14,y:9,label:'云峰关口七日任务简报'}:site==='registration'?{scene:'border_barracks',x:8,y:6,label:'巡防登记'}:site==='training'?{scene:'border_barracks',x:8,y:9,label:'训练簿'}:site==='appointment'?{scene:'border_barracks',x:14,y:6,label:'委任台'}:site==='supply'?{scene:'border_depot',x:8,y:7,label:'军需账'}:site==='medical'?{scene:'border_camp',x:19,y:17,label:'伤员帐'}:site==='pass_route'?{scene:'cloud_pass',x:17,y:17,label:'巡路台'}:site==='oldroad_station'?{scene:'oldroad_survey',x:8,y:7,label:'古道调查簿'}:site==='oldroad_marker'?{scene:'old_road',x:23,y:17,label:'古道界碑'}:site==='neighbor_case'?{scene:'neighbor_office',x:8,y:7,label:'边界记录'}:{scene:'neighbor_exchange',x:8,y:7,label:'互市合同'};
+function militarySiteButton(b,site,label,opts,apply){b.appendChild(mkBtn(label,'',function(){var point=site==='campaign'?{scene:'border_barracks',x:16,y:7,label:'云峰关口七日任务简报'}:site==='registration'?{scene:'border_barracks',x:8,y:6,label:'巡防登记'}:site==='training'?{scene:'border_barracks',x:8,y:9,label:'训练簿'}:site==='appointment'?{scene:'border_barracks',x:14,y:6,label:'委任台'}:site==='supply'?{scene:'border_depot',x:8,y:7,label:'军需账'}:site==='medical'?{scene:'border_camp',x:19,y:17,label:'伤员帐'}:site==='pass_route'?{scene:'cloud_pass',x:17,y:17,label:'巡路台'}:site==='oldroad_station'?{scene:'oldroad_survey',x:8,y:7,label:'古道调查簿'}:site==='oldroad_marker'?{scene:'old_road',x:23,y:17,label:'古道界碑'}:site==='neighbor_case'?{scene:'neighbor_office',x:8,y:7,label:'边界记录'}:{scene:'neighbor_exchange',x:8,y:7,label:'互市合同'};
     ruralWorkAction(point,opts,apply);}));}
 function institutionCharge(amount){var m=militaryLifeState();if(m.institutionFund<amount){toast('机构军费不足；个人金币不会自动垫付。');return false;}m.institutionFund-=amount;return true;}
 function openMilitarySite(site){
@@ -13714,9 +13715,16 @@ function extendedSceneAllowed(s,region){
   return true;
 }
 var EXTENDED_REGION_NODE={wetland:'wetland.marsh',vineyard:'vineyard.estate',clinic:'clinic.white_stork',port:'port.lower_lock',quarry:'quarry.limestone',waterworks:'waterworks.reservoir',cloud_pass:'pass.cloud_peak',border_camp:'camp.frontier',old_road:'road.ancient',neighbor:'neighbor.market_town'};
+var baseNewGameStateCDE=newGameState;
+newGameState=function(){var s=baseNewGameStateCDE();s.wetlandLife=newWetlandLife();s.professionalLife=newProfessionalLife();s.militaryLife=newMilitaryLife();return s;};
+var baseSerializeCDE=serialize;
+serialize=function(){var raw=baseSerializeCDE();raw.wetlandLife=normalizeWetlandLife(state.wetlandLife);raw.professionalLife=normalizeProfessionalLife(state.professionalLife);raw.militaryLife=normalizeMilitaryLife(state.militaryLife);return raw;};
 var baseNormalizeSaveCDE=normalizeSave;
 normalizeSave=function(raw){
   var s=baseNormalizeSaveCDE(raw);if(!s)return null;
+  s.wetlandLife=normalizeWetlandLife(raw.wetlandLife);
+  s.professionalLife=normalizeProfessionalLife(raw.professionalLife);
+  s.militaryLife=normalizeMilitaryLife(raw.militaryLife);
   var region=EXTENDED_REGION_BY_SCENE[s.sceneId];
   if(region&&!extendedSceneAllowed(s,region)){s.sceneId='town';s.player={x:14,y:22,face:'up'};region=null;}
   if(region&&s.travel){var id=EXTENDED_REGION_NODE[region];if(id)s.travel.discovered[id]=true;}
