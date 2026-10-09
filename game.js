@@ -1450,7 +1450,10 @@ var HOUSE_FURNITURE = [
   { id: 'book',     kind: 'book',     x: 8,  y: 3, w: 1, h: 1, tiles: [[8,3]],                   label: '农场手册', z: 24 },
   { id: 'chair',    kind: 'chair',    x: 9,  y: 4, w: 1, h: 1, tiles: [[9,4]],                   label: '椅子', z: 0 },
   { id: 'chest',    kind: 'chest',    x: 13, y: 2, w: 1, h: 1, tiles: [[13,2]],                  label: '储物箱', z: 0 },
-  { id: 'calendar', kind: 'calendar', x: 10, y: 10, w: 1, h: 1, tiles: [[10,10]],                label: '日历', z: 0 }
+  { id: 'calendar', kind: 'calendar', x: 10, y: 10, w: 1, h: 1, tiles: [[10,10]],                label: '日历', z: 0 },
+  /* §32.2 居家与邻里：农舍要有「可用厨房」。灶台占 2×2 并参与碰撞，
+     配套 INTERACTABLES.house 里的 h_kitchen 让玩家能真正走到灶前按 E。 */
+  { id: 'kitchen',  kind: 'kitchen',  x: 13, y: 6, w: 2, h: 2, tiles: [[13,6],[14,6],[13,7],[14,7]], label: '厨房灶台', z: 0 }
 ];
 var HOUSE_BED_WAKE = { x: 2, y: 3 };     // 睡醒位置：床旁
 var HOUSE_DOOR_TILES = [[7, 11], [8, 11]];
@@ -1678,7 +1681,10 @@ var INTERACTABLES = {
     { id: 'h_bed',      x: 1, y: 1, stand: [[1,3],[2,3],[3,1],[3,2]], kind: 'bed', label: '床' },
     { id: 'h_chest',    x: 13, y: 2, stand: [[13,3],[12,2],[14,2]], kind: 'houseChest', label: '储物箱' },
     { id: 'h_calendar', x: 10, y: 10, stand: [[10,9],[9,10],[11,10]], kind: 'calendar', label: '日历' },
-    { id: 'h_book',     x: 8, y: 3, stand: [[8,2],[9,3]], kind: 'handbook', label: '农场手册' }
+    { id: 'h_book',     x: 8, y: 3, stand: [[8,2],[9,3]], kind: 'handbook', label: '农场手册' },
+    /* §32.2 居家与邻里：厨房必须有真实 UI 入口，不是只画个灶台。
+       stand 覆盖灶台四周可站立格，保证玩家站得到、能按 E。 */
+    { id: 'h_kitchen',  x: 13, y: 6, stand: [[13,5],[14,5],[13,8],[14,8],[12,6],[12,7]], kind: 'kitchen', label: '厨房' }
   ]
 };
 
@@ -7886,6 +7892,63 @@ function openCraft() {
   });
 }
 
+/* §32.2 居家与邻里：农舍厨房窗口。
+   筛选口径必须用 isFood()（即 ITEMS[id].food > 0），不能用 kind === 'food'：
+   真正可食用的 20 种物品里，大部分 kind 是 crop/forage/fish，只有 food 字段才是判据。
+   复用 recipeUnlocked / canCraft / craft，保证解锁与背包占位判定只有一套口径。 */
+function kitchenRecipes() {
+  return RECIPES.filter(function (r) { return isFood(r.out); });
+}
+function openKitchen() {
+  openWindow({
+    id: 'kitchen', kind: 'kitchen', wide: true, title: '厨房',
+    build: function (b) {
+      var list = kitchenRecipes();
+      if (!list.length) {
+        b.appendChild(el('p', 'muted', '灶台还是冷的。先去工作台做点能吃的东西。'));
+        return;
+      }
+      b.appendChild(el('p', 'muted', '用灶台把作物做成能顶饱的料理。成品进背包，直接食用即可回复体力。'));
+      var g = el('div', 'grid two');
+      list.forEach(function (r) {
+        var unlocked = recipeUnlocked(r);
+        var ok = canCraft(r);
+        var enough = Object.keys(r.cost).every(function (id) { return invCount(id) >= r.cost[id]; });
+        var tile = el('div', 'item' + (ok ? '' : ' static'));
+        var ic = el('div', 'item-ico');
+        var cv = getIcon(r.out); if (cv) ic.appendChild(cv);
+        tile.appendChild(ic);
+        var main = el('div', 'item-main');
+        var nm = el('div', 'item-name');
+        nm.appendChild(el('span', null, ITEMS[r.out].name));
+        main.appendChild(nm);
+        main.appendChild(el('div', 'item-desc', r.desc));
+        var reqs = el('div', 'quest-req');
+        Object.keys(r.cost).forEach(function (k) {
+          var have = invCount(k), need = r.cost[k];
+          reqs.appendChild(el('span', 'req-chip ' + (have >= need ? 'ok' : 'no'), itemName(k) + ' ' + have + ' / ' + need));
+        });
+        main.appendChild(reqs);
+        if (!unlocked) main.appendChild(el('div', 'item-desc', '🔒 ' + kitchenUnlockText(r)));
+        tile.appendChild(main);
+        var acts = el('div', 'item-actions');
+        var btn = mkBtn(ok ? '开火' : (unlocked ? (enough ? '空间不足' : '材料不足') : '未解锁'),
+          ok ? 'primary' : 'sm', function () { craft(r); refreshWindow(); refreshHotbar(); });
+        btn.disabled = !ok;
+        acts.appendChild(btn);
+        tile.appendChild(acts);
+        g.appendChild(tile);
+      });
+      b.appendChild(g);
+    },
+    actions: [{ label: '离开灶台', kind: 'ghost', close: true }]
+  });
+}
+function kitchenUnlockText(r) {
+  if (r.unlock === 'quest2') return '完成委托 2「木匠的准备」后解锁。';
+  if (r.unlock === 'friendship') return '芽芽好感达到 25 后解锁。';
+  return '尚未解锁。';
+}
 /* --- 任务 --- */
 var QUEST_TAB='main';
 function renderDailyJobCard(b,id){
@@ -8849,6 +8912,9 @@ function activateInteractable(it) {
   if (it.kind === 'houseChest') { openHouseChest(); return; }
   if (it.kind === 'calendar') { openCalendar(); return; }
   if (it.kind === 'handbook') { openHandbook(); return; }
+  /* §32.2 居家与邻里：农舍厨房。openKitchen 复用既有 craft()/RECIPES，
+     不另造一套制作系统，避免配方解锁与背包占位判定出现两套口径。 */
+  if (it.kind === 'kitchen') { openKitchen(); return; }
   if (it.kind === 'shop') { openShop(); return; }
   if(it.kind==='forestGate'){openExploreSite('forest');return;}
   if(it.kind==='mineGate'){openExploreSite('mine');return;}
@@ -8873,6 +8939,7 @@ function houseFurnitureHint(fur) {
   if (fur.kind === 'lamp') return '点着的小灯，夜里很暖。';
   if (fur.kind === 'table') return '桌上放着农场手册。';
   if (fur.kind === 'chair') return '坐一会儿也行，不过天色不等人。';
+  if (fur.kind === 'kitchen') return '农舍灶台。按 E 开火。';
   return '按 E 使用';
 }
 
@@ -10147,6 +10214,20 @@ function drawHouseFurniture(g, f) {
     g.fillStyle = '#7A6A3A'; g.fillRect(sx + 4, sy + 5, 8, 1);
     g.fillRect(sx + 4, sy + 7, 8, 1); g.fillRect(sx + 4, sy + 9, 8, 1);
     g.fillStyle = '#4A3524'; g.fillRect(sx + 7, sy + 14, 2, 2);
+  } else if (f.kind === 'kitchen') {
+    // §32.2 农舍灶台：2×2。台面 + 灶眼 + 吊起的锅，让玩家远远就认得出这里能开火。
+    g.fillStyle = '#4A3524'; g.fillRect(sx, sy + 3, w, h - 3);            // 柜体
+    g.fillStyle = '#6E5236'; g.fillRect(sx + 1, sy + 4, w - 2, h - 5);
+    g.fillStyle = '#3E2C1E'; g.fillRect(sx + 4, sy + h - 12, w - 8, 9); // 灶膛
+    g.fillStyle = '#B84A2C'; g.fillRect(sx + 6, sy + h - 11, w - 12, 7); // 火光
+    g.fillStyle = '#E8A24A'; g.fillRect(sx + 9, sy + h - 9, 4, 3);
+    g.fillStyle = '#F5D98A'; g.fillRect(sx + 11, sy + h - 8, 2, 1);
+    g.fillStyle = '#8A6A46'; g.fillRect(sx, sy, w, 3);                  // 台面
+    g.fillStyle = '#A8835A'; g.fillRect(sx + 1, sy, w - 2, 1);
+    g.fillStyle = '#5A4630'; g.fillRect(sx + 1, sy + h - 4, w - 2, 2);
+    g.fillStyle = '#5B6570'; g.fillRect(sx + 3, sy - 5, w - 6, 2);      // 吊杆
+    g.fillStyle = '#2E3238'; g.fillRect(sx + 6, sy - 4, 10, 4);        // 铁锅
+    g.fillStyle = '#43484F'; g.fillRect(sx + 7, sy - 3, 8, 1);
   }
 }
 
@@ -11295,6 +11376,24 @@ UI.refreshReel = function () {
 
 /* --- 调试/测试接口 --- */
 window.__MOSS__ = {
+  /* 森林勘探观测面：基线探针需要 execute 采集来验证 hp 渐进/采空拒绝，
+     之前 gatherExplore 未导出，导致 32.4 五项断言全部空转。 */
+  gatherExplore: gatherExplore,
+  EXPLORE_NODES: EXPLORE_NODES,
+
+  isFood: isFood,
+  eatItem: eatItem,
+  canCraft: canCraft,
+  craft: craft,
+  recipeUnlocked: recipeUnlocked,
+  /* 测试观测面：农舍家具 / 交互判定，探针需要读它们来验证灶台落地
+     （INTERACTABLES 已在下方原有导出里列出，此处不重复） */
+  HOUSE_FURNITURE: HOUSE_FURNITURE,
+  houseFurnitureAt: houseFurnitureAt,
+  findInteractable: findInteractable,
+  /* §32.2 居家厨房：导出供运行时探针验证 UI 与配方面 */
+  openKitchen: openKitchen,
+  kitchenRecipes: kitchenRecipes,
   get state() { return state; },
   CFG: CFG, ITEMS: ITEMS, CROPS: CROPS, QUESTS: QUESTS, RECIPES: RECIPES, FISHES: FISHES, NPCS: NPCS,
   MAPS: MAPS, INTERACTABLES: INTERACTABLES, CITY_ROOMS: CITY_ROOMS, CITY_INFO: CITY_INFO,
