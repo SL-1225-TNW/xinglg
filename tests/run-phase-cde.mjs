@@ -154,6 +154,21 @@ try {
 
   const saved = await evaluate(() => __MOSS__.serialize());
   const normalized = await evaluate(raw => __MOSS__.normalizeSaveForTest(raw), saved);
+  const zeroUnit = await evaluate(raw => {
+    const fields = ['training','equipment','morale','supply','discipline'];
+    fields.forEach(key => { raw.militaryLife.unit[key] = 0; });
+    const restored = __MOSS__.normalizeSaveForTest(raw);
+    return fields.map(key => restored.militaryLife.unit[key]);
+  }, saved);
+  eq('零训练、装备、士气、补给与纪律不会被存档重载恢复', zeroUnit, [0,0,0,0,0]);
+  const invalidUnit = await evaluate(raw => {
+    raw.militaryLife.unit.morale = 'corrupt';
+    raw.militaryLife.unit.supply = -10;
+    raw.militaryLife.unit.equipment = 99;
+    const restored = __MOSS__.normalizeSaveForTest(raw).militaryLife.unit;
+    return [restored.morale, restored.supply, restored.equipment];
+  }, saved);
+  eq('损坏和越界军队存档数值仍使用默认值或限制到合法范围', invalidUnit, [70,0,5]);
   eq('湿地、职业、邻领、裁判审计在重载后保留', await page.evaluate(s => [s.wetlandLife.habitat,s.professionalLife.waterworks.certified,s.militaryLife.neighbor.settled,s.militaryLife.neighbor.tradeReceived,s.militaryLife.battleRecords.length,s.militaryLife.battleRecords[1].audit.phases.length], normalized), ['open_water',true,true,true,2,3]);
   await evaluate(() => { __MOSS__.saveNow(); }); await page.reload(); await click('继续游戏');
   eq('浏览器存档重载保留阶段 E 与室内场景', await evaluate(() => [__MOSS__.state.sceneId,__MOSS__.militaryLifeState().rank,__MOSS__.professionalLifeState().waterworks.certified]), ['border_barracks','field_commander',true]);

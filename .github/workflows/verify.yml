@@ -37,7 +37,9 @@ jobs:
           node tests/run-phase-c-mill.mjs
           node tests/run-phase-c-meadow.mjs
       - name: Verify wetland, professional routes, and frontier chapter
-        run: node tests/run-phase-cde.mjs
+        run: |
+          node tests/run-phase-cde.mjs
+          node tests/run-indoor-weather.mjs
       - name: Verify Stage B and save regressions
         run: |
           node tests/run-v7-stageB.mjs
