@@ -167,7 +167,7 @@ try {
   await mature(rad); await harvest(rad); eq((await snap(page)).inv.radish, 16, '八株萝卜按当前肥力收获 16 个');
   await quest(1, '第一份收成'); await quest(2, '木匠的准备');
   await collect(25, 15); await mature(pot); await harvest(pot);
-  eq((await snap(page)).inv.potato, 2, '收获两颗土豆');
+  eq((await snap(page)).inv.potato, 4, '两株土豆按当前肥力收获 4 个');
   await quest(3, '把小桥修好'); check((await snap(page)).bridge, '正常材料修桥');
   check((await snap(page)).inv.tool_rod, '修桥获得钓竿');
   let caught;
