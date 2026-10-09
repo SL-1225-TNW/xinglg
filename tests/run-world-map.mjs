@@ -8,7 +8,8 @@ const desktop=await launch();
 try{
  const p=desktop.page;await boot(p);await p.keyboard.press('m');
  check('M 打开地图',await p.evaluate(()=>__MOSS__.ui.window.id),'worldmap');
- check('八个区域均可查看',await p.locator('.atlas-place').count(),8);
+ check('九个区域均可查看',await p.locator('.atlas-place').count(),9);
+ check('石楠草甸已有实际地图节点',await p.getByRole('button',{name:/^石楠草甸，已开放/}).count(),1);
  check('农场显示当前位置',await p.locator('.atlas-place.here').innerText(),'苔芽农场 · 你在这里');
  const time=await p.evaluate(()=>__MOSS__.state.timeMinutes);await p.waitForTimeout(350);
  check('查看地图暂停时间',await p.evaluate(()=>__MOSS__.state.timeMinutes),time);

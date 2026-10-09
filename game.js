@@ -734,6 +734,7 @@ function newGameState() {
     structures: [],
     fishpond: newFishpondState(),
     millLife: newMillLife(),
+    meadowLife: newMeadowLife(),
     shipping: {},
     houseChest: {},
     tutorial: newTutorial('active'),
@@ -830,6 +831,7 @@ function serialize() {
     overloaded: state.overloaded,
     travel: state.travel,
     millLife: state.millLife || newMillLife(),
+    meadowLife: state.meadowLife || newMeadowLife(),
     savedAt: Date.now()
   };
 }
@@ -923,6 +925,7 @@ function normalizeSave(raw) {
   s.dsMet = !!raw.dsMet;
   s.exploration = normalizeExploration(raw.exploration);
   s.millLife = normalizeMillLife(raw.millLife);
+  s.meadowLife = normalizeMeadowLife(raw.meadowLife);
   if (raw.sceneId && raw.sceneId.indexOf('mill_') === 0 && !raw.bridgeRepaired) { s.sceneId='town'; s.player={x:22,y:21,face:'up'}; }
   if ((s.sceneId==='city'||s.sceneId.indexOf('city_')===0)&&!s.exploration.city){s.sceneId='town';s.player={x:14,y:22,face:'up'};}
   if ((s.sceneId === 'forest' && !s.exploration.forest) || (s.sceneId.indexOf('mine') === 0 && (!s.exploration.mine || +s.sceneId.slice(4)>s.exploration.depth))) { s.sceneId='town';s.player={x:14,y:2,face:'down'}; }
@@ -6047,6 +6050,8 @@ function performSettlement(auto) {
         grewList.push({ name: crop.name + '（再生）', stage: st2, stageKey: st2 ? st2.key : '', stageLabel: st2 ? st2.label : '' });
       }
     }
+    // 草甸试种田沿用真实雨天；只记本夜，不模拟离线雨水。
+    if(state.weather.today==='rain')meadowLifeState().plots.forEach(function(p){if(p&&p.waterDays.length<2&&p.waterDays.indexOf(state.totalDay)<0)p.waterDays.push(state.totalDay);});
     summary.grew = grewList;
     summary.matured = maturedList.length;
     summary.matureDetail = maturedList;
@@ -8041,6 +8046,7 @@ function openQuestLog(site) {
         var btn=mkBtn(t[1],QUEST_TAB===t[0]?'primary':'sm',function(){QUEST_TAB=t[0];renderWindow();});
         tabs.appendChild(btn);
       });b.appendChild(tabs);
+      b.appendChild(mkBtn('石楠草甸 · '+meadowTaskText(),'sm',function(){openMeadowLife('journal');}));
       b.appendChild(mkBtn('风铃磨坊 · '+millLifeTaskText(),'sm',function(){openMillLife('journal');}));
       if(QUEST_TAB==='daily'){
         b.appendChild(el('p','muted','每天从居民委托池抽取 3 份，完成后次日刷新。'));
@@ -8186,6 +8192,8 @@ function openDialogue(id, text, friendshipGain) {
         var d = npcDaily(id);
         var row = el('div', 'row');
         var millNpcSite={mill_martin:'mill',mill_elise:'baker',mill_jeanne:'hall',mill_abel:'farmer'}[id];
+        var meadowNpcSite={meadow_ada:'ranch',meadow_luan:'vet'}[id];
+        if(meadowNpcSite)row.appendChild(mkBtn('牧场照料与合同','primary',function(){openMeadowLife(meadowNpcSite);}));
         if(millNpcSite)row.appendChild(mkBtn('磨坊与村庄事务','primary',function(){openMillLife(millNpcSite);}));
         if(LIVING_JOBS[id])row.appendChild(mkBtn('帮忙委托','primary',function(){openResidentJob(id);}));
         if(BOND_QUESTS.some(function(q){return q.npc===id&&!specialQuestDone(q,'bond')&&specialQuestUnlocked(q,'bond');}))row.appendChild(mkBtn('居民委托','primary',function(){QUEST_TAB='bond';openQuestLog('npc');}));
@@ -8306,6 +8314,7 @@ function openWorkRecords(initial) {
   clearKeys();var tab=initial==='mine'?'mine':'farm',selected=null;
   openWindow({id:'workrecords',kind:'custom',wide:true,title:'农务与矿山记录',build:function(b){
     var tabs=el('div','row');[['farm','农务总览'],['mine','矿山记录']].forEach(function(pair){tabs.appendChild(mkBtn(pair[1],tab===pair[0]?'primary':'',function(){tab=pair[0];renderWindow();}));});b.appendChild(tabs);
+    b.appendChild(mkBtn('石楠草甸照料与合同','',function(){openMeadowLife('journal');}));
     b.appendChild(mkBtn('磨坊与麦田村委托','',function(){openMillLife('journal');}));
     if(tab==='farm'){
       var summary=farmWorkSummary();
@@ -8602,6 +8611,7 @@ function travelNodeUnlocked(n) {
   if (n.kind === 'district') return !!exploreState().city;
   if (n.id === 'farm.home') return true;
   if (n.id === 'town.square') return true;
+  if (n.id === 'meadow.pasture') return true;
   if (n.id === 'mill.village') return !!state.bridgeRepaired;
   if (n.id === 'riverside.bank') return !!state.bridgeRepaired;
   if (n.id === 'forest.gate') return !!exploreState().forest;
@@ -8792,6 +8802,7 @@ var WORLD_REGIONS = [
   {id:'mill',name:'风铃磨坊',x:81,y:67,desc:'河流穿过麦田与古老水磨坊，连接山谷东南部的乡野。'}
 ];
 function worldRegionStatus(r) {
+  if (r.id === 'meadow') return '已开放';
   if (r.id === 'mill') return state.bridgeRepaired ? '已开放' : '未解锁 · 修复小桥';
   if (r.id === 'farm' || r.id === 'town') return '已开放';
   if (r.id === 'riverside') return state.bridgeRepaired ? '已开放' : '未解锁 · 修复小桥';
@@ -8809,7 +8820,7 @@ function drawWorldAtlas(c) {
   for(var j=0;j<21;j++){var mx=25+j*29,my=24+(j%3)*9;g.fillStyle='#8B9384';g.beginPath();g.moveTo(mx,my+42);g.lineTo(mx+18,my);g.lineTo(mx+37,my+42);g.fill();g.fillStyle='#E7E3CD';g.beginPath();g.moveTo(mx+12,my+14);g.lineTo(mx+18,my);g.lineTo(mx+25,my+14);g.fill();}
   g.strokeStyle='#678F97';g.lineWidth=18;g.lineJoin='round';g.beginPath();g.moveTo(588,70);g.lineTo(565,140);g.lineTo(458,246);g.lineTo(309,276);g.lineTo(206,324);g.lineTo(137,387);g.stroke();
   g.strokeStyle='#91B5B8';g.lineWidth=8;g.stroke();
-  var paths=[[0,1],[1,2],[1,3],[3,5],[1,4],[4,6],[4,5],[5,6],[5,7]];
+  var paths=[[0,1],[1,2],[1,3],[3,5],[1,4],[4,6],[4,5],[5,6],[5,7],[0,8],[1,8]];
   paths.forEach(function(p){var a=WORLD_REGIONS[p[0]],b=WORLD_REGIONS[p[1]];g.strokeStyle='#DCCD9B';g.lineWidth=5;g.setLineDash(p[0]===0?[]:[6,6]);g.beginPath();g.moveTo(a.x*6.4,a.y*4);g.lineTo(b.x*6.4,b.y*4);g.stroke();});g.setLineDash([]);
   function house(x,y,w){g.fillStyle='#F0E5C8';g.fillRect(x-w/2,y-12,w,16);g.fillStyle='#86664D';g.fillRect(x-3,y-3,6,7);g.fillStyle='#5D7181';g.beginPath();g.moveTo(x-w/2-3,y-12);g.lineTo(x,y-24);g.lineTo(x+w/2+3,y-12);g.fill();}
   WORLD_REGIONS.forEach(function(r){var x=r.x*6.4,y=r.y*4;
@@ -8824,7 +8835,7 @@ function drawWorldAtlas(c) {
 }
 function openWorldMap() {
   clearKeys();
-  var current=state.sceneId.indexOf('mill_')===0?'mill':state.sceneId==='house'?'farm':state.sceneId.indexOf('mine')===0?'pass':state.sceneId.indexOf('city_')===0?'city':state.sceneId;
+  var current=state.sceneId.indexOf('meadow')===0?'meadow':state.sceneId.indexOf('mill_')===0?'mill':state.sceneId==='house'?'farm':state.sceneId.indexOf('mine')===0?'pass':state.sceneId.indexOf('city_')===0?'city':state.sceneId;
   var selected=current;
   var cityView=current==='city';
   /* 城市内街区落点：同城内公共街区 0 分钟，直接传送到已发现公共落点，
@@ -8898,7 +8909,7 @@ function openWorldMap() {
 function regionTravelNode(regionId) {
   var map = {
     farm: 'farm.home', town: 'town.square', riverside: 'riverside.bank',
-    forest: 'forest.gate', city: 'city.gate', pass: 'mine.entrance', mill: 'mill.village'
+    forest: 'forest.gate', city: 'city.gate', pass: 'mine.entrance', mill: 'mill.village', meadow:'meadow.pasture'
   };
   return map[regionId] ? travelNodeById(map[regionId]) : null;
 }
@@ -9160,6 +9171,7 @@ function openStructure(st) {
   });
 }
 function activateInteractable(it) {
+  if (it.kind === 'meadowLife') { openMeadowLife(it.work); return; }
   if (it.kind === 'millLife') { openMillLife(it.work); return; }
   if (it.kind === 'millDoor') { doSwitchScene(it.to,Math.floor(MAPS[it.to].w/2),MAPS[it.to].h-2); return; }
   if(it.kind==='cityGate'){openCityGate();return;}
@@ -10923,6 +10935,7 @@ function drawScene(g, dt) {
   // 地面按块烘焙、只贴视野内的块（大城市整张画布开不出来）
   drawGround(g, state.sceneId, R);
   drawMillLifeGround(g, R);
+  drawMeadowGround(g,R);
   // 池塘：水下鱼 → 水面波纹反光冒泡（只出现在农场池塘）
   if (state.sceneId === 'farm') {
     if (R.x1 >= POND_AREA.x0 && R.x0 <= POND_AREA.x1 && R.y1 >= POND_AREA.y0 && R.y0 <= POND_AREA.y1) {
@@ -10951,6 +10964,7 @@ function drawScene(g, dt) {
   // 实体
   var ents = [];
   addMillLifeEntities(ents, R);
+  addMeadowEntities(ents,R);
   // 作物按脚底位置参与深度排序：玩家可从前后遮挡植物
   if (state.sceneId === 'farm') {
     for (var cy = R.y0; cy <= R.y1; cy++) {
@@ -10981,7 +10995,7 @@ function drawScene(g, dt) {
   (map.buildings || []).forEach(function (b) {
     var visualTop=b.y+b.h-Math.ceil((b.visualHeight||64)/TILE);
     if(b.x+b.w<R.x0||b.x>R.x1||b.y+b.h<R.y0||visualTop>R.y1)return;
-    ents.push({ z: (b.y + b.h) * TILE, f: state.sceneId==='city'?drawCityBuilding:state.sceneId==='mill_village'?drawMillLifeBuilding:drawHouse, a: state.sceneId==='city'?[b.x,b.y,b]:[b.x, b.y, b.w, b.h, b.kind] });
+    ents.push({ z: (b.y + b.h) * TILE, f: state.sceneId==='city'?drawCityBuilding:(state.sceneId==='mill_village'||state.sceneId==='meadow')?drawMillLifeBuilding:drawHouse, a: state.sceneId==='city'?[b.x,b.y,b]:[b.x, b.y, b.w, b.h, b.kind] });
   });
   (INTERACTABLES[state.sceneId] || []).forEach(function (it) {
     if (it.x < R.x0 || it.x > R.x1 || it.y < R.y0 || it.y > R.y1) return;
@@ -11708,8 +11722,9 @@ TRAVEL_NODES.push(MILL_TRAVEL_NODE);NODE_BY_ID[MILL_TRAVEL_NODE.id]=MILL_TRAVEL_
 [['town.square',30],['riverside.bank',10],['city.gate',30],['farm.home',60]].forEach(function(p){TRAVEL_PAIRS[[p[0],'mill.village'].sort().join('|')]=p[1];});
 WORLD_REGIONS.filter(function(r){return r.id==='mill';})[0].desc=MILL_TRAVEL_NODE.desc+' 修好小桥后，从小镇东南乡道路牌首次进入；到访后可直接传送。';
 function millLifeNear(site){var p=MILL_LIFE_SITES[site];return !!p&&state.sceneId===p.scene&&Math.abs(state.player.x-p.x)+Math.abs(state.player.y-p.y)<=1;}
-function millLifeAction(site,opts,apply) {
-  if(!millLifeNear(site)){toast('请到'+MILL_LIFE_SITES[site].label+'旁操作。');return false;}
+function millLifeAction(site,opts,apply) { return ruralWorkAction(MILL_LIFE_SITES[site],opts,apply); }
+function ruralWorkAction(point,opts,apply) {
+  if(!point||state.sceneId!==point.scene||Math.abs(state.player.x-point.x)+Math.abs(state.player.y-point.y)>1){toast('请到'+(point?point.label:'设施')+'旁操作。');return false;}
   if(opts.guard&&!opts.guard()){toast(opts.reason||'当前条件尚未满足。');return false;}
   if(!canSpendGameMinutes(opts.minutes||0)||!hasEnergy(opts.energy||0))return false;
   if(state.coins<(opts.coins||0)){toast('金币不足，尚未扣费。');return false;}
@@ -11754,9 +11769,10 @@ function openMillLife(site) {
     if(site==='delivery'){b.appendChild(el('p',null,'第一份村庄早餐：水轮验收后交乡村面包 ×2，奖励50金。可以用本村加工链，也接受已有或购买的面包。'));if(!m.delivery)millLifeButton(b,site,'交付乡村面包 ×2 · 奖励50金',{need:{bread:2},guard:function(){return m.inspected&&!m.delivery;},reason:'先完成水轮试运行验收；已经交付的订单不可重复领奖。'},function(){m.delivery=true;state.coins+=50;state.npcFriendship.mill_elise=Math.min(100,(state.npcFriendship.mill_elise||0)+5);toast('村庄早餐已交付，获得50金。');});}
   },actions:[{label:'返回游戏',close:true}]});
 }
-function drawMillLifeBuilding(g,bx,by,bw,bh,kind){var x=bx*TILE,y=by*TILE,w=bw*TILE,h=bh*TILE,roof=kind==='mill'?'#596F7B':kind==='bakery'?'#A36D50':kind==='hall'?'#65775B':'#80665E';
-  px(g,x+2,y+14,w-4,h-14,kind==='mill'?'#C0B9A4':'#E3D6B9');px(g,x,y,w,14,roof);px(g,x-1,y+12,w+2,3,'#514D43');
+function drawMillLifeBuilding(g,bx,by,bw,bh,kind){var x=bx*TILE,y=by*TILE,w=bw*TILE,h=bh*TILE,roof=kind==='mill'?'#596F7B':kind==='bakery'?'#A36D50':kind==='hall'?'#65775B':kind==='barn'?'#8D7858':kind==='vet'?'#718D7A':'#80665E';
+  px(g,x+2,y+14,w-4,h-14,kind==='mill'?'#C0B9A4':kind==='barn'?'#92795A':kind==='vet'?'#E6DED0':'#E3D6B9');px(g,x,y,w,14,roof);px(g,x-1,y+12,w+2,3,'#514D43');
   for(var i=8;i<w-10;i+=18){px(g,x+i,y+21,8,10,'#536E75');px(g,x+i+3,y+21,1,10,'#E2D5B5');px(g,x+i,y+25,8,1,'#E2D5B5');}
+  if(kind==='barn'){for(var sy=19;sy<h-8;sy+=7)px(g,x+4,y+sy,w-8,1,'#735E45');}if(kind==='vet'){px(g,x+w-21,y+17,3,11,'#688B7A');px(g,x+w-25,y+21,11,3,'#688B7A');}
   var dx=x+Math.floor(bw/2)*TILE;px(g,dx+3,y+h-18,10,18,'#76563E');px(g,dx+10,y+h-10,1,1,'#E6C887');
   px(g,x+w-14,y-5,6,14,'#8F7661');px(g,x+w-15,y-6,8,2,'#534B40'); // 烟囱固定在屋顶
   if(kind==='hall'||kind==='bakery'||kind==='mill'){px(g,dx-7,y+h-25,29,5,'#5E6850');px(g,dx-4,y+h-23,22,1,'#E7D7A3');}
@@ -11779,7 +11795,93 @@ function addMillLifeEntities(ents,R){var sc=state.sceneId;
   if(sc==='mill_village')ents.push({z:17*TILE,f:function(g){var x=32*TILE,y=14*TILE,run=millLifeState().inspected;px(g,x,y,25,39,'#6B5843');for(var i=0;i<4;i++){var off=run?Math.floor(animalClock*3)%4:0;px(g,x-2,y+3+(i+off)%4*9,29,3,'#B18C5A');}px(g,x+10,y+1,3,37,'#D2B783');},a:[]});
 }
 
+/* 阶段 C：草甸的照料日期与牧草账本；复用世界日期，不运行离线模拟。 */
+function newMeadowLife(){return {troughSeen:false,trough:false,observed:false,advice:false,feedDays:[],lastShear:0,produced:0,redeemed:0,contractDay:0,coopFeedDay:0,coopCollectedDay:0,plots:[null,null,null]};}
+function normalizeMeadowLife(raw){
+  var m=newMeadowLife(),r=raw&&typeof raw==='object'?raw:{};
+  ['troughSeen','observed','advice'].forEach(function(k){m[k]=r[k]===true;});m.trough=m.troughSeen&&r.trough===true;
+  function day(n){return Number.isFinite(n)?clamp(Math.floor(n),0,100000):0;}
+  m.feedDays=Array.isArray(r.feedDays)?r.feedDays.filter(function(d){return Number.isInteger(d)&&d>0&&d<=100000;}).filter(function(d,i,a){return a.indexOf(d)===i;}).sort(function(a,b){return a-b;}).slice(-32):[];
+  if(!m.trough||!m.observed||!m.advice)m.feedDays=[];
+  m.lastShear=day(r.lastShear);m.produced=day(r.produced);m.redeemed=Math.min(m.produced,day(r.redeemed));m.contractDay=day(r.contractDay);m.coopFeedDay=day(r.coopFeedDay);m.coopCollectedDay=Math.min(m.coopFeedDay,day(r.coopCollectedDay));
+  m.plots=m.plots.map(function(_,i){var p=Array.isArray(r.plots)?r.plots[i]:null;if(!p||!day(p.seedDay))return null;return {seedDay:day(p.seedDay),waterDays:Array.isArray(p.waterDays)?p.waterDays.filter(function(d){return Number.isInteger(d)&&d>=day(p.seedDay)&&d<=100000;}).filter(function(d,j,a){return a.indexOf(d)===j;}).sort(function(a,b){return a-b;}).slice(0,2):[]};});return m;
+}
+function meadowLifeState(){return state.meadowLife||(state.meadowLife=newMeadowLife());}
+ICON_ART.pasture_seed=function(g){px(g,4,4,9,10,'#C4B18A');px(g,5,3,7,2,'#7A684C');px(g,8,7,1,5,'#5F7C45');px(g,6,7,5,2,'#8FA564');};
+ICON_ART.pasture_hay=function(g){for(var i=0;i<4;i++)px(g,3+i*3,3+(i%2),2,11,'#C9B96E');px(g,2,8,12,2,'#8A7546');};
+ITEMS.pasture_seed={name:'牧草种籽',kind:'material',sell:2,food:0,desc:'在石楠草甸试种田使用；浇水两个夜晚后可割草。'};
+ITEMS.pasture_hay={name:'牧草干草',kind:'material',sell:4,food:0,desc:'草甸试种田收成，可替代一份小麦照料牧场新羊。'};
+MILL_LIFE_FURNITURE.meadow_barn=[{x:2,y:2,w:3,h:2,type:'sacks'},{x:11,y:2,w:4,h:3,type:'shelf'},{x:4,y:7,w:4,h:1,type:'table'},{x:12,y:8,w:2,h:2,type:'sacks'}];
+MILL_LIFE_FURNITURE.meadow_vet=[{x:2,y:2,w:2,h:4,type:'shelf'},{x:10,y:4,w:4,h:2,type:'clinic'},{x:5,y:7,w:4,h:1,type:'desk'},{x:13,y:2,w:2,h:1,type:'notice'}];
+MAPS.meadow=(function(){var m=mkMap(44,34,T_GRASS);m.name='石楠草甸与牧场';m.trees=[[3,3],[7,5],[29,3],[39,5],[40,27],[5,28],[30,29]];
+  m.buildings=[{x:12,y:6,w:6,h:4,kind:'barn'},{x:27,y:9,w:5,h:3,kind:'vet'}];
+  fillRect(m,0,17,30,18,T_PATH,false);fillRect(m,14,10,16,17,T_PATH,false);fillRect(m,28,12,30,20,T_PATH,false);fillRect(m,12,19,22,20,T_PATH,false);
+  fillRect(m,5,9,8,10,T_BUILDING,true);fillRect(m,34,17,38,21,T_WATER,true);fillRect(m,12,23,25,28,T_SAND,false);
+  m.buildings.forEach(function(b){fillRect(m,b.x,b.y,b.x+b.w-1,b.y+b.h-1,T_BUILDING,true);});
+  [[20,8,25,8],[25,8,25,14],[20,14,22,14],[24,14,25,14]].forEach(function(p){fillRect(m,p[0],p[1],p[2],p[3],T_WALL,true);});
+  m.trees.forEach(function(p){m.solid[p[0]][p[1]]=1;});m.exits=[{x:0,y:17,to:'town',tx:3,ty:18},{x:0,y:18,to:'town',tx:3,ty:18}];return m;
+})();
+makeMillLifeRoom('meadow_barn','石楠牧场 · 畜棚与工作间',18,13,[15,10]);makeMillLifeRoom('meadow_vet','石楠草甸 · 兽医小屋',18,12,[29,12]);
+MAPS.meadow_barn.exits[0].to='meadow';MAPS.meadow_vet.exits[0].to='meadow';
+['meadow','meadow_barn','meadow_vet'].forEach(function(id){SCENE_ORDER.push(id);INTERACTABLES[id]=[];});
+var MEADOW_SITES={coop:{scene:'meadow',x:7,y:12,label:'鸡舍饲料盘与蛋篮'},gate:{scene:'town',x:2,y:18,label:'谷底步道 · 石楠草甸'},trough:{scene:'meadow',x:19,y:15,label:'牧场公共饮水槽'},sheep:{scene:'meadow',x:23,y:14,label:'观察与照料新羊'},ranch:{scene:'meadow_barn',x:8,y:7,label:'艾妲的牧场工作台'},vet:{scene:'meadow_vet',x:9,y:7,label:'卢安的诊疗记录'},plot0:{scene:'meadow',x:14,y:24,label:'试种田一'},plot1:{scene:'meadow',x:18,y:24,label:'试种田二'},plot2:{scene:'meadow',x:22,y:24,label:'试种田三'}};
+Object.keys(MEADOW_SITES).forEach(function(k){var p=MEADOW_SITES[k];INTERACTABLES[p.scene].push({kind:'meadowLife',work:k,x:p.x,y:p.y,label:p.label,stand:[[p.x,p.y+1],[p.x-1,p.y],[p.x+1,p.y],[p.x,p.y-1]]});});
+[['meadow_barn',15,10,'畜棚与工作间'],['meadow_vet',29,12,'兽医小屋']].forEach(function(p){INTERACTABLES.meadow.push({kind:'millDoor',to:p[0],x:p[1],y:p[2],label:'进入'+p[3],stand:[[p[1],p[2]],[p[1],p[2]+1]]});});
+fillRect(MAPS.town,2,17,6,19,T_PATH,false);
+addResident('meadow_ada','艾妲','石楠牧场主','meadow_barn',7,9,'gardener',['#A87349','#789078','#E4C79B'],['先修好饮水槽，再观察新羊。照料要隔天来看，不能一天连喂两次充数。','试种田收下的干草可以代替小麦喂羊。剪毛有三天间隔，别急着薅空。']);
+addResident('meadow_luan','卢安','乡村兽医','meadow_vet',11,7,'scholar',['#4C555A','#D1D1BC','#758F9B'],['先看饮水、步态和胃口。新羊需要干净饮水与规律喂食，不要急着剪毛。','羊已经安顿下来后，隔三天剪一次毛。契约要求你的照料与剪毛记录。']);
+ANIMAL_HOMES.meadow=[['bird',7,22],['butterfly',29,25]];
+var MEADOW_TRAVEL_NODE={id:'meadow.pasture',locationId:'white_rose.northwest.heather_meadow',sceneId:'meadow',name:'石楠草甸与牧场',region:'northwest',kind:'pasture',safe:[[3,17],[4,17],[3,18]],desc:'沿谷底步道进入牧场，修饮水槽、观察照料新羊、种牧草并剪毛交付。'};
+TRAVEL_NODES.push(MEADOW_TRAVEL_NODE);NODE_BY_ID[MEADOW_TRAVEL_NODE.id]=MEADOW_TRAVEL_NODE;NODE_BY_SCENE.meadow=MEADOW_TRAVEL_NODE;
+['meadow','meadow_barn','meadow_vet'].forEach(function(id){SCENE_TO_NODE[id]='meadow.pasture';});
+[['town.square',10],['farm.home',30],['forest.gate',30],['mill.village',60],['city.gate',60]].forEach(function(p){TRAVEL_PAIRS[[p[0],'meadow.pasture'].sort().join('|')]=p[1];});
+WORLD_REGIONS.push({id:'meadow',name:'石楠草甸',x:19,y:45,desc:MEADOW_TRAVEL_NODE.desc+' 从小镇西侧 (2,18) 路牌首次步行到访。'});
+function meadowTaskText(){var m=meadowLifeState();return m.contractDay?'首份羊毛合同完成 · 继续种草、照料与剪毛':!m.trough?'检查并修复饮水槽':!m.observed?'在羊栏门口观察新羊':!m.advice?'到兽医小屋学习照料':m.feedDays.length<2?'在两个不同游戏日喂养新羊':!m.produced?'新羊已适应 · 羊栏剪毛':'到畜棚交付亲手剪下的羊毛 ×2';}
+function meadowPlotReady(p){return !!p&&p.waterDays.filter(function(d){return d<state.totalDay;}).length>=2;}
+function meadowCanShear(){var m=meadowLifeState();return m.trough&&m.observed&&m.advice&&m.feedDays.length>=2&&m.feedDays[0]<state.totalDay&&m.feedDays.indexOf(state.totalDay)>=0&&(!m.lastShear||state.totalDay-m.lastShear>=3);}
+function meadowButton(b,site,label,opts,apply){b.appendChild(mkBtn(label,'',function(){ruralWorkAction(MEADOW_SITES[site],opts,apply);}));}
+function openMeadowLife(site){
+  if(site==='gate'){openWindow({id:'meadowgate',kind:'custom',title:'谷底步道',build:function(b){b.appendChild(el('p',null,'步道通往石楠草甸与牧场。村民欢迎来学习照料，首次走进草甸后登记地图传送。'));},actions:[{label:'前往石楠草甸',kind:'primary',onClick:function(){closeWindow();doSwitchScene('meadow',3,17);}},{label:'返回',close:true}]});return;}
+  openWindow({id:'meadowlife',kind:'custom',wide:true,title:'石楠牧场 · 照料与羊毛',build:function(b){b.classList.add('mill-life-panel');var m=meadowLifeState();b.appendChild(el('p','work-summary',meadowTaskText()));
+    if(site==='journal'){b.appendChild(el('p',null,'饮水槽 (19,15) → 羊栏门 (23,14) → 兽医小屋 (29,12) → 两日喂养 → 剪毛 → 畜棚 (15,10) 交付。三个试种田在 (14,24)、(18,24)、(22,24)，旁边按 E 操作。'));b.appendChild(el('p',null,'照料天数 '+m.feedDays.length+'；累计剪毛 '+m.produced+'；合同已交付 '+m.redeemed+'。今天'+(m.feedDays.indexOf(state.totalDay)>=0?'已经喂养':'尚未喂养')+'。'));return;}
+    if(site==='trough'){b.appendChild(el('p',null,m.trough?'饮水槽已修好，清水可以供羊饮用。':'槽底有裂缝，水漏得很快。先检查，再修补。'));
+      if(!m.troughSeen)meadowButton(b,site,'检查饮水槽 · 10分钟',{minutes:10,energy:2,guard:function(){return !m.troughSeen;}},function(){m.troughSeen=true;});
+      else if(!m.trough)meadowButton(b,site,'修补饮水槽 · 木材6／石头8',{need:{wood:6,stone:8},minutes:40,energy:6,guard:function(){return !m.trough;}},function(){m.trough=true;});}
+    if(site==='coop'){b.appendChild(el('p',null,'艾妲的两只母鸡：修好饮水槽后，可每天喂小麦一份。隔夜产蛋 ×2，领取后再安排下一次饲料；不会无限积蛋。'));
+      meadowButton(b,site,'给鸡喂小麦 ×1',{need:{grain:1},minutes:5,energy:1,guard:function(){return m.trough&&m.coopFeedDay!==state.totalDay&&m.coopCollectedDay>=m.coopFeedDay;},reason:'先修好公共饮水槽；今天已喂或尚有未领取的鸡蛋。'},function(){m.coopFeedDay=state.totalDay;});
+      meadowButton(b,site,'收鸡蛋 ×2',{out:'egg',qty:2,minutes:5,guard:function(){return m.coopFeedDay>0&&m.coopFeedDay<state.totalDay&&m.coopCollectedDay<m.coopFeedDay;},reason:'需要喂过鸡并睡过一夜；鸡蛋只能领取一次。'},function(){m.coopCollectedDay=m.coopFeedDay;});}
+    if(site==='vet'){b.appendChild(el('p',null,'卢安：观察到新羊口渴但步态正常。修饮水槽后，每天给一份小麦或干草，照料两个不同游戏日再剪毛；之后每三天可剪一次，当天仍要喂养。'));if(!m.advice)meadowButton(b,site,'学习新羊照料 · 15分钟',{minutes:15,guard:function(){return m.observed&&!m.advice;},reason:'先在羊栏门口观察新羊。'},function(){m.advice=true;});}
+    if(site==='sheep'){b.appendChild(el('p',null,'新羊「棉团」：'+(!m.trough?'饮水不足':m.feedDays.length<2?'正在适应牧场':'已经适应牧场')+'。照料 '+m.feedDays.length+' 天；'+(m.lastShear?'上次剪毛第 '+m.lastShear+' 天':'尚未剪毛')+'。'));
+      if(!m.observed)meadowButton(b,site,'观察新羊 · 10分钟',{minutes:10,energy:2,guard:function(){return !m.observed;}},function(){m.observed=true;});
+      [['grain','喂小麦 ×1'],['pasture_hay','喂牧草干草 ×1']].forEach(function(p){var need={};need[p[0]]=1;meadowButton(b,site,p[1],{need:need,minutes:10,energy:2,guard:function(){return m.trough&&m.observed&&m.advice&&m.feedDays.indexOf(state.totalDay)<0;},reason:'修好饮水槽、观察并向兽医学习后，每个游戏日喂一次。'},function(){m.feedDays.push(state.totalDay);m.feedDays=m.feedDays.slice(-32);});});
+      meadowButton(b,site,'剪毛 · 羊毛 ×2',{out:'wool',qty:2,minutes:20,energy:4,guard:meadowCanShear,reason:'需照料两个不同日且今天已喂养；剪毛后要等待三天。'},function(){m.lastShear=state.totalDay;m.produced+=2;});}
+    if(site==='ranch'){b.appendChild(el('p',null,'艾妲的试种田有三个小区，每区一份种籽，浇过水并经过两个夜晚后可收干草 ×3。羊毛合同需牧场剪毛记录和背包羊毛，不接受只买来的羊毛冒充照料。'));
+      meadowButton(b,site,'购买牧草种籽 ×3 · 12金',{coins:12,out:'pasture_seed',qty:3});
+      meadowButton(b,site,'购买小麦 ×2 · 14金',{coins:14,out:'grain',qty:2});
+      var wait=m.contractDay?Math.max(0,7-(state.totalDay-m.contractDay)):0;b.appendChild(el('p',null,wait?'下一份羊毛合同还需 '+wait+' 天。':'羊毛合同可交付：羊毛 ×2，报酬60金。'));
+      meadowButton(b,site,'交付羊毛 ×2 · 60金',{need:{wool:2},guard:function(){return m.produced-m.redeemed>=2&&(!m.contractDay||state.totalDay-m.contractDay>=7);},reason:'需要尚未交付的牧场剪毛记录；合同每七天开放一次。'},function(){m.redeemed+=2;m.contractDay=state.totalDay;state.coins+=60;state.npcFriendship.meadow_ada=Math.min(100,(state.npcFriendship.meadow_ada||0)+5);toast('牧场羊毛合同完成，获得60金。');});}
+    if(site.indexOf('plot')===0){var i=+site.slice(4),p=m.plots[i];b.appendChild(el('p',null,'试种田 '+(i+1)+'：'+(!p?'空地':meadowPlotReady(p)?'牧草成熟，可以割草':meadowPlotWet(p)?'今天已有水，等待夜间生长':'牧草生长中，旁边按 E 浇水')+'。成熟需要两个浇过水的夜晚；普通农具不作用于村民试种田。'));
+      if(!p)meadowButton(b,site,'播牧草 · 种籽 ×1',{need:{pasture_seed:1},minutes:10,energy:2,guard:function(){return !m.plots[i];}},function(){m.plots[i]={seedDay:state.totalDay,waterDays:[]};});
+      else if(meadowPlotReady(p))meadowButton(b,site,'割牧草 · 干草 ×3',{out:'pasture_hay',qty:3,minutes:15,energy:3,guard:function(){return meadowPlotReady(m.plots[i]);}},function(){m.plots[i]=null;});
+      else meadowButton(b,site,'浇试种田 · 5分钟',{minutes:5,energy:2,guard:function(){return m.plots[i]&&!meadowPlotWet(m.plots[i]);},reason:'今天已浇水；生长需要经过游戏夜晚。'},function(){m.plots[i].waterDays.push(state.totalDay);});}
+  },actions:[{label:'返回游戏',close:true}]});
+}
+function meadowPlotWet(p){return !!p&&(p.waterDays.indexOf(state.totalDay)>=0||state.weather.today==='rain');}
+function drawMeadowGround(g,R){if(state.sceneId!=='meadow')return;
+  for(var wx=20;wx<=25;wx++)for(var wy=8;wy<=14;wy++){if(MAPS.meadow.t[wx][wy]!==T_WALL||wx<R.x0||wx>R.x1||wy<R.y0||wy>R.y1)continue;var sx=wx*TILE,sy=wy*TILE;px(g,sx,sy,TILE,TILE,PAL.grass);px(g,sx,sy+8,TILE,6,'#959C88');px(g,sx,sy+8,TILE,2,'#BCC1AB');px(g,sx+6,sy+10,1,4,'#737D6C');px(g,sx+11,sy+10,1,4,'#737D6C');}
+  for(var y=2;y<32;y++)for(var x=2;x<42;x++){if(x<R.x0||x>R.x1||y<R.y0||y>R.y1||MAPS.meadow.t[x][y]!==T_GRASS||(x*7+y*11)%23!==0)continue;px(g,x*TILE+4,y*TILE+7,1,5,'#567649');px(g,x*TILE+2,y*TILE+5,5,3,'#BA8EAB');}
+  meadowLifeState().plots.forEach(function(p,i){var x=(14+i*4)*TILE,y=24*TILE;px(g,x-8,y-5,32,22,meadowPlotWet(p)?'#6B6550':'#9D8866');if(p){var mature=meadowPlotReady(p);for(var j=0;j<5;j++){px(g,x-4+j*5,y+2,1,mature?12:6,'#657C43');px(g,x-5+j*5,y+2,3,2,mature?'#C5C37B':'#91AA62');}}});
+}
+function drawMeadowSheep(g,x,y,index){var bob=timePaused()?0:Math.floor(animalClock*2+index)%2;px(g,x-10,y,20,3,'rgba(0,0,0,.16)');px(g,x-9,y-11-bob,17,11,'#ECE4CF');px(g,x-6,y-14-bob,10,5,'#F6EEDC');px(g,x+7,y-10-bob,6,7,'#7D7060');px(g,x+10,y-9-bob,1,1,'#273C31');px(g,x-6,y-1,2,4,'#6A6556');px(g,x+3,y-1,2,4,'#6A6556');}
+function addMeadowEntities(ents,R){var sc=state.sceneId;if(sc.indexOf('meadow')!==0)return;
+  Object.keys(MEADOW_SITES).forEach(function(k){var p=MEADOW_SITES[k];if(p.scene!==sc||k.indexOf('plot')===0)return;ents.push({z:(p.y+1)*TILE,f:drawBoard,a:[p.x,p.y]});});
+  if(sc==='meadow'){ents.push({z:12*TILE,f:function(g){var x=5*TILE,y=9*TILE;px(g,x,y,4*TILE,2*TILE,'#8F7656');px(g,x-2,y-5,4*TILE+4,6,'#777B62');px(g,x+7,y+9,14,22,'#5E5644');px(g,x+35,y+9,13,12,'#C6B78E');px(g,x+20,y+31,25,6,'#B39D70');for(var i=0;i<2;i++){var cx=(6+i*2)*TILE+4,cy=12*TILE+4;px(g,cx,cy-5,10,7,'#E4D8B4');px(g,cx+8,cy-9,5,5,'#F0E3C7');px(g,cx+8,cy-11,4,2,'#B77863');px(g,cx+13,cy-7,3,2,'#CEAD64');px(g,cx+11,cy-8,1,1,'#333D2D');px(g,cx+3,cy+2,1,3,'#9D7B42');}} ,a:[]});ents.push({z:15*TILE,f:function(g){var m=meadowLifeState();px(g,18*TILE,15*TILE,3*TILE,10,'#8B8F7B');px(g,18*TILE+3,15*TILE+2,3*TILE-6,5,m.trough?'#7FAAB0':'#A29B80');if(!m.trough)px(g,19*TILE+4,15*TILE+3,2,6,'#4F5548');},a:[]});
+    [[21,10],[23,12]].forEach(function(p,i){var x=p[0]*TILE+8+Math.round(Math.sin(animalClock*.5+i)*3),y=p[1]*TILE+12;ents.push({z:y,f:drawMeadowSheep,a:[x,y,i]});});
+  }else if(sc==='meadow_vet')ents.push({z:6*TILE,f:function(g){px(g,10*TILE+4,4*TILE+5,4*TILE-8,2*TILE-10,'#DAD9C5');px(g,12*TILE,4*TILE+7,7,7,'#769488');px(g,12*TILE+3,4*TILE+5,2,11,'#EEEBDD');},a:[]});
+}
+
 window.__MOSS__ = {
+  meadowLifeState:meadowLifeState, meadowSites:MEADOW_SITES, openMeadowLife:openMeadowLife,
   millLifeState: millLifeState, millLifeSites: MILL_LIFE_SITES, openMillLife: openMillLife,
   houseFurniture: houseFurniture,
 
