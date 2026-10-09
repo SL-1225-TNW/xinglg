@@ -39,6 +39,7 @@ jobs:
       - name: Verify wetland, professional routes, and frontier chapter
         run: |
           node tests/run-phase-cde.mjs
+          node tests/run-phase-d-review.mjs
           node tests/run-indoor-weather.mjs
       - name: Verify Stage B and save regressions
         run: |
