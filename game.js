@@ -733,6 +733,7 @@ function newGameState() {
     resourceNodes: {},
     structures: [],
     fishpond: newFishpondState(),
+    millLife: newMillLife(),
     shipping: {},
     houseChest: {},
     tutorial: newTutorial('active'),
@@ -828,6 +829,7 @@ function serialize() {
     migratedFrom: state.migratedFrom,
     overloaded: state.overloaded,
     travel: state.travel,
+    millLife: state.millLife || newMillLife(),
     savedAt: Date.now()
   };
 }
@@ -920,6 +922,8 @@ function normalizeSave(raw) {
   // DS 小姐：没有该字段的旧存档视为尚未相遇，她会在玩家解锁钓竿后的第一次钓鱼时出现。
   s.dsMet = !!raw.dsMet;
   s.exploration = normalizeExploration(raw.exploration);
+  s.millLife = normalizeMillLife(raw.millLife);
+  if (raw.sceneId && raw.sceneId.indexOf('mill_') === 0 && !raw.bridgeRepaired) { s.sceneId='town'; s.player={x:22,y:21,face:'up'}; }
   if ((s.sceneId==='city'||s.sceneId.indexOf('city_')===0)&&!s.exploration.city){s.sceneId='town';s.player={x:14,y:22,face:'up'};}
   if ((s.sceneId === 'forest' && !s.exploration.forest) || (s.sceneId.indexOf('mine') === 0 && (!s.exploration.mine || +s.sceneId.slice(4)>s.exploration.depth))) { s.sceneId='town';s.player={x:14,y:2,face:'down'}; }
   s.rodLevel = clamp(Math.floor(num(raw.rodLevel, 1, 1, 3)), 1, 3);
@@ -1638,6 +1642,7 @@ function doSwitchScene(to, tx, ty) {
 }
 
 function onSceneChanged() {
+  cam.init = false; // 换场景立即按新地图重新取景，避免室内第一帧沿用室外镜头。
   MINE_RECORD_POS='';
   if (isSolid(state.sceneId, state.player.x, state.player.y)) {
     // 落点被占用时向周围找空位
@@ -3272,14 +3277,12 @@ function openCityService(it) {
         if ((ex.millStock || 0) < 2) { toast('麦仓空了，明天再来。'); return; }
         var okMill = ex.millStock - 2; /* 先确认产物体积，再扣麦 */
         if (!bagAccepts('flour', 4)) { toast('背包满了，面粉放不下。'); return; }
-        ex.millStock = okMill;
-        cityWork({ out: 'flour', qty: 4, energy: 10, minutes: 90, done: '水轮磨出四袋面' });
+        if (cityWork({ out: 'flour', qty: 4, energy: 10, minutes: 90, done: '水轮磨出四袋面' })) { ex.millStock = okMill; saveNow(); refreshWindow(); }
       }));
-      r1.appendChild(mkBtn('加磨一整夜 → 面粉 ×10 · 麦 4 · 体力 24', '', function () {
+      r1.appendChild(mkBtn('连续磨粉四小时 → 面粉 ×10 · 麦 4 · 体力 24', '', function () {
         if ((ex.millStock || 0) < 4) { toast('麦仓不够，明日再来。'); return; }
         if (!bagAccepts('flour', 10)) { toast('背包满了，面粉放不下。'); return; }
-        ex.millStock -= 4;
-        cityWork({ out: 'flour', qty: 10, energy: 24, minutes: 240, done: '水轮磨了一夜' });
+        if (cityWork({ out: 'flour', qty: 10, energy: 24, minutes: 240, done: '水轮磨了四小时' })) { ex.millStock -= 4; saveNow(); refreshWindow(); }
       }));
       b.appendChild(r1);
       b.appendChild(el('p', 'muted', '磨好的面粉可直接送往交易所或中央市场出手。'));
@@ -7921,7 +7924,7 @@ function openCraft() {
   openWindow({
     id: 'craft', kind: 'craft', wide: true, title: '制作',
     build: function (b) {
-      b.appendChild(el('p', 'muted', '设备制作后进入背包，用快捷栏第 9 格在农场种植区放置。'));
+      b.appendChild(el('p', 'muted', '设备制作后进入背包，用快捷栏第 8 格在农场种植区放置。第 9 格为小铲子，第 10 格为施肥。'));
       var g = el('div', 'grid two');
       RECIPES.forEach(function (r) {
         var unlocked = recipeUnlocked(r);
@@ -8038,6 +8041,7 @@ function openQuestLog(site) {
         var btn=mkBtn(t[1],QUEST_TAB===t[0]?'primary':'sm',function(){QUEST_TAB=t[0];renderWindow();});
         tabs.appendChild(btn);
       });b.appendChild(tabs);
+      b.appendChild(mkBtn('风铃磨坊 · '+millLifeTaskText(),'sm',function(){openMillLife('journal');}));
       if(QUEST_TAB==='daily'){
         b.appendChild(el('p','muted','每天从居民委托池抽取 3 份，完成后次日刷新。'));
         activeDailyJobIds().forEach(function(id){renderDailyJobCard(b,id);});return;
@@ -8181,6 +8185,8 @@ function openDialogue(id, text, friendshipGain) {
         if (friendshipGain) b.appendChild(el('p', 'muted', '聊天好感 +' + friendshipGain));
         var d = npcDaily(id);
         var row = el('div', 'row');
+        var millNpcSite={mill_martin:'mill',mill_elise:'baker',mill_jeanne:'hall',mill_abel:'farmer'}[id];
+        if(millNpcSite)row.appendChild(mkBtn('磨坊与村庄事务','primary',function(){openMillLife(millNpcSite);}));
         if(LIVING_JOBS[id])row.appendChild(mkBtn('帮忙委托','primary',function(){openResidentJob(id);}));
         if(BOND_QUESTS.some(function(q){return q.npc===id&&!specialQuestDone(q,'bond')&&specialQuestUnlocked(q,'bond');}))row.appendChild(mkBtn('居民委托','primary',function(){QUEST_TAB='bond';openQuestLog('npc');}));
         if (!d.chat) row.appendChild(mkBtn('再聊一句', 'primary', function () { talkToNpc(id); }));
@@ -8300,6 +8306,7 @@ function openWorkRecords(initial) {
   clearKeys();var tab=initial==='mine'?'mine':'farm',selected=null;
   openWindow({id:'workrecords',kind:'custom',wide:true,title:'农务与矿山记录',build:function(b){
     var tabs=el('div','row');[['farm','农务总览'],['mine','矿山记录']].forEach(function(pair){tabs.appendChild(mkBtn(pair[1],tab===pair[0]?'primary':'',function(){tab=pair[0];renderWindow();}));});b.appendChild(tabs);
+    b.appendChild(mkBtn('磨坊与麦田村委托','',function(){openMillLife('journal');}));
     if(tab==='farm'){
       var summary=farmWorkSummary();
       b.appendChild(el('p','work-summary','待浇水 '+summary.dry+' 块 · 可收获 '+summary.ripe+' 块 · 空耕地 '+summary.empty+' 块'));
@@ -8595,6 +8602,7 @@ function travelNodeUnlocked(n) {
   if (n.kind === 'district') return !!exploreState().city;
   if (n.id === 'farm.home') return true;
   if (n.id === 'town.square') return true;
+  if (n.id === 'mill.village') return !!state.bridgeRepaired;
   if (n.id === 'riverside.bank') return !!state.bridgeRepaired;
   if (n.id === 'forest.gate') return !!exploreState().forest;
   if (n.id === 'city.gate') return !!exploreState().city;
@@ -8607,6 +8615,7 @@ function travelNodeUnlocked(n) {
 /* 未解锁时给出具体条件，不写“未知错误”。 */
 function travelLockReason(n) {
   if (!n) return '地点不存在。';
+  if (n.id === 'mill.village' && !state.bridgeRepaired) return '未解锁 · 修好小桥后，从小镇东南乡道路牌首次到访';
   if (n.id === 'riverside.bank' && !state.bridgeRepaired) return '未解锁 · 完成小镇东侧修桥委托';
   if (n.id === 'forest.gate' && !exploreState().forest) return '未解锁 · 小镇北口清理倒木（木材 15 + 80 金）';
   if (n.id === 'city.gate' && !exploreState().city) return '未解锁 · 小镇南口办理通行证（150 金）';
@@ -8783,6 +8792,7 @@ var WORLD_REGIONS = [
   {id:'mill',name:'风铃磨坊',x:81,y:67,desc:'河流穿过麦田与古老水磨坊，连接山谷东南部的乡野。'}
 ];
 function worldRegionStatus(r) {
+  if (r.id === 'mill') return state.bridgeRepaired ? '已开放' : '未解锁 · 修复小桥';
   if (r.id === 'farm' || r.id === 'town') return '已开放';
   if (r.id === 'riverside') return state.bridgeRepaired ? '已开放' : '未解锁 · 修复小桥';
   if(r.id==='forest')return exploreState().forest?'已开放':'未解锁 · 小镇北口清理倒木';
@@ -8814,7 +8824,7 @@ function drawWorldAtlas(c) {
 }
 function openWorldMap() {
   clearKeys();
-  var current=state.sceneId==='house'?'farm':state.sceneId.indexOf('mine')===0?'pass':state.sceneId.indexOf('city_')===0?'city':state.sceneId;
+  var current=state.sceneId.indexOf('mill_')===0?'mill':state.sceneId==='house'?'farm':state.sceneId.indexOf('mine')===0?'pass':state.sceneId.indexOf('city_')===0?'city':state.sceneId;
   var selected=current;
   var cityView=current==='city';
   /* 城市内街区落点：同城内公共街区 0 分钟，直接传送到已发现公共落点，
@@ -8888,7 +8898,7 @@ function openWorldMap() {
 function regionTravelNode(regionId) {
   var map = {
     farm: 'farm.home', town: 'town.square', riverside: 'riverside.bank',
-    forest: 'forest.gate', city: 'city.gate', pass: 'mine.entrance'
+    forest: 'forest.gate', city: 'city.gate', pass: 'mine.entrance', mill: 'mill.village'
   };
   return map[regionId] ? travelNodeById(map[regionId]) : null;
 }
@@ -9150,6 +9160,8 @@ function openStructure(st) {
   });
 }
 function activateInteractable(it) {
+  if (it.kind === 'millLife') { openMillLife(it.work); return; }
+  if (it.kind === 'millDoor') { doSwitchScene(it.to,Math.floor(MAPS[it.to].w/2),MAPS[it.to].h-2); return; }
   if(it.kind==='cityGate'){openCityGate();return;}
   if(it.kind==='cityDoor'){var room=MAPS[it.to];doSwitchScene(it.to,Math.floor(room.w/2),room.h-2);return;}
   if(it.kind==='cityService'){openCityService(it);return;}
@@ -10910,6 +10922,7 @@ function drawScene(g, dt) {
   g.translate(-ox, -oy);
   // 地面按块烘焙、只贴视野内的块（大城市整张画布开不出来）
   drawGround(g, state.sceneId, R);
+  drawMillLifeGround(g, R);
   // 池塘：水下鱼 → 水面波纹反光冒泡（只出现在农场池塘）
   if (state.sceneId === 'farm') {
     if (R.x1 >= POND_AREA.x0 && R.x0 <= POND_AREA.x1 && R.y1 >= POND_AREA.y0 && R.y0 <= POND_AREA.y1) {
@@ -10937,6 +10950,7 @@ function drawScene(g, dt) {
   drawMineWork(g);
   // 实体
   var ents = [];
+  addMillLifeEntities(ents, R);
   // 作物按脚底位置参与深度排序：玩家可从前后遮挡植物
   if (state.sceneId === 'farm') {
     for (var cy = R.y0; cy <= R.y1; cy++) {
@@ -10967,7 +10981,7 @@ function drawScene(g, dt) {
   (map.buildings || []).forEach(function (b) {
     var visualTop=b.y+b.h-Math.ceil((b.visualHeight||64)/TILE);
     if(b.x+b.w<R.x0||b.x>R.x1||b.y+b.h<R.y0||visualTop>R.y1)return;
-    ents.push({ z: (b.y + b.h) * TILE, f: state.sceneId==='city'?drawCityBuilding:drawHouse, a: state.sceneId==='city'?[b.x,b.y,b]:[b.x, b.y, b.w, b.h, b.kind] });
+    ents.push({ z: (b.y + b.h) * TILE, f: state.sceneId==='city'?drawCityBuilding:state.sceneId==='mill_village'?drawMillLifeBuilding:drawHouse, a: state.sceneId==='city'?[b.x,b.y,b]:[b.x, b.y, b.w, b.h, b.kind] });
   });
   (INTERACTABLES[state.sceneId] || []).forEach(function (it) {
     if (it.x < R.x0 || it.x > R.x1 || it.y < R.y0 || it.y > R.y1) return;
@@ -11639,7 +11653,134 @@ UI.refreshReel = function () {
 };
 
 /* --- 调试/测试接口 --- */
+/* 第七版 C 首批地点：风铃磨坊与麦田村。静态场景共用碰撞、日程、
+   物品、世界时间及传送事务；工程事实独立保存，不复制畜养或肥力系统。 */
+function newMillLife() { return {intake:false,gear:false,repair:null,farmOpinion:false,breadOpinion:false,allocation:null,trialDay:0,inspected:false,delivery:false,batchDay:0,batches:0,stockDay:0,bought:0}; }
+function normalizeMillLife(raw) {
+  var m=newMillLife(),r=raw&&typeof raw==='object'?raw:{};
+  ['intake','gear','farmOpinion','breadOpinion'].forEach(function(k){m[k]=r[k]===true;});
+  m.repair=m.intake&&m.gear&&['gear','paddles'].indexOf(r.repair)>=0?r.repair:null;
+  m.allocation=m.repair&&m.farmOpinion&&m.breadOpinion&&['balanced','irrigation'].indexOf(r.allocation)>=0?r.allocation:null;
+  ['trialDay','batchDay','stockDay'].forEach(function(k){m[k]=Number.isFinite(r[k])?clamp(Math.floor(r[k]),0,100000):0;});
+  if(!m.allocation)m.trialDay=0;
+  m.inspected=!!(m.trialDay&&r.inspected===true);m.delivery=m.inspected&&r.delivery===true;
+  m.batches=Number.isFinite(r.batches)?clamp(Math.floor(r.batches),0,3):0;
+  m.bought=Number.isFinite(r.bought)?clamp(Math.floor(r.bought),0,6):0;return m;
+}
+function millLifeState(){return state.millLife||(state.millLife=newMillLife());}
+var MILL_LIFE_FURNITURE={
+  mill_workshop:[{x:11,y:3,w:5,h:4,type:'mill'},{x:3,y:3,w:3,h:2,type:'sacks'},{x:3,y:9,w:3,h:2,type:'sacks'},{x:17,y:4,w:1,h:5,type:'shelf'}],
+  mill_bakery:[{x:11,y:2,w:4,h:3,type:'oven'},{x:5,y:5,w:7,h:1,type:'counter'},{x:2,y:2,w:3,h:2,type:'prep'},{x:2,y:9,w:3,h:1,type:'table'}],
+  mill_hall:[{x:5,y:4,w:4,h:1,type:'desk'},{x:1,y:2,w:2,h:3,type:'shelf'},{x:14,y:2,w:2,h:2,type:'notice'},{x:4,y:8,w:8,h:1,type:'table'}]
+};
+MAPS.mill_village=(function(){
+  var m=mkMap(48,36,T_GRASS);m.name='风铃磨坊与麦田村';m.trees=[[2,3],[4,6],[3,28],[6,32],[27,3],[38,5],[42,12],[43,28],[28,32]];
+  m.buildings=[{x:7,y:5,w:5,h:3,kind:'cottage'},{x:17,y:8,w:5,h:3,kind:'hall'},{x:8,y:14,w:5,h:3,kind:'bakery'},{x:26,y:12,w:6,h:4,kind:'mill'},{x:4,y:24,w:4,h:3,kind:'cottage'},{x:40,y:20,w:5,h:3,kind:'cottage'}];
+  fillRect(m,32,0,34,21,T_WATER,true);fillRect(m,34,24,36,35,T_WATER,true);
+  fillRect(m,0,18,30,19,T_PATH,false);fillRect(m,17,12,19,21,T_PATH,false);fillRect(m,10,8,11,20,T_PATH,false);
+  fillRect(m,18,21,44,23,T_PATH,false);fillRect(m,31,22,36,23,T_BRIDGEFIXED,false);fillRect(m,28,16,30,22,T_PATH,false);
+  fillRect(m,8,25,25,30,T_SAND,false);
+  m.buildings.forEach(function(b){fillRect(m,b.x,b.y,b.x+b.w-1,b.y+b.h-1,T_BUILDING,true);var dx=b.x+Math.floor(b.w/2),dy=b.y+b.h;fillCol(m,dx,dy,Math.max(dy,19),T_PATH,false);});
+  m.trees.forEach(function(p){m.solid[p[0]][p[1]]=1;});m.exits=[{x:0,y:18,to:'town',tx:22,ty:21},{x:0,y:19,to:'town',tx:22,ty:21}];return m;
+})();
+function makeMillLifeRoom(id,name,w,h,door) {
+  var m=mkMap(w,h,T_FLOOR);m.name=name;m.indoor=true;m.buildings=[];m.trees=[];
+  fillRow(m,0,w-1,0,T_WALL,true);fillRow(m,0,w-1,h-1,T_WALL,true);fillCol(m,0,0,h-1,T_WALL,true);fillCol(m,w-1,0,h-1,T_WALL,true);
+  var ex=Math.floor(w/2);m.t[ex][h-1]=T_FLOOR;m.solid[ex][h-1]=0;
+  (MILL_LIFE_FURNITURE[id]||[]).forEach(function(f){fillRect(m,f.x,f.y,f.x+f.w-1,f.y+f.h-1,T_FLOOR,true);});
+  m.exits=[{x:ex,y:h-1,to:'mill_village',tx:door[0],ty:door[1]+1}];MAPS[id]=m;
+}
+makeMillLifeRoom('mill_workshop','风铃磨坊 · 机房',20,14,[29,16]);
+makeMillLifeRoom('mill_bakery','麦田村 · 面包房',18,12,[10,17]);
+makeMillLifeRoom('mill_hall','麦田村 · 议事屋',18,12,[19,11]);
+['mill_village','mill_workshop','mill_bakery','mill_hall'].forEach(function(id){SCENE_ORDER.push(id);INTERACTABLES[id]=[];});
+var MILL_LIFE_SITES={gate:{scene:'town',x:22,y:22,label:'东南乡道 · 风铃磨坊'},intake:{scene:'mill_village',x:31,y:20,label:'检查进水渠'},gear:{scene:'mill_workshop',x:13,y:7,label:'检查传动齿轮'},mill:{scene:'mill_workshop',x:9,y:6,label:'马丁的维修与磨粉台'},farmer:{scene:'mill_village',x:11,y:25,label:'听取农田用水意见'},baker:{scene:'mill_bakery',x:9,y:6,label:'烘焙台与供水意见'},hall:{scene:'mill_hall',x:9,y:5,label:'议事与试运行记录'},delivery:{scene:'mill_bakery',x:5,y:7,label:'交付村庄早餐'}};
+Object.keys(MILL_LIFE_SITES).forEach(function(k){var p=MILL_LIFE_SITES[k];INTERACTABLES[p.scene].push({kind:'millLife',work:k,x:p.x,y:p.y,label:p.label,stand:[[p.x,p.y+1],[p.x-1,p.y],[p.x+1,p.y],[p.x,p.y-1]]});});
+[['mill_workshop',29,16,'风铃磨坊机房'],['mill_bakery',10,17,'麦田村面包房'],['mill_hall',19,11,'村议事屋']].forEach(function(p){INTERACTABLES.mill_village.push({kind:'millDoor',to:p[0],x:p[1],y:p[2],label:'进入'+p[3],stand:[[p[1],p[2]],[p[1],p[2]+1]]});});
+fillRect(MAPS.town,21,19,23,23,T_PATH,false);
+addResident('mill_martin','马丁','磨坊师','mill_workshop',8,6,'engineer',['#70543B','#B8A782','#526C76'],['水轮还能转，但齿轮在打滑。先看看进水渠和传动轴。','先修理、再试水，别把整个村子的水都引来磨粉。']);
+addResident('mill_elise','艾莉丝','乡村面包师','mill_bakery',12,7,'baker',['#996D46','#F0E1C5','#B77656'],['面包房也要干净的水。把农田那边的意见一起带给村议事屋吧。','你可以带自种的粮食，也可以买村庄麦仓里的小麦。']);
+addResident('mill_jeanne','让娜','村议事员','mill_hall',12,6,'scholar',['#65555B','#87707F','#D2BE83'],['水是大家共用的。听完农田和面包房的意见，再决定水轮开多久。','试运行一夜后回来验收，修好了也要看实际结果。']);
+addResident('mill_abel','阿贝尔','麦田农夫','mill_village',11,26,'gardener',['#8B7152','#788756','#E0C394'],['麦田傍晚最需要水。水轮若连转一整天，下游就会缺水。','可以午后停磨，让晚水流到田里；也可以安排轮流取水。']);
+var MILL_TRAVEL_NODE={id:'mill.village',locationId:'white_rose.southeast.mill_village',sceneId:'mill_village',name:'风铃磨坊与麦田村',region:'southeast',kind:'village',safe:[[3,18],[4,18],[3,19]],desc:'水轮、机房、面包房与议事屋。调查故障，维修水轮，协商用水并完成村庄早餐。'};
+TRAVEL_NODES.push(MILL_TRAVEL_NODE);NODE_BY_ID[MILL_TRAVEL_NODE.id]=MILL_TRAVEL_NODE;NODE_BY_SCENE.mill_village=MILL_TRAVEL_NODE;
+['mill_village','mill_workshop','mill_bakery','mill_hall'].forEach(function(id){SCENE_TO_NODE[id]='mill.village';});
+[['town.square',30],['riverside.bank',10],['city.gate',30],['farm.home',60]].forEach(function(p){TRAVEL_PAIRS[[p[0],'mill.village'].sort().join('|')]=p[1];});
+WORLD_REGIONS.filter(function(r){return r.id==='mill';})[0].desc=MILL_TRAVEL_NODE.desc+' 修好小桥后，从小镇东南乡道路牌首次进入；到访后可直接传送。';
+function millLifeNear(site){var p=MILL_LIFE_SITES[site];return !!p&&state.sceneId===p.scene&&Math.abs(state.player.x-p.x)+Math.abs(state.player.y-p.y)<=1;}
+function millLifeAction(site,opts,apply) {
+  if(!millLifeNear(site)){toast('请到'+MILL_LIFE_SITES[site].label+'旁操作。');return false;}
+  if(opts.guard&&!opts.guard()){toast(opts.reason||'当前条件尚未满足。');return false;}
+  if(!canSpendGameMinutes(opts.minutes||0)||!hasEnergy(opts.energy||0))return false;
+  if(state.coins<(opts.coins||0)){toast('金币不足，尚未扣费。');return false;}
+  var next=Object.assign({},state.inventory),need=opts.need||{};
+  for(var k in need){if((next[k]||0)<need[k]){toast('材料不足：'+itemName(k)+' ×'+need[k]);return false;}next[k]-=need[k];}
+  if(opts.out&&!canAccept(next,opts.out,opts.qty||1)){toast('背包满了，先整理一下；尚未扣除材料。');return false;}
+  Object.keys(need).forEach(function(k){invRemove(k,need[k]);});state.coins-=opts.coins||0;state.energy-=opts.energy||0;
+  spendGameMinutes(opts.minutes||0);if(opts.out)invAdd(opts.out,opts.qty||1);if(apply)apply();markDirty();saveNow();refreshHud();refreshWindow();Audio2.play('place');return true;
+}
+function millLifeButton(b,site,label,opts,apply){b.appendChild(mkBtn(label,'',function(){millLifeAction(site,opts,apply);}));}
+function millLifeTaskText(){var m=millLifeState();return m.delivery?'村庄早餐已交付 · 水轮继续按协定工作':m.inspected?'水轮已验收 · 向面包房交付乡村面包 ×2':m.trialDay?(state.totalDay>m.trialDay?'试运行结束 · 到议事屋验收':'试运行中 · 睡过一夜后到议事屋验收'):m.allocation?'用水协议已定 · 到议事屋启动试运行':m.repair?'水轮已修 · 听取麦田与面包房意见，到议事屋选择用水协议':'调查进水渠与机房齿轮，再到马丁工作台选择修法';}
+function openMillLife(site) {
+  if(site==='gate'){openWindow({id:'millgate',kind:'custom',title:'东南乡道',build:function(b){b.appendChild(el('p',null,'乡道通向风铃磨坊与麦田村。修好小桥后可步行进入，首次到访后登记免费传送。'));},actions:[{label:'前往风铃磨坊与麦田村',kind:'primary',onClick:function(){if(!state.bridgeRepaired){toast('先完成小镇东侧修桥委托。');return;}closeWindow();doSwitchScene('mill_village',3,18);}},{label:'返回',close:true}]});return;}
+  openWindow({id:'milllife',kind:'custom',wide:true,title:'水轮与村庄早餐',build:function(b){
+    b.classList.add('mill-life-panel');
+    var m=millLifeState();b.appendChild(el('p','work-summary',millLifeTaskText()));
+    b.appendChild(el('p','muted','任务记录随存档保存。维修与用水协议只能完成一次；粮食与面包允许合法购买。N「册」可随时查看任务。'));
+    if(site==='journal'){b.appendChild(el('p',null,'首次进入：小镇东南 (22,22) 乡道路牌按 E。村内：进水渠 (31,20)，机房门 (29,16)，面包房门 (10,17)，议事屋门 (19,11)，麦田 (11,25)。'));return;}
+    if(site==='intake'){b.appendChild(el('p',null,'进水槽有落叶淤积，但没有断流。问题更像是传动磨损。'));if(!m.intake)millLifeButton(b,site,'记录进水渠 · 10分钟',{minutes:10,energy:2,guard:function(){return !m.intake;}},function(){m.intake=true;});}
+    if(site==='gear'){b.appendChild(el('p',null,'两颗齿轮齿缺损，水轮木桨也有裂纹。可以补齿轮，也可以替换木桨降低负荷。'));if(!m.gear)millLifeButton(b,site,'记录齿轮磨损 · 10分钟',{minutes:10,energy:2,guard:function(){return !m.gear;}},function(){m.gear=true;});}
+    if(site==='mill'){
+      b.appendChild(el('p',null,'马丁：先做两处调查，再选修法。铁件方案节省木材；木桨方案不需要矿石。两种都能完成任务。'));
+      if(!m.repair){[['gear','修补齿轮 · 木材8／铁矿1／45分钟',{wood:8,iron_ore:1},45],['paddles','更换木桨 · 木材12／石头6／60分钟',{wood:12,stone:6},60]].forEach(function(p){millLifeButton(b,site,p[1],{need:p[2],minutes:p[3],energy:8,guard:function(){return m.intake&&m.gear&&!m.repair;},reason:'先检查村外进水渠与机房齿轮；已修好的水轮不用重复扣材料。'},function(){m.repair=p[0];});});}
+      if(m.inspected){var count=m.batchDay===state.totalDay?m.batches:0,limit=m.allocation==='irrigation'?2:3;b.appendChild(el('p',null,'按用水协议今日已磨 '+count+' / '+limit+' 批；一批小麦2→面粉3，30分钟，4体力。'));
+        millLifeButton(b,site,'磨粉 · 小麦2 → 面粉3',{need:{grain:2},out:'flour',qty:3,minutes:30,energy:4,guard:function(){return (m.batchDay===state.totalDay?m.batches:0)<limit;},reason:'今日协定磨粉额度已用完，明天再来。'},function(){if(m.batchDay!==state.totalDay){m.batchDay=state.totalDay;m.batches=0;}m.batches++;});
+      }
+      var bought=m.stockDay===state.totalDay?m.bought:0;b.appendChild(el('p',null,'村庄麦仓：今日可买 '+(6-bought)+' 份小麦，每份7金；每天补货一次，传送或重载不补货。'));
+      millLifeButton(b,site,'购买小麦 ×2 · 14金',{coins:14,out:'grain',qty:2,guard:function(){return (m.stockDay===state.totalDay?m.bought:0)<=4;},reason:'今日麦仓已售完。'},function(){if(m.stockDay!==state.totalDay){m.stockDay=state.totalDay;m.bought=0;}m.bought+=2;});
+    }
+    if(site==='farmer'){b.appendChild(el('p',null,'阿贝尔：傍晚请给麦田留水。水轮可以轮流开，也可以午后停磨。'));if(!m.farmOpinion)millLifeButton(b,site,'记录农田意见 · 10分钟',{minutes:10,guard:function(){return !m.farmOpinion;}},function(){m.farmOpinion=true;});}
+    if(site==='baker'){
+      b.appendChild(el('p',null,'艾莉丝：面包房需要稳定清水。粮食可自备，也可购买；这是一份普通供货合同。'));if(!m.breadOpinion)millLifeButton(b,site,'记录面包房意见 · 10分钟',{minutes:10,guard:function(){return !m.breadOpinion;}},function(){m.breadOpinion=true;});
+      millLifeButton(b,site,'烤面包 · 面粉1 → 乡村面包2',{need:{flour:1},out:'bread',qty:2,minutes:30,energy:4});
+    }
+    if(site==='hall'){
+      b.appendChild(el('p',null,'让娜：两方意见记录齐全后再定协议。轮流取水可每天磨3批；优先灌溉只磨2批，但保护麦田晚水。决定影响今后日常产能。'));
+      if(!m.allocation)[['balanced','轮流取水 · 每天磨3批'],['irrigation','优先灌溉 · 每天磨2批']].forEach(function(p){millLifeButton(b,site,p[1],{minutes:15,guard:function(){return m.repair&&m.farmOpinion&&m.breadOpinion&&!m.allocation;},reason:'先修好水轮，并记录麦田与面包房的意见。'},function(){m.allocation=p[0];});});
+      else if(!m.trialDay)millLifeButton(b,site,'启动试运行 · 20分钟',{minutes:20,energy:3,guard:function(){return !m.trialDay;}},function(){m.trialDay=state.totalDay;});
+      else if(!m.inspected)millLifeButton(b,site,'验收试运行 · 奖励90金',{minutes:10,energy:2,guard:function(){return !m.inspected&&state.totalDay>m.trialDay;},reason:'试运行要经过一个游戏夜晚，再来验收。'},function(){m.inspected=true;state.coins+=90;state.npcFriendship.mill_martin=Math.min(100,(state.npcFriendship.mill_martin||0)+5);toast('水轮按协议恢复运行，获得90金。');});
+      else b.appendChild(el('p',null,'用水协定：'+(m.allocation==='irrigation'?'优先灌溉，午后停磨':'轮流取水')+'。维修方式：'+(m.repair==='gear'?'修补齿轮':'更换木桨')+'。水轮与村庄共用一份验收，不会重复领奖。'));
+    }
+    if(site==='delivery'){b.appendChild(el('p',null,'第一份村庄早餐：水轮验收后交乡村面包 ×2，奖励50金。可以用本村加工链，也接受已有或购买的面包。'));if(!m.delivery)millLifeButton(b,site,'交付乡村面包 ×2 · 奖励50金',{need:{bread:2},guard:function(){return m.inspected&&!m.delivery;},reason:'先完成水轮试运行验收；已经交付的订单不可重复领奖。'},function(){m.delivery=true;state.coins+=50;state.npcFriendship.mill_elise=Math.min(100,(state.npcFriendship.mill_elise||0)+5);toast('村庄早餐已交付，获得50金。');});}
+  },actions:[{label:'返回游戏',close:true}]});
+}
+function drawMillLifeBuilding(g,bx,by,bw,bh,kind){var x=bx*TILE,y=by*TILE,w=bw*TILE,h=bh*TILE,roof=kind==='mill'?'#596F7B':kind==='bakery'?'#A36D50':kind==='hall'?'#65775B':'#80665E';
+  px(g,x+2,y+14,w-4,h-14,kind==='mill'?'#C0B9A4':'#E3D6B9');px(g,x,y,w,14,roof);px(g,x-1,y+12,w+2,3,'#514D43');
+  for(var i=8;i<w-10;i+=18){px(g,x+i,y+21,8,10,'#536E75');px(g,x+i+3,y+21,1,10,'#E2D5B5');px(g,x+i,y+25,8,1,'#E2D5B5');}
+  var dx=x+Math.floor(bw/2)*TILE;px(g,dx+3,y+h-18,10,18,'#76563E');px(g,dx+10,y+h-10,1,1,'#E6C887');
+  px(g,x+w-14,y-5,6,14,'#8F7661');px(g,x+w-15,y-6,8,2,'#534B40'); // 烟囱固定在屋顶
+  if(kind==='hall'||kind==='bakery'||kind==='mill'){px(g,dx-7,y+h-25,29,5,'#5E6850');px(g,dx-4,y+h-23,22,1,'#E7D7A3');}
+}
+function drawMillLifeGround(g,R){if(state.sceneId!=='mill_village')return;
+  for(var y=25;y<=30;y++)for(var x=8;x<=25;x++){if(x<R.x0||x>R.x1||y<R.y0||y>R.y1)continue;px(g,x*TILE+3,y*TILE+5,1,9,'#7F9154');px(g,x*TILE+9,y*TILE+3,1,11,'#7F9154');px(g,x*TILE+2,y*TILE+4,3,4,'#CFB965');px(g,x*TILE+8,y*TILE+2,3,4,'#DCC576');}
+}
+function drawMillLifeFurniture(g,f){var x=f.x*TILE,y=f.y*TILE,w=f.w*TILE,h=f.h*TILE;
+  px(g,x+2,y+3,w-4,h-3,f.type==='oven'?'#897363':f.type==='mill'?'#6A706B':'#8D6B49');px(g,x,y,w,4,'#B29B78');
+  if(f.type==='mill'){px(g,x+7,y+9,w-14,h-18,'#A6AAA0');px(g,x+9,y+11,w-18,3,'#D5D0B4');px(g,x+13,y+16,22,24,'#696F67');px(g,x+10,y+20,28,16,'#747C70');px(g,x+16,y+23,16,10,'#B6BBAC');px(g,x+22,y+24,4,8,'#5B635A');px(g,x+37,y+25,23,3,'#6E5543');px(g,x+50,y+12,15,11,'#B68C61');px(g,x+55,y+23,4,15,'#7F664F');px(g,x+8,y+h-7,w-16,3,'#626756');}
+  else if(f.type==='oven'){px(g,x+9,y+h-23,w-18,21,'#40392F');px(g,x+15,y+h-11,w-30,7,'#D59A5A');}
+  else if(f.type==='sacks'){for(var i=2;i<w-8;i+=14){px(g,x+i,y+9,11,h-10,'#D2C299');px(g,x+i+3,y+7,5,2,'#746C50');px(g,x+i+2,y+13,7,2,'#B7A573');px(g,x+i+5,y+17,1,9,'#9F8A62');}}
+  else if(f.type==='shelf'||f.type==='notice'){for(var yy=8;yy<h;yy+=12){px(g,x+3,y+yy,w-6,2,'#4D5045');px(g,x+5,y+yy-6,w-10,5,'#C4B58C');}}
+  else{px(g,x+8,y+5,10,6,'#D8CA9D');px(g,x+w-20,y+5,10,4,'#B5A078');if(f.type==='counter'){for(var i=20;i<w-18;i+=18){px(g,x+i,y+5,12,5,'#C79859');px(g,x+i+4,y+5,1,3,'#ECD6A0');}}}
+}
+function addMillLifeEntities(ents,R){var sc=state.sceneId;
+  if(MILL_LIFE_FURNITURE[sc])ents.push({z:0,f:function(g){var map=MAPS[sc];[3,map.w-5].forEach(function(x){px(g,x*TILE,TILE,2*TILE,2*TILE,'#DBC69D');px(g,x*TILE+3,TILE+3,2*TILE-6,2*TILE-6,'#678B92');px(g,x*TILE+TILE-1,TILE+3,2,2*TILE-6,'#E4D7B5');px(g,x*TILE+3,2*TILE-1,2*TILE-6,2,'#E4D7B5');});},a:[]});
+  (MILL_LIFE_FURNITURE[sc]||[]).forEach(function(f){ents.push({z:(f.y+f.h)*TILE,f:drawMillLifeFurniture,a:[f]});});
+  Object.keys(MILL_LIFE_SITES).forEach(function(k){var p=MILL_LIFE_SITES[k];if(p.scene!==sc||p.x<R.x0||p.x>R.x1||p.y<R.y0||p.y>R.y1)return;ents.push({z:(p.y+1)*TILE,f:drawBoard,a:[p.x,p.y]});});
+  if(sc==='mill_village')ents.push({z:17*TILE,f:function(g){var x=32*TILE,y=14*TILE,run=millLifeState().inspected;px(g,x,y,25,39,'#6B5843');for(var i=0;i<4;i++){var off=run?Math.floor(animalClock*3)%4:0;px(g,x-2,y+3+(i+off)%4*9,29,3,'#B18C5A');}px(g,x+10,y+1,3,37,'#D2B783');},a:[]});
+}
+
 window.__MOSS__ = {
+  millLifeState: millLifeState, millLifeSites: MILL_LIFE_SITES, openMillLife: openMillLife,
   houseFurniture: houseFurniture,
 
   nearestWalkable: nearestWalkable,
