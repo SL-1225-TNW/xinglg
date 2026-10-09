@@ -60,7 +60,30 @@ try{
  check('城市面积是农场四百倍',await page.evaluate(()=>__MOSS__.livingInfo().city.w*__MOSS__.livingInfo().city.h/(32*24)),400);
  check('十个片区与大批可进入建筑',await page.evaluate(()=>[__MOSS__.livingInfo().city.districts.length,__MOSS__.livingInfo().city.buildings.length>=30]),[10,true]);
  const families=await page.evaluate(()=>{const c=__MOSS__.livingInfo().city,byD={};c.allBuildings.forEach(b=>{(byD[b.districtId]=byD[b.districtId]||new Set()).add(b.archetypeId);});return c.districts.filter(d=>d.id!=='park').map(d=>(byD[d.id]||new Set()).size);});
- check('每个片区都有多种建筑家族且不跨区借用',await page.evaluate(()=>{const c=__MOSS__.livingInfo().city;return c.districts.every(d=>{const ids=(c.archetypes[d.family]||[]).map(a=>a.id);return c.allBuildings.filter(b=>b.districtId===d.id).every(b=>ids.indexOf(b.archetypeId)>=0);});}),true);
+ // 「不跨区借用」只约束轮换游标（game.js:2346 注释）；theme 精确映射是
+ // 更高优先级的显式例外（pickArchetype @2363-2369：目标原型不在本片区家族时
+ // 跨家族兜底，「绝不静默退化成住宅模板」）。civic_hall 落在 garden 片区即此例，
+ // 且总规 §32.7 要求「公共大厅无需爵位」。因此这里只校验游标轮换不跨借。
+ const cursorOnly = await page.evaluate(() => {
+  const c = __MOSS__.livingInfo().city;
+  const themed = new Set(['store','sawmill','foundry','mill','boiler','shed',
+                          'unimain','uniwing','unilab','unidorm','arcaded','civic']);
+  const bad = [];
+  c.districts.forEach(d => {
+    const ids = (c.archetypes[d.family] || []).map(a => a.id);
+    c.allBuildings.filter(b => b.districtId === d.id).forEach(b => {
+      if (themed.has(b.kind)) return;               // theme 映射：允许跨家族兜底
+      if (ids.indexOf(b.archetypeId) < 0) bad.push(d.id + '/' + b.id + ':' + b.archetypeId);
+    });
+  });
+  return bad;
+ });
+ check('游标轮换的建筑不跨片区借用外形', cursorOnly, []);
+ check('theme 精确映射优先于片区家族', await page.evaluate(() => {
+  const c = __MOSS__.livingInfo().city;
+  const hall = c.allBuildings.find(b => b.id === 'hall');
+  return hall ? hall.archetypeId : null;
+ }), 'civic_hall');
  check('建成片区实际用到的家族变体不少于三种',Math.min.apply(null,families)>=3,true);
  const architecture=await page.evaluate(()=>{const bs=__MOSS__.livingInfo().city.buildings,c=bs.find(b=>b.id==='castle'),homes=bs.filter(b=>b.id.indexOf('home')===0||b.noEnter&&b.kind==='home');return{castleFootprint:c.w*c.h,castleRows:c.h,castleVisualHeight:c.visualHeight,homeMaxRows:Math.max(...homes.map(b=>b.h)),homeMaxVisualHeight:Math.max(...homes.map(b=>b.visualHeight))};});
  check('城堡紧凑地基支撑显著高于地基的立面',architecture.castleFootprint<=320&&architecture.castleVisualHeight/16>architecture.castleRows*1.8,true);

@@ -2887,9 +2887,17 @@ function renderSpecialQuestCard(b,q,kind){
   b.appendChild(box);
 }
 function addResident(id,name,title,scene,x,y,style,colors,lines){
+  // 三段日程都要过碰撞校验：第一段用原始岗位点也可能落在建筑内部
+  // （学院教师曾被直接放在大学教学楼里），不能只校验后两段。
+  var wp1 = nearestWalkable(scene, x, y);
+  var wp2 = nearestWalkable(scene, x + 2, y), wp4 = nearestWalkable(scene, x, y + 2);
   NPCS[id]={id:id,name:name,title:title,scene:scene,style:style,hair:colors[0],shirt:colors[1],accent:colors[2],skin:'#EDC6A3',
     like:['bread','berry','potato'],dislike:['stone'],
-    schedule:[{from:360,to:540,x:x,y:y},{from:540,to:1080,x:x+2,y:y},{from:1080,to:1320,x:x,y:y+2}],
+    // 默认日程的三点要过碰撞校验：室内锅炉、货箱、柜台都会占格，
+    // 盲加偏移会让居民站在家具上（曾在锅炉房见到锅炉工站进货箱里）。
+    schedule:[{from:360,to:540,x:wp1.x,y:wp1.y},
+             {from:540,to:1080,x:wp2.x,y:wp2.y},
+             {from:1080,to:1320,x:wp4.x,y:wp4.y}],
     lines:lines,rainLines:['下雨了，今天的工作慢一点也没关系。'],bridgeLines:lines,
     heartLines:{25:'以后有空就过来坐坐吧。',50:'和你一起做事总是很安心。',75:'山谷里有你这样的朋友，真好。'}};
 }
@@ -2911,12 +2919,35 @@ NPCS.engineer.schedule[2].y=22;
 
 /* 店员固定在自己的铺子里：他们本来就在工作，而不是沿街循环。
    麦穗烤面包、贝尔看柜台、塞琳核对城堡清单——从门外就能看出店里有人。 */
+/* 居民日程落点吸附：室内家具、锅炉、货箱都会占格，岗位点与手写偏移
+   很可能正好落在实心上，NPC 会走进墙里。这里以岗位点为圆心做螺旋搜索，
+   就近吸附到可行走格；找不到就退回岗位点本身（宁可原地不动，也不穿墙）。 */
+function nearestWalkable(sceneId, x, y, maxR) {
+  if (!isSolid(sceneId, x, y)) return { x: x, y: y };
+  // 城市大场景里建筑占地可达二十多格，岗位坐标直接落在楼内也不罕见，
+  // 所以搜索半径给到 30；室内小场景仍然很快收敛。
+  var rmax = maxR || 30;
+  for (var r = 1; r <= rmax; r++) {
+    for (var dy = -r; dy <= r; dy++) {
+      for (var dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        var nx = x + dx, ny = y + dy;
+        if (!isSolid(sceneId, nx, ny)) return { x: nx, y: ny };
+      }
+    }
+  }
+  return { x: x, y: y };
+}
+
 function postResident(id, scene, x, y) {
   var n = NPCS[id];
   if (!n) return;
   n.scene = scene;
   var routine=CITY_STAFF_ROUTINES[id]||[[360,540,x,y],[540,660,x,y],[660,1020,x,y],[1020,1320,x,y]];
-  n.schedule = routine.map(function(s){return {from:s[0],to:s[1],x:s[2],y:s[3]};});
+  n.schedule = routine.map(function(s){
+    var p = nearestWalkable(scene, s[2], s[3]);
+    return {from:s[0],to:s[1],x:p.x,y:p.y};
+  });
   if (npcRuntime && npcRuntime[id]) { npcRuntime[id].x = x; npcRuntime[id].y = y; npcRuntime[id].path = []; }
 }
 addResident('blacksmith','霍尔','白蔷薇铁匠','city',96,63,'engineer',['#4A3E38','#6B5C57','#B4BBC4'],
@@ -11376,6 +11407,18 @@ UI.refreshReel = function () {
 
 /* --- 调试/测试接口 --- */
 window.__MOSS__ = {
+  houseFurniture: houseFurniture,
+
+  nearestWalkable: nearestWalkable,
+
+  fertilityTier: fertilityTier,
+  fertilityYieldFactor: fertilityYieldFactor,
+
+  /* 肥力观测面：audit-fertility-logic 直接驱动 plotFertility/rotationHint，
+     之前未导出导致 lint-self 报孤儿引用、审计脚本只能靠间接路径。 */
+  plotFertility: plotFertility,
+  rotationHint: rotationHint,
+
   /* 森林勘探观测面：基线探针需要 execute 采集来验证 hp 渐进/采空拒绝，
      之前 gatherExplore 未导出，导致 32.4 五项断言全部空转。 */
   gatherExplore: gatherExplore,

@@ -52,7 +52,9 @@ console.log('\n【3】UI 真实渲染验证：直接渲染委托页与探索日�
 
     // (a) 委托页 explore tab 的说明段落
     try {
-      M.openQuestLog && M.openQuestLog();
+      // 显式传 undefined：openQuestLog(site) 的 site 决定交付按钮文案，
+  // 不传等价于「不在交付点」，本用例只验 explore tab 文案，不受影响
+      M.openQuestLog && M.openQuestLog(undefined);
       document.querySelectorAll('#windowRoot p, .win-body p, .win p').forEach(p => {
         const t = (p.textContent || '').trim();
         if (/探索度|探索等级/.test(t)) out.questTab.push(t);
