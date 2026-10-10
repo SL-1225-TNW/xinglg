@@ -415,6 +415,24 @@ button{font-family:inherit}
 .work-row{white-space:pre-line;text-align:left;justify-content:flex-start;line-height:1.7;min-height:84px;width:100%;font-size:12px}
 .work-row.selected{outline:2px solid #e8c76c;outline-offset:1px}
 .district-chip:hover,.district-chip:focus-visible{outline:2px solid #b88c4b;outline-offset:1px}
+/* 第七版 §32.2：田区肥力只展示低／适宜／充足三档 */
+.soil-panel{margin:8px 0;padding:8px 10px;background:#f3ecd6;border:1px solid #a99b74;border-radius:5px}
+.soil-panel .section-title{margin:0 0 6px}
+.soil-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:3px;font-size:13px}
+.soil-row+.soil-row{border-top:1px solid #ded3ae}
+.soil-row.low{background:#EFD9C4}
+.soil-row.ok{background:#E4EDD2}
+.soil-row.high{background:#D6E7CE}
+.soil-name{min-width:56px;color:#3b4a33;font-weight:600}
+.soil-band{min-width:40px;font-size:12px;padding:1px 6px;border-radius:8px;background:#ffffff66;color:#3b4a33}
+.soil-row.low .soil-band{background:#C87A4A;color:#fff}
+.soil-row.high .soil-band{background:#4E7A45;color:#fff}
+.soil-eff{flex:1;color:#6a6a52;font-size:12px}
+/* 第七版 §27.10 战报：阶段逐条列出，战力与损失可核对 */
+.battle-report .panel-box{margin:6px 0;padding:8px 10px;background:#f3ecd6;border:1px solid #a99b74;border-radius:5px}
+.battle-report .panel-box .section-title{margin:0 0 4px}
+.battle-report p{margin:2px 0;line-height:1.55}
+.battle-report p.muted{font-variant-numeric:tabular-nums}
 .city-plan{display:block;width:min(100%,640px);height:auto;align-self:center;border:2px solid #897e5c;image-rendering:pixelated;border-radius:4px}
 #quickFood{align-self:flex-start;pointer-events:auto}
 @media(max-width:520px){.atlas-place{font-size:10px;padding:3px 4px}.world-atlas{min-height:230px;aspect-ratio:auto}.atlas-place.here{max-width:94px;white-space:normal}.district-grid{grid-template-columns:repeat(2,1fr)}.district-chip{font-size:11px;padding:8px 4px}}
@@ -1268,6 +1286,9 @@ var ITEMS = {
   bond:          { name: '市政公债',   kind: 'material', sell: 160, food: 0, desc: '市政厅为市政工程发行的债券，年息一分，售价 160 金。' },
   gem: {name:'紫晶',kind:'material',sell:100,food:0,desc:'探索获得，可出售，售价 100 金。'},
   jam:       { name: '莓果酱', kind: 'craft', sell: 50, food: 25, desc: '果酱罐熬制的果酱，售价 50 金。' },
+  egg:       { name: '鸡蛋', kind: 'material', sell: 9, food: 8, desc: '草场鸡下的蛋，售价 9 金，也可以直接吃。' },
+  wool:      { name: '羊毛', kind: 'material', sell: 22, food: 0, desc: '给羊剪下的羊毛，一份够做一件厚外套，售价 22 金。' },
+  hay:       { name: '牧草', kind: 'material', sell: 4, food: 0, desc: '割下来喂牲口的牧草，售价 4 金。' },
   wood:      { name: '木材',   kind: 'material', sell: 3, desc: '砍伐获得，可制作、交付或卖给木匠，售价 3 金。' },
   stone:     { name: '石头',   kind: 'material', sell: 2, desc: '采掘获得，可制作、交付或卖给木匠，售价 2 金。' },
   rice:        { name: '大米饭',   kind: 'food',   sell: 0,  food: 30, desc: '一大碗热腾腾的白米饭。DS 小姐的最爱。' },
@@ -1283,6 +1304,75 @@ var CROPS = {
   strawberry: { id: 'strawberry', name: '草莓', seed: 'seed_strawberry', produce: 'strawberry', seedPrice: 25, sell: 30, growDays: 6, regrow: 3, yield: 1 }
 };
 var CROP_ORDER = ['radish', 'potato', 'strawberry'];
+
+/* 第七版 §32.2：三类轮作 + 土壤肥力
+   轮作只提供有限差异，不做酸碱、十余种元素与虫害概率表。
+   肥力按田区记录 0—100，只展示「低／适宜／充足」三档与实际影响：
+   低肥力影响产量，不突然杀死作物；连续同类缓慢下降，轮作与堆肥恢复。 */
+var CROP_GROUPS = {
+  leafy:  { id: 'leafy',  name: '叶菜类', hint: '叶菜类：重氮，适合种在上一季用过豆类的田区' },
+  root:   { id: 'root',   name: '根茎类', hint: '根茎类：重磷钾，会持续消耗田区' },
+  legume: { id: 'legume', name: '豆类',   hint: '豆类：固氮，种的当季就能把田区养回来' }
+};
+var CROP_GROUP_OF = { radish: 'root', potato: 'root', strawberry: 'leafy' };
+
+/* 田区：把农场地块切成四块，便于按区看肥力而不是每格一个数字 */
+var FARM_ZONES = [
+  { id: 'z1', name: '北田区', x0: 6,  y0: 4,  x1: 13, y1: 6 },
+  { id: 'z2', name: '东北区', x0: 14, y0: 4,  x1: 21, y1: 6 },
+  { id: 'z3', name: '西南区', x0: 6,  y0: 7,  x1: 13, y1: 9 },
+  { id: 'z4', name: '东南区', x0: 14, y0: 7,  x1: 21, y1: 9 }
+];
+function farmZoneAt(x, y) {
+  for (var i = 0; i < FARM_ZONES.length; i++) {
+    var z = FARM_ZONES[i];
+    if (x >= z.x0 && x <= z.x1 && y >= z.y0 && y <= z.y1) return z.id;
+  }
+  return null;
+}
+function fertilityState() {
+  if (!state.soil) state.soil = { zones: {}, compost: 0 };
+  if (!state.soil.zones) state.soil.zones = {};
+  FARM_ZONES.forEach(function (z) {
+    if (typeof state.soil.zones[z.id] !== 'number') state.soil.zones[z.id] = 60;
+  });
+  if (typeof state.soil.compost !== 'number') state.soil.compost = 0;
+  return state.soil;
+}
+function fertilityAt(x, y) {
+  var z = farmZoneAt(x, y);
+  if (!z) return 60;
+  return fertilityState().zones[z] == null ? 60 : state.soil.zones[z];
+}
+/* 只给三档，不给一根精确数字占满界面（§32.2） */
+function fertilityBand(v) {
+  if (v < 35) return { id: 'low', name: '偏低', effect: '产量下降，作物不会因此枯死' };
+  if (v < 70) return { id: 'ok', name: '适宜', effect: '没有额外负担' };
+  return { id: 'high', name: '充足', effect: '产量略高' };
+}
+/* 肥力对产量的影响：低→最多少 1 个，最低 1 个（不会归零、不会死人） */
+function fertilityYieldBonus(v) {
+  if (v < 35) return -1;
+  if (v >= 70) return 1;
+  return 0;
+}
+/* 连续同类缓慢下降：每天 -4，上限不超过同田区连续 5 天的扣减量。
+   轮作（换不同组）立即回补，豆类额外回补更多。 */
+function fertilityOnHarvest(zoneId, cropId) {
+  if (!zoneId) return;
+  var s = fertilityState();
+  var group = CROP_GROUP_OF[cropId] || 'root';
+  var lastKey = '__last_' + zoneId;
+  var prev = s.zones[lastKey];
+  var before = s.zones[zoneId] == null ? 60 : s.zones[zoneId];
+  var after;
+  if (group === 'legume') after = before + 8;                  // 豆类固氮
+  else if (prev && prev !== group) after = before + 3;          // 确实换过组才回补
+  else after = before - 4;                                       // 连续同类缓慢下降
+  s.zones[lastKey] = group;
+  s.zones[zoneId] = clamp(Math.round(after), 0, 100);
+}
+/* 空耕地提示里直接给出这一区的轮作建议；提示文字来自作物组，不写死在这一处 */
 
 var FISHES = [
   { id: 'fish_crucian', name: '小鲫鱼', sell: 20, sunny: 0.60, rain: 0.40, speed: 45 },
@@ -1483,6 +1573,59 @@ var NPCS = {
       50: '村里有人开始问你意见了。我会记着。',
       75: '议事屋的门随时给你开着。这不是客气话。'
     }
+  },
+  /* 石楠草甸与牧场（§31.1） */
+  aida: {
+    id: 'aida', name: '艾妲', title: '牧场主', scene: 'heath',
+    hair: '#7A4A32', shirt: '#6E7F4A', accent: '#E2D3A8', skin: '#E8C09B',
+    like: ['hay', 'wool', 'egg'], dislike: [],
+    schedule: [
+      { from: 360,  to: 720,  x: 12, y: 9 },
+      { from: 720,  to: 1140, x: 9,  y: 13 },
+      { from: 1140, to: 1320, x: 14, y: 18 }
+    ],
+    lines: [
+      '这坡上的草长得好，是因为我从来不把它全割光。留一半给羊自己啃。',
+      '饮水槽不是我不想修，是石料一直不够。你要是能弄来石头，我这边出人工。',
+      '新来的那两只羊还不认生，你多喂两次草它们就记住你了。',
+      '羊毛要等羊长够了再剪，太早剪了它们扛不住这个天。',
+      '草场看着空，其实一年到头有的是活干。你要是有空，来搭把手。'
+    ],
+    rainLines: [
+      '下雨天草场不用管，羊自己会找地方躲。',
+      '这种雨一停，蚱蜢就全出来了。羊开心，我忙着找漏洞。'
+    ],
+    heartLines: {
+      25: '你说话算话，这就好办多了。',
+      50: '草场的事我开始跟你商量，不只是使唤你。',
+      75: '这块坡地往后交给你一半，我信得过。'
+    }
+  },
+  luan: {
+    id: 'luan', name: '卢安', title: '兽医', scene: 'heath',
+    hair: '#3F3A36', shirt: '#E8E4DA', accent: '#8FA8B5', skin: '#D9AE86',
+    like: ['egg', 'hay'], dislike: [],
+    schedule: [
+      { from: 360,  to: 660,  x: 32, y: 8 },
+      { from: 660,  to: 1140, x: 16, y: 16 },
+      { from: 1140, to: 1320, x: 32, y: 8 }
+    ],
+    lines: [
+      '缺水比缺料来得快。我先看水槽，再看草料，顺序别弄反。',
+      '别急着喂饱，羊吃撑了会胀气。我宁可你少喂一次。',
+      '羊毛剪完要过两天才长得齐，急不来。',
+      '你要是发现哪只羊跛了，先别自己治，来叫我。',
+      '我这儿的药不给钱，但也不白给——你得帮我把草场看住。'
+    ],
+    rainLines: [
+      '雨天草料潮，容易霉。割下来先摊开晾。',
+      '这种天气蹄子最容易出问题，我得挨个看一遍。'
+    ],
+    heartLines: {
+      25: '你学得挺快，都知道先看水槽了。',
+      50: '草场上的牲口，我放心交给你先看。',
+      75: '下回想学配药，我教你。真的教。'
+    }
   }
 };
 
@@ -1674,6 +1817,9 @@ function newGameState() {
   /* 第七版：农场从新档已知，小镇作为相邻生活节点一并登记（§33.2）。
      其余地点必须真实到访后自动登记，不因为地图上见过就解锁。 */
   s.travel = { discovered: { 'farm.home': true, 'town.square': true }, home: 'farm.home', txLog: {} };
+  /* 第七版 §32.2：旧档田区肥力按正常值起步，不追溯处罚历史种植 */
+  s.soil = { zones: {}, compost: 0 };
+  FARM_ZONES.forEach(function (z) { s.soil.zones[z.id] = 60; });
   return s;
 }
 
@@ -1740,6 +1886,7 @@ function serialize() {
     migratedFrom: state.migratedFrom,
     overloaded: state.overloaded,
     travel: state.travel,
+    soil: state.soil,
     savedAt: Date.now()
   };
 }
@@ -1878,6 +2025,15 @@ function normalizeSave(raw) {
     });
   }
   migrateTravelForOldSaves(s, !raw.travel || !raw.travel.discovered);
+  /* §32.2：旧档没有 soil 字段时，四个田区按「适宜」起步，不追溯处罚历史种植 */
+  s.soil = { zones: {}, compost: 0 };
+  if (raw.soil && raw.soil.zones && typeof raw.soil.zones === 'object') {
+    Object.keys(raw.soil.zones).forEach(function (k) {
+      var v = raw.soil.zones[k];
+      if (typeof v === 'number' && isFinite(v)) s.soil.zones[k] = clamp(Math.round(v), 0, 100);
+    });
+  }
+  FARM_ZONES.forEach(function (z) { if (typeof s.soil.zones[z.id] !== 'number') s.soil.zones[z.id] = 60; });
   return s;
 }
 
@@ -2264,7 +2420,7 @@ for(var floor=1;floor<=3;floor++){
   })(floor);
 }
 MAPS.town.exits.push({x:14,y:0,to:'forest',tx:14,ty:26});
-var SCENE_ORDER = ['farm', 'town', 'millvillage', 'riverside', 'house','forest','mine1','mine2','mine3'];
+var SCENE_ORDER = ['farm', 'town', 'millvillage', 'heath', 'millroom', 'vetroom', 'cloudpass', 'riverside', 'house','forest','mine1','mine2','mine3'];
 var EXPLORE_NODES={forest:{},mine1:{},mine2:{},mine3:{}};
 [[6,12],[9,16],[18,18],[24,20],[33,18],[36,23],[8,22],[20,3]].forEach(function(p){EXPLORE_NODES.forest[key2(p[0],p[1])]={type:'tree',item:'hardwood',qty:4,hp:4};});
 [[11,9],[5,16],[17,8],[25,16],[31,19],[35,9],[6,24],[22,23]].forEach(function(p){EXPLORE_NODES.forest[key2(p[0],p[1])]={type:'forage',item:'mushroom',qty:2,hp:1};});
@@ -2298,6 +2454,48 @@ function normalizeExploration(raw){
  /* 任务进度与工程状态必须自洽：没有修好就不可能已验收 */
  if(!e.millWorks.repaired){e.millWorks.inspected=false;if(e.millTask.step>1)e.millTask.step=1;}
  if(e.millTask.step>=2&&!e.millWorks.repaired)e.millTask.step=1;
+ /* 阶段 C 石楠草甸：水槽、照料与产出都写入存档 */
+ var md=raw.meadow||{};
+ e.meadow={trough:md.trough===true,wateredDay:Math.floor(num(md.wateredDay,-1,-1,1e6)),fedDay:Math.floor(num(md.fedDay,-1,-1,1e6)),
+   sheared:Math.floor(num(md.sheared,0,0,1e5)),eggs:Math.floor(num(md.eggs,0,0,999)),
+   sheepFed:Math.floor(num(md.sheepFed,0,0,1e5))};
+ e.meadowTask={step:clamp(Math.floor(num((raw.meadowTask||{}).step,0,0,3)),0,3)};
+ if(!e.meadow.trough){e.meadowTask.step=0;e.meadow.sheepFed=0;}
+ if(e.meadowTask.step>1&&e.meadow.sheepFed<3)e.meadowTask.step=1;
+ /* §29.2 军队账本必须随存档保存：战报、唯一结算标记、部队与资格不能丢，
+    否则读档会重新抽一次战斗或让玩家白拿一次委任。 */
+ var ml=raw.military||{};
+ e.military={
+   rank:MIL_RANK_IDS.indexOf(ml.rank)>=0?ml.rank:'civilian',
+   training:Math.floor(num(ml.training,0,0,1e4)),
+   drills:Math.floor(num(ml.drills,0,0,1e4)),
+   commission:(ml.commission&&typeof ml.commission==='object')
+     ? {role:String(ml.commission.role||'委任'),sinceDay:Math.floor(num(ml.commission.sinceDay,1,1,1e6)),expiresDay:Math.floor(num(ml.commission.expiresDay,1e6,1,1e6))}
+     : null,
+   units:Array.isArray(ml.units)?ml.units.slice(0,64).map(function(u){
+     return {id:String(u.id||''),name:String(u.name||''),type:String(u.type||'infantry'),owner:u.owner==='player'?'player':'npc',
+       institution:String(u.institution||'local_guard'),commander:String(u.commander||''),location:String(u.location||''),
+       assignment:u.assignment?String(u.assignment):null,
+       personnel:{healthy:Math.floor(num(u.personnel&&u.personnel.healthy,0,0,1e5)),
+         wounded:Math.floor(num(u.personnel&&u.personnel.wounded,0,0,1e5)),
+         missing:Math.floor(num(u.personnel&&u.personnel.missing,0,0,1e5)),
+         captive:Math.floor(num(u.personnel&&u.personnel.captive,0,0,1e5)),
+         dead:Math.floor(num(u.personnel&&u.personnel.dead,0,0,1e5))},
+       groups:Array.isArray(u.groups)?u.groups.slice(0,16).map(function(g){
+         return {count:Math.floor(num(g.count,0,0,1e5)),train:milClampStat(g.train),equip:milClampStat(g.equip),
+           morale:milClampStat(g.morale),supply:milClampStat(g.supply),discipline:milClampStat(g.discipline)};}):[]};
+   }):[],
+   battles:(ml.battles&&typeof ml.battles==='object')?JSON.parse(JSON.stringify(ml.battles)):{},
+   appliedEffectIds:(ml.appliedEffectIds&&typeof ml.appliedEffectIds==='object')?JSON.parse(JSON.stringify(ml.appliedEffectIds)):{},
+   frontier:(ml.frontier&&typeof ml.frontier==='object')
+     ? {started:!!ml.frontier.started,day:Math.floor(num(ml.frontier.day,0,0,1e4)),route:ml.frontier.route==='engineer'?'engineer':(ml.frontier.route==='escort'?'escort':''),
+        step:Math.floor(num(ml.frontier.step,0,0,2)),resolved:String(ml.frontier.resolved||''),
+        evacuated:Math.floor(num(ml.frontier.evacuated,0,0,1e5)),delivered:Math.floor(num(ml.frontier.delivered,0,0,1e5)),
+        roadClosed:!!ml.frontier.roadClosed,relief:Math.floor(num(ml.frontier.relief,0,0,1e5))}
+     : {started:false,day:0,route:'',step:0,resolved:'',evacuated:0,delivered:0,roadClosed:false,relief:0}
+ };
+ /* 战斗记录是已结算的事实：没有部队在场也不该被抹掉，但资格不得凭空高于权限表 */
+ if(MIL_RANK_IDS.indexOf(e.military.rank)<0)e.military.rank='civilian';
  Object.keys(raw.mineSurvey||{}).forEach(function(k){var parts=k.split(':'),v=raw.mineSurvey[k];if(/^mine[123]$/.test(parts[0])&&EXPLORE_NODES[parts[0]][parts[1]]&&v&&Number.isFinite(v.seenDay))e.mineSurvey[k]={seenDay:clamp(Math.floor(v.seenDay),1,1e6)};});
  Object.keys(LIVING_JOBS||{}).forEach(function(id){if(raw.jobs&&Number.isInteger(raw.jobs[id]))e.jobs[id]=Math.max(-1,raw.jobs[id]);});
  (CITY_STORY_QUESTS||[]).forEach(function(q){var st=raw.cityStories&&raw.cityStories[q.id];if(st==='accepted'||st==='done')e.cityStories[q.id]=st;});
@@ -2452,6 +2650,93 @@ function drawWheatField(g, f, ripe, watered) {
   }
 }
 
+/* --- 石楠草甸与牧场（第七版 §31.1 P1，阶段 C 第二个常驻地点） ---
+   缓坡草场、低矮石墙、畜棚、兽医小屋与公共饮水槽。鸡与羊是真的要吃要喝，
+   缺水缺料先掉膘再停产，不会短暂离家就凭空死掉（§32.2）。 */
+MAPS.heath = (function () {
+  var m = mkMap(38, 26, T_GRASS);
+  // 缓坡草场：中部大片开阔地，围出三块牧场
+  fillRect(m, 4, 8, 33, 20, T_GRASS, false);
+  // 低矮石墙：把草场分成主牧场、北坡幼畜地与东侧鸡舍院
+  fillRow(m, 4, 33, 6, T_BUILDING, true);
+  fillCol(m, 20, 7, 14, T_BUILDING, true);
+  fillCol(m, 28, 7, 20, T_BUILDING, true);
+  // 主路：西侧入口纵贯，南侧横路
+  fillCol(m, 2, 2, 22, T_PATH, false);
+  fillRow(m, 2, 35, 22, T_PATH, false);
+  // 畜棚与兽医小屋门前
+  fillRect(m, 24, 17, 27, 20, T_PATH, false);
+  // 溪流（草场北侧）
+  fillRect(m, 0, 3, 37, 4, T_WATER, true);
+  // 跨溪小桥（西侧入口）
+  fillRect(m, 2, 3, 3, 4, T_BRIDGEFIXED, false);
+  // 建筑
+  fillRect(m, 8, 2, 12, 4, T_BUILDING, true);     // 畜棚
+  fillRect(m, 30, 2, 34, 4, T_BUILDING, true);    // 兽医小屋
+  return {
+    w: m.w, h: m.h, t: m.t, solid: m.solid,
+    name: '石楠草甸',
+    exits: [
+      { x: 0, y: 22, to: 'town', tx: 30, ty: 18 },
+      { x: 1, y: 22, to: 'town', tx: 30, ty: 18 }
+    ],
+    plantArea: null,
+    buildings: [
+      { x: 8, y: 2, w: 5, h: 3, kind: 'shed' },
+      { x: 30, y: 2, w: 5, h: 3, kind: 'vet' }
+    ]
+  };
+})();
+
+function meadowState() {
+  var e = exploreState();
+  if (!e.meadow) e.meadow = { trough: false, wateredDay: -1, fedDay: -1, sheared: 0, eggs: 0, woolReady: false, sheepFed: 0 };
+  if (e.meadow.eggs == null) e.meadow.eggs = 0;
+  if (e.meadow.woolReady == null) e.meadow.woolReady = false;
+  if (e.meadow.sheared == null) e.meadow.sheared = 0;
+  return e.meadow;
+}
+
+/* 饮水与喂食按世界日期记：缺水缺料先影响产出，不直接处死牲口（§32.2） */
+function meadowCare() {
+  var m = meadowState();
+  m.watered = m.trough && m.wateredDay === state.totalDay;
+  m.fed = m.fedDay === state.totalDay;
+  return m;
+}
+function drawSheep(g, x, y, ok) {
+  var bx = x * TILE, by = y * TILE;
+  px(g, bx + 1, by + 6, 14, 8, ok ? '#E6E2D6' : '#CFC9BA');
+  px(g, bx + 3, by + 4, 10, 4, ok ? '#F2EEE3' : '#DAD4C6');
+  px(g, bx + 12, by + 7, 3, 4, '#4A4038');
+  px(g, bx + 13, by + 6, 1, 1, '#1E1A16');
+  px(g, bx + 3, by + 13, 2, 2, '#4A4038');
+  px(g, bx + 10, by + 13, 2, 2, '#4A4038');
+  if (!ok) px(g, bx + 5, by + 9, 5, 1, '#B9A98E');
+}
+function drawHen(g, x, y, ok) {
+  var bx = x * TILE, by = y * TILE;
+  px(g, bx + 3, by + 6, 9, 7, ok ? '#F0E7D2' : '#D8CDB6');
+  px(g, bx + 10, by + 4, 4, 4, ok ? '#EADFC6' : '#D2C6AC');
+  px(g, bx + 12, by + 3, 2, 2, '#C4553F');
+  px(g, bx + 13, by + 6, 1, 1, '#1E1A16');
+  px(g, bx + 14, by + 5, 2, 1, '#D89A3A');
+  px(g, bx + 5, by + 12, 1, 2, '#D89A3A');
+  px(g, bx + 9, by + 12, 1, 2, '#D89A3A');
+}
+function drawTrough(g, x, y, fixed, full) {
+  var bx = x * TILE, by = y * TILE;
+  px(g, bx, by + 5, 16, 9, '#8B7355');
+  px(g, bx, by + 5, 16, 2, '#6E5A41');
+  if (fixed) {
+    px(g, bx + 1, by + 7, 14, 6, full ? '#5C93A8' : '#6E6A5E');
+    px(g, bx + 2, by + 8, 12, 1, full ? '#8CC0CE' : '#8A857A');
+  } else {
+    px(g, bx + 1, by + 7, 14, 6, '#5C5548');
+    px(g, bx + 5, by + 9, 6, 1, '#7A7264');
+  }
+}
+
 /* --- 农舍室内：16×12，家具各自占格并参与碰撞 --- */
 var HOUSE_FURNITURE = [
   { id: 'bed',      kind: 'bed',      x: 1,  y: 1, w: 2, h: 2, tiles: [[1,1],[2,1],[1,2],[2,2]], label: '床', z: 0 },
@@ -2505,6 +2790,87 @@ MAPS.house = (function () {
   };
 })();
 
+/* ============================================================
+   阶段 C 补齐「真实内部」（§34.1 退出条件、§32.7 不许只有通用柜台）
+   磨坊机房：磨盘、水轮轴、面粉袋与工单台；
+   兽医小屋：药柜、检查台与病历架。家具各自占格并参与碰撞。
+   ============================================================ */
+var INTERIOR_FURNITURE = {
+  millroom: [
+    { id: 'millstone',  kind: 'millstone', x: 4,  y: 3, w: 3, h: 3, tiles: [[4,3],[5,3],[6,3],[4,4],[5,4],[6,4],[4,5],[5,5],[6,5]], label: '磨盘', z: 0 },
+    { id: 'millshaft',  kind: 'millshaft', x: 9,  y: 2, w: 1, h: 2, tiles: [[9,2],[9,3]],                   label: '水轮轴', z: 0 },
+    { id: 'floursacks', kind: 'floursacks', x: 1,  y: 7, w: 2, h: 2, tiles: [[1,7],[2,7],[1,8],[2,8]],     label: '面粉袋', z: 0 },
+    { id: 'workorder',  kind: 'workorder', x: 11, y: 7, w: 2, h: 1, tiles: [[11,7],[12,7]],                label: '工单台', z: 24 },
+    { id: 'millchest',  kind: 'millchest', x: 12, y: 2, w: 1, h: 1, tiles: [[12,2]],                     label: '工具柜', z: 0 }
+  ],
+  vetroom: [
+    { id: 'drugcabinet', kind: 'drugcabinet', x: 1,  y: 1, w: 2, h: 2, tiles: [[1,1],[2,1],[1,2],[2,2]], label: '药柜', z: 0 },
+    { id: 'examtbl',     kind: 'examtbl',     x: 7,  y: 4, w: 3, h: 2, tiles: [[7,4],[8,4],[9,4],[7,5],[8,5],[9,5]], label: '检查台', z: 0 },
+    { id: 'records',     kind: 'records',     x: 12, y: 1, w: 2, h: 3, tiles: [[12,1],[13,1],[12,2],[13,2],[12,3],[13,3]], label: '病历架', z: 0 },
+    { id: 'vetchest',    kind: 'vetchest',    x: 1,  y: 8, w: 1, h: 1, tiles: [[1,8]],                   label: '出诊箱', z: 0 }
+  ]
+};
+function interiorFurnitureAt(sceneId, x, y) {
+  var list = INTERIOR_FURNITURE[sceneId];
+  if (!list) return null;
+  for (var i = 0; i < list.length; i++) {
+    var f = list[i];
+    for (var j = 0; j < f.tiles.length; j++) {
+      if (f.tiles[j][0] === x && f.tiles[j][1] === y) return f;
+    }
+  }
+  return null;
+}
+function interiorFurniture(sceneId, id) {
+  var list = INTERIOR_FURNITURE[sceneId] || [];
+  for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+  return null;
+}
+var INTERIOR_DOOR_TILES = { millroom: [[6, 10], [7, 10]], vetroom: [[7, 10], [8, 10]] };
+
+function buildInterior(size) {
+  var m = mkMap(15, 11, T_FLOOR);
+  fillRect(m, 0, 0, 14, 0, T_WALL, true);
+  fillRect(m, 0, 10, 14, 10, T_WALL, true);
+  fillCol(m, 0, 0, 10, T_WALL, true);
+  fillCol(m, 14, 0, 10, T_WALL, true);
+  return { m: m, size: size };
+}
+
+MAPS.millroom = (function () {
+  var b = buildInterior(); var m = b.m;
+  INTERIOR_DOOR_TILES.millroom.forEach(function (t) { m.t[t[0]][t[1]] = T_FLOOR; m.solid[t[0]][t[1]] = 0; });
+  return {
+    w: m.w, h: m.h, t: m.t, solid: m.solid,
+    name: '磨坊机房', indoor: true,
+    exits: [
+      { x: 6, y: 10, to: 'millvillage', tx: 12, ty: 12 },
+      { x: 7, y: 10, to: 'millvillage', tx: 12, ty: 12 }
+    ],
+    enter: { x: 7, y: 9 },
+    windowTiles: [[7, 0]],
+    plantArea: null, buildings: [],
+    furniture: INTERIOR_FURNITURE.millroom
+  };
+})();
+
+MAPS.vetroom = (function () {
+  var b = buildInterior(); var m = b.m;
+  INTERIOR_DOOR_TILES.vetroom.forEach(function (t) { m.t[t[0]][t[1]] = T_FLOOR; m.solid[t[0]][t[1]] = 0; });
+  return {
+    w: m.w, h: m.h, t: m.t, solid: m.solid,
+    name: '兽医小屋', indoor: true,
+    exits: [
+      { x: 7, y: 10, to: 'heath', tx: 32, ty: 6 },
+      { x: 8, y: 10, to: 'heath', tx: 32, ty: 6 }
+    ],
+    enter: { x: 8, y: 9 },
+    windowTiles: [[8, 0]],
+    plantArea: null, buildings: [],
+    furniture: INTERIOR_FURNITURE.vetroom
+  };
+})();
+
 /* --- 装饰（确定性生成，刷新不变） --- */
 var decorCache = {};
 function getDecor(sceneId) {
@@ -2548,6 +2914,7 @@ function isSolid(sceneId, x, y) {
   }
   var en=exploreNode(sceneId,x,y);if(en&&en.saved.hp>0&&en.def.type!=='forage')return true;
   if (sceneId === 'house' && houseFurnitureAt(x, y)) return true;
+  if (INTERIOR_FURNITURE[sceneId] && interiorFurnitureAt(sceneId, x, y)) return true;
   if (sceneId === 'farm') {
     var n = state.resourceNodes[key2(x, y)];
     if (n && n.active && (n.type === 'tree' || n.type === 'stone')) return true;
@@ -2686,7 +3053,36 @@ var INTERACTABLES = {
     {id:'mill_wheel',x:9,y:13,stand:[[9,14],[8,13],[10,13],[9,12]],kind:'millWheel',label:'水轮与磨坊机房'},
     {id:'mill_granary',x:22,y:17,stand:[[22,18],[21,17],[23,17],[22,16]],kind:'millGranary',label:'粮仓'},
     {id:'mill_board',x:20,y:21,stand:[[20,22],[19,21],[21,21],[20,20]],kind:'millBoard',label:'议事屋告示'},
-    {id:'mill_deliver',x:26,y:19,stand:[[26,20],[25,19],[27,19],[26,18]],kind:'millDeliver',label:'交货台'}
+    {id:'mill_deliver',x:26,y:19,stand:[[26,20],[25,19],[27,19],[26,18]],kind:'millDeliver',label:'交货台'},
+    {id:'mill_door',x:12,y:15,stand:[[12,16],[11,15],[13,15],[12,14]],kind:'millDoor',label:'进入磨坊机房',to:'millroom'}
+  ],
+  /* 石楠草甸与牧场：饮水槽 / 畜棚 / 剪毛架 / 兽医小屋 */
+  heath: [
+    {id:'meadow_trough',x:14,y:16,stand:[[14,17],[13,16],[15,16],[14,15]],kind:'meadowTrough',label:'公共饮水槽'},
+    {id:'meadow_shed',x:10,y:5,stand:[[10,6],[9,5],[11,5],[10,4]],kind:'meadowShed',label:'畜棚'},
+    {id:'meadow_shear',x:17,y:16,stand:[[17,17],[16,16],[18,16],[17,15]],kind:'meadowShear',label:'剪毛架'},
+    {id:'meadow_vet',x:32,y:5,stand:[[32,6],[31,5],[33,5],[32,4]],kind:'meadowVet',label:'兽医小屋'},
+    {id:'meadow_vetdoor',x:32,y:5,stand:[[32,6],[31,5],[33,5],[32,4]],kind:'vetDoor',label:'进入兽医小屋',to:'vetroom'}
+  ],
+  millroom: [
+    {id:'mr_stone',x:5,y:4,stand:[[5,6],[4,4],[6,4],[5,3]],kind:'interiorProp',scene:'millroom',prop:'millstone',label:'磨盘'},
+    {id:'mr_shaft',x:9,y:3,stand:[[9,4],[8,3],[10,3],[9,2]],kind:'interiorProp',scene:'millroom',prop:'millshaft',label:'水轮轴'},
+    {id:'mr_sacks',x:2,y:8,stand:[[2,9],[1,8],[3,8],[2,7]],kind:'interiorProp',scene:'millroom',prop:'floursacks',label:'面粉袋'},
+    {id:'mr_order',x:12,y:7,stand:[[12,8],[11,7],[13,7],[12,6]],kind:'interiorProp',scene:'millroom',prop:'workorder',label:'工单台'},
+    {id:'mr_chest',x:12,y:2,stand:[[12,3],[11,2],[13,2]],kind:'interiorProp',scene:'millroom',prop:'millchest',label:'工具柜'}
+  ],
+  vetroom: [
+    {id:'vr_drug',x:2,y:2,stand:[[2,3],[1,2],[3,2],[2,1]],kind:'interiorProp',scene:'vetroom',prop:'drugcabinet',label:'药柜'},
+    {id:'vr_exam',x:8,y:5,stand:[[8,6],[7,5],[9,5],[8,4]],kind:'interiorProp',scene:'vetroom',prop:'examtbl',label:'检查台'},
+    {id:'vr_rec',x:13,y:2,stand:[[13,4],[12,2],[14,2],[13,1]],kind:'interiorProp',scene:'vetroom',prop:'records',label:'病历架'},
+    {id:'vr_chest',x:1,y:8,stand:[[1,9],[2,8],[1,7]],kind:'interiorProp',scene:'vetroom',prop:'vetchest',label:'出诊箱'}
+  ],
+  /* 云峰山口：演练场 / 军需库 / 边境营地 */
+  cloudpass: [
+    {id:'cp_drill',x:14,y:12,stand:[[14,13],[13,12],[15,12],[14,11]],kind:'cpDrill',label:'演练场'},
+    {id:'cp_supply',x:25,y:13,stand:[[25,14],[24,13],[26,13],[25,15]],kind:'cpSupply',label:'军需库'},
+    {id:'cp_frontier',x:15,y:19,stand:[[15,20],[14,19],[16,19],[15,18]],kind:'cpFrontier',label:'边境营地'},
+    {id:'cp_gate',x:16,y:5,stand:[[16,6],[15,5],[17,5]],kind:'cpGate',label:'山口关门'}
   ],
   forest: [{id:'mine_gate',x:30,y:4,stand:[[30,5],[29,4],[31,4]],kind:'mineGate',label:'旧矿山入口'},{id:'lumber_hut',x:23,y:10,stand:[[23,11],[22,10],[24,10]],kind:'lumberHut',label:'伐木屋'},{id:'forest_cache',x:37,y:25,stand:[[37,24],[36,25],[38,25]],kind:'treasure',label:'林间宝箱'}],
   mine1: [{id:'stairs2',x:22,y:3,stand:[[22,4],[21,3],[23,3]],kind:'mineStairs',next:2,label:'二层轨道'}],
@@ -6307,7 +6703,10 @@ function toolHarvest(tx, ty) {
     return false;
   }
   var crop = CROPS[p.crop];
-  var prod = crop.produce, y = crop.yield;
+  /* §32.2：低肥力影响产量但不杀死作物；收获按田区消耗或回补肥力 */
+  var zone = farmZoneAt(tx, ty);
+  var fert = fertilityAt(tx, ty);
+  var prod = crop.produce, y = Math.max(1, crop.yield + fertilityYieldBonus(fert));
   if (!bagAccepts(prod, y)) { toast('背包满了，先整理一下。'); Audio2.play('fail'); return false; }
   invAdd(prod, y);
   tutorialEvent('harvested');
@@ -6316,11 +6715,13 @@ function toolHarvest(tx, ty) {
   Audio2.play('harvest');
   if (crop.regrow > 0) {
     p.harvested = true; p.regrow = 0; p.mature = false; p.age = crop.growDays;
-    toast('收获了' + crop.name + ' ×' + y + '，' + crop.regrow + ' 天后可再收。');
   } else {
     p.crop = null; p.age = 0; p.mature = false; p.harvested = false; p.regrow = 0;
-    toast('收获了' + crop.name + ' ×' + y + '，地块保留，需要重新播种。');
   }
+  fertilityOnHarvest(zone, crop.id);
+  var band = fertilityBand(fertilityAt(tx, ty));
+  var tail = crop.regrow > 0 ? (crop.regrow + ' 天后可再收。') : '地块保留，需要重新播种。';
+  toast('收获了' + crop.name + ' ×' + y + '，' + tail + ' 田区肥力：' + band.name + '。');
   markDirty(); refreshHud();
   return true;
 }
@@ -6634,6 +7035,27 @@ function performSettlement(auto) {
       else if (st.input > 0 && st.ready) summary.jamWaiting += 1;
     });
 
+    /* 3b. 草甸畜养：当天有没有水、有没有草，决定第二天有没有蛋。
+        缺照料先减产并提示，不直接处死牲口（§32.2 照料短缺的处理口径）。 */
+    var md = meadowState();
+    if (md.trough) {
+      var hadWater = md.wateredDay === state.totalDay;
+      var hadFood = md.fedDay === state.totalDay;
+      if (hadWater && hadFood) {
+        md.eggs = (md.eggs || 0) + 2;
+        summary.meadow = '鸡吃饱喝足了，今天下蛋 2 个。';
+      } else if (hadFood) {
+        md.eggs = (md.eggs || 0) + 1;
+        summary.meadow = '喂了但没水，鸡只下了 1 个蛋。';
+      } else if (hadWater) {
+        summary.meadow = '有水但没草料，羊开始掉膘，今天没有蛋。';
+      } else {
+        summary.meadow = '水槽是空的，草料也没喂。牲口今天没产出。';
+      }
+    } else if (travelState().discovered['heath.ranch']) {
+      summary.meadow = '饮水槽还没修好，牲口只能去溪边找水。';
+    }
+
     /* 4. 日期 +1 */
     state.totalDay += 1;
     summary.dailyAllowance = CFG.dailyAllowance;
@@ -6685,6 +7107,7 @@ function performSettlement(auto) {
     pendingQuestLines.length = 0;
     var histRec = {
       day: summary.day, income: summary.income, dailyAllowance: summary.dailyAllowance, matured: summary.matured, jam: summary.jam,
+    meadow: summary.meadow || '',
       weather: summary.weatherTo, auto: summary.auto,
       sold: summary.sold.map(function (x) { return { id: x.id, name: x.name, qty: x.qty, value: x.value }; }),
       matureDetail: summary.matureDetail.slice()
@@ -6785,6 +7208,12 @@ function settlementPages(s) {
   }
   if (s.quests && s.quests.length) {
     pages.push(settleStep('quest', '委托进展', s.quests.slice()));
+  }
+  if (s.meadow) {
+    pages.push(settleStep('meadow', '石楠草甸', [
+      s.meadow,
+      '缺水比缺草料来得早：卢安的习惯是先看水槽，再看草料。'
+    ]));
   }
   var toRain = s.weatherTo === 'rain';
   var wlines = [];
@@ -8899,6 +9328,330 @@ function drawMillVillage(ents, R, g) {
   }, a: [16, 10] });
 }
 
+var MEADOW_QUEST = [
+  { id: 'trough', title: '一、修好公共饮水槽', desc: '草场缺水槽已经空了一冬。凑齐石料把它修好，羊和鸡才有水喝。' },
+  { id: 'care',   title: '二、照料新羊', desc: '新来的两只羊还不认生。连续几天按时喂食喂水，等它们稳下来。' },
+  { id: 'wool',   title: '三、首份羊毛合同', desc: '羊稳了之后才能剪毛。剪下第一份羊毛交给艾妲，履行草场的第一份合同。' }
+];
+
+function meadowTaskState() {
+  var e = exploreState();
+  if (!e.meadowTask) e.meadowTask = { step: 0 };
+  return e.meadowTask;
+}
+function meadowAtSite(it) {
+  return state.sceneId === 'heath' && it.stand.some(function (p) { return p[0] === state.player.x && p[1] === state.player.y; });
+}
+
+/* 饮水槽：修好后每天要记得添水，忘了羊就掉膘 */
+function openTrough(it) {
+  var m = meadowState(), c = meadowCare();
+  openWindow({
+    id: 'trough', kind: 'custom', title: '公共饮水槽',
+    build: function (b) {
+      if (!m.trough) {
+        b.appendChild(el('p', null, '水槽是个空石坑，底都裂了。羊绕着它走，也没人喝水。'));
+        b.appendChild(el('p', 'muted', '需要：石头 ×10 · 木材 ×4 · 60 分钟 · 8 体力。艾妲出人工，材料你出。'));
+      } else {
+        b.appendChild(el('p', null, c.watered ? '水槽满了，水面在反光。' : '水槽修好了，但今天是空的。'));
+        b.appendChild(el('p', 'muted', c.watered
+          ? '今天的水已经添过，羊和鸡都喝过了。'
+          : '添一次水要 15 分钟、2 体力。漏掉今天，羊会掉膘，蛋也会少。'));
+      }
+    },
+    actions: !m.trough ? [
+      { label: '修好水槽', kind: 'primary', close: false, onClick: function () {
+        if (!meadowAtSite(it)) { toast('请在饮水槽旁操作。'); return; }
+        if (!canSpendGameMinutes(60)) return;
+        if (!payExplore({ stone: 10, wood: 4 })) return;
+        if (!hasEnergy(8)) return;
+        state.energy -= 8;
+        spendGameMinutes(60);
+        m.trough = true;
+        m.wateredDay = state.totalDay;
+        meadowTaskState().step = 1;
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('水槽修好了。羊群挤过来喝水，第二步开始了。');
+      } },
+      { label: '再想想', close: true }
+    ] : [
+      { label: c.watered ? '今天已经添过水' : '添水（15 分钟 · 2 体力）', kind: c.watered ? '' : 'primary', close: false, onClick: function () {
+        if (!meadowAtSite(it)) { toast('请在饮水槽旁操作。'); return; }
+        if (c.watered) { toast('今天添过了。'); return; }
+        if (!canSpendGameMinutes(15)) return;
+        if (!hasEnergy(2)) return;
+        state.energy -= 2;
+        spendGameMinutes(15);
+        m.wateredDay = state.totalDay;
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('水槽添满了。');
+      } },
+      { label: '关闭', close: true }
+    ]
+  });
+}
+
+/* 畜棚：喂食、割草、收蛋 */
+function openShed(it) {
+  var m = meadowState(), c = meadowCare();
+  openWindow({
+    id: 'shed', kind: 'custom', title: '畜棚',
+    build: function (b) {
+      b.appendChild(el('p', null, '两只羊和一群鸡挤在棚里。草料槽今天还是满的，说明昨天喂过。'));
+      b.appendChild(el('p', c.watered ? 'muted' : 'req-chip', c.watered
+        ? '今天的水和草都到位了。'
+        : '水槽是空的。先去添水，羊渴着的时候喂多少草都不长膘。'));
+      if (m.eggs > 0) b.appendChild(el('p', null, '草窝里攒了 ' + m.eggs + ' 个蛋，可以一起收走。'));
+      b.appendChild(el('p', 'muted', '喂一次 20 分钟、3 体力，需要牧草 ×2。割草 25 分钟、4 体力，得先有镰。'));
+    },
+    actions: [
+      { label: '喂食（牧草 ×2 · 20 分钟 · 3 体力）', close: false, onClick: function () {
+        if (!meadowAtSite(it)) { toast('请在畜棚旁操作。'); return; }
+        if (c.fed) { toast('今天已经喂过了。'); return; }
+        if (invCount('hay') < 2) { toast('牧草不够，需要 2 捆（现有 ' + invCount('hay') + '）。先割草。'); return; }
+        if (!canSpendGameMinutes(20)) return;
+        if (!hasEnergy(3)) return;
+        var after = Object.assign({}, state.inventory); after.hay = after.hay - 2;
+        if (!canAccept(after, 'egg', 0)) { /* 不产蛋时不占位 */ }
+        invRemove('hay', 2);
+        state.energy -= 3;
+        spendGameMinutes(20);
+        m.fedDay = state.totalDay;
+        m.sheepFed = (m.sheepFed || 0) + 1;
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('羊群围过来了。今天的草料算喂上了。');
+      } },
+      { label: '割草（25 分钟 · 4 体力）', close: false, onClick: function () {
+        if (!meadowAtSite(it)) { toast('请在畜棚旁操作。'); return; }
+        if (!canSpendGameMinutes(25)) return;
+        if (!hasEnergy(4)) return;
+        if (!bagAccepts('hay', 2)) { toast('背包满了，牧草放不下。'); return; }
+        state.energy -= 4;
+        spendGameMinutes(25);
+        invAdd('hay', 2);
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('割到牧草 ×2。');
+      } },
+      { label: '收蛋（' + m.eggs + ' 个）', close: false, onClick: function () {
+        if (!meadowAtSite(it)) { toast('请在畜棚旁操作。'); return; }
+        if (m.eggs < 1) { toast('今天还没有蛋。鸡要吃饱、喝足水才下蛋。'); return; }
+        if (!canSpendGameMinutes(10)) return;
+        if (!bagAccepts('egg', m.eggs)) { toast('背包���了，鸡蛋放不下。'); return; }
+        var got = m.eggs;
+        m.eggs = 0;
+        spendGameMinutes(10);
+        invAdd('egg', got);
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('收了鸡蛋 ×' + got + '。');
+      } },
+      { label: '关闭', close: true }
+    ]
+  });
+}
+
+/* 剪毛：第三节点，羊稳了才能剪 */
+function openShear(it) {
+  var m = meadowState(), c = meadowCare(), t = meadowTaskState();
+  var ready = m.sheepFed >= 3;
+  openWindow({
+    id: 'shear', kind: 'custom', title: '剪毛架',
+    build: function (b) {
+      b.appendChild(el('p', null, ready ? '羊已经认得你了，肯自己走上剪毛架。' : '羊还在躲人，硬来会伤着它们。'));
+      b.appendChild(el('p', 'muted', '先连续照料几天（每天喂食并添水），羊稳了才剪得下来。已照料 ' + (m.sheepFed || 0) + ' 次。'));
+      if (t.step < 3) b.appendChild(el('p', 'req-chip', '进度：第 ' + (t.step + 1) + ' / 3 步'));
+      else b.appendChild(el('p', 'req-chip ok', '首份羊毛合同已经履行。'));
+    },
+    actions: ready ? [
+      { label: '剪毛（45 分钟 · 6 体力）', kind: 'primary', close: false, onClick: function () {
+        if (!meadowAtSite(it)) { toast('请在剪毛架旁操作。'); return; }
+        if (!canSpendGameMinutes(45)) return;
+        if (!hasEnergy(6)) return;
+        if (!bagAccepts('wool', 1)) { toast('背包满了，羊毛放不下。'); return; }
+        state.energy -= 6;
+        spendGameMinutes(45);
+        invAdd('wool', 1);
+        m.sheared++;
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('剪下一份羊毛 ×1。');
+      } }
+    ] : [{ label: '关闭', close: true }]
+  });
+}
+
+/* 兽医小屋：兽医的检查与最终合同交付 */
+function openVet(it) {
+  var m = meadowState(), c = meadowCare(), t = meadowTaskState();
+  openWindow({
+    id: 'vet', kind: 'custom', title: '兽医小屋',
+    build: function (b) {
+      b.appendChild(el('p', null, '卢安在整理药箱。她说缺水比缺料来得快，所以先看水槽是对的。'));
+      b.appendChild(el('p', 'muted', '草场状态：水槽' + (m.trough ? '已修' : '待修') + ' · 今日饮水' + (c.watered ? '已添' : '未添') + ' · 今日喂食' + (c.fed ? '已喂' : '未喂') + ' · 已照料 ' + (m.sheepFed || 0) + ' 次。'));
+      if (t.step >= 3) b.appendChild(el('p', 'req-chip ok', '卢安说头一份羊毛的活儿你干得干净。'));
+      else if (t.step === 2) b.appendChild(el('p', null, '羊稳了就可以剪毛。剪完一份羊毛再拿回来，才算履行合同。'));
+      else b.appendChild(el('p', null, '先把饮水槽修好。没有水，羊喝不上，补多少草都没用。'));
+    },
+    actions: [
+      { label: '交付首份羊毛合同（羊毛 ×1）', close: false, onClick: function () {
+        if (!meadowAtSite(it)) { toast('请在兽医小屋旁操作。'); return; }
+        if (invCount('wool') < 1) { toast('还没有剪下羊毛。先去剪毛架把羊稳住了再剪。'); return; }
+        if (!canSpendGameMinutes(40)) return;
+        invRemove('wool', 1);
+        spendGameMinutes(40);
+        t.step = 3;
+        state.coins += 100;
+        state.npcFriendship.aida = (state.npcFriendship.aida || 0) + 15;
+        state.npcFriendship.luan = (state.npcFriendship.luan || 0) + 10;
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('合同履行完毕。草场付 100 金，艾妲与卢安都记下了这一笔。');
+      } },
+      { label: '关闭', close: true }
+    ]
+  });
+}
+
+/* 石楠草甸：羊与鸡按当天照料状态显示精神好不好；
+   数量固定几只，不随人数创建同数量 AI（手机表现口径）。 */
+var HEATH_FLOCK = [
+  { kind: 'sheep', x: 10, y: 12 }, { kind: 'sheep', x: 13, y: 11 },
+  { kind: 'sheep', x: 9, y: 16 }, { kind: 'sheep', x: 16, y: 13 },
+  { kind: 'hen', x: 25, y: 17 }, { kind: 'hen', x: 26, y: 18 },
+  { kind: 'hen', x: 24, y: 19 }, { kind: 'hen', x: 27, y: 16 }
+];
+function drawHeath(ents, R) {
+  var c = meadowCare();
+  var ok = c.watered && c.fed;
+  var half = c.watered || c.fed;
+  HEATH_FLOCK.forEach(function (a) {
+    if (a.x < R.x0 - 1 || a.x > R.x1 + 1 || a.y < R.y0 - 1 || a.y > R.y1 + 1) return;
+    ents.push({
+      z: a.y * TILE + TILE,
+      f: function (g, x, y, kind, good) {
+        if (kind === 'sheep') drawSheep(g, x, y, good);
+        else drawHen(g, x, y, good);
+      },
+      a: [a.x, a.y, a.kind, ok ? 1 : (half ? 0 : -1)]
+    });
+  });
+}
+
+/* 室内陈设：每一件都对应真实的场内状态，不是装饰用的复制品 */
+function openInteriorProp(it) {
+  var w = it.scene === 'millroom' ? millWorks() : meadowState();
+  var c = it.scene === 'millroom' ? { on: w.waterTo === 'mill' } : meadowCare();
+  var t = it.scene === 'millroom' ? millTaskState() : meadowTaskState();
+  var texts = {
+    millstone: [
+      w.repaired ? '石磨盘面磨得发亮，边上积着一圈细细的面粉。' : '磨盘停着，盘底还留着上一次没筛净的粗麸。',
+      '磨盘靠水轮带动。水给磨坊时转得最快，麦田村这阵子每天要磨十几斗。'
+    ],
+    millshaft: [
+      w.repaired
+        ? (w.plan === 'channel'
+          ? '橡木轴是新换的，旁边那道改宽的渠把水压卸掉了大半，轴几乎不再吃力。'
+          : '新轴装上了，跑起来还很顺。但渠里的水压没变，这根轴迟早还要再换。')
+        : '轴上缠着一圈布，凑合压着裂口。每转一下都发出让人牙酸的声音。'
+    ],
+    floursacks: [
+      '仓里堆着 ' + (it.scene === 'millroom' ? (w.wheelTurns || 0) : 0) + ' 袋记过账的面粉，麻袋口用麻绳扎着。',
+      it.scene === 'millroom'
+        ? '面粉按斗出、按袋收。行情看盘 30 分钟能问出明天涨还是跌。'
+        : '草料袋和药箱分开放，别让羊把药吃了。'
+    ],
+    workorder: [
+      it.scene === 'millroom'
+        ? (t.step >= 2 ? '工单上写着：' + (w.plan === 'channel' ? '改渠降压，已完工。' : '换橡木轴，已完工。') + '待验收。' : '工单还空着。等水轮停下来才知道该写什么。')
+        : (t.step >= 3 ? '病历架上多了一条：草场初次检查，饮水槽已修，羊况稳定。' : '病历架上贴着草场牲口的例行记录。')
+    ],
+    millchest: [
+      '工具柜里是磨粉用的筛子、油壶和备用的皮带。',
+      '柜子上刻着历年修轴的年份，最早一笔是二十年前。'
+    ],
+    drugcabinet: [
+      '药柜按格子分：止痛、退热、驱虫、止血。卢安写了标签，字很小但很清楚。',
+      '药不给钱，但得帮她把草场看住——这是她自己定的规矩。'
+    ],
+    examtbl: [
+      '检查台铺着旧帆布，台边有一圈洗得发白的绳结。',
+      '羊被抱上台的时候会挣扎，所以要先让它认得你，连续喂几天才行。'
+    ],
+    records: [
+      (c.trough || w.trough) ? '最新一条：公共饮水槽已修复，供水恢复。' : '最新一条：饮水槽仍缺石料，草场缺水。',
+      '按卢安的习惯，记录先写水，再写草料，最后才写牲口。'
+    ],
+    vetchest: [
+      '出诊箱里是针线、绷带和一把小剪子。',
+      '剪羊毛的剪子和剪药的不是同一把。'
+    ]
+  };
+  var tx = texts[it.prop] || ['这里没什么特别的。'];
+  openWindow({
+    id: 'interiorprop', kind: 'custom', title: it.label,
+    build: function (b) {
+      b.appendChild(el('p', null, tx[0]));
+      b.appendChild(el('p', 'muted', tx[1]));
+    },
+    actions: [{ label: '离开', close: true }]
+  });
+}
+
+/* 室内家具按种类分别画，不用一个通用色块冒充 */
+function drawInteriorFurniture(g, f) {
+  var bx = f.x * TILE, by = f.y * TILE, w = f.w * TILE, h = f.h * TILE;
+  if (f.kind === 'millstone') {
+    px(g, bx + 4, by + 8, w - 8, h - 12, '#9A9184');
+    px(g, bx + 7, by + 11, w - 14, h - 18, '#B6AD9E');
+    px(g, bx + 12, by + 16, w - 24, h - 28, '#CFC6B4');
+    px(g, bx + w / 2 - 1, by + 6, 3, 10, '#6B5236');          // 轴
+    px(g, bx + 8, by + h - 6, w - 16, 3, '#6B5236');
+  } else if (f.kind === 'millshaft') {
+    px(g, bx + 4, by + 2, w - 8, h - 4, '#7A5A3C');
+    px(g, bx + 6, by + 4, w - 12, h - 8, '#A8763F');
+    px(g, bx + 1, by + 1, w - 2, 3, '#5C4634');
+    px(g, bx + 1, by + h - 4, w - 2, 3, '#5C4634');
+  } else if (f.kind === 'floursacks') {
+    px(g, bx, by + 4, w, h - 4, '#D9CDAA');
+    px(g, bx + 1, by + 6, w - 2, 3, '#B9AC86');
+    px(g, bx + 1, by + h - 7, w - 2, 2, '#B9AC86');
+    px(g, bx + w / 2 - 2, by + 1, 4, 4, '#9A8E6C');          // 扎口
+  } else if (f.kind === 'workorder') {
+    px(g, bx, by + 3, w, h - 3, '#8B7355');
+    px(g, bx + 2, by + 1, w - 4, h - 1, '#F0E6C8');
+    px(g, bx + 4, by + 5, w - 8, 1, '#8C6F4A');
+    px(g, bx + 4, by + 8, w - 10, 1, '#A08A62');
+    px(g, bx + 4, by + 11, w - 12, 1, '#A08A62');
+  } else if (f.kind === 'millchest') {
+    px(g, bx + 1, by + 4, w - 2, h - 5, '#8B6A47');
+    px(g, bx + 1, by + 4, w - 2, 3, '#A8845C');
+    px(g, bx + 5, by + h - 8, 3, 4, '#D9C07A');
+  } else if (f.kind === 'drugcabinet') {
+    px(g, bx, by, w, h, '#C9C0AA');
+    px(g, bx + 1, by + 1, w - 2, Math.floor(h / 2) - 2, '#D8D0BC');
+    px(g, bx + 1, by + Math.floor(h / 2), w - 2, Math.floor(h / 2) - 1, '#D8D0BC');
+    ['#B4635A', '#6E8FA8', '#8A9A6B', '#C2A05E'].forEach(function (cc, i) {
+      px(g, bx + 3 + i * 6, by + 4, 4, 3, cc);
+      px(g, bx + 3 + i * 6, by + Math.floor(h / 2) + 3, 4, 3, cc);
+    });
+  } else if (f.kind === 'examtbl') {
+    px(g, bx, by + 2, w, h - 2, '#8E7A5E');
+    px(g, bx + 1, by + 3, w - 2, h - 5, '#E4DAC2');          // 帆布
+    px(g, bx + 2, by + 4, w - 4, 1, '#C9BC9C');
+    px(g, bx + 3, by + h - 6, 2, 4, '#6B5236');
+    px(g, bx + w - 5, by + h - 6, 2, 4, '#6B5236');
+  } else if (f.kind === 'records') {
+    px(g, bx, by, w, h, '#8B6A47');
+    for (var s = 0; s < 3; s++) {
+      px(g, bx + 1, by + 1 + s * 9, w - 2, 8, '#C7B48E');
+      px(g, bx + 2, by + 3 + s * 9, w - 4, 1, '#A08A62');
+      px(g, bx + 2, by + 5 + s * 9, w - 7, 1, '#A08A62');
+    }
+  } else if (f.kind === 'vetchest') {
+    px(g, bx, by + 3, w, h - 3, '#9A6A52');
+    px(g, bx, by + 3, w, 3, '#B87E63');
+    px(g, bx + w / 2 - 1, by + 7, 2, 4, '#E4D9B8');
+    px(g, bx + 2, by + h - 4, w - 4, 2, '#7A4E3C');
+  }
+}
+
 function openWorkRecords(initial) {
   clearKeys();var tab=initial==='mine'?'mine':'farm',selected=null;
   openWindow({id:'workrecords',kind:'custom',wide:true,title:'农务与矿山记录',build:function(b){
@@ -8906,6 +9659,21 @@ function openWorkRecords(initial) {
     if(tab==='farm'){
       var summary=farmWorkSummary();
       b.appendChild(el('p','work-summary','待浇水 '+summary.dry+' 块 · 可收获 '+summary.ripe+' 块 · 空耕地 '+summary.empty+' 块'));
+      /* §32.2：田区肥力只展示三档与实际影响，不堆精确数字 */
+      var soilBox=el('div','soil-panel');
+      soilBox.appendChild(el('div','section-title','田区肥力'));
+      var ss=fertilityState();
+      FARM_ZONES.forEach(function(z){
+        var v=ss.zones[z.id]==null?60:ss.zones[z.id];
+        var band=fertilityBand(v);
+        var lastGroup=ss.zones['__last_'+z.id];
+        var row2=el('div','soil-row '+band.id);
+        row2.appendChild(el('span','soil-name',z.name));
+        row2.appendChild(el('span','soil-band',band.name));
+        row2.appendChild(el('span','soil-eff',lastGroup?('上一季'+(CROP_GROUPS[lastGroup]?CROP_GROUPS[lastGroup].name:lastGroup)):band.effect));
+        soilBox.appendChild(row2);
+      });
+      b.appendChild(soilBox);
       b.appendChild(el('p','muted','选择田块，在农场简图中查看位置。收获日是每天照料情况下的最早估计。'));
       var map=MAPS.farm,c=newCanvas(map.w*8,map.h*8);c.className='work-map';c.setAttribute('aria-label','农场田块简图，金框表示选中田块');
       var g=c.getContext('2d');g.imageSmoothingEnabled=false;
@@ -8996,6 +9764,791 @@ function openPause() {
 }
 
 /* ============================================================
+   第七版 §26—§29：军队系统与本地规则裁判
+   ------------------------------------------------------------
+   裁判是纯函数：同一份 rulesVersion / seed / 输入 / 行动，
+   结果完全一致，可复算。输入、公式版本、阶段、随机种子、结果与结算
+   全部存档（§27.1、§29.2）。AI 只负责写战报文本，不得改动兵力、
+   胜负、伤亡、债务或任务结果（§27.1）。
+
+   权重与系数都是本游戏第一轮的可检验设计初值，不是历史军队战力
+   或现实战争伤亡的统计结论（§29.6）。 */
+
+var MIL_RULES_VERSION = 'v7-1';
+var MIL = {
+  statMin: 0, statMax: 100,
+  wTrain: 0.35, wEquip: 0.30, wMorale: 0.15, wSupply: 0.15, wDiscipline: 0.05,
+  kFloor: 0.25, kSpan: 0.75,
+  reserveRatio: 0.5, reservePower: 0.25,      // §27.3 有效预备 min(R,0.5F)，预备战力 ×0.25
+  envMin: 0.75, envMax: 1.45,                 // §27.3 环境与组织修正总范围
+  jitterMax: 0.06,                           // §27.4 阶段扰动
+  ratioClear: 1.50, ratioSlight: 1.15,        // §27.4 态势阈值
+  minTrainDeploy: 20, minEquipDeploy: 20,     // §27.2 最低参战阈值
+  lossCoef: 0.04, lossMin: 0.005, lossMax: 0.12,  // §27.6
+  intensityLimited: 0.5, intensityNormal: 1.0, intensityHigh: 1.25,
+  shareWounded: 0.60, shareDead: 0.20, shareMissing: 0.20,  // §27.6 失能分配
+  moraleFlee: 25, supplyFlee: 10              // §27.7
+};
+
+/* §26.2 参与与指挥分级。人数是本游戏缩比权限初值，不是现实编制。 */
+var MIL_RANKS = [
+  { id: 'civilian', name: '普通居民', limit: 0, desc: '查看公开局势、物资和救助任务；不能进入正式军事战斗。' },
+  { id: 'trainee', name: '受训见习者', limit: 0, desc: '自愿报名并完成基础武器与纪律训练，可参加演练与训练场；实战还需正式登记。' },
+  { id: 'member', name: '登记队员', limit: 0, desc: '完成职业登记、训练与具体派遣，按受命目标参加护送、治安或小规模军事行动。' },
+  { id: 'squad', name: '小队长', limit: 12, desc: '通过资格考核与代表任务并取得委任，可选择有限战术与撤退。' },
+  { id: 'captain', name: '队长', limit: 40, desc: '通过岗位考核并完成至少一项指挥经历，可带小队任务与局部边境行动。' },
+  { id: 'regional', name: '地区指挥官', limit: 150, desc: '领地机构正式任命，可负责多阶段地区防务。' },
+  { id: 'marshal', name: '高级统领', limit: 400, desc: '省级主线与更高授权，可跨地区作战与机构协调。' }
+];
+function milRank(id) {
+  for (var i = 0; i < MIL_RANKS.length; i++) if (MIL_RANKS[i].id === id) return MIL_RANKS[i];
+  return MIL_RANKS[0];
+}
+function milRankIndex(id) {
+  for (var i = 0; i < MIL_RANKS.length; i++) if (MIL_RANKS[i].id === id) return i;
+  return 0;
+}
+/* 归一化时用来校验存档里的职级，防止脏数据造出表外权限 */
+var MIL_RANK_IDS = MIL_RANKS.map(function (r) { return r.id; });
+function milCommandLimit(rankId) { return milRank(rankId).limit; }
+
+/* §26.4 单位：人员状态与质量分组分开记录。
+   available() 只数健康可用且未被任务占用的人员。 */
+function milUnit(o) {
+  var u = Object.assign({
+    id: '', name: '', type: 'infantry', owner: 'npc', institution: 'local_guard',
+    commander: '', location: '', assignment: null, availableWindow: null,
+    personnel: { healthy: 0, wounded: 0, missing: 0, captive: 0, dead: 0 },
+    groups: []
+  }, o || {});
+  u.available = function () { return u.assignment ? 0 : u.personnel.healthy; };
+  u.total = function () {
+    var p = u.personnel;
+    return p.healthy + p.wounded + p.missing + p.captive + p.dead;
+  };
+  return u;
+}
+
+/* 人数权限统计玩家实际控制的全部分队；拆成多个单位不能绕过上限（§26.2） */
+function milUnderCommand(units, rankId) {
+  var used = 0;
+  for (var i = 0; i < units.length; i++) if (units[i].owner === 'player') used += units[i].available();
+  return { used: used, limit: milCommandLimit(rankId), ok: used <= milCommandLimit(rankId) };
+}
+
+/* ============================================================
+   §27.2 单位质量：Q 与 K，全部限制在 0—100。
+   数量不混进这张百分比表，它在下一步直接决定实际投入规模。
+   ============================================================ */
+function milClampStat(v) {
+  if (typeof v !== 'number' || !isFinite(v)) return MIL.statMin;
+  return v < MIL.statMin ? MIL.statMin : (v > MIL.statMax ? MIL.statMax : v);
+}
+function milQuality(g) {
+  var T = milClampStat(g.train), E = milClampStat(g.equip), M = milClampStat(g.morale),
+      S = milClampStat(g.supply), D = milClampStat(g.discipline);
+  var Q = (MIL.wTrain * T + MIL.wEquip * E + MIL.wMorale * M + MIL.wSupply * S + MIL.wDiscipline * D) / 100;
+  return { T: T, E: E, M: M, S: S, D: D, Q: Q, K: MIL.kFloor + MIL.kSpan * Q };
+}
+
+/* ============================================================
+   §27.3 投入兵力与战力
+   预备上限按整方计算；未投入的人可在后续阶段轮换，
+   不能同时既当前线又当预备队重复计数。
+   ============================================================ */
+function milDeployment(side) {
+  var groups = side.groups || [];
+  var deployable = [], blocked = [], pool = 0;
+  for (var i = 0; i < groups.length; i++) {
+    var g = groups[i];
+    var q = milQuality(g);
+    var count = Math.max(0, Math.floor(g.count || 0));
+    if (count <= 0) continue;
+    if (q.T < MIL.minTrainDeploy || q.E < MIL.minEquipDeploy) {
+      /* 没到最低参战要求：先走部署或撤退规则，不假装零准备能打 */
+      blocked.push({ count: count, Q: q.Q, K: q.K, reason: q.T < MIL.minTrainDeploy ? '训练未达最低参战要求（' + q.T + '/' + MIL.minTrainDeploy + '）' : '装备未达最低参战要求（' + q.E + '/' + MIL.minEquipDeploy + '）' });
+      continue;
+    }
+    deployable.push({ g: g, q: q, count: count });
+    pool += count;
+  }
+  var F, R;
+  if (side.front != null && side.reserve != null) { F = Math.floor(side.front); R = Math.floor(side.reserve); }
+  else if (side.front != null) { F = Math.floor(side.front); R = 0; }
+  else if (side.reserve != null) { F = 0; R = Math.floor(side.reserve); }
+  else { F = pool; R = 0; }
+  F = Math.max(0, Math.min(F, pool));
+  R = Math.max(0, Math.min(R, pool - F));
+  var reserveEffective = Math.min(R, MIL.reserveRatio * F);   // 整方预备上限
+
+  var frontDetail = [], usedFront = 0, basePower = 0;
+  var left = [];
+  for (var j = 0; j < deployable.length; j++) {
+    var take = Math.max(0, Math.min(deployable[j].count, F - usedFront));
+    usedFront += take;
+    basePower += take * deployable[j].q.K;
+    frontDetail.push({ count: take, K: deployable[j].q.K, Q: deployable[j].q.Q, T: deployable[j].q.T, E: deployable[j].q.E, M: deployable[j].q.M, S: deployable[j].q.S, D: deployable[j].q.D });
+    left.push({ q: deployable[j].q, left: deployable[j].count - take });
+  }
+  var usedRes = 0, resPower = 0;
+  for (var k = 0; k < left.length; k++) {
+    var take2 = Math.max(0, Math.min(left[k].left, reserveEffective - usedRes));
+    usedRes += take2;
+    resPower += MIL.reservePower * take2 * left[k].q.K;
+  }
+  return {
+    pool: pool, front: F, reserve: R, reserveEffective: reserveEffective, reserveUsed: usedRes,
+    basePower: basePower + resPower, frontDetail: frontDetail, blocked: blocked,
+    deployableTotal: deployable.reduce(function (a, b) { return a + b.count; }, 0)
+  };
+}
+
+/* §27.3 环境与组织修正由三项相乘后统一限制在 0.75—1.45 */
+function milEnvModifier(profile) {
+  var p = profile || {};
+  var terrain = (typeof p.terrain === 'number' && isFinite(p.terrain)) ? p.terrain : 1;
+  var command = (typeof p.command === 'number' && isFinite(p.command)) ? p.command : 1;
+  var tactic = (typeof p.tactic === 'number' && isFinite(p.tactic)) ? p.tactic : 1;
+  var m = terrain * command * tactic;
+  if (m < MIL.envMin) m = MIL.envMin;
+  if (m > MIL.envMax) m = MIL.envMax;
+  return m;
+}
+/* 玩家个人能力对全军直接数值影响最多 5%，且计入指挥与组织上限（§27.3）。
+   幸运不改变军队胜负权重。 */
+function milPersonalBonus(attrs) {
+  var a = attrs || {};
+  var sum = (a.intel || 0) + (a.percept || 0) + (a.nerve || 0);
+  var b = 1 + Math.max(0, Math.min(0.05, (sum / 60) * 0.05));
+  return b;
+}
+
+/* §27.4 固化种子的三角分布扰动，只表示小规模时机与执行差异，
+   不能覆盖重大兵力和准备差距。 */
+function milSeededRandom(seed) {
+  var s = seed | 0;
+  return function () {
+    s = (s + 0x6D2B79F5) | 0;
+    var t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+/* 三角分布：在 [-m, m] 上中间密两头疏 */
+function milTriangular(rnd, m) {
+  var u = rnd(), c = rnd();
+  var v = (u + c) / 2;                 // 两个均匀取平均 → 三角分布
+  return (v * 2 - 1) * m;
+}
+
+/* §27.4 态势区间，上下文对称 */
+function milSituation(ratio) {
+  if (!isFinite(ratio) || ratio <= 0) return { id: 'none', name: '无可战兵力', desc: '没有可战人员，阶段无法结算。' };
+  if (ratio >= MIL.ratioClear) return { id: 'clear', name: '我方明显优势', desc: '优势比 ' + ratio.toFixed(2) + '，达到明显优势区间。' };
+  if (ratio >= MIL.ratioSlight) return { id: 'slight', name: '我方优势', desc: '优势比 ' + ratio.toFixed(2) + '，略占上风。' };
+  if (ratio > 1 / MIL.ratioSlight) return { id: 'even', name: '接近／僵持', desc: '优势比 ' + ratio.toFixed(2) + '，双方咬得很紧。' };
+  if (ratio > 1 / MIL.ratioClear) return { id: 'enemySlight', name: '敌方优势', desc: '优势比 ' + ratio.toFixed(2) + '，我方吃亏。' };
+  return { id: 'enemyClear', name: '敌方明显优势', desc: '优势比 ' + ratio.toFixed(2) + '，处于明显劣势。' };
+}
+
+/* ============================================================
+   §27.6 人员损失：只对实际发生交锋的阶段计算。
+   纯部署或已安全抵达的护送不照公式扣人。
+   ============================================================ */
+function milCasualties(contact, ratio, intensity) {
+  var r = (typeof ratio === 'number' && ratio > 0) ? ratio : 1;
+  var frac = clamp(MIL.lossCoef * r, MIL.lossMin, MIL.lossMax) * intensity;
+  var total = contact * frac;
+  // 总量守恒的舍入：先算整数总额，再按比例拆分成三类，绝不多扣
+  var totalRounded = Math.min(contact, Math.round(total));
+  var wounded = Math.round(totalRounded * MIL.shareWounded);
+  var dead = Math.round(totalRounded * MIL.shareDead);
+  var missing = totalRounded - wounded - dead;      // 余数全部落在失踪/被俘，保证三者之和等于总额
+  if (missing < 0) { wounded += missing; missing = 0; }
+  return { total: totalRounded, wounded: wounded, dead: dead, missing: missing, frac: frac, contact: contact };
+}
+
+/* §27.8 目标判定按明确的状态转移表，不靠临场解说。
+   守桥样板：进攻方突破进度 0—2；部署阶段不改变进度。
+   每实际交锋阶段以进攻方战力 ÷ 防守方战力：
+     ≥1.50 → +2；≥1.15 → +1；僵持 → 不变；防守方优势达 1.15 → −1。
+   进度到 2 立即判定突破；两个交锋阶段结束仍未突破且守方保持合法驻守，
+   判定守护完成。守方主动放弃阵地、无可战人员或居民撤离条件未完成，
+   分别记录失守或部分完成，不能用"进度未满"假装守桥成功。 */
+function milBridgeProgress(prev, ratio, phaseKind) {
+  if (phaseKind !== 'contact') return prev;                 // 部署阶段不改变进度
+  if (ratio >= MIL.ratioClear) return clamp(prev + 2, 0, 2);   // 达到 1.50 → +2
+  if (ratio >= MIL.ratioSlight) return clamp(prev + 1, 0, 2);  // 达到 1.15 → +1
+  if (ratio > 1 / MIL.ratioSlight) return prev;                // 接近区间不变
+  /* 防守方优势达到 1.15（含明显优势那档）：减少 1。
+     原文只写了一档 −1，上下对称，因此两个敌方优势档都用 −1，
+     不额外发明 −2 这种规划里没有的档位。 */
+  return clamp(prev - 1, 0, 2);
+}
+
+var MIL_MISSION_INTENSITY = {
+  limited: MIL.intensityLimited, normal: MIL.intensityNormal, high: MIL.intensityHigh
+};
+
+/* ============================================================
+   §27.5 最多三个关键阶段。阶段使用更新后的人员、装备、士气、补给与
+   位置；前一阶段的损失、消耗和选择真实进入下一阶段。
+   ============================================================ */
+var MIL_PHASES = [
+  { id: 'deploy', name: '接敌与部署', kind: 'deploy',   contact: false },
+  { id: 'main',   name: '主要交锋',     kind: 'contact', contact: true },
+  { id: 'object', name: '目标争夺与撤离', kind: 'contact', contact: true }
+];
+
+/* ============================================================
+   §27 裁判主入口。battleId / crisisFamilyId / rulesVersion / seed 与
+   全部阶段输入输出都返回，存档后可完整复算同一场战斗（§27.1、§29.2）。
+   ============================================================ */
+function milAdjudicate(input) {
+  var seed = (typeof input.seed === 'number' && isFinite(input.seed)) ? (input.seed | 0) : 12345;
+  var rnd = milSeededRandom(seed);
+  var report = {
+    battleId: input.battleId || ('btl_' + seed.toString(36)),
+    crisisFamilyId: input.crisisFamilyId || '',
+    rulesVersion: MIL_RULES_VERSION,
+    seed: seed,
+    objective: input.objective || 'hold',       // 'bridge' | 'escort' | 'rescue' | 'clear'
+    terrainProfile: input.terrainProfile || 'open',
+    intensity: MIL_MISSION_INTENSITY[input.intensity] || MIL.intensityNormal,
+    playerAttrBonus: milPersonalBonus(input.playerAttrs),
+    phases: [],
+    progress: input.startProgress != null ? input.startProgress : 0,
+    contactsUsed: 0,
+    aborted: false,
+    abortReason: ''
+  };
+  var me = { groups: input.mine ? input.mine.groups : [], front: input.mine ? input.mine.front : null, reserve: input.mine ? input.mine.reserve : null };
+  var foe = { groups: input.foe ? input.foe.groups : [], front: input.foe ? input.foe.front : null, reserve: input.foe ? input.foe.reserve : null };
+  var envMine = milEnvModifier(input.mineProfile);
+  var envFoe = milEnvModifier(input.foeProfile);
+  report.envMine = envMine; report.envFoe = envFoe;
+
+  // 无兵或无合法部署目标的状态在除法前处理（§27.4）
+  var depMine = milDeployment(me), depFoe = milDeployment(foe);
+  if (depMine.deployableTotal <= 0 && depFoe.deployableTotal <= 0) {
+    report.aborted = true; report.abortReason = '双方都没有达到最低参战要求的可战人员，战斗无法进行。';
+    report.result = 'noContact';
+    return report;
+  }
+
+  var moraleFleeMine = false, supplyFleeMine = false;
+  var mineAvailable = depMine.deployableTotal, foeAvailable = depFoe.deployableTotal;
+
+  for (var pi = 0; pi < MIL_PHASES.length; pi++) {
+    var ph = MIL_PHASES[pi];
+    if (report.aborted) break;
+    // 敌方已无兵 / 护送已抵达 / 某方没有可战兵力 → 提前结束（§27.5）
+    if (mineAvailable <= 0) { report.abortReason = '我方已无可战人员，交锋终止。'; report.aborted = true; break; }
+    if (foeAvailable <= 0 && ph.kind === 'contact') { report.abortReason = '对方已无可战人员。'; break; }
+
+    var Pmine = depMine.basePower * envMine;
+    var Pfoe = depFoe.basePower * envFoe;
+    var rM = milTriangular(rnd, MIL.jitterMax);
+    var rF = milTriangular(rnd, MIL.jitterMax);
+    var PmPrime = Pmine * (1 + rM);
+    var PfPrime = Pfoe * (1 + rF);
+    // 无兵或非正数在除法前处理
+    var ratio = (PfPrime > 0) ? (PmPrime / PfPrime) : MIL.ratioClear * 10;
+    var sit = milSituation(ratio);
+    var phRec = {
+      index: pi, id: ph.id, name: ph.name, kind: ph.kind,
+      frontMine: depMine.front, frontFoe: depFoe.front,
+      reserveMine: depMine.reserveUsed, reserveFoe: depFoe.reserveUsed,
+      baseMine: round4(depMine.basePower), baseFoe: round4(depFoe.basePower),
+      envMine: round4(envMine), envFoe: round4(envFoe),
+      jitterMine: round4(rM), jitterFoe: round4(rF),
+      powerMine: round4(Pmine), powerFoe: round4(Pfoe),
+      primeMine: round4(PmPrime), primeFoe: round4(PfPrime),
+      ratio: round4(ratio), situation: sit.id, situationName: sit.name, situationDesc: sit.desc,
+      contact: 0, casualtiesMine: null, casualtiesFoe: null,
+      progress: report.progress,
+      blockedMine: depMine.blocked, blockedFoe: depFoe.blocked
+    };
+
+    if (ph.kind === 'contact') {
+      // CONTACT = min(双方实际前线人数)
+      var contact = Math.min(depMine.front, depFoe.front);
+      phRec.contact = contact;
+      // 双方阶段结果先一起算，再同时应用（§27.6）
+      var casMine = milCasualties(contact, (PmPrime > 0) ? (PfPrime / PmPrime) : 1, report.intensity);
+      var casFoe = milCasualties(contact, (PfPrime > 0) ? (PmPrime / PfPrime) : 1, report.intensity);
+      phRec.casualtiesMine = casMine;
+      phRec.casualtiesFoe = casFoe;
+      // 最大损失不超过本阶段真正到场、可失能的人数
+      casMine.total = Math.min(casMine.total, depMine.front);
+      casFoe.total = Math.min(casFoe.total, depFoe.front);
+      mineAvailable -= casMine.total;
+      foeAvailable -= casFoe.total;
+      report.contactsUsed++;
+      // 守桥进度按明确状态转移表更新
+      if (report.objective === 'bridge') report.progress = milBridgeProgress(report.progress, ratio, ph.kind);
+      phRec.progress = report.progress;
+      // 士气与补给随损失与态势变化（§27.7）
+      var moraleMine = dropMorale(depMine, casMine.total, sit.id, true);
+      var moraleFoe = dropMorale(depFoe, casFoe.total, sit.id, false);
+      phRec.moraleMine = moraleMine; phRec.moraleFoe = moraleFoe;
+      if (moraleMine < MIL.moraleFlee) moraleFleeMine = true;
+    } else {
+      phRec.moraleMine = depMine.frontDetail.length ? avgDetail(depMine.frontDetail, 'M') : 0;
+      phRec.moraleFoe = depFoe.frontDetail.length ? avgDetail(depFoe.frontDetail, 'M') : 0;
+    }
+    report.phases.push(phRec);
+
+    if (moraleFleeMine) {
+      report.aborted = true;
+      report.abortReason = '我方士气低于 ' + MIL.moraleFlee + '，强烈建议撤退并请求求援。';
+      break;
+    }
+    // 轮换：把损失后仍可用的人补进前线（§27.5 允许轮换，不允许重复计数）
+    if (pi < MIL_PHASES.length - 1 && ph.kind === 'contact') {
+      depMine = milDeployment({ groups: input.mine.groups, front: depMine.front, reserve: input.mine.reserve });
+      depFoe = milDeployment({ groups: input.foe.groups, front: depFoe.front, reserve: input.foe.reserve });
+    }
+  }
+
+  report.result = milResolveOutcome(report, { mineAvailable: mineAvailable, foeAvailable: foeAvailable, moraleFleeMine: moraleFleeMine });
+  report.mineAvailable = mineAvailable;
+  report.foeAvailable = foeAvailable;
+  return report;
+}
+function round4(v) { return Math.round(v * 10000) / 10000; }
+function avgStat(groups, key) {
+  var total = 0, n = 0;
+  for (var i = 0; i < groups.length; i++) {
+    var c = Math.max(0, groups[i].count || 0);
+    if (!c) continue;
+    total += milClampStat(groups[i][key]) * c; n += c;
+  }
+  return n ? Math.round(total / n) : 0;
+}
+function avgDetail(detail, key) {
+  var s = 0, n = 0;
+  for (var i = 0; i < detail.length; i++) { s += (detail[i][key] || 0) * detail[i].count; n += detail[i].count; }
+  return n ? Math.round(s / n) : 0;
+}
+/* 士气：按损失比例与态势调整，越吃亏掉得越多（§27.7） */
+function dropMorale(dep, lost, situationId, isMine) {
+  var before = dep.frontDetail.length ? avgDetail(dep.frontDetail, 'M') : 0;
+  var lossRatio = dep.front > 0 ? (lost / dep.front) : 0;
+  var mood = (situationId === 'enemyClear') ? -14 : (situationId === 'enemySlight') ? -7
+    : (situationId === 'clear') ? -3 : (situationId === 'slight') ? -1 : 0;
+  var v = before + mood - lossRatio * 55;
+  return Math.round(clamp(v, 0, 100));
+}
+
+/* §27.8 按任务目标判断胜负，"杀敌多"不等于胜利 */
+function milResolveOutcome(report, st) {
+  if (report.objective === 'bridge') {
+    if (report.progress >= 2) return { id: 'breakthrough', name: '突破封锁', desc: '进攻方突破进度达到 2，封锁被打开。' };
+    if (report.aborted && /无可战人员|士气/.test(report.abortReason)) return { id: 'partial', name: '部分完成', desc: '守方失去有生力量，阵地未失守但已无法维持。' };
+    if (report.contactsUsed < 2) return { id: 'hold', name: '守护完成', desc: '两个交锋阶段结束仍未被突破，守方保持合法驻守。' };
+    return { id: 'hold', name: '守护完成', desc: '突破进度未满，守方完成守护目标。' };
+  }
+  if (report.objective === 'escort') return st.mineAvailable > 0
+    ? { id: 'delivered', name: '送达', desc: '护送目标抵达，途中虽有损失但完成交接。' }
+    : { id: 'lost', name: '未能送达', desc: '我方失去全部可战人员，护送中断。' };
+  if (report.objective === 'rescue') return st.mineAvailable > 0
+    ? { id: 'extracted', name: '救援完成', desc: '人员带出并安全撤离。' }
+    : { id: 'failed', name: '救援失败', desc: '无可战人员，无法继续带出。' };
+  if (report.objective === 'clear') return st.foeAvailable <= 0
+    ? { id: 'cleared', name: '道路恢复', desc: '袭扰条件被破坏，道路重新通行。' }
+    : { id: 'partial', name: '部分恢复', desc: '道路恢复有限，仍有零星袭扰。' };
+  return st.mineAvailable > 0 ? { id: 'held', name: '目标达成', desc: '完成受命目标。' }
+    : { id: 'failed', name: '目标未达成', desc: '无可战人员。' };
+}
+
+/* §26—§29 军队与防务状态：权限、训练、部队账本与边境事件 */
+function militaryState() {
+  var e = exploreState();
+  if (!e.military) {
+    e.military = {
+      rank: 'civilian',        // §26.2 权限等级
+      training: 0,             // 已完成训练记录
+      drills: 0,               // 演练次数
+      commission: null,        // 正式委任 {role, sinceDay, expiresDay}
+      units: [],               // §29.2 部队账本
+      battles: {},             // battleId → 完整战报存档（可复算）
+      appliedEffectIds: {},    // 唯一结算标记，重载不重复发
+      frontier: null           // 云峰关口事件状态
+    };
+  }
+  if (!e.military.units) e.military.units = [];
+  if (!e.military.battles) e.military.battles = {};
+  if (!e.military.appliedEffectIds) e.military.appliedEffectIds = {};
+  return e.military;
+}
+
+/* §26.2 参战权限：职业资格 + 训练记录 + 本次任务授权，三者都要满足。
+   军队职级不等于贵族爵位，也不等于角色等级。 */
+function milCanDeploy(m) {
+  return milRankIndex(m.rank) >= milRankIndex('member');
+}
+function milCanCommand(m) {
+  return milRankIndex(m.rank) >= milRankIndex('squad') && !!m.commission;
+}
+/* 参战权限采用三项检查，不强行再加一个无关的角色等级门槛 */
+function milDeployGate(m) {
+  if (!milCanDeploy(m)) return { ok: false, reason: '尚未取得军事资格。普通居民不能进入正式军事战斗；先去山口报名受训。' };
+  if (m.training < 1) return { ok: false, reason: '缺少训练记录。受训见习者可以演练，实战还需要完成基础训练。' };
+  if (!m.commission) return { ok: false, reason: '本次任务还没有正式委任。资格、训练和委任三者都齐了才能受命。' };
+  return { ok: true };
+}
+/* §26.1：玩家个人野外武器训练与军事登记分开 */
+function milNewUnit(o) { return milUnit(o); }
+
+/* §28.1 袭扰事件池：按地区压力、已知势力筛选，不每天对全省抽一次无理由战争 */
+var MIL_RAID_POOL = [
+  { id: 'raid_road', name: '道路袭扰', effect: 'traffic', desc: '商路上出现不明武装，部分路段改道，运输时长与货损上升。' },
+  { id: 'raid_store', name: '仓库失窃', effect: 'goods', desc: '一处货栈被搬空，村里要补货、查访、守夜。' },
+  { id: 'raid_cart', name: '车队被劫', effect: 'supply', desc: '一支粮车队没能按时到，村里开始议论要不要加派人手。' }
+];
+
+/* ============================================================
+   §21.4 云峰关口的七日：省份级事件，不是全地图即时战略
+   ============================================================ */
+var FRONTIER_PHASES = [
+  { day: 1, title: '第一至二日 · 核实道路', desc: '越境事件让交通收紧。先核实道路与撤离名单，别把错误情报当真的。' },
+  { day: 3, title: '第三至四日 · 分配资源', desc: '在护送居民、保持运粮与修复通路之间分配有限的人手与物资。' },
+  { day: 5, title: '第五至七日 · 受命守护或交接', desc: '完成受命目标；外交与上级行动决定更大局势，不由玩家独力终结。' }
+];
+var FRONTIER_ROUTES = [
+  { id: 'escort', name: '直接护路', desc: '利用准备和战斗处理有限威胁，速度快但有受伤与补给损耗。', intensity: 'high', env: { terrain: 1.0, command: 1.05, tactic: 1.05 } },
+  { id: 'engineer', name: '迂回撤离／工程路线', desc: '依赖勘察、修复与时间，减少正面交锋；可能放弃部分货物或暂时封闭路线。', intensity: 'normal', env: { terrain: 1.15, command: 1.0, tactic: 0.95 } }
+];
+function frontierState() {
+  var m = militaryState();
+  if (!m.frontier) {
+    m.frontier = { started: false, day: 0, route: '', step: 0, resolved: '', evacuated: 0, delivered: 0, roadClosed: false, relief: 0 };
+  }
+  return m.frontier;
+}
+/* 边境章节的固定对手编队：脚本化、可复算，不随机生成大世界战争（§29.4 第 2 步） */
+function frontierGarrison(route) {
+  return { groups: [{ count: 100, train: 40, equip: 35, morale: 50, supply: 40, discipline: 40 }] };
+}
+function frontierPlayerDetachment(route) {
+  // 玩家实际控制的人数受指挥权限限制；没有权限就只能带受命的小队
+  return { groups: [{ count: 40, train: 55, equip: 50, morale: 60, supply: 55, discipline: 55 }] };
+}
+
+/* --- 云峰山口与边境营地（第七版 §30.2 东北山地，阶段 E） ---
+   山口关门、官道、驿站、营房、医帐、军需库与演练场。玩家在这里取得
+   军事资格并接受有限编队的任务，不做全地图即时战略（§21.3）。 */
+MAPS.cloudpass = (function () {
+  var m = mkMap(34, 24, T_GRASS);
+  // 山体：两侧高岩夹出关口
+  fillRect(m, 0, 0, 11, 7, T_BUILDING, true);
+  fillRect(m, 22, 0, 33, 7, T_BUILDING, true);
+  fillRect(m, 0, 16, 11, 23, T_BUILDING, true);
+  fillRect(m, 22, 16, 33, 23, T_BUILDING, true);
+  // 官道纵贯，关门卡在中间
+  fillCol(m, 16, 0, 23, T_PATH, false);
+  fillCol(m, 17, 0, 23, T_PATH, false);
+  // 关内演���场与营区
+  fillRect(m, 12, 10, 21, 15, T_PATH, false);
+  // 溪流（医帐旁）
+  fillRect(m, 0, 12, 5, 14, T_WATER, true);
+  // 建筑：驿站、营房、医帐、军需库、关门
+  fillRect(m, 14, 2, 19, 4, T_BUILDING, true);     // 山口驿站
+  fillRect(m, 4, 17, 8, 20, T_BUILDING, true);     // 营房（避开营地中庭，否则受命的站位会落在实心格里）
+  fillRect(m, 19, 18, 21, 21, T_BUILDING, true);   // 医帐
+  fillRect(m, 24, 10, 26, 12, T_BUILDING, true);   // 军需库
+  return {
+    w: m.w, h: m.h, t: m.t, solid: m.solid,
+    name: '云峰山口',
+    exits: [
+      { x: 16, y: 23, to: 'forest', tx: 30, ty: 5 },
+      { x: 17, y: 23, to: 'forest', tx: 30, ty: 5 }
+    ],
+    plantArea: null,
+    buildings: [
+      { x: 14, y: 2, w: 6, h: 3, kind: 'post' },
+      { x: 4, y: 17, w: 5, h: 4, kind: 'barracks' },
+      { x: 19, y: 18, w: 3, h: 4, kind: 'infirmary' },
+      { x: 24, y: 10, w: 3, h: 3, kind: 'supply' }
+    ]
+  };
+})();
+
+/* §26.5 演练场：取得受训资格与训练记录 */
+function openDrillGround(it) {
+  var m = militaryState();
+  openWindow({
+    id: 'drill', kind: 'custom', title: '演练场',
+    build: function (b) {
+      b.appendChild(el('p', null, '场上有二十来个人在练队列和器械。教官看你的眼神，像在估你能不能扛住三行。'));
+      b.appendChild(el('p', 'muted', '训练按长期事务计算：预览天数、消耗与预计改善。重复训练不会无限增加能力。'));
+      b.appendChild(el('p', null, '当前权限：' + milRank(m.rank).name + ' · 训练记录 ' + m.training + ' 次 · 演练 ' + m.drills + ' 次。'));
+      if (m.commission) b.appendChild(el('p', 'muted', '现行委任：' + m.commission.role + '（第 ' + m.commission.sinceDay + ' 天起）'));
+      else b.appendChild(el('p', 'muted', '尚无正式委任。训练满一次后可在军需库申请受命。'));
+    },
+    actions: [
+      { label: '参加训练（半日 · 8 体力 · 40 金）', kind: 'primary', close: false, onClick: function () {
+        if (!cloudAt(it)) { toast('请在演练场操作。'); return; }
+        if (!canSpendGameMinutes(300)) return;
+        if (!hasEnergy(8)) return;
+        if (!payExplore({ coins: 40 })) return;
+        state.energy -= 8;
+        /* 只推进当天时间，不假装跳过一整天：
+           跨日的长期训练要走统一的快进与日结算接口（§15.1、§29.1），
+           这里不自行 +1 天，免得跳过作物、补助与事件结算。 */
+        spendGameMinutes(300);
+        m.training = (m.training || 0) + 1;
+        m.drills = (m.drills || 0) + 1;
+        if (milRankIndex(m.rank) < milRankIndex('trainee')) m.rank = 'trainee';
+        if (m.training >= 2 && milRankIndex(m.rank) < milRankIndex('member')) {
+          m.rank = 'member';
+          state.npcFriendship.garrison = (state.npcFriendship.garrison || 0) + 5;
+          toast('基础训练完成，取得登记队员资格。');
+        } else {
+          toast('训练完成。训练记录 +1。');
+        }
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+      } },
+      { label: '离开', close: true }
+    ]
+  });
+}
+
+/* §26.5 军需库：申请受命；公共资金与个人金币分账（§26.3） */
+function openSupplyDepot(it) {
+  var m = militaryState();
+  openWindow({
+    id: 'supply', kind: 'custom', title: '军需库',
+    build: function (b) {
+      // 权限门必须在每次重绘时重算：拿到委任后这一行要立刻变成"可受命"，
+      // 不能沿用开窗那一刻的旧结论（否则玩家拿到委任还一直被拦）
+      var gate = milDeployGate(m);
+      b.appendChild(el('p', null, '军需官核对名册与授权。机构招募和军费走公共账，不会动你背包里的钱。'));
+      b.appendChild(el('p', 'muted', '参战权限 = 职业资格 + 训练记录 + 本次任务授权，三项都要齐。'));
+      b.appendChild(el('p', null, '当前：' + milRank(m.rank).name + ' · 训练 ' + (m.training || 0) + ' 次 · 委任 ' + (m.commission ? m.commission.role : '无') + '。'));
+      if (!gate.ok) b.appendChild(el('p', 'req-chip', gate.reason));
+      else b.appendChild(el('p', 'req-chip ok', '资格、训练与委任均已具备，可以受命。'));
+      var fr = frontierState();
+      if (fr.started && !fr.resolved) b.appendChild(el('p', 'muted', '云峰关口事件进行中：第 ' + (fr.day || 0) + ' / 7 日。'));
+    },
+    actions: [
+      { label: '申请受命（委任）', kind: 'primary', close: false, onClick: function () {
+        if (!cloudAt(it)) { toast('请在军需库旁操作。'); return; }
+        if (milRankIndex(m.rank) < milRankIndex('member')) { toast('还没有登记队员资格，先去演练场训练。'); return; }
+        if (m.training < 1) { toast('缺少训练记录。'); return; }
+        if (m.commission) { toast('你已经有委任了。'); return; }
+        if (!canSpendGameMinutes(60)) return;
+        spendGameMinutes(60);
+        m.commission = { role: '巡防联络官（临时委任）', sinceDay: state.totalDay, expiresDay: state.totalDay + 112 };
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('取得临时委任：巡防联络官。任期一年（游戏内 112 天）。');
+      } },
+      { label: '查看编制', close: false, onClick: function () {
+        openWindow({
+          id: 'ranks', kind: 'custom', title: '参与与指挥权限',
+          build: function (bb) {
+            MIL_RANKS.forEach(function (rk) {
+              bb.appendChild(el('p', null, rk.name + ' · 指挥上限 ' + (rk.limit === 0 ? '无' : rk.limit + ' 人') + '\n' + rk.desc));
+            });
+            bb.appendChild(el('p', 'muted', '人数是本游戏缩比权限初值，不是现实编制。拆分部队不能绕过上限。'));
+          },
+          actions: [{ label: '返回', close: true }]
+        });
+      } },
+      { label: '离开', close: true }
+    ]
+  });
+}
+
+/* §27.10 战报与复盘：能回答"为什么这场败了、准备什么会改善" */
+function openBattleReport(btl) {
+  openWindow({
+    id: 'battle', kind: 'custom', wide: true, title: '战报 · ' + (btl.objective === 'bridge' ? '守桥' : btl.objective),
+    build: function (b) {
+      b.appendChild(el('p', 'muted', '规则版本 ' + btl.rulesVersion + ' · 战斗 ID ' + btl.battleId + ' · 种子 ' + btl.seed + '（同输入可复算）'));
+      if (btl.abortReason) b.appendChild(el('p', 'req-chip', btl.abortReason));
+      btl.phases.forEach(function (ph) {
+        var box = el('div', 'panel-box');
+        box.appendChild(el('div', 'section-title', '第 ' + (ph.index + 1) + ' 阶段 · ' + ph.name + ' · ' + ph.situationName));
+        box.appendChild(el('p', null, '到场前线：我方 ' + ph.frontMine + ' 人 / 对方 ' + ph.frontFoe + ' 人；有效预备 ' + ph.reserveMine + ' / ' + ph.reserveFoe + '。'));
+        box.appendChild(el('p', 'muted', '基础战力 ' + ph.baseMine + ' vs ' + ph.baseFoe +
+          '；环境与组织修正 ×' + ph.envMine + ' / ×' + ph.envFoe +
+          ' → ' + ph.powerMine + ' vs ' + ph.powerFoe +
+          '；扰动 ×' + (1 + ph.jitterMine) + ' / ×' + (1 + ph.jitterFoe) +
+          ' → ' + ph.primeMine + ' vs ' + ph.primeFoe + '，优势比 ' + ph.ratio + '。'));
+        if (ph.kind === 'contact') {
+          box.appendChild(el('p', null, '接触 ' + ph.contact + ' 人。我方失能 ' + ph.casualtiesMine.total +
+            '（伤 ' + ph.casualtiesMine.wounded + ' / 亡 ' + ph.casualtiesMine.dead + ' / 失踪 ' + ph.casualtiesMine.missing + '），' +
+            '对方失能 ' + ph.casualtiesFoe.total +
+            '（伤 ' + ph.casualtiesFoe.wounded + ' / 亡 ' + ph.casualtiesFoe.dead + ' / 失踪 ' + ph.casualtiesFoe.missing + '）。'));
+          if (ph.progress != null) box.appendChild(el('p', 'muted', '突破进度：' + ph.progress + ' / 2'));
+        }
+        var blk = (ph.blockedMine || []).concat(ph.blockedFoe || []);
+        if (blk.length) {
+          box.appendChild(el('p', 'req-chip', '未达最低参战要求：' + blk.map(function (x) { return x.reason + '（' + x.count + ' 人）'; }).join('；')));
+        }
+        b.appendChild(box);
+      });
+      if (btl.result) {
+        var rb = el('div', 'panel-box');
+        rb.appendChild(el('div', 'section-title', '结果 · ' + btl.result.name));
+        rb.appendChild(el('p', null, btl.result.desc));
+        rb.appendChild(el('p', 'muted', '杀敌多不自动等于胜利；胜负按任务目标判断。'));
+        b.appendChild(rb);
+      }
+      b.appendChild(el('p', 'muted', '想改善结果，优先补训练与装备覆盖率；地形与指挥修正都有上限，人数差距仍有分量。'));
+    },
+    actions: [{ label: '返回', close: true }]
+  });
+}
+
+/* §21.4 云峰关口七日：两条真实路线，目标按状态转移表判定 */
+function openFrontierDesk(it) {
+  var m = militaryState(), fr = frontierState();
+  openWindow({
+    id: 'frontier', kind: 'custom', title: '边境营地 · 受命',
+    build: function (b) {
+      if (!fr.started) {
+        b.appendChild(el('p', null, '越境事件让交通收紧。营房里贴着一张七日任务单：核实道路、分配资源、完成受命守护。'));
+        b.appendChild(el('p', 'muted', '你可以选直接护路或迂回撤离／工程路线。前者快但有伤损，后者依赖勘察与修复但少正面交锋。'));
+        var gate = milDeployGate(m);
+        b.appendChild(el('p', gate.ok ? 'req-chip ok' : 'req-chip', gate.ok
+          ? '资格齐备，可以受命。指挥上限：' + milCommandLimit(m.rank) + ' 人。'
+          : gate.reason));
+        FRONTIER_ROUTES.forEach(function (rt) {
+          b.appendChild(el('p', 'muted', '· ' + rt.name + '：' + rt.desc));
+        });
+      } else if (!fr.resolved) {
+        var ph = FRONTIER_PHASES[Math.min(Math.floor((fr.day - 1) / 3), 2)];
+        b.appendChild(el('p', 'div', 'section-title', '第 ' + fr.day + ' / 7 日 · ' + ph.title));
+        b.appendChild(el('p', null, ph.desc));
+        b.appendChild(el('p', 'muted', '已选路线：' + (FRONTIER_ROUTES.filter(function (r) { return r.id === fr.route; })[0] || {}).name));
+        b.appendChild(el('p', 'muted', '当前突破进度（仅护路路线计入）：' + fr.step + ' / 2 · 撤离 ' + fr.evacuated + ' 人 · 送达 ' + fr.delivered + ' 车。'));
+      } else {
+        b.appendChild(el('div', 'section-title', '七日任务结束'));
+        b.appendChild(el('p', null, fr.resolved));
+        b.appendChild(el('p', 'muted', '更大局势由省级事件链与相关机构共同决定；这段任务只改变局势中的一部分。'));
+      }
+    },
+    actions: (!fr.started ? [
+      { label: '接下七日任务', kind: 'primary', close: false, onClick: function () {
+        if (!cloudAt(it)) { toast('请在边境营地旁接令。'); return; }
+        var gate = milDeployGate(m);
+        if (!gate.ok) { toast(gate.reason); return; }
+        if (!canSpendGameMinutes(90)) return;
+        spendGameMinutes(90);
+        fr.started = true; fr.day = 1; fr.step = 0; fr.route = '';
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('受命：云峰关口七日。第一天先核实道路。');
+      } }
+    ] : (fr.resolved
+      ? [
+        // 结束之后仍然要能翻战报：战后复盘是内容的一部分，不能随任务关闭消失
+        { label: '查看战报', close: false, onClick: function () { showLastBattle(); } },
+        { label: '返回', close: true }
+      ]
+      : [
+      { label: fr.route ? '推进一天' : '选择路线并推进', kind: 'primary', close: false, onClick: function () {
+        if (!fr.route) { if (!cloudAt(it)) { toast('请在边境营地旁。'); return; } openRoutePick(); return; }
+        frontierAdvanceDay();
+      } },
+      { label: '查看战报', close: false, onClick: function () { showLastBattle(); } },
+      { label: '返回', close: true }
+    ]))
+  });
+}
+function showLastBattle() {
+  var m = militaryState();
+  var last = null;
+  Object.keys(m.battles).forEach(function (k) { last = m.battles[k]; });
+  if (last) openBattleReport(last); else toast('这段任务还没有产生战斗记录。');
+}
+function openRoutePick() {
+  openWindow({
+    id: 'routepick', kind: 'custom', title: '选择路线',
+    build: function (b) {
+      b.appendChild(el('p', null, '两条路都能完成任务，但代价与结果不同。'));
+      FRONTIER_ROUTES.forEach(function (rt) {
+        b.appendChild(el('p', 'muted', '· ' + rt.name + '：' + rt.desc + '（任务强度 ' + rt.intensity + '）'));
+      });
+    },
+    actions: FRONTIER_ROUTES.map(function (rt) {
+      return { label: '走' + rt.name, close: true, onClick: function () {
+        frontierState().route = rt.id;
+        markDirty(); saveNow();
+        toast('已选择：' + rt.name);
+      } };
+    }).concat([{ label: '再想想', kind: 'ghost', close: true }])
+  });
+}
+/* 推进一个事件日：吃满当天剩余时间；不够就停下来让玩家先结束今天。
+   长计划必须在被授权参加的战斗阶段前停下，交给玩家处理资源与选择
+   （§29.1），所以这里不自行跨日，也不偷偷替玩家睡觉。 */
+function frontierAdvanceDay() {
+  var m = militaryState(), fr = frontierState();
+  if (!fr.started || fr.resolved) return;
+  if (!cloudFrontierReady()) return;
+  if (!hasEnergy(6)) return;
+  var rt = FRONTIER_ROUTES.filter(function (r) { return r.id === fr.route; })[0] || FRONTIER_ROUTES[0];
+  state.energy -= 6;
+  spendGameMinutes(180);
+  fr.day++;
+  if (rt.id === 'escort') {
+    var gate = milDeployGate(m);
+    if (!gate.ok) { toast(gate.reason); return; }
+    // 种子在事件成立时生成并存档，不在打开菜单或确认结果时重新抽取（§29.1）
+    var battleId = 'yunfeng_d' + fr.day;
+    if (!m.battles[battleId]) {
+      var seed = (state.totalDay * 2654435761 + fr.day * 40503) | 0;
+      var btl = milAdjudicate({
+        battleId: battleId, crisisFamilyId: 'yunfeng_pass', seed: seed,
+        objective: 'bridge', startProgress: fr.step, intensity: rt.intensity,
+        mine: frontierPlayerDetachment(rt), foe: frontierGarrison(rt),
+        mineProfile: rt.env, foeProfile: { terrain: 1.1, command: 1.0, tactic: 1.0 },
+        playerAttrs: { intellect: 10, percept: 10, nerve: 10 }
+      });
+      m.battles[battleId] = btl;
+      fr.step = btl.progress;
+    }
+    fr.evacuated += Math.max(0, Math.min(6, 12 - fr.day * 2));
+  } else {
+    fr.delivered += 2;
+    fr.evacuated += Math.max(0, Math.min(4, 10 - fr.day * 2));
+  }
+  if (fr.day >= 7) {
+    fr.resolved = fr.step >= 2
+      ? '突破封锁：路口被打开，交通恢复，但你也留下了伤亡与问责。'
+      : (fr.route === 'engineer' ? '迂回完成：靠修复与撤离保住了人，路暂时封闭。'
+        : '守护完成：桥还在，但补给损耗不轻。');
+  }
+  markDirty(); refreshHud(); saveNow(); refreshWindow();
+}
+function cloudAt(it) {
+  return state.sceneId === 'cloudpass' && it.stand.some(function (p) { return p[0] === state.player.x && p[1] === state.player.y; });
+}
+/* 关口演进的共用前置：站位、时间、权限都在同一处检查，避免各处重复漏掉 */
+function cloudFrontierReady() {
+  var list = INTERACTABLES.cloudpass || [];
+  var it = null;
+  for (var i = 0; i < list.length; i++) if (list[i].kind === 'cpFrontier') { it = list[i]; break; }
+  if (!it) return false;
+  if (!cloudAt(it)) { toast('请在边境营地旁。'); return false; }
+  var gate = milDeployGate(militaryState());
+  if (!gate.ok) { toast(gate.reason); return false; }
+  var rt = FRONTIER_ROUTES.filter(function (r) { return r.id === frontierState().route; })[0];
+  if (rt && rt.intensity === 'high') {
+    var cmd = milUnderCommand(militaryState().units, militaryState().rank);
+    if (!cmd.ok) { toast('指挥人数超过 ' + cmd.limit + ' 人上限，无法带队进入受交战阶段。'); return false; }
+  }
+  if (!canSpendGameMinutes(180)) {
+    toast('今天剩下的时间不够推进到下一阶段。先结束今天，明天再来（Esc → 睡觉）。');
+    return false;
+  }
+  return true;
+}
+
+/* ============================================================
    第七版 §33／§34.2：地点登记与快速传送
    ------------------------------------------------------------
    地点、像素场景与交通站分开标识：locationId 稳定且不改名，
@@ -9057,6 +10610,19 @@ var TRAVEL_NODES = [
     desc: '从小镇南口办理通行证后进入。640×480 格城市：城堡高台、西侧旧城、花园住宅区、老市集、工匠区、河岸、学院区与南门驿站。'
   },
   {
+    id: 'heath.ranch', locationId: 'white_rose.northwest.heath_ranch', sceneId: 'heath',
+    name: '云峰山口', locationId: 'white_rose.northeast.cloud_pass', sceneId: 'cloudpass',
+    region: 'northeast', kind: 'frontier',
+    safe: [[16, 21], [17, 21], [15, 21], [16, 20]],
+    desc: '省界上的山口与边境营地。官道、驿站、演练场与军需库都在这里，往北就是邻领。'
+  },
+  {
+    id: 'heath.ranch', locationId: 'white_rose.northwest.heath_ranch', sceneId: 'heath',
+    name: '石楠草甸', region: 'northwest', kind: 'village',
+    safe: [[6, 22], [7, 22], [5, 22], [6, 21]],
+    desc: '缓坡草场、低矮石墙、畜棚与兽医小屋。养鸡养羊的地方，艾妲和卢安在这里。'
+  },
+  {
     id: 'mill.square', locationId: 'white_rose.southeast.mill_village', sceneId: 'millvillage',
     name: '风铃磨坊与麦田村', region: 'southeast', kind: 'village',
     safe: [[16, 18], [15, 18], [17, 18], [16, 17]],
@@ -9104,6 +10670,15 @@ var TRAVEL_PAIRS = {
   'riverside.bank|mill.square': TRAVEL_MIN.provinceShort,
   'mill.square|forest.gate': TRAVEL_MIN.provinceShort,
   'mill.square|city.gate': TRAVEL_MIN.provinceLong,
+  'town.square|heath.ranch': TRAVEL_MIN.adjacent,
+  'heath.ranch|mill.square': TRAVEL_MIN.provinceShort,
+  'heath.ranch|forest.gate': TRAVEL_MIN.provinceShort,
+  'farm.home|heath.ranch': TRAVEL_MIN.provinceShort,
+  'heath.ranch|riverside.bank': TRAVEL_MIN.provinceShort,
+  'cloud.pass|forest.gate': TRAVEL_MIN.provinceShort,
+  'cloud.pass|mine.entrance': TRAVEL_MIN.adjacent,
+  'cloud.pass|heath.ranch': TRAVEL_MIN.provinceLong,
+  'cloud.pass|mill.square': TRAVEL_MIN.provinceLong,
   'mill.square|mine.entrance': TRAVEL_MIN.provinceLong
 };
 /* 表内书写方向不影响往返查找。 */
@@ -9216,6 +10791,8 @@ function travelNodeUnlocked(n) {
   if (n.id === 'city.gate') return !!exploreState().city;
   if (n.id === 'mine.entrance') return !!exploreState().mine;
   if (n.id === 'mill.square') return true;   // 麦田村沿小镇主路开放，先到访再登记
+  if (n.id === 'heath.ranch') return true;   // 草甸沿小镇南路过坡即到
+  if (n.id === 'cloud.pass') return !!exploreState().mine;   // 关口在矿山东侧，先能到山区
   if (n.id === 'mine.level2') return !!exploreState().mine && exploreState().depth >= 2;
   if (n.id === 'mine.level3') return !!exploreState().mine && exploreState().depth >= 3;
   return false;
@@ -9241,6 +10818,9 @@ var SCENE_TO_NODE = {
   forest: 'forest.gate',
   city: 'city.gate',
   millvillage: 'mill.square',
+  millroom: 'mill.square',
+  heath: 'heath.ranch', cloudpass: 'cloud.pass',
+  vetroom: 'heath.ranch',
   mine1: 'mine.entrance', mine2: 'mine.level2', mine3: 'mine.level3'
 };
 
@@ -9394,9 +10974,11 @@ var WORLD_REGIONS = [
   {id:'farm',name:'苔芽农场',x:18,y:21,desc:'山谷西北角的家。农舍、田地与池塘，是旅途的起点。'},
   {id:'town',name:'芽芽小镇',x:26,y:48,desc:'通往山谷各处的乡村集市。现有种子铺、任务板与村民就在这里。'},
   {id:'riverside',name:'溪畔河湾',x:33,y:76,desc:'小桥另一侧的钓鱼河岸。完成修桥委托后开放。'},
+  {id:'heath',name:'石楠草甸',x:38,y:33,desc:'从小镇西北上过坡的缓坡草场。低矮石墙、畜棚、兽医小屋与公共饮水槽；养鸡养羊的地方，牧场主艾妲与兽医卢安在此。'},
   {id:'vineyard',name:'金叶葡萄园',x:43,y:23,desc:'缓坡上的葡萄架、石墙与乡村庄园。未来探索路线的一站。'},
   {id:'forest',name:'雾杉森林',x:55,y:81,desc:'从小镇北口进入。硬木、蘑菇、林间湖、伐木屋与隐藏宝箱；东北通往旧矿山。'},
   {id:'city',name:'白蔷薇城',x:57,y:47,desc:'从小镇南口办理通行证后进入。640×480 格城市：城堡高台、西侧旧城、花园住宅区、老市集、工匠区、河岸、学院区与南门驿站。'},
+  {id:'cloud',name:'云峰山口',x:88,y:44,desc:'省界上的山口与边境营地。官道穿过关门往北就是邻领；这里有演练场、军需库与受命的七日任务。'},
   {id:'pass',name:'旧矿山',x:80,y:22,desc:'从森林东北进入，共三层：铜矿、铁矿、紫晶。修复轨道逐层深入，原路返回森林。'},
   {id:'mill',name:'风铃磨坊与麦田村',x:81,y:67,desc:'河流穿过麦田与古老水磨坊的村落。水轮、粮仓、分水闸与议事屋都在这里；磨坊与麦田共用有限的来水。'}
 ];
@@ -9408,6 +10990,8 @@ function worldRegionStatus(r) {
   if(r.id==='pass')return exploreState().mine?'已开放':'未解锁 · 森林东北修复矿山';
   /* 阶段 C：麦田村经小镇主路抵达，修好水轮并交货后记为已开放 */
   if(r.id==='mill')return exploreState().millWorks&&exploreState().millWorks.inspected?'已开放':'可前往 · 水轮待修复';
+  if(r.id==='heath')return '可前往 · 饮水槽待修';
+  if(r.id==='cloud')return exploreState().mine?'可前往 · 关口开放':'未解锁 · 先到东北山区';
   return '待开放';
 }
 function drawWorldAtlas(c) {
@@ -9419,15 +11003,26 @@ function drawWorldAtlas(c) {
   for(var j=0;j<21;j++){var mx=25+j*29,my=24+(j%3)*9;g.fillStyle='#8B9384';g.beginPath();g.moveTo(mx,my+42);g.lineTo(mx+18,my);g.lineTo(mx+37,my+42);g.fill();g.fillStyle='#E7E3CD';g.beginPath();g.moveTo(mx+12,my+14);g.lineTo(mx+18,my);g.lineTo(mx+25,my+14);g.fill();}
   g.strokeStyle='#678F97';g.lineWidth=18;g.lineJoin='round';g.beginPath();g.moveTo(588,70);g.lineTo(565,140);g.lineTo(458,246);g.lineTo(309,276);g.lineTo(206,324);g.lineTo(137,387);g.stroke();
   g.strokeStyle='#91B5B8';g.lineWidth=8;g.stroke();
-  var paths=[[0,1],[1,2],[1,3],[3,5],[1,4],[4,6],[4,5],[5,6],[5,7]];
-  paths.forEach(function(p){var a=WORLD_REGIONS[p[0]],b=WORLD_REGIONS[p[1]];g.strokeStyle='#DCCD9B';g.lineWidth=5;g.setLineDash(p[0]===0?[]:[6,6]);g.beginPath();g.moveTo(a.x*6.4,a.y*4);g.lineTo(b.x*6.4,b.y*4);g.stroke();});g.setLineDash([]);
+  /* 路线按稳定 id 写，不按数组下标——新增地点不会把既有连线指到别的地方 */
+  var routes=[['farm','town'],['town','riverside'],['town','vineyard'],['vineyard','city'],
+    ['town','forest'],['forest','pass'],['forest','city'],['city','pass'],['city','mill'],
+    ['town','heath'],['heath','forest'],['heath','mill'],['riverside','heath'],['forest','cloud'],['pass','cloud'],['heath','cloud']];
+  routes.forEach(function(rt){
+    var a=WORLD_REGIONS.filter(function(p){return p.id===rt[0];})[0];
+    var b=WORLD_REGIONS.filter(function(p){return p.id===rt[1];})[0];
+    if(!a||!b)return;
+    g.strokeStyle='#DCCD9B';g.lineWidth=5;g.setLineDash(rt[0]==='farm'?[]:[6,6]);
+    g.beginPath();g.moveTo(a.x*6.4,a.y*4);g.lineTo(b.x*6.4,b.y*4);g.stroke();
+  });g.setLineDash([]);
   function house(x,y,w){g.fillStyle='#F0E5C8';g.fillRect(x-w/2,y-12,w,16);g.fillStyle='#86664D';g.fillRect(x-3,y-3,6,7);g.fillStyle='#5D7181';g.beginPath();g.moveTo(x-w/2-3,y-12);g.lineTo(x,y-24);g.lineTo(x+w/2+3,y-12);g.fill();}
   WORLD_REGIONS.forEach(function(r){var x=r.x*6.4,y=r.y*4;
     if(r.id==='city'){g.fillStyle='#6E8961';g.fillRect(x-36,y-17,72,35);house(x,y,42);house(x-29,y+2,15);house(x+29,y+2,15);house(x-14,y-16,12);house(x+14,y-16,12);g.fillStyle='#E8DCCA';g.fillRect(x-27,y+3,54,6);g.fillStyle='#A56D79';g.fillRect(x-37,y+12,8,4);g.fillRect(x+30,y+12,8,4);}
     else if(r.id==='forest'){for(var k=0;k<6;k++){g.fillStyle='#476951';g.beginPath();g.moveTo(x-26+k*9,y+4);g.lineTo(x-20+k*9,y-20-(k%2)*6);g.lineTo(x-14+k*9,y+4);g.fill();}}
     else if(r.id==='pass'){g.fillStyle='#7E887F';g.beginPath();g.moveTo(x-25,y+5);g.lineTo(x,y-29);g.lineTo(x+25,y+5);g.fill();}
     else if(r.id==='riverside'){g.fillStyle='#B99B6A';g.fillRect(x-18,y-6,36,7);g.fillStyle='#647E5C';g.fillRect(x-12,y-20,7,13);}
-    else {house(x,y,r.id==='farm'?24:18);if(r.id==='town'){house(x-19,y+6,13);house(x+19,y+6,13);}if(r.id==='vineyard'){g.fillStyle='#637E4B';for(var v=0;v<4;v++)g.fillRect(x-25,y+9+v*4,50,2);}}
+    else {house(x,y,r.id==='farm'?24:18);if(r.id==='town'){house(x-19,y+6,13);house(x+19,y+6,13);}if(r.id==='vineyard'){g.fillStyle='#637E4B';for(var v=0;v<4;v++)g.fillRect(x-25,y+9+v*4,50,2);}
+    if(r.id==='heath'){g.fillStyle='#8FAE6C';g.fillRect(x-26,y-8,52,20);g.fillStyle='#B9C4CE';g.fillRect(x-24,y-10,48,3);g.fillRect(x-24,y+10,48,3);g.fillStyle='#EFE7D2';for(var hn=0;hn<3;hn++)g.fillRect(x-16+hn*13,y-2,7,5);}
+    }
   });
   g.strokeStyle='#897E5C';g.lineWidth=2;g.strokeRect(8,8,624,384);
   g.fillStyle='#665F48';g.font='12px serif';g.fillText('N',604,37);g.beginPath();g.moveTo(609,44);g.lineTo(604,56);g.lineTo(614,56);g.fill();
@@ -9508,7 +11103,7 @@ function openWorldMap() {
 function regionTravelNode(regionId) {
   var map = {
     farm: 'farm.home', town: 'town.square', riverside: 'riverside.bank',
-    forest: 'forest.gate', city: 'city.gate', pass: 'mine.entrance', mill: 'mill.square'
+    forest: 'forest.gate', city: 'city.gate', pass: 'mine.entrance', mill: 'mill.square', heath: 'heath.ranch', cloud: 'cloud.pass'
   };
   return map[regionId] ? travelNodeById(map[regionId]) : null;
 }
@@ -9789,6 +11384,17 @@ function activateInteractable(it) {
   if(it.kind==='millGranary'){openMillGranary(it);return;}
   if(it.kind==='millBoard'){openMillBoard(it);return;}
   if(it.kind==='millDeliver'){openMillDeliver(it);return;}
+  if(it.kind==='meadowTrough'){openTrough(it);return;}
+  if(it.kind==='meadowShed'){openShed(it);return;}
+  if(it.kind==='meadowShear'){openShear(it);return;}
+  if(it.kind==='meadowVet'){openVet(it);return;}
+  if(it.kind==='millDoor'){var mr=MAPS.millroom;doSwitchScene('millroom',mr.enter.x,mr.enter.y);return;}
+  if(it.kind==='vetDoor'){var vr=MAPS.vetroom;doSwitchScene('vetroom',vr.enter.x,vr.enter.y);return;}
+  if(it.kind==='interiorProp'){openInteriorProp(it);return;}
+  if(it.kind==='cpDrill'){openDrillGround(it);return;}
+  if(it.kind==='cpSupply'){openSupplyDepot(it);return;}
+  if(it.kind==='cpFrontier'){openFrontierDesk(it);return;}
+  if(it.kind==='cpGate'){var m=militaryState(),fr=frontierState();if(!fr.started||fr.resolved){toast('关口封闭，边境无事。');return;}toast('关口外就是邻领官道。现在不是时候。');return;}
   if(it.kind==='treasure'){exploreTreasure(it.id);return;}
   if (it.kind === 'tackle') { openTackleShop(); return; }
   if (it.kind === 'workshop') { openWorkshop(); return; }
@@ -11051,6 +12657,17 @@ function updateTileTip(t, ox, oy) {
     if(!p.mature)lines.push(cropCareInfo(p).forecast);
   } else {
     lines.push('空耕地 · ' + w.t);
+    /* §32.2：播种前就告诉玩家这块地的肥力与该种哪一类 */
+    var zoneId = farmZoneAt(t[0], t[1]);
+    var zName = '';
+    for (var zi = 0; zi < FARM_ZONES.length; zi++) if (FARM_ZONES[zi].id === zoneId) zName = FARM_ZONES[zi].name;
+    var band = fertilityBand(fertilityAt(t[0], t[1]));
+    lines.push(zName + ' · 肥力' + band.name + '（' + band.effect + '）');
+    var lastGroup = zoneId ? fertilityState().zones['__last_' + zoneId] : null;
+    var advice = '轮作建议：' + (lastGroup
+      ? ('这一区上一季是' + (CROP_GROUPS[lastGroup] ? CROP_GROUPS[lastGroup].name : lastGroup) + '，换个种比较好')
+      : '这块地还没种过，什么都行');
+    lines.push(advice);
   }
   tip.innerHTML = lines.map(function (s, i) {
     var mark = i === 1 ? (w.ok ? '●' : '○') : '';
@@ -11440,6 +13057,13 @@ function drawScene(g, dt) {
     } else if(it.kind==='treasure'){ents.push({z:it.y*TILE+TILE,f:function(g,x,y){px(g,x*TILE+2,y*TILE+5,12,9,'#895F38');px(g,x*TILE+2,y*TILE+5,12,3,'#BD9257');px(g,x*TILE+7,y*TILE+7,2,4,'#E5C775');},a:[it.x,it.y]});
     } else if(it.kind==='mineStairs'||it.kind==='mineGate'||it.kind==='forestGate'){ents.push({z:it.y*TILE+TILE,f:function(g,x,y){px(g,x*TILE,y*TILE,16,16,'#544A3D');px(g,x*TILE+3,y*TILE+2,10,14,'#272C32');for(var i=0;i<4;i++)px(g,x*TILE+4,y*TILE+5+i*3,8,1,'#A8A18C');},a:[it.x,it.y]});
     } else if(it.kind==='cityGate'){ents.push({z:it.y*TILE+TILE,f:drawCityGateSite,a:[it.x,it.y]});
+    } else if(it.kind==='meadowTrough'||it.kind==='meadowShed'||it.kind==='meadowShear'||it.kind==='meadowVet'){
+      ents.push({z:it.y*TILE+TILE,f:function(g,x,y,kind){
+        if(kind==='meadowTrough')drawTrough(g,x,y,meadowState().trough,meadowCare().watered);
+        else if(kind==='meadowShear'){px(g,x*TILE+2,y*TILE+8,12,2,'#7A5A3C');px(g,x*TILE+3,y*TILE+2,2,7,'#6E5A41');px(g,x*TILE+11,y*TILE+2,2,7,'#6E5A41');px(g,x*TILE+3,y*TILE+3,10,1,'#8B7355');}
+        else if(kind==='meadowVet'){px(g,x*TILE+3,y*TILE+7,10,7,'#E2E6E2');px(g,x*TILE+3,y*TILE+6,10,1,'#B04A4A');px(g,x*TILE+7,y*TILE+11,3,3,'#5C6B72');}
+        else {px(g,x*TILE+1,y*TILE+6,14,8,'#8B7355');px(g,x*TILE+1,y*TILE+4,14,3,'#6E5A41');}
+      },a:[it.x,it.y,it.kind]});
     } else if(it.kind==='millWheel'||it.kind==='millGranary'||it.kind==='millBoard'||it.kind==='millDeliver'){
       /* 麦田村设施统一画成可辨识的小道具；水轮本体与闸口在 drawMillVillage 里画 */
       ents.push({z:it.y*TILE+TILE,f:function(g,x,y,kind){
@@ -11478,6 +13102,23 @@ function drawScene(g, dt) {
       ents.push({ z: f.y * TILE + f.h * TILE + (f.z || 0), f: drawHouseFurniture, a: [f] });
     });
   }
+  /* 阶段 C 的两个真实内部：暖光 + 各有造型的家具 */
+  if (INTERIOR_FURNITURE[state.sceneId]) {
+    var im = MAPS[state.sceneId];
+    var lg2 = g.createRadialGradient(7 * TILE, 5 * TILE, 8, 7 * TILE, 5 * TILE, 10 * TILE);
+    lg2.addColorStop(0, state.sceneId === 'vetroom' ? 'rgba(214,232,236,.20)' : 'rgba(255,206,132,.20)');
+    lg2.addColorStop(1, 'rgba(255,200,120,0)');
+    g.fillStyle = lg2;
+    g.fillRect(0, 0, im.w * TILE, im.h * TILE);
+    (im.windowTiles || []).forEach(function (wt) {
+      px(g, wt[0] * TILE + 2, 2, TILE - 4, TILE - 6, '#BBD4DC');
+      px(g, wt[0] * TILE + 2, 2, TILE - 4, 2, '#8FB4BF');
+    });
+    INTERIOR_FURNITURE[state.sceneId].forEach(function (f) {
+      if (f.x < R.x0 - 1 || f.x > R.x1 + 1 || f.y < R.y0 - 1 || f.y > R.y1 + 1) return;
+      ents.push({ z: f.y * TILE + f.h * TILE + (f.z || 0), f: drawInteriorFurniture, a: [f] });
+    });
+  }
   for (var nid in npcRuntime) {
     if (!Object.prototype.hasOwnProperty.call(npcRuntime, nid)) continue;
     if (NPCS[nid].scene !== state.sceneId) continue;
@@ -11497,6 +13138,7 @@ function drawScene(g, dt) {
   sceneAnimals().forEach(function(a){if(a.x>=R.x0-1&&a.x<=R.x1+1&&a.y>=R.y0-1&&a.y<=R.y1+1)ents.push({z:a.y*TILE+TILE,f:drawAnimal,a:[a.x,a.y,a]});});
   if(state.sceneId==='city')drawCityCrowd(ents,R);
   if(state.sceneId==='millvillage')drawMillVillage(ents,R,g);
+  if(state.sceneId==='heath')drawHeath(ents,R);
   if(state.sceneId.indexOf('city_')===0)drawCityInterior(g,map);
   ents.sort(function(a,b){return a.z-b.z;});
   ents.forEach(function (e) { e.f(g, e.a[0], e.a[1], e.a[2], e.a[3], e.a[4]); });
@@ -12147,6 +13789,77 @@ window.__MOSS__ = {
   sceneSize: function () { var m = MAPS[state.sceneId]; return { w: m.w, h: m.h, name: m.name }; },
   npcInfo: function (id) { return NPCS[id] ? { name: NPCS[id].name, title: NPCS[id].title, scene: NPCS[id].scene } : null; },
   millInfo: function () { var t = millTaskState(), w = millWorks(); return { step: t.step, cause: t.cause, plan: t.plan, delivered: t.delivered, repaired: w.repaired, inspected: w.inspected, waterTo: w.waterTo, wheelTurns: w.wheelTurns }; },
+  milFreshState: function () { return freshState(); },
+  milGate: function (m) { return milDeployGate({ rank: m.rank, training: m.training, commission: m.commission }); },
+  milAttrBonus: function (a) { return milPersonalBonus(a); },
+  milFrontier: function () { var m = militaryState(); return { rank: m.rank, training: m.training, drills: m.drills, commission: m.commission, frontier: frontierState(), battleCount: Object.keys(m.battles).length }; },
+  milDev: function (kind, fn) {
+    var list = INTERACTABLES.cloudpass || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].kind === kind) {
+        if (fn === 'advance') { frontierAdvanceDay(); return true; }
+        if (kind === 'cpDrill') openDrillGround(list[i]);
+        else if (kind === 'cpSupply') openSupplyDepot(list[i]);
+        else openFrontierDesk(list[i]);
+        return true;
+      }
+    }
+    return false;
+  },
+  milRoutePick: function () { return openRoutePick(); },
+  dayEndDebug: function () { return CFG.dayEnd; },
+  milQ: function (g) { return milQuality(g); },
+  milDep: function (side) { return milDeployment(side); },
+  milEnv: function (p) { return milEnvModifier(p); },
+  milSit: function (r) { return milSituation(r); },
+  milCas: function (contact, ratio, intensity) { return milCasualties(contact, ratio, intensity); },
+  milBridge: function (prev, ratio, kind) { return milBridgeProgress(prev, ratio, kind); },
+  milAdjudicate: function (input) { return milAdjudicate(input); },
+  milRanks: MIL_RANKS.map(function (r) { return { id: r.id, name: r.name, limit: r.limit }; }),
+  milCmd: function (units, rankId) { return milUnderCommand(units, rankId); },
+  milUnit: function (o) { return milUnit(o); },
+  milSeedRandom: function (seed) { var r = milSeededRandom(seed); return [r(), r(), r()]; },
+  milTriangular: function (seed, m) { return milTriangular(milSeededRandom(seed), m); },
+  meadowInfo: function () { var m = meadowState(), c = meadowCare(); return { trough: m.trough, watered: !!c.watered, fed: !!c.fed, eggs: m.eggs || 0, sheepFed: m.sheepFed || 0, sheared: m.sheared || 0, step: meadowTaskState().step }; },
+  hasProp: function (kind) { return !!(INTERACTABLES[state.sceneId] || []).some(function (it) { return it.kind === kind; }); },
+  devInteract: function (kind) {
+    var list = INTERACTABLES[state.sceneId] || [];
+    for (var i = 0; i < list.length; i++) if (list[i].kind === kind) { activateInteractable(list[i]); return true; }
+    return false;
+  },
+  devOpenProp: function (prop) {
+    var scene = prop === 'millstone' || prop === 'millshaft' || prop === 'floursacks' || prop === 'workorder' || prop === 'millchest' ? 'millroom' : 'vetroom';
+    var list = INTERACTABLES[scene] || [];
+    for (var i = 0; i < list.length; i++) if (list[i].prop === prop) { openInteriorProp(list[i]); return true; }
+    return false;
+  },
+  interiorFurnitureCount: function (sceneId) { return (INTERIOR_FURNITURE[sceneId] || []).length; },
+  currentNodeDebug: function () { return currentTravelNodeId(); },
+  checkExitDebug: function () { checkExit(); },
+  soilInfo: function () { var s = fertilityState(), out = { zones: {}, bands: {} }; FARM_ZONES.forEach(function (z) { var v = s.zones[z.id] == null ? 60 : s.zones[z.id]; out.zones[z.id] = v; out.bands[z.id] = fertilityBand(v).name; }); return out; },
+  soilValue: function (zoneId) { var s = fertilityState(); return s.zones[zoneId] == null ? 60 : s.zones[zoneId]; },
+  soilBand: function (zoneId) { return fertilityBand(fertilityState().zones[zoneId] == null ? 60 : fertilityState().zones[zoneId]).name; },
+  setFert: function (zoneId, v) { fertilityState().zones[zoneId] = clamp(Math.round(v), 0, 100); markDirty(); },
+  harvestTest: function (x, y, cropId) { fertilityOnHarvest(farmZoneAt(x, y), cropId); markDirty(); },
+  harvestYieldTest: function (cropId) { return Math.max(1, (CROPS[cropId] ? CROPS[cropId].yield : 1) + fertilityYieldBonus(fertilityAt(9, 5))); },
+  fertilityDeltaFor: function (group) {
+    var before = 60;
+    var after = group === 'legume' ? before + 8 : (group === 'root' ? before - 4 : before - 4);
+    return after - before;
+  },
+  sleepOnceForTest: function () { performSettlement(false); },
+  devOpenMeadow: function (kind) {
+    var list = INTERACTABLES.heath || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].kind !== kind) continue;
+      if (kind === 'meadowTrough') openTrough(list[i]);
+      else if (kind === 'meadowShed') openShed(list[i]);
+      else if (kind === 'meadowShear') openShear(list[i]);
+      else openVet(list[i]);
+      return true;
+    }
+    return false;
+  },
   devOpenMill: function (kind) {
     var list = INTERACTABLES.millvillage || [];
     for (var i = 0; i < list.length; i++) {

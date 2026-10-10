@@ -407,6 +407,24 @@ button{font-family:inherit}
 .work-row{white-space:pre-line;text-align:left;justify-content:flex-start;line-height:1.7;min-height:84px;width:100%;font-size:12px}
 .work-row.selected{outline:2px solid #e8c76c;outline-offset:1px}
 .district-chip:hover,.district-chip:focus-visible{outline:2px solid #b88c4b;outline-offset:1px}
+/* 第七版 §32.2：田区肥力只展示低／适宜／充足三档 */
+.soil-panel{margin:8px 0;padding:8px 10px;background:#f3ecd6;border:1px solid #a99b74;border-radius:5px}
+.soil-panel .section-title{margin:0 0 6px}
+.soil-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:3px;font-size:13px}
+.soil-row+.soil-row{border-top:1px solid #ded3ae}
+.soil-row.low{background:#EFD9C4}
+.soil-row.ok{background:#E4EDD2}
+.soil-row.high{background:#D6E7CE}
+.soil-name{min-width:56px;color:#3b4a33;font-weight:600}
+.soil-band{min-width:40px;font-size:12px;padding:1px 6px;border-radius:8px;background:#ffffff66;color:#3b4a33}
+.soil-row.low .soil-band{background:#C87A4A;color:#fff}
+.soil-row.high .soil-band{background:#4E7A45;color:#fff}
+.soil-eff{flex:1;color:#6a6a52;font-size:12px}
+/* 第七版 §27.10 战报：阶段逐条列出，战力与损失可核对 */
+.battle-report .panel-box{margin:6px 0;padding:8px 10px;background:#f3ecd6;border:1px solid #a99b74;border-radius:5px}
+.battle-report .panel-box .section-title{margin:0 0 4px}
+.battle-report p{margin:2px 0;line-height:1.55}
+.battle-report p.muted{font-variant-numeric:tabular-nums}
 .city-plan{display:block;width:min(100%,640px);height:auto;align-self:center;border:2px solid #897e5c;image-rendering:pixelated;border-radius:4px}
 #quickFood{align-self:flex-start;pointer-events:auto}
 @media(max-width:520px){.atlas-place{font-size:10px;padding:3px 4px}.world-atlas{min-height:230px;aspect-ratio:auto}.atlas-place.here{max-width:94px;white-space:normal}.district-grid{grid-template-columns:repeat(2,1fr)}.district-chip{font-size:11px;padding:8px 4px}}
