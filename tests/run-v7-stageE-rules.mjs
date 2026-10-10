@@ -22,11 +22,11 @@ const base = { battleId: 'b1', seed: 4242, objective: 'bridge', intensity: 'norm
 const r1 = await M((b) => __MOSS__.milAdjudicate(b), base);
 const r2 = await M((b) => __MOSS__.milAdjudicate(b), base);
 check('同版本同输入同种子 → 完全一致', JSON.stringify(r1), JSON.stringify(r2));
-check('存档里记录了规则版本与种子', [r1.rulesVersion, r1.seed], ['v7-1', 4242]);
+check('存档里记录了规则版本与种子', [r1.rulesVersion, r1.seed], ['v7-2', 4242]);
 
 // 不同种子才可能不同，但都必须在同一规则版本下
 const r3 = await M((b) => __MOSS__.milAdjudicate(Object.assign({}, b, { seed: 99 })), base);
-check('换种子后规则版本不变', r3.rulesVersion, 'v7-1');
+check('换种子后规则版本不变', r3.rulesVersion, 'v7-2');
 
 // ── 2. 敌我使用同一套规则（对称性） ──
 const sym = await M(() => {

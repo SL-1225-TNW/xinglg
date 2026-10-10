@@ -26,7 +26,8 @@ rep.ok('画布比例与自适应分辨率一致', await page.evaluate(() => {
   const b = document.getElementById('world');
   return Math.abs(c.width / c.height - b.width / b.height) < 0.01;
 }), JSON.stringify(rect));
-rep.eq('快捷栏 9 格（第 9 格是小铲子）', await page.locator('.hotbar .slot').count(), 9);
+rep.eq('快捷栏 10 格（末三格为设备、小铲子、施肥）', await page.locator('.hotbar .slot').count(), 10);
+rep.eq('末三格工具名称与用途正确', await page.locator('.hotbar .slot').evaluateAll(nodes => nodes.slice(7).map(n => n.getAttribute('aria-label'))), ['设备', '小铲子', '施肥']);
 rep.ok('选中工具有边框与数字', await page.evaluate(() => {
   const s = document.querySelector('.slot.selected');
   return !!s && !!s.querySelector('.slot-num');
@@ -187,7 +188,7 @@ rep.ok('小屏无横向滚动', await noScrollX(page));
 rep.ok('触屏方向键可见', await page.evaluate(() => getComputedStyle(document.getElementById('touch')).display === 'flex'));
 const tb = await page.evaluate(() => { const r = document.getElementById('touchAct').getBoundingClientRect(); return [r.width, r.height]; });
 rep.ok('触控目标 ≥44px', tb[0] >= 44 && tb[1] >= 44, JSON.stringify(tb));
-rep.ok('快捷栏可点击且 9 格', await page.locator('.hotbar .slot').count() === 9);
+rep.ok('快捷栏可点击且 10 格', await page.locator('.hotbar .slot').count() === 10);
 // 触屏移动
 const p0 = await pos(page);
 const dpad = await page.locator('[data-dir="1,0"]').boundingBox();

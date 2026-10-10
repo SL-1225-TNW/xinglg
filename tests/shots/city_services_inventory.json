@@ -12,6 +12,7 @@
     "castle",
     "carriage",
     "stable",
+    "park",
     "academy",
     "hall",
     "home",
@@ -36,7 +37,7 @@
       "id": "castle",
       "name": "",
       "kind": "castle",
-      "w": 32,
+      "w": 28,
       "h": 10,
       "service": null
     },
@@ -85,6 +86,30 @@
       "name": "",
       "kind": "shop",
       "w": 17,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "bandstand",
+      "name": "",
+      "kind": "park",
+      "w": 13,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "teahouse",
+      "name": "",
+      "kind": "park",
+      "w": 13,
+      "h": 4,
+      "service": null
+    },
+    {
+      "id": "keeper",
+      "name": "",
+      "kind": "home",
+      "w": 13,
       "h": 4,
       "service": null
     },

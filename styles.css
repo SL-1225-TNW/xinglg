@@ -402,6 +402,9 @@ button{font-family:inherit}
 .district-chip.on{background:#344f3e;color:#fff0bc;border-color:#e4c77d}
 .district-chip:disabled{opacity:.55;cursor:default}
 .work-summary{font-weight:700;color:var(--gold)}
+.mill-life-panel{gap:8px}
+.mill-life-panel>p{margin:4px 0;line-height:1.65}
+.mill-life-panel>.btn{align-self:flex-start;max-width:100%;white-space:normal;text-align:left}
 .work-map{display:block;width:auto;max-width:100%;max-height:190px;image-rendering:pixelated;border:2px solid #9f966f;margin:12px auto}
 .work-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:8px}
 .work-row{white-space:pre-line;text-align:left;justify-content:flex-start;line-height:1.7;min-height:84px;width:100%;font-size:12px}
@@ -564,6 +567,13 @@ button{font-family:inherit}
 .tile-tip.dry .tt-l1{color:#F0C88A}
 .tile-tip.ripe{border-color:#9ed36a}
 .tile-tip.ripe .tt-l0{color:#B6E88A}
+/* 土壤肥力行（§32.2）：三档只用文字表达，不展示具体数值 */
+.tile-tip .tt-fert{color:#9FB88C;align-self:flex-start;max-width:100%}
+.tile-tip .tt-fert.low{color:#E0A15E}
+.tile-tip.fert-low{border-color:#C98A4B}
+/* 预计收获日（§32.2）：缺水时用 warn 色，不给虚假的确定日期 */
+.tile-tip .tt-eta{color:#8FA8B0;align-self:flex-start;max-width:100%;white-space:normal}
+.tile-tip .tt-eta.warn{color:#F0C88A}
 
 /* 种子 / 设备类型选择（内联在快捷栏下方，不暂停游戏时间） */
 .typepick{

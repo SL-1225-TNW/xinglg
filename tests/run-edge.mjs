@@ -124,7 +124,7 @@ async function mineAtSafe(pg, x, y) {
 await page.evaluate(() => { const s = window.__MOSS__.state; s.inventory = { seed_radish: 5, tool_hoe: 1, tool_can: 1, tool_axe: 1, tool_pick: 1, basket: 1 }; });
 await walkTo(page, 7, 9); await pickTool(page, 4); await clickTile(page, 7, 8);
 s = await snap(page);
-rep.eq('腾出空间后收获成功', s.inv.radish, 1);
+rep.eq('腾出空间后收获成功', s.inv.radish, 2);   // yield3 × 适宜档0.85
 
 /* ================= 4. 制作失败不扣材料 ================= */
 console.log('【边界 4】制作失败不扣材料 / 背包满不扣材料');
@@ -186,7 +186,7 @@ s = await snap(page);
 rep.eq('草莓第 6 次结算后首次成熟', s.plots['7,8'].mature, true);
 await walkTo(page, 7, 9); await pickTool(page, 4); await clickTile(page, 7, 8);
 s = await snap(page);
-rep.eq('收获草莓', s.inv.strawberry, 1);
+rep.eq('收获草莓', s.inv.strawberry, 2);   // yield3 × 适宜档0.85
 rep.eq('收获后进入再生', [s.plots['7,8'].mature, s.plots['7,8'].harvested], [false, true]);
 await page.evaluate(() => { const s = window.__MOSS__.state; s.weather = { today: 'sun', tomorrow: 'sun' }; });
 for (let i = 0; i < 2; i++) {

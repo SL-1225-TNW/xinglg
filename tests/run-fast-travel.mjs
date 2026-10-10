@@ -46,7 +46,7 @@ try {
   await p.waitForFunction(() => __MOSS__.state.sceneId === 'town');
   const after = await p.evaluate(() => ({ t: __MOSS__.state.timeMinutes, e: __MOSS__.state.energy, c: __MOSS__.state.coins, s: __MOSS__.state.sceneId }));
   check('已抵达小镇', after.s, 'town');
-  check('时间推进 10 分钟', after.t - before.t, 10);
+  check('时间推进约10分钟（包括正常帧流逝）', Math.abs(after.t-before.t-10)<0.2, true);
   check('传送不消耗体力', after.e, before.e);
   check('传送不消耗金币', after.c, before.c);
   check('传送后窗口关闭', await p.evaluate(() => __MOSS__.ui.window), null);
@@ -63,6 +63,7 @@ try {
   await p.getByRole('button', { name: /^苔芽农场，已开放/ }).click();
   await p.getByRole('button', { name: '传送过去', exact: true }).click();
   await p.waitForFunction(() => __MOSS__.state.sceneId === 'farm');
+  await p.waitForTimeout(250);
   check('已返回农场', await p.evaluate(() => __MOSS__.state.sceneId), 'farm');
 
   /* --- §33.2 未解锁地点不可传送，并给出具体条件 --- */
@@ -76,7 +77,7 @@ try {
   /* --- §33.2 葡萄园与磨坊是规划中地点，不得出现可执行传送 --- */
   await p.keyboard.press('m');
   await p.getByRole('button', { name: /^金叶葡萄园/ }).click();
-  check('葡萄园标注内容待开放', (await p.locator('.travel-panel').innerText()).includes('内容待开放'), true);
+  check('葡萄园显示磨坊验收前置条件', (await p.locator('.travel-panel').innerText()).includes('磨坊'), true);
   check('葡萄园没有传送按钮', await p.getByRole('button', { name: '传送过去', exact: true }).count(), 0);
   await p.keyboard.press('Escape');
 

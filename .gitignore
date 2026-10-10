@@ -1,5 +1,6 @@
 # 测试依赖：游戏本体不需要 node_modules
 tests/node_modules/
+node_modules/
 
 # 试玩过程产生的日志与错误输出
 tests/*.log
