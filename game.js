@@ -1285,7 +1285,7 @@ for(var floor=1;floor<=3;floor++){
   })(floor);
 }
 MAPS.town.exits.push({x:14,y:0,to:'forest',tx:14,ty:26});
-var SCENE_ORDER = ['farm', 'town', 'millvillage', 'heath', 'millroom', 'vetroom', 'cloudpass', 'riverside', 'house','forest','mine1','mine2','mine3'];
+var SCENE_ORDER = ['farm', 'town', 'millvillage', 'heath', 'millroom', 'vetroom', 'cloudpass', 'oldroad', 'bordertown', 'riverside', 'house','forest','mine1','mine2','mine3'];
 var EXPLORE_NODES={forest:{},mine1:{},mine2:{},mine3:{}};
 [[6,12],[9,16],[18,18],[24,20],[33,18],[36,23],[8,22],[20,3]].forEach(function(p){EXPLORE_NODES.forest[key2(p[0],p[1])]={type:'tree',item:'hardwood',qty:4,hp:4};});
 [[11,9],[5,16],[17,8],[25,16],[31,19],[35,9],[6,24],[22,23]].forEach(function(p){EXPLORE_NODES.forest[key2(p[0],p[1])]={type:'forage',item:'mushroom',qty:2,hp:1};});
@@ -1327,7 +1327,38 @@ function normalizeExploration(raw){
  e.meadowTask={step:clamp(Math.floor(num((raw.meadowTask||{}).step,0,0,3)),0,3)};
  if(!e.meadow.trough){e.meadowTask.step=0;e.meadow.sheepFed=0;}
  if(e.meadowTask.step>1&&e.meadow.sheepFed<3)e.meadowTask.step=1;
- /* §29.2 军队账本必须随存档保存：战报、唯一结算标记、部队与资格不能丢，
+ var orr=raw.oldRoad||{};
+ e.oldRoad={found:!!orr.found,records:clamp(Math.floor(num(orr.records,0,0,2)),0,2),opened:!!orr.opened,bridged:!!orr.bridged};
+ var bdr=raw.border||{};
+ e.border={visited:!!bdr.visited,contracts:Math.floor(num(bdr.contracts,0,0,1e5)),cleared:!!bdr.cleared};
+ /* §28 袭扰：事件实例、频率与历史都随存档保存；重载不重抽同一场预警 */
+ var rd=raw.raids||{};
+ e.raids={
+   active:(rd.active&&typeof rd.active==='object')
+     ? {id:String(rd.active.id||''),familyId:String(rd.active.familyId||''),seed:Math.floor(num(rd.active.seed,0,-1e9,1e9)),
+        kind:String(rd.active.kind||'raid_road'),name:String(rd.active.name||'袭扰'),scope:rd.active.scope==='institution'?'institution':'region',
+        effect:String(rd.active.effect||'traffic'),severity:clamp(Math.floor(num(rd.active.severity,1,1,MIL_RAID_RULES.maxSeverity)),1,MIL_RAID_RULES.maxSeverity),
+        desc:String(rd.active.desc||''),report:String(rd.active.report||''),day:Math.floor(num(rd.active.day,1,1,1e6)),
+        expiresDay:Math.floor(num(rd.active.expiresDay,1,1,1e6)),evidenceKnown:!!rd.active.evidenceKnown,
+        resolved:String(rd.active.resolved||''),roadPenalty:Math.floor(num(rd.active.roadPenalty,0,0,99))}
+     : null,
+   lastDay:Math.floor(num(rd.lastDay,-99,-99,1e6)),
+   seasonCount:Math.floor(num(rd.seasonCount,0,0,99)),
+   seasonKey:String(rd.seasonKey||''),
+   history:Array.isArray(rd.history)?rd.history.slice(-20).map(function(h){
+     return {id:String(h.id||''),day:Math.floor(num(h.day,0,0,1e6)),kind:String(h.kind||''),resolved:String(h.resolved||'')};}):[]
+ };
+ /* §26.5 机构预算与个人钱包分开；装备采购是合同，不是直接扣背包 */
+ var inst=raw.institution||{};
+ e.institution={
+   budget:Math.floor(num(inst.budget,0,0,1e7)),
+   contracts:Array.isArray(inst.contracts)?inst.contracts.slice(-20).map(function(c){
+     return {id:String(c.id||''),kind:String(c.kind||''),cover:Math.floor(num(c.cover,0,0,1e5)),
+       level:String(c.level||'standard'),day:Math.floor(num(c.day,0,0,1e6)),cost:Math.floor(num(c.cost,0,0,1e7)),
+       paid:!!c.paid,delivered:!!c.delivered};}):[],
+   unitId:String(inst.unitId||'unit_white_rose_guard')
+ };
+ /* 军队账本必须随存档保存：战报、唯一结算标记、部队与资格不能丢，
     否则读档会重新抽一次战斗或让玩家白拿一次委任。 */
  var ml=raw.military||{};
  e.military={
@@ -1947,7 +1978,18 @@ var INTERACTABLES = {
     {id:'cp_drill',x:14,y:12,stand:[[14,13],[13,12],[15,12],[14,11]],kind:'cpDrill',label:'演练场'},
     {id:'cp_supply',x:25,y:13,stand:[[25,14],[24,13],[26,13],[25,15]],kind:'cpSupply',label:'军需库'},
     {id:'cp_frontier',x:15,y:19,stand:[[15,20],[14,19],[16,19],[15,18]],kind:'cpFrontier',label:'边境营地'},
-    {id:'cp_gate',x:16,y:5,stand:[[16,6],[15,5],[17,5]],kind:'cpGate',label:'山口关门'}
+    {id:'cp_gate',x:16,y:5,stand:[[16,6],[15,5],[17,5]],kind:'cpGate',label:'山口关门'},
+    {id:'cp_raid',x:14,y:15,stand:[[14,16],[13,15],[15,15],[14,14]],kind:'cpRaid',label:'边境公开情报'}
+  ],
+  oldroad: [
+    {id:'or_hut',x:7,y:8,stand:[[7,9],[6,8],[8,8],[7,7]],kind:'orHut',label:'废弃邮亭'},
+    {id:'or_archive',x:6,y:3,stand:[[6,4],[5,3],[7,3]],kind:'orArchive',label:'旧邮档匣'},
+    {id:'or_road',x:14,y:17,stand:[[14,18],[13,17],[15,17],[14,16]],kind:'orRoad',label:'林间旧路'},
+    {id:'or_survey',x:14,y:12,stand:[[14,13],[13,12],[15,12],[14,11]],kind:'orSurvey',label:'断墙缺口'}
+  ],
+  bordertown: [
+    {id:'bt_office',x:8,y:8,stand:[[8,9],[7,8],[9,8],[8,7]],kind:'btOffice',label:'领地办事处'},
+    {id:'bt_inn',x:19,y:8,stand:[[19,9],[18,8],[20,8],[19,7]],kind:'btInn',label:'贸易客栈'}
   ],
   forest: [{id:'mine_gate',x:30,y:4,stand:[[30,5],[29,4],[31,4]],kind:'mineGate',label:'旧矿山入口'},{id:'lumber_hut',x:23,y:10,stand:[[23,11],[22,10],[24,10]],kind:'lumberHut',label:'伐木屋'},{id:'forest_cache',x:37,y:25,stand:[[37,24],[36,25],[38,25]],kind:'treasure',label:'林间宝箱'}],
   mine1: [{id:'stairs2',x:22,y:3,stand:[[22,4],[21,3],[23,3]],kind:'mineStairs',next:2,label:'二层轨道'}],
@@ -5901,8 +5943,7 @@ function performSettlement(auto) {
     });
 
     /* 3b. 草甸畜养：当天有没有水、有没有草，决定第二天有没有蛋。
-        缺照料先减产并提示，不直接处死牲口（§32.2 照料短缺的处理口径）。 */
-    var md = meadowState();
+        缺照料先减产并提示，不直接处死牲口（§32.2 照料短缺的处理口径）。 */    var md = meadowState();
     if (md.trough) {
       var hadWater = md.wateredDay === state.totalDay;
       var hadFood = md.fedDay === state.totalDay;
@@ -5919,6 +5960,17 @@ function performSettlement(auto) {
       }
     } else if (travelState().discovered['heath.ranch']) {
       summary.meadow = '饮水槽还没修好，牲口只能去溪边找水。';
+    }
+
+    /* 3c. 边境袭扰：到期未处置就按制度自行收场，恢复窗口照常计时（§28.1、§19.5） */
+    var expired = milTickRaid();
+    if (expired) summary.raid = expired.name + '：' + expired.resolved;
+    else if (milRollRaid(state.totalDay)) {
+      var nr = raidState().active;
+      summary.raid = nr.name + '：' + nr.report + '（期限第 ' + nr.expiresDay + ' 天）';
+    } else if (raidState().active) {
+      var cur = raidState().active;
+      summary.raid = cur.name + '仍在处理中，期限第 ' + cur.expiresDay + ' 天。';
     }
 
     /* 4. 日期 +1 */
@@ -5973,6 +6025,7 @@ function performSettlement(auto) {
     var histRec = {
       day: summary.day, income: summary.income, dailyAllowance: summary.dailyAllowance, matured: summary.matured, jam: summary.jam,
     meadow: summary.meadow || '',
+    raid: summary.raid || '',
       weather: summary.weatherTo, auto: summary.auto,
       sold: summary.sold.map(function (x) { return { id: x.id, name: x.name, qty: x.qty, value: x.value }; }),
       matureDetail: summary.matureDetail.slice()
@@ -6078,6 +6131,12 @@ function settlementPages(s) {
     pages.push(settleStep('meadow', '石楠草甸', [
       s.meadow,
       '缺水比缺草料来得早：卢安的习惯是先看水槽，再看草料。'
+    ]));
+  }
+  if (s.raid) {
+    pages.push(settleStep('raid', '边境消息', [
+      s.raid,
+      '公开消息不等于准确情报。真正的敌方位置要靠侦察与报告。'
     ]));
   }
   var toRain = s.weatherTo === 'rain';
@@ -8678,26 +8737,31 @@ var MIL_RANK_IDS = MIL_RANKS.map(function (r) { return r.id; });
 function milCommandLimit(rankId) { return milRank(rankId).limit; }
 
 /* §26.4 单位：人员状态与质量分组分开记录。
-   available() 只数健康可用且未被任务占用的人员。 */
+   这里只放纯数据——单位要进存档，方法不会跟着 JSON 一起活下来，
+   可用人数一律用 milUnitAvailable() 现算。 */
 function milUnit(o) {
-  var u = Object.assign({
+  return Object.assign({
     id: '', name: '', type: 'infantry', owner: 'npc', institution: 'local_guard',
     commander: '', location: '', assignment: null, availableWindow: null,
     personnel: { healthy: 0, wounded: 0, missing: 0, captive: 0, dead: 0 },
     groups: []
   }, o || {});
-  u.available = function () { return u.assignment ? 0 : u.personnel.healthy; };
-  u.total = function () {
-    var p = u.personnel;
-    return p.healthy + p.wounded + p.missing + p.captive + p.dead;
-  };
-  return u;
+}
+function milUnitAvailable(u) {
+  if (!u || !u.personnel) return 0;
+  var n = Math.max(0, Math.floor(u.personnel.healthy || 0));
+  return u.assignment ? 0 : n;    // 被任务占用的部队不能重复参战
+}
+function milUnitTotal(u) {
+  if (!u || !u.personnel) return 0;
+  var p = u.personnel;
+  return (p.healthy || 0) + (p.wounded || 0) + (p.missing || 0) + (p.captive || 0) + (p.dead || 0);
 }
 
 /* 人数权限统计玩家实际控制的全部分队；拆成多个单位不能绕过上限（§26.2） */
 function milUnderCommand(units, rankId) {
   var used = 0;
-  for (var i = 0; i < units.length; i++) if (units[i].owner === 'player') used += units[i].available();
+  for (var i = 0; i < units.length; i++) if (units[i].owner === 'player') used += milUnitAvailable(units[i]);
   return { used: used, limit: milCommandLimit(rankId), ok: used <= milCommandLimit(rankId) };
 }
 
@@ -9066,13 +9130,6 @@ function milDeployGate(m) {
 /* §26.1：玩家个人野外武器训练与军事登记分开 */
 function milNewUnit(o) { return milUnit(o); }
 
-/* §28.1 袭扰事件池：按地区压力、已知势力筛选，不每天对全省抽一次无理由战争 */
-var MIL_RAID_POOL = [
-  { id: 'raid_road', name: '道路袭扰', effect: 'traffic', desc: '商路上出现不明武装，部分路段改道，运输时长与货损上升。' },
-  { id: 'raid_store', name: '仓库失窃', effect: 'goods', desc: '一处货栈被搬空，村里要补货、查访、守夜。' },
-  { id: 'raid_cart', name: '车队被劫', effect: 'supply', desc: '一支粮车队没能按时到，村里开始议论要不要加派人手。' }
-];
-
 /* ============================================================
    §21.4 云峰关口的七日：省份级事件，不是全地图即时战略
    ============================================================ */
@@ -9189,16 +9246,31 @@ function openSupplyDepot(it) {
       // 权限门必须在每次重绘时重算：拿到委任后这一行要立刻变成"可受命"，
       // 不能沿用开窗那一刻的旧结论（否则玩家拿到委任还一直被拦）
       var gate = milDeployGate(m);
+      var inst = milInstitution();
       b.appendChild(el('p', null, '军需官核对名册与授权。机构招募和军费走公共账，不会动你背包里的钱。'));
       b.appendChild(el('p', 'muted', '参战权限 = 职业资格 + 训练记录 + 本次任务授权，三项都要齐。'));
       b.appendChild(el('p', null, '当前：' + milRank(m.rank).name + ' · 训练 ' + (m.training || 0) + ' 次 · 委任 ' + (m.commission ? m.commission.role : '无') + '。'));
+      b.appendChild(el('p', 'muted', '机构预算 ' + inst.budget + ' 金 · 你的私房钱 ' + state.coins + ' 金（两本账不混用）。'));
+      var used = milUnderCommand(m.units, m.rank);
+      b.appendChild(el('p', 'muted', '直属 ' + used.used + ' / ' + used.limit + ' 人。'));
       if (!gate.ok) b.appendChild(el('p', 'req-chip', gate.reason));
       else b.appendChild(el('p', 'req-chip ok', '资格、训练与委任均已具备，可以受命。'));
+      if (m.units.length) {
+        m.units.forEach(function (u) {
+          var d = (u.groups && u.groups[0]) || { train: 0, equip: 0 };
+          b.appendChild(el('p', 'muted', u.name + '：' + u.personnel.healthy + ' 人可战（总 ' +
+            (u.personnel.healthy + u.personnel.wounded + u.personnel.missing + u.personnel.captive + u.personnel.dead) +
+            '，伤 ' + u.personnel.wounded + ' / 亡 ' + u.personnel.dead + '）· 训练 ' + d.train + ' · 装备 ' + d.equip));
+        });
+      }
+      inst.contracts.filter(function (c) { return !c.delivered; }).forEach(function (c) {
+        b.appendChild(el('p', 'muted', '待交付装备合同：覆盖 ' + c.cover + ' 人，装备度 ' + c.level + '，第 ' + (c.day + 2) + ' 天交付。'));
+      });
       var fr = frontierState();
       if (fr.started && !fr.resolved) b.appendChild(el('p', 'muted', '云峰关口事件进行中：第 ' + (fr.day || 0) + ' / 7 日。'));
     },
     actions: [
-      { label: '申请受命（委任）', kind: 'primary', close: false, onClick: function () {
+      { label: '申请受命（委任）', close: false, onClick: function () {
         if (!cloudAt(it)) { toast('请在军需库旁操作。'); return; }
         if (milRankIndex(m.rank) < milRankIndex('member')) { toast('还没有登记队员资格，先去演练场训练。'); return; }
         if (m.training < 1) { toast('缺少训练记录。'); return; }
@@ -9208,6 +9280,14 @@ function openSupplyDepot(it) {
         m.commission = { role: '巡防联络官（临时委任）', sinceDay: state.totalDay, expiresDay: state.totalDay + 112 };
         markDirty(); refreshHud(); saveNow(); refreshWindow();
         toast('取得临时委任：巡防联络官。任期一年（游戏内 112 天）。');
+      } },
+      { label: '招募人手（机构预算）', close: false, onClick: function () {
+        if (!cloudAt(it)) { toast('请在军需库旁操作。'); return; }
+        openRecruitPanel(it);
+      } },
+      { label: '签装备合同', close: false, onClick: function () {
+        if (!cloudAt(it)) { toast('请在军需库旁操作。'); return; }
+        openEquipContractPanel(it);
       } },
       { label: '查看编制', close: false, onClick: function () {
         openWindow({
@@ -9222,6 +9302,65 @@ function openSupplyDepot(it) {
         });
       } },
       { label: '离开', close: true }
+    ]
+  });
+}
+/* §26.5 招募面板：新兵带自己的训练与装备水平进来，不是满值老兵 */
+function openRecruitPanel(it) {
+  openWindow({
+    id: 'recruit', kind: 'custom', title: '招募人手',
+    build: function (b) {
+      var inst = milInstitution();
+      b.appendChild(el('p', 'muted', '可招募人数受你的指挥上限限制；费用走机构预算，不会动你的私房钱。'));
+      b.appendChild(el('p', null, '机构预算 ' + inst.budget + ' 金。'));
+      MIL_RECRUIT_POOL.forEach(function (p) {
+        b.appendChild(el('p', null, p.name + '：每人 ' + p.cost + ' 金 · 训练 ' + p.train + ' · 装备 ' + p.equip +
+          ' · 士气 ' + p.morale + ' · 补给 ' + p.supply + ' · 纪律 ' + p.discipline));
+      });
+      b.appendChild(el('p', 'muted', '训练与装备没到最低参战要求的部队，会被裁判排除在前线之外。'));
+    },
+    actions: [
+      { label: '招 5 名本地青壮', close: false, onClick: function () {
+        if (!cloudAt(it)) { toast('请在军需库旁操作。'); return; }
+        var r = milRecruit('rec_local', 5);
+        toast(r.reason); if (r.ok) { markDirty(); saveNow(); closeWindow(true); openSupplyDepot(it); }
+      } },
+      { label: '招 5 名退伍乡勇', close: false, onClick: function () {
+        if (!cloudAt(it)) { toast('请在军需库旁操作。'); return; }
+        var r = milRecruit('rec_veteran', 5);
+        toast(r.reason); if (r.ok) { markDirty(); saveNow(); closeWindow(true); openSupplyDepot(it); }
+      } },
+      { label: '返回', close: true }
+    ]
+  });
+}
+function openEquipContractPanel(it) {
+  openWindow({
+    id: 'equipcontract', kind: 'custom', title: '装备采购',
+    build: function (b) {
+      var inst = milInstitution();
+      b.appendChild(el('p', 'muted', '按"覆盖多少人、达到什么级别、何时交付"签合同。签约付钱，交付时才真正提升装备度。'));
+      b.appendChild(el('p', null, '机构预算 ' + inst.budget + ' 金。'));
+      MIL_EQUIP_TIERS.forEach(function (t) {
+        b.appendChild(el('p', null, t.name + '：装备度 ' + t.level + '，每人 ' + t.costPer + ' 金 · 20 人 ' + (t.costPer * 20) + ' 金。'));
+      });
+      inst.contracts.filter(function (c) { return !c.delivered; }).forEach(function (c) {
+        var d = milDeliverEquipment(c.id);
+        b.appendChild(el('p', 'muted', c.id + '：' + (d.ok ? d.reason : d.reason)));
+      });
+    },
+    actions: [
+      { label: '签合格制式（20 人）', close: false, onClick: function () {
+        if (!cloudAt(it)) { toast('请在军需库旁操作。'); return; }
+        var r = milContractEquip('standard', 20);
+        toast(r.reason); if (r.ok) { markDirty(); saveNow(); refreshWindow(); }
+      } },
+      { label: '签精工装备（20 人）', close: false, onClick: function () {
+        if (!cloudAt(it)) { toast('请在军需库旁操作。'); return; }
+        var r = milContractEquip('good', 20);
+        toast(r.reason); if (r.ok) { markDirty(); saveNow(); refreshWindow(); }
+      } },
+      { label: '返回', close: true }
     ]
   });
 }
@@ -9414,6 +9553,530 @@ function cloudFrontierReady() {
 }
 
 /* ============================================================
+   §26.5 招募与装备：机构预算与个人钱包分账
+   ------------------------------------------------------------
+   招募按地区或机构有可用人手与批准数量；新兵到场后进入训练阶段，
+   不能付钱瞬间得到满训练度老兵。装备采购按"覆盖多少人、达到什么
+   级别、何时交付"签合同（§26.5）。预算不足会明确限制招募，不会自动
+   挪用玩家农场存款。 */
+var MIL_RECRUIT_POOL = [
+  { id: 'rec_local', name: '本地青壮', base: 30, train: 30, equip: 20, morale: 55, supply: 50, discipline: 40, cost: 18 },
+  { id: 'rec_veteran', name: '退伍乡勇', base: 20, train: 60, equip: 55, morale: 60, supply: 55, discipline: 60, cost: 46 }
+];
+var MIL_EQUIP_TIERS = [
+  { id: 'standard', name: '合格制式', level: 45, costPer: 26 },
+  { id: 'good', name: '精工装备', level: 70, costPer: 44 }
+];
+function milInstitution() {
+  var e = exploreState();
+  if (!e.institution) e.institution = { budget: 600, contracts: [], unitId: 'unit_white_rose_guard' };
+  if (typeof e.institution.budget !== 'number') e.institution.budget = 600;
+  if (!Array.isArray(e.institution.contracts)) e.institution.contracts = [];
+  return e.institution;
+}
+function milRecruitPool() {
+  var m = militaryState();
+  var limit = milCommandLimit(m.rank);
+  var used = milUnderCommand(m.units, m.rank).used;
+  return MIL_RECRUIT_POOL.map(function (p) {
+    var room = Math.max(0, limit - used);
+    return { id: p.id, name: p.name, cost: p.cost, room: room,
+      allowed: room > 0 && m.rank !== 'civilian' && m.rank !== 'trainee' };
+  });
+}
+function milEquipTiers() { return MIL_EQUIP_TIERS; }
+
+/* 招募：新兵进入训练阶段，训练度低，装备覆盖率也低 */
+function milRecruit(kind, count) {
+  var m = militaryState(), inst = milInstitution();
+  var pool = MIL_RECRUIT_POOL.filter(function (p) { return p.id === kind; })[0];
+  if (!pool) return { ok: false, reason: '没有这个人手来源。' };
+  if (m.rank === 'civilian' || m.rank === 'trainee') return { ok: false, reason: '你还不能替机构招募人手。' };
+  var used = milUnderCommand(m.units, m.rank).used;
+  var limit = milCommandLimit(m.rank);
+  if (used + count > limit) return { ok: false, reason: '超出 ' + m.rank + ' 的 ' + limit + ' 人上限（当前 ' + used + ' 人）。' };
+  var cost = pool.cost * count;
+  if (inst.budget < cost) return { ok: false, reason: '机构预算不足：需要 ' + cost + ' 金，现有 ' + inst.budget + ' 金。不会动用你的私房钱。' };
+  inst.budget -= cost;
+  // 已有部队则补进对应质量分组；否则新建一支
+  var unit = null;
+  for (var i = 0; i < m.units.length; i++) {
+    if (m.units[i].owner === 'player' && m.units[i].institution === 'white_rose_guard' && !m.units[i].assignment) { unit = m.units[i]; break; }
+  }
+  if (!unit) {
+    unit = { id: inst.unitId + '_' + (m.units.length + 1), name: '白蔷薇守备队 · 第 ' + (m.units.length + 1) + ' 队',
+      type: 'infantry', owner: 'player', institution: 'white_rose_guard', commander: '',
+      location: 'cloudpass', assignment: null, availableWindow: null,
+      personnel: { healthy: 0, wounded: 0, missing: 0, captive: 0, dead: 0 },
+      groups: [{ count: 0, train: pool.train, equip: pool.equip, morale: pool.morale, supply: pool.supply, discipline: pool.discipline }] };
+    m.units.push(unit);
+  }
+  unit.personnel.healthy += count;
+  unit.groups[0].count += count;
+  // 保留原成员的质量记录，不因为补新人就沿用满训练度
+  markDirty();
+  return { ok: true, reason: '招募 ' + count + ' 名' + pool.name + '，花费机构预算 ' + cost +
+    ' 金。新兵训练度 ' + pool.train + '、装备 ' + pool.equip + '，需要继续训练与装备覆盖。', unit: unit.id };
+}
+/* 装备合同：按覆盖人数与级别签，交付时才改变装备度 */
+function milContractEquip(tierId, cover) {
+  var m = militaryState(), inst = milInstitution();
+  var tier = MIL_EQUIP_TIERS.filter(function (t) { return t.id === tierId; })[0];
+  if (!tier) return { ok: false, reason: '没有这个装备等级。' };
+  if (m.rank === 'civilian' || m.rank === 'trainee') return { ok: false, reason: '你还不能代表机构签采购合同。' };
+  var cost = tier.costPer * cover;
+  if (inst.budget < cost) return { ok: false, reason: '机构预算不足：需要 ' + cost + ' 金，现有 ' + inst.budget + ' 金。' };
+  inst.budget -= cost;
+  var id = 'equip_' + tierId + '_' + (inst.contracts.length + 1);
+  inst.contracts.push({ id: id, kind: 'equip', cover: cover, level: String(tier.level),
+    day: state.totalDay, cost: cost, paid: true, delivered: false });
+  return { ok: true, reason: '签下装备合同：覆盖 ' + cover + ' 人、达到装备度 ' + tier.level +
+    '，花费机构预算 ' + cost + ' 金，' + '预计两天后交付。', contractId: id };
+}
+/* 交付：到了日子才真正提升装备覆盖率，训练与装备达标才能上战场（§27.2） */
+function milDeliverEquipment(contractId) {
+  var inst = milInstitution(), m = militaryState();
+  var c = inst.contracts.filter(function (x) { return x.id === contractId; })[0];
+  if (!c) return { ok: false, reason: '找不到这份合同。' };
+  if (c.delivered) return { ok: false, reason: '已经交付过了。' };
+  if (state.totalDay < c.day + 2) return { ok: false, reason: '还没到交付日（第 ' + (c.day + 2) + ' 天）。' };
+  var need = 0, got = 0;
+  for (var i = 0; i < m.units.length; i++) {
+    if (m.units[i].owner !== 'player') continue;
+    var u = m.units[i];
+    u.groups.forEach(function (g) { need += g.count || 0; });
+    got += need;
+  }
+  // 覆盖率优先分配到未达标的人
+  var left = c.cover;
+  for (var j = 0; j < m.units.length && left > 0; j++) {
+    var un = m.units[j];
+    if (un.owner !== 'player') continue;
+    un.groups.forEach(function (g) {
+      if (left <= 0) return;
+      var need2 = Math.max(0, Math.min(g.count || 0, left));
+      if (need2 > 0 && g.equip < Number(c.level)) {
+        g.equip = Number(c.level);
+        left -= need2;
+      }
+    });
+  }
+  c.delivered = true;
+  markDirty();
+  return { ok: true, reason: '装备交付完成：覆盖 ' + (c.cover - left) + ' 人，装备度提升到 ' + c.level +
+    (left > 0 ? '；仍有 ' + left + ' 人未覆盖。' : '，全队达标。'), total: need };
+}
+
+/* --- 古道驿站与遗址（§31.1 东北山地可选支路） ---
+   废弃邮亭、断墙、石拱与林间旧路。玩法是找旧邮路 → 核对两份记录 →
+   开放一条安全支路，不是又一座新城。 */
+MAPS.oldroad = (function () {
+  var m = mkMap(30, 22, T_GRASS);
+  // 林间旧路：从南往北，中途有断墙挡着
+  fillCol(m, 14, 20, 22, T_PATH, false);
+  fillCol(m, 14, 8, 14, T_PATH, false);
+  fillCol(m, 15, 8, 14, T_PATH, false);
+  fillRect(m, 13, 15, 16, 16, T_BUILDING, true);   // 断墙，暂时不通
+  // 石拱（找到旧路后可通行）
+  fillRect(m, 13, 10, 16, 10, T_BRIDGEFIXED, false);
+  // 废弃邮亭
+  fillRect(m, 5, 4, 9, 7, T_BUILDING, true);
+  // 溪流
+  fillRect(m, 22, 12, 29, 15, T_WATER, true);
+  return {
+    w: m.w, h: m.h, t: m.t, solid: m.solid,
+    name: '古道遗址',
+    exits: [
+      { x: 14, y: 21, to: 'cloudpass', tx: 16, ty: 22 },
+      { x: 15, y: 21, to: 'cloudpass', tx: 16, ty: 22 }
+    ],
+    plantArea: null,
+    buildings: [{ x: 5, y: 4, w: 5, h: 4, kind: 'post' }]
+  };
+})();
+/* 邻领边城：只开一个完整的跨境地点，不靠堆空地图抢故乡内容（§34.1 E、§31.1 P3） */
+MAPS.bordertown = (function () {
+  var m = mkMap(28, 20, T_GRASS);
+  fillRect(m, 0, 8, 27, 11, T_PATH, false);          // 边城主街
+  fillRect(m, 8, 12, 19, 17, T_PATH, false);        // 集市小广场
+  fillRect(m, 6, 4, 10, 7, T_BUILDING, true);       // 领地办事处
+  fillRect(m, 17, 4, 21, 7, T_BUILDING, true);      // 贸易客栈
+  fillRect(m, 6, 13, 9, 15, T_BUILDING, true);      // 边城集市摊棚
+  return {
+    w: m.w, h: m.h, t: m.t, solid: m.solid,
+    name: '邻领边城',
+    exits: [
+      { x: 0, y: 9, to: 'cloudpass', tx: 16, ty: 6 },
+      { x: 0, y: 10, to: 'cloudpass', tx: 16, ty: 6 }
+    ],
+    plantArea: null,
+    buildings: [
+      { x: 6, y: 4, w: 5, h: 4, kind: 'office' },
+      { x: 17, y: 4, w: 5, h: 4, kind: 'inn' }
+    ]
+  };
+})();
+
+/* ============================================================
+   §31.1 古道驿站与遗址：找旧邮路 → 核对两份记录 → 开放安全支路
+   危险支路是自愿选择，不要求武器高阶。
+   ============================================================ */
+function oldRoadState() {
+  var e = exploreState();
+  if (!e.oldRoad) e.oldRoad = { found: false, records: 0, opened: false, bridged: false };
+  return e.oldRoad;
+}
+function oldRoadAt(it) {
+  return state.sceneId === 'oldroad' && it.stand.some(function (p) { return p[0] === state.player.x && p[1] === state.player.y; });
+}
+function openOldRoadHut(it) {
+  var o = oldRoadState();
+  openWindow({
+    id: 'orh', kind: 'custom', title: '废弃邮亭',
+    build: function (b) {
+      b.appendChild(el('p', null, '屋顶塌了一半，但信架还立着。埃米尔最后一次送信就是从这儿出的。'));
+      b.appendChild(el('p', 'muted', o.found
+        ? '你已经找到旧邮路的位置，但要开放安全支路还得先核对两份记录。'
+        : '往北找到旧路的位置，才有东西可以核对。'));
+      b.appendChild(el('p', 'muted', '已核对记录 ' + o.records + ' / 2。'));
+    },
+    actions: [
+      { label: '在信架上翻找（30 分钟 · 3 体力）', close: false, onClick: function () {
+        if (!oldRoadAt(it)) { toast('请在邮亭旁操作。'); return; }
+        if (!canSpendGameMinutes(30)) return;
+        if (!hasEnergy(3)) return;
+        state.energy -= 3;
+        spendGameMinutes(30);
+        if (!o.found) { o.found = true; toast('找到一张被雨水泡过的旧邮路草图，标着断墙的位置。'); }
+        else toast('信架上没什么新东西了。');
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+      } },
+      { label: '离开', close: true }
+    ]
+  });
+}
+function openOldRoadArchive(it) {
+  var o = oldRoadState();
+  var src = [
+    { id: 'r1', name: '驿站值日簿', need: 'wood', cost: 4, desc: '值日簿记着当年每一班邮差的出发时刻和天气。' },
+    { id: 'r2', name: '大学的拓本', need: 'stone', cost: 5, desc: '大学寄来的旧路拓本，标注了石拱的位置。' }
+  ];
+  openWindow({
+    id: 'ora', kind: 'custom', title: '旧邮档匣',
+    build: function (b) {
+      b.appendChild(el('p', null, '匣子里塞着两份互相矛盾的材料。要开放安全支路，两份都得核对上。'));
+      b.appendChild(el('p', 'muted', '已核对 ' + o.records + ' / 2。' + (o.found ? '（你已找到旧路草图）' : '（还没找到旧路位置）')));
+      src.forEach(function (s) {
+        b.appendChild(el('p', 'muted', s.name + '：需要 ' + (s.need === 'wood' ? '木材' : '石头') + ' ×' + s.cost + '。' + s.desc));
+      });
+    },
+    actions: src.map(function (s) {
+      return { label: '核对' + s.name, close: false, onClick: function () {
+        if (!oldRoadAt(it)) { toast('请在旧邮档匣旁操作。'); return; }
+        if (invCount(s.need) < s.cost) { toast('材料不够：需要 ' + itemName(s.need) + ' ×' + s.cost + '。'); return; }
+        if (!canSpendGameMinutes(45)) return;
+        if (!hasEnergy(2)) return;
+        invRemove(s.need, s.cost);
+        state.energy -= 2;
+        spendGameMinutes(45);
+        o.records = Math.min(2, o.records + 1);
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('核对完成（' + o.records + ' / 2）。');
+      } };
+    }).concat([{ label: '离开', close: true }])
+  });
+}
+function openOldRoadTrace(it) {
+  var o = oldRoadState();
+  openWindow({
+    id: 'ort', kind: 'custom', title: '林间旧路',
+    build: function (b) {
+      b.appendChild(el('p', null, o.opened
+        ? '石拱已经清过，路面也垫平了，这条支路现在可以安全通行。'
+        : '路基还在，但石拱塌了一半，中间堆着碎石。断墙那一段更窄，只能侧身过去。'));
+      b.appendChild(el('p', 'muted', '开放条件：先找到旧路位置（' + (o.found ? '✓' : '未完成') +
+        '），再核对两份记录（' + o.records + ' / 2）。'));
+    },
+    actions: [
+      { label: '清理石拱（90 分钟 · 石头 ×8 · 木材 ×4）', close: false, onClick: function () {
+        if (!oldRoadAt(it)) { toast('请在林间旧路旁操作。'); return; }
+        if (o.opened) { toast('已经清理过了。'); return; }
+        if (!o.found) { toast('连旧路在哪都还不确定，先去邮亭翻翻。'); return; }
+        if (o.records < 2) { toast('两份记录还没核对齐，贸然动工容易挖错地方。'); return; }
+        if (invCount('stone') < 8 || invCount('wood') < 4) { toast('材料不够：石头 ×8、木材 ×4。'); return; }
+        if (!canSpendGameMinutes(90)) return;
+        if (!hasEnergy(8)) return;
+        invRemove('stone', 8); invRemove('wood', 4);
+        state.energy -= 8;
+        spendGameMinutes(90);
+        o.opened = true;
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('石拱清好了。古道支路从此可以安全通行。');
+      } },
+      { label: '离开', close: true }
+    ]
+  });
+}
+function openOldRoadSurvey(it) {
+  var o = oldRoadState();
+  openWindow({
+    id: 'ors', kind: 'custom', title: '断墙缺口',
+    build: function (b) {
+      b.appendChild(el('p', null, o.opened ? '缺口已经打通，能过车。' : '墙塌了一段，留下一个刚够人侧身过去的缺口。'));
+      b.appendChild(el('p', 'muted', '这是可选的短近路，不要求武器高阶；要不要走由你决定。'));
+    },
+    actions: [
+      { label: '记下这里的通行状况（20 分钟 · 1 体力）', close: false, onClick: function () {
+        if (!oldRoadAt(it)) { toast('请在断墙缺口旁操作。'); return; }
+        if (!canSpendGameMinutes(20)) return;
+        if (!hasEnergy(1)) return;
+        state.energy -= 1;
+        spendGameMinutes(20);
+        exploreState().explorePoints += 5;
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('记录完成，探索度 +5。');
+      } },
+      { label: '离开', close: true }
+    ]
+  });
+}
+
+/* ============================================================
+   §31.1 邻领边城：只开一个完整跨境地点
+   跨省行程按 §11.1 属于 2—5 日起的长途旅行，不属于省内快速传送。
+   ============================================================ */
+function borderState() {
+  var e = exploreState();
+  if (!e.border) e.border = { visited: false, contracts: 0, cleared: false };
+  return e.border;
+}
+function borderAt(it) {
+  return state.sceneId === 'bordertown' && it.stand.some(function (p) { return p[0] === state.player.x && p[1] === state.player.y; });
+}
+function openBorderOffice(it) {
+  var b = borderState();
+  openWindow({
+    id: 'bto', kind: 'custom', title: '邻领领地办事处',
+    build: function (bb) {
+      bb.appendChild(el('p', null, '办事处的柜台后面挂着邻领的地图。白蔷薇省在这一侧只占了一个角。'));
+      bb.appendChild(el('p', 'muted', '这里办的是跨境合同：商旅、研究与护送。你可以凭省内的履历来接洽，但要按邻领的规矩重新登记。'));
+      bb.appendChild(el('p', null, b.visited ? '你已经登记过一次。' : '首次办跨境合同需要先通关登记。'));
+    },
+    actions: [
+      { label: '通关登记（120 分钟 · 8 体力 · 200 金）', close: false, onClick: function () {
+        if (!borderAt(it)) { toast('请在办事处柜台旁。'); return; }
+        if (b.visited) { toast('你已经登记过了。'); return; }
+        if (!canSpendGameMinutes(120)) return;
+        if (!hasEnergy(8)) return;
+        if (!payExplore({ coins: 200 })) return;
+        state.energy -= 8;
+        spendGameMinutes(120);
+        b.visited = true;
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast('登记完成。你现在可以接邻领的跨境合同了。');
+      } },
+      { label: '离开', close: true }
+    ]
+  });
+}
+function openBorderInn(it) {
+  var b = borderState();
+  var jobs = [
+    { id: 'cj1', name: '商旅护送', need: 'wood:6', pay: 180, desc: '一车木料送往邻领关口，路上不太平。' },
+    { id: 'cj2', name: '记录誊抄', need: 'stone:4', pay: 150, desc: '替邻领档案室誊抄一批旧测量记录。' }
+  ];
+  openWindow({
+    id: 'bti', kind: 'custom', title: '贸易客栈',
+    build: function (bb) {
+      bb.appendChild(el('p', null, '客栈里坐着三种口音的人。没人说边境的事，但每个人都知道今天封没封路。'));
+      bb.appendChild(el('p', 'muted', b.visited
+        ? '凭登记可以接洽跨境合同。完成的合同会记在白蔷薇省这边的履历里。'
+        : '还没在办事处登记，接不了合同。'));
+      bb.appendChild(el('p', null, '已完成跨境合同：' + b.contracts + ' 份。'));
+    },
+    actions: jobs.map(function (j) {
+      var parts = j.need.split(':'), id = parts[0], n = Number(parts[1]);
+      return { label: j.name + '（' + itemName(id) + ' ×' + n + ' · ' + j.pay + ' 金）', close: false, onClick: function () {
+        if (!borderAt(it)) { toast('请在客栈柜台旁。'); return; }
+        if (!b.visited) { toast('先到办事处办通关登记。'); return; }
+        if (invCount(id) < n) { toast('材料不够：需要 ' + itemName(id) + ' ×' + n + '。'); return; }
+        if (!canSpendGameMinutes(240)) { toast('跨境合同要一整天；今天时间不够，明天再来。'); return; }
+        if (!hasEnergy(6)) return;
+        invRemove(id, n);
+        state.energy -= 6;
+        spendGameMinutes(240);
+        b.contracts++;
+        state.coins += j.pay;
+        state.npcFriendship.caravan = (state.npcFriendship.caravan || 0) + 8;
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        toast(j.name + '完成，报酬 ' + j.pay + ' 金。');
+      } };
+    }).concat([{ label: '离开', close: true }])
+  });
+}
+
+/* ============================================================
+   §28 不定时袭扰：消息与现场证据要分开，事件有上限与恢复窗口
+   ------------------------------------------------------------
+   不做"每睡一天掷骰、掷中就出大事"。先有状态与触发条件，再从
+   符合条件的事件池里选；同类事件有冷却，不允许用子事件绕过频率限制。 */
+var MIL_RAID_POOL = [
+  { id: 'raid_road', name: '道路袭扰', scope: 'region', effect: 'traffic', severity: 2,
+    desc: '商路上出现不明武装，部分路段改道。', report: '商队在这段路上绕行，运输时长与货损都上升。' },
+  { id: 'raid_store', name: '仓库失窃', scope: 'institution', effect: 'goods', severity: 1,
+    desc: '一处货栈被搬空，村里要补货、查访、守夜。', report: '货栈少了货，机构要额外支出补货并派人守夜。' },
+  { id: 'raid_cart', name: '车队被劫', scope: 'region', effect: 'supply', severity: 2,
+    desc: '一支粮车队没能按时到，村里开始议论要不要加派人手。', report: '粮车被劫，供给推迟，机构支出增加。' },
+  { id: 'raid_mine', name: '矿区盗采', scope: 'institution', effect: 'resource', severity: 1,
+    desc: '有人在废弃巷道里偷采，工具和安全都受影响。', report: '盗采者动过旧支撑，矿区要额外安排人巡看。' }
+];
+/* §19.5 / §28.1 频率与恢复：一次主危机内部不另起新的同级事件 */
+var MIL_RAID_RULES = {
+  maxActive: 1,              // 同一时间最多一次主要袭扰
+  cooldownDays: 7,          // 处理完主事件后至少 7 天不再抽同级随机事件
+  maxPerSeason: 1,           // 随机省级重大事件首轮最多每季一次
+  maxSeverity: 2,            // 影响有上限，不无限叠加
+  minDaysAfterTravel: 2      // 旅行结束至少两天后才可能发生
+};
+function raidState() {
+  var m = militaryState();
+  if (!m.raids) m.raids = { active: null, lastDay: -99, seasonCount: 0, seasonKey: '', history: [] };
+  if (!m.raids.history) m.raids.history = [];
+  return m.raids;
+}
+/* 资格筛选：先有状态与触发条件，再从合格事件里选。
+   每季一次的硬上限只管"省级重大"事件（severity 2）；仓库失窃这类
+   局部事件只受七天恢复窗口约束，否则整个季度都见不到任何动静。 */
+function raidEligible(r, now, cand) {
+  if (r.active) return false;                                   // 已有主事件在跑
+  if (MIL_RAID_RULES.cooldownDays != null && now - r.lastDay < MIL_RAID_RULES.cooldownDays) return false;
+  if (cand && cand.severity >= 2) {
+    var seasonKey = Math.floor((now - 1) / 28);                 // 每季 28 天（§9.2）
+    if (r.seasonKey === seasonKey && r.seasonCount >= MIL_RAID_RULES.maxPerSeason) return false;
+  }
+  return true;
+}
+/* 事件实例化时固化关键事实、来源与种子；重载不能把同一场预警换成别的（§19.4） */
+function milRollRaid(now) {
+  var r = raidState();
+  if (!raidEligible(r, now, null)) return null;
+  // 有边境事端时更容易出道路/供给类，没有时偏向机构内部
+  var fr = frontierState();
+  var pool = MIL_RAID_POOL.filter(function (e) {
+    if (fr.started && !fr.resolved) return e.effect === 'traffic' || e.effect === 'supply';
+    return true;
+  });
+  if (!pool.length) return null;
+  // 先按每季上限筛掉省级重大事件，局部事件不受这条限制
+  var seed = (now * 2654435761 + 0x5bf03635) | 0;
+  var rnd = milSeededRandom(seed);
+  var order = [];
+  for (var i = 0; i < 4 && order.length < pool.length; i++) order.push(Math.floor(rnd() * pool.length) % pool.length);
+  var pick = null;
+  for (var j = 0; j < order.length; j++) {
+    var cand = pool[order[j]];
+    if (raidEligible(r, now, cand)) { pick = cand; break; }
+  }
+  if (!pick) return null;
+  var instance = {
+    id: 'raid_' + pick.id + '_' + now,
+    familyId: 'raid.' + pick.id,
+    seed: seed,
+    kind: pick.id, name: pick.name, scope: pick.scope, effect: pick.effect,
+    severity: pick.severity, desc: pick.desc, report: pick.report,
+    day: now, expiresDay: now + 3,
+    evidenceKnown: false,       // 关键预警普通玩家也看得到，不靠感知藏
+    resolved: '', roadPenalty: 0
+  };
+  r.active = instance;
+  r.lastDay = now;
+  var seasonKey = Math.floor((now - 1) / 28);
+  if (r.seasonKey !== seasonKey) { r.seasonKey = seasonKey; r.seasonCount = 0; }
+  r.seasonCount++;
+  r.history.push({ id: instance.id, day: now, kind: instance.kind, resolved: '' });
+  if (r.history.length > 20) r.history.shift();
+  return instance;
+}
+/* 事件推进：到第 3 天未处理就按既定结果收场，NPC 机构应对，不要求玩家拯救全省 */
+function milTickRaid() {
+  var r = raidState();
+  if (!r.active) return null;
+  if (state.totalDay < r.active.expiresDay) return r.active;
+  // 到期未处理：按制度自行收场，损失有限且可恢复
+  r.active.resolved = '逾期未处置，机构按既定方案自行应对：路断了几天，货损有限，道路随后恢复。';
+  r.active.roadPenalty = 0;
+  r.history.forEach(function (h) { if (h.id === r.active.id) h.resolved = r.active.resolved; });
+  var done = r.active;
+  r.active = null;
+  return done;
+}
+/* 交通影响：只影响真实路线耗时，不影响省内个人快速传送（§21.5） */
+function raidTravelPenalty(region) {
+  var r = raidState();
+  if (!r.active || r.active.resolved) return 0;
+  return (r.active.effect === 'traffic' || r.active.effect === 'supply') ? r.active.severity * 15 : 0;
+}
+function milOpenRaidBoard(it) {
+  var r = raidState();
+  var m = militaryState();
+  openWindow({
+    id: 'raidboard', kind: 'custom', title: '边境公开情报',
+    build: function (b) {
+      b.appendChild(el('p', 'muted', '这里只有公开消息与已核实的情报。准确的敌方位置来自侦察和报告，不会免费显示。'));
+      if (!r.active) {
+        b.appendChild(el('p', 'req-chip ok', '目前没有已确认的袭扰事件。商路与各站点通行正常。'));
+        if (r.history.length) {
+          b.appendChild(el('p', 'muted', '近期记录：' + r.history.slice(-4).map(function (h) {
+            return '第 ' + h.day + ' 天 ' + h.name + (h.resolved ? '（已结）' : '（进行中）');
+          }).join('；')));
+        }
+        return;
+      }
+      var a = r.active;
+      b.appendChild(el('p', null, a.name + '（第 ' + a.day + ' 天起）'));
+      b.appendChild(el('p', 'muted', a.report));
+      b.appendChild(el('p', 'muted', '影响范围：' + (a.scope === 'region' ? '一段区域道路' : '一个机构') +
+        ' · 运输时长 +' + raidTravelPenalty() + ' 分钟 · 期限 第 ' + a.expiresDay + ' 天。'));
+      var gate = milDeployGate(m);
+      b.appendChild(el('p', gate.ok ? 'req-chip ok' : 'req-chip', gate.ok
+        ? '你具备受命条件，可选择参与处置。'
+        : gate.reason + '（普通居民仍可选择不参与并继续生活）'));
+    },
+    actions: [
+      { label: '参与处置（60 分钟 · 6 体力）', close: false, onClick: function () {
+        if (!cloudAt(it)) { toast('请在边境营地旁接令。'); return; }
+        var gate = milDeployGate(m);
+        if (!gate.ok) { toast(gate.reason); return; }
+        var a = r.active;
+        if (!a) { toast('现在已经没有事件了。'); return; }
+        if (!canSpendGameMinutes(60)) return;
+        if (!hasEnergy(6)) return;
+        state.energy -= 6;
+        spendGameMinutes(60);
+        // 用同一套裁判结算，避免袭扰变成另一套伤害公式
+        var btl = milAdjudicate({
+          battleId: 'raid_' + a.id, crisisFamilyId: a.familyId, seed: a.seed,
+          objective: 'clear', intensity: a.severity >= 2 ? 'normal' : 'limited',
+          mine: { groups: [{ count: 12, train: 55, equip: 50, morale: 60, supply: 55, discipline: 55 }] },
+          foe: { groups: [{ count: a.severity >= 2 ? 60 : 24, train: 40, equip: 35, morale: 45, supply: 40, discipline: 40 }] },
+          mineProfile: {}, foeProfile: {}
+        });
+        m.battles[btl.battleId] = btl;
+        a.resolved = btl.result.id === 'cleared'
+          ? '找到据点、阻断了供应，对方撤离，道路恢复通行。'
+          : '道路恢复有限，仍有零星袭扰；机构安排巡逻，损失有限。';
+        a.roadPenalty = btl.result.id === 'cleared' ? 0 : a.severity;
+        r.history.forEach(function (h) { if (h.id === a.id) h.resolved = a.resolved; });
+        r.active = null;
+        markDirty(); refreshHud(); saveNow(); refreshWindow();
+        openBattleReport(btl);
+      } },
+      { label: '不参与', close: true }
+    ]
+  });
+}
+
+/* ============================================================
    第七版 §33／§34.2：地点登记与快速传送
    ------------------------------------------------------------
    地点、像素场景与交通站分开标识：locationId 稳定且不改名，
@@ -9476,16 +10139,27 @@ var TRAVEL_NODES = [
   },
   {
     id: 'heath.ranch', locationId: 'white_rose.northwest.heath_ranch', sceneId: 'heath',
-    name: '云峰山口', locationId: 'white_rose.northeast.cloud_pass', sceneId: 'cloudpass',
-    region: 'northeast', kind: 'frontier',
-    safe: [[16, 21], [17, 21], [15, 21], [16, 20]],
-    desc: '省界上的山口与边境营地。官道、驿站、演练场与军需库都在这里，往北就是邻领。'
-  },
-  {
-    id: 'heath.ranch', locationId: 'white_rose.northwest.heath_ranch', sceneId: 'heath',
     name: '石楠草甸', region: 'northwest', kind: 'village',
     safe: [[6, 22], [7, 22], [5, 22], [6, 21]],
     desc: '缓坡草场、低矮石墙、畜棚与兽医小屋。养鸡养羊的地方，艾妲和卢安在这里。'
+  },
+  {
+    id: 'old.road', locationId: 'white_rose.east.old_road', sceneId: 'oldroad',
+    name: '古道遗址', region: 'east', kind: 'ruin',
+    safe: [[14, 20], [15, 20], [13, 20], [14, 19]],
+    desc: '废弃邮亭、断墙与林间旧路。老邮差埃米尔最后一次送信就是从这里出去的。'
+  },
+  {
+    id: 'border.town', locationId: 'world.neighbour_realm.border_town', sceneId: 'bordertown',
+    name: '邻领边城', region: 'outer', kind: 'border',
+    safe: [[12, 14], [13, 14], [11, 14], [12, 15]],
+    desc: '关外的边城集市与领地办事处。跨境合同在这里签，但要按邻领的规矩重新登记。'
+  },
+  {
+    id: 'cloud.pass', locationId: 'white_rose.northeast.cloud_pass', sceneId: 'cloudpass',
+    region: 'northeast', kind: 'frontier',
+    safe: [[16, 21], [17, 21], [15, 21], [16, 20]],
+    desc: '省界上的山口与边境营地。官道、驿站、演练场与军需库都在这里，往北就是邻领。'
   },
   {
     id: 'mill.square', locationId: 'white_rose.southeast.mill_village', sceneId: 'millvillage',
@@ -9544,6 +10218,9 @@ var TRAVEL_PAIRS = {
   'cloud.pass|mine.entrance': TRAVEL_MIN.adjacent,
   'cloud.pass|heath.ranch': TRAVEL_MIN.provinceLong,
   'cloud.pass|mill.square': TRAVEL_MIN.provinceLong,
+  'cloud.pass|old.road': TRAVEL_MIN.adjacent,
+  'old.road|forest.gate': TRAVEL_MIN.adjacent,
+  'cloud.pass|border.town': 240,        // 跨境按 §11.1 属长途旅行，不是省内快传
   'mill.square|mine.entrance': TRAVEL_MIN.provinceLong
 };
 /* 表内书写方向不影响往返查找。 */
@@ -9658,6 +10335,8 @@ function travelNodeUnlocked(n) {
   if (n.id === 'mill.square') return true;   // 麦田村沿小镇主路开放，先到访再登记
   if (n.id === 'heath.ranch') return true;   // 草甸沿小镇南路过坡即到
   if (n.id === 'cloud.pass') return !!exploreState().mine;   // 关口在矿山东侧，先能到山区
+  if (n.id === 'old.road') return true;             // 古道是关口的可选支路
+  if (n.id === 'border.town') return !!travelState().discovered['cloud.pass'];   // 跨境要先到过关口
   if (n.id === 'mine.level2') return !!exploreState().mine && exploreState().depth >= 2;
   if (n.id === 'mine.level3') return !!exploreState().mine && exploreState().depth >= 3;
   return false;
@@ -9684,7 +10363,7 @@ var SCENE_TO_NODE = {
   city: 'city.gate',
   millvillage: 'mill.square',
   millroom: 'mill.square',
-  heath: 'heath.ranch', cloudpass: 'cloud.pass',
+  heath: 'heath.ranch', cloudpass: 'cloud.pass', oldroad: 'old.road', bordertown: 'border.town',
   vetroom: 'heath.ranch',
   mine1: 'mine.entrance', mine2: 'mine.level2', mine3: 'mine.level3'
 };
@@ -9844,6 +10523,8 @@ var WORLD_REGIONS = [
   {id:'forest',name:'雾杉森林',x:55,y:81,desc:'从小镇北口进入。硬木、蘑菇、林间湖、伐木屋与隐藏宝箱；东北通往旧矿山。'},
   {id:'city',name:'白蔷薇城',x:57,y:47,desc:'从小镇南口办理通行证后进入。640×480 格城市：城堡高台、西侧旧城、花园住宅区、老市集、工匠区、河岸、学院区与南门驿站。'},
   {id:'cloud',name:'云峰山口',x:88,y:44,desc:'省界上的山口与边境营地。官道穿过关门往北就是邻领；这里有演练场、军需库与受命的七日任务。'},
+  {id:'oldroad',name:'古道遗址',x:70,y:72,desc:'废弃邮亭、断墙与林间旧路。找旧邮路、核对两份记录，才能开放一条安全支路；危险缺口是自愿选择。'},
+  {id:'border',name:'邻领边城',x:96,y:30,desc:'关外的边城集市与领地办事处。跨境合同在这里签，但要按邻领的规矩重新登记。'},
   {id:'pass',name:'旧矿山',x:80,y:22,desc:'从森林东北进入，共三层：铜矿、铁矿、紫晶。修复轨道逐层深入，原路返回森林。'},
   {id:'mill',name:'风铃磨坊与麦田村',x:81,y:67,desc:'河流穿过麦田与古老水磨坊的村落。水轮、粮仓、分水闸与议事屋都在这里；磨坊与麦田共用有限的来水。'}
 ];
@@ -9857,6 +10538,8 @@ function worldRegionStatus(r) {
   if(r.id==='mill')return exploreState().millWorks&&exploreState().millWorks.inspected?'已开放':'可前往 · 水轮待修复';
   if(r.id==='heath')return '可前往 · 饮水槽待修';
   if(r.id==='cloud')return exploreState().mine?'可前往 · 关口开放':'未解锁 · 先到东北山区';
+  if(r.id==='oldroad')return '可前往 · 古道支路';
+  if(r.id==='border')return travelState().discovered['cloud.pass']?'可前往 · 需通关登记':'未解锁 · 先到云峰关口';
   return '待开放';
 }
 function drawWorldAtlas(c) {
@@ -9871,7 +10554,7 @@ function drawWorldAtlas(c) {
   /* 路线按稳定 id 写，不按数组下标——新增地点不会把既有连线指到别的地方 */
   var routes=[['farm','town'],['town','riverside'],['town','vineyard'],['vineyard','city'],
     ['town','forest'],['forest','pass'],['forest','city'],['city','pass'],['city','mill'],
-    ['town','heath'],['heath','forest'],['heath','mill'],['riverside','heath'],['forest','cloud'],['pass','cloud'],['heath','cloud']];
+    ['town','heath'],['heath','forest'],['heath','mill'],['riverside','heath'],['forest','cloud'],['pass','cloud'],['heath','cloud'],['pass','oldroad'],['cloud','border']];
   routes.forEach(function(rt){
     var a=WORLD_REGIONS.filter(function(p){return p.id===rt[0];})[0];
     var b=WORLD_REGIONS.filter(function(p){return p.id===rt[1];})[0];
@@ -9887,6 +10570,8 @@ function drawWorldAtlas(c) {
     else if(r.id==='riverside'){g.fillStyle='#B99B6A';g.fillRect(x-18,y-6,36,7);g.fillStyle='#647E5C';g.fillRect(x-12,y-20,7,13);}
     else {house(x,y,r.id==='farm'?24:18);if(r.id==='town'){house(x-19,y+6,13);house(x+19,y+6,13);}if(r.id==='vineyard'){g.fillStyle='#637E4B';for(var v=0;v<4;v++)g.fillRect(x-25,y+9+v*4,50,2);}
     if(r.id==='heath'){g.fillStyle='#8FAE6C';g.fillRect(x-26,y-8,52,20);g.fillStyle='#B9C4CE';g.fillRect(x-24,y-10,48,3);g.fillRect(x-24,y+10,48,3);g.fillStyle='#EFE7D2';for(var hn=0;hn<3;hn++)g.fillRect(x-16+hn*13,y-2,7,5);}
+    if(r.id==='oldroad'){g.fillStyle='#6E7A5C';g.fillRect(x-22,y-2,44,4);g.fillStyle='#9A9484';g.fillRect(x-8,y-9,5,12);g.fillRect(x+3,y-9,5,12);g.fillStyle='#C8B98F';g.fillRect(x-9,y-10,19,2);}
+    if(r.id==='border'){g.fillStyle='#A9855E';g.fillRect(x-24,y-6,48,16);g.fillStyle='#D8C49A';g.fillRect(x-24,y-8,48,3);for(var bn=0;bn<3;bn++)g.fillRect(x-18+bn*14,y-2,9,6);g.fillStyle='#8A6E4C';g.fillRect(x-26,y+8,52,2);}
     }
   });
   g.strokeStyle='#897E5C';g.lineWidth=2;g.strokeRect(8,8,624,384);
@@ -9968,7 +10653,7 @@ function openWorldMap() {
 function regionTravelNode(regionId) {
   var map = {
     farm: 'farm.home', town: 'town.square', riverside: 'riverside.bank',
-    forest: 'forest.gate', city: 'city.gate', pass: 'mine.entrance', mill: 'mill.square', heath: 'heath.ranch', cloud: 'cloud.pass'
+    forest: 'forest.gate', city: 'city.gate', pass: 'mine.entrance', mill: 'mill.square', heath: 'heath.ranch', cloud: 'cloud.pass', oldroad: 'old.road', border: 'border.town'
   };
   return map[regionId] ? travelNodeById(map[regionId]) : null;
 }
@@ -10260,6 +10945,13 @@ function activateInteractable(it) {
   if(it.kind==='cpSupply'){openSupplyDepot(it);return;}
   if(it.kind==='cpFrontier'){openFrontierDesk(it);return;}
   if(it.kind==='cpGate'){var m=militaryState(),fr=frontierState();if(!fr.started||fr.resolved){toast('关口封闭，边境无事。');return;}toast('关口外就是邻领官道。现在不是时候。');return;}
+  if(it.kind==='cpRaid'){milOpenRaidBoard(it);return;}
+  if(it.kind==='orHut'){openOldRoadHut(it);return;}
+  if(it.kind==='orArchive'){openOldRoadArchive(it);return;}
+  if(it.kind==='orRoad'){openOldRoadTrace(it);return;}
+  if(it.kind==='orSurvey'){openOldRoadSurvey(it);return;}
+  if(it.kind==='btOffice'){openBorderOffice(it);return;}
+  if(it.kind==='btInn'){openBorderInn(it);return;}
   if(it.kind==='treasure'){exploreTreasure(it.id);return;}
   if (it.kind === 'tackle') { openTackleShop(); return; }
   if (it.kind === 'workshop') { openWorkshop(); return; }
@@ -12673,6 +13365,41 @@ window.__MOSS__ = {
   },
   milRoutePick: function () { return openRoutePick(); },
   dayEndDebug: function () { return CFG.dayEnd; },
+  milRaid: function () { var r = raidState(); return { active: r.active, lastDay: r.lastDay, seasonCount: r.seasonCount, history: r.history.length, penalty: raidTravelPenalty() }; },
+  milRaidRoll: function () { return milRollRaid(state.totalDay) ? raidState().active : null; },
+  milRaidTick: function () { return milTickRaid(); },
+  milRaidOpen: function () { var list = INTERACTABLES.cloudpass || []; for (var i = 0; i < list.length; i++) if (list[i].kind === 'cpRaid') { milOpenRaidBoard(list[i]); return true; } return false; },
+  milInst: function () { var i = milInstitution(), m = militaryState(); return { budget: i.budget, playerCoins: state.coins, contracts: i.contracts.length, units: m.units.length }; },
+  milRecruit: function (kind, n) { return milRecruit(kind, n); },
+  milContract: function (tier, n) { return milContractEquip(tier, n); },
+  milDeliver: function (id) { return milDeliverEquipment(id); },
+  milRecruitPool: function () { return milRecruitPool(); },
+  oldRoadInfo: function () { return oldRoadState(); },
+  borderInfo: function () { return borderState(); },
+  devOpenOldRoad: function (kind) {
+    var list = INTERACTABLES.oldroad || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].kind === kind) {
+        if (kind === 'orHut') openOldRoadHut(list[i]);
+        else if (kind === 'orArchive') openOldRoadArchive(list[i]);
+        else if (kind === 'orRoad') openOldRoadTrace(list[i]);
+        else openOldRoadSurvey(list[i]);
+        return true;
+      }
+    }
+    return false;
+  },
+  devOpenBorder: function (kind) {
+    var list = INTERACTABLES.bordertown || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].kind === kind) {
+        if (kind === 'btOffice') openBorderOffice(list[i]);
+        else openBorderInn(list[i]);
+        return true;
+      }
+    }
+    return false;
+  },
   milQ: function (g) { return milQuality(g); },
   milDep: function (side) { return milDeployment(side); },
   milEnv: function (p) { return milEnvModifier(p); },
@@ -12683,6 +13410,8 @@ window.__MOSS__ = {
   milRanks: MIL_RANKS.map(function (r) { return { id: r.id, name: r.name, limit: r.limit }; }),
   milCmd: function (units, rankId) { return milUnderCommand(units, rankId); },
   milUnit: function (o) { return milUnit(o); },
+  milAvail: function (u) { return milUnitAvailable(u); },
+  milTotal: function (u) { return milUnitTotal(u); },
   milSeedRandom: function (seed) { var r = milSeededRandom(seed); return [r(), r(), r()]; },
   milTriangular: function (seed, m) { return milTriangular(milSeededRandom(seed), m); },
   meadowInfo: function () { var m = meadowState(), c = meadowCare(); return { trough: m.trough, watered: !!c.watered, fed: !!c.fed, eggs: m.eggs || 0, sheepFed: m.sheepFed || 0, sheared: m.sheared || 0, step: meadowTaskState().step }; },

@@ -196,9 +196,9 @@ check('被占用的部队不计入可用人数', (await M(() => {
 // ── 13. 被占用的部队不能重复参战 ──
 const busyUnit = await M(() => {
   const u = __MOSS__.milUnit({ id: 'a', owner: 'player', personnel: { healthy: 50, wounded: 0, missing: 0, captive: 0, dead: 0 } });
-  const free = u.available();
+  const free = __MOSS__.milAvail(u);
   u.assignment = 'yunfeng';
-  return { free, busy: u.available(), total: u.total() };
+  return { free, busy: __MOSS__.milAvail(u), total: __MOSS__.milTotal(u) };
 }, null);
 check('空闲时可战 50 人', busyUnit.free, 50);
 check('被任务占用后不可战', busyUnit.busy, 0);
