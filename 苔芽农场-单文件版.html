@@ -12517,20 +12517,20 @@ var WORLD_REGIONS = [
   {id:'mill',name:'风铃磨坊与麦田村',x:81,y:67,desc:'河流穿过麦田与古老水磨坊的村落。水轮、粮仓、分水闸与议事屋都在这里；磨坊与麦田共用有限的来水。'}
 ];
 function worldRegionStatus(r) {
-  if (r.id === 'meadow') return '已开放';
-  if (r.id === 'mill') return (state.bridgeRepaired||millLifeState().legacyAccess) ? '已开放' : '未解锁 · 修复小桥';
   if (r.id === 'farm' || r.id === 'town') return '已开放';
   if (r.id === 'riverside') return state.bridgeRepaired ? '已开放' : '未解锁 · 修复小桥';
-  if(r.id==='forest')return exploreState().forest?'已开放':'未解锁 · 小镇北口清理倒木';
-  if(r.id==='city')return exploreState().city?'已开放':'未解锁 · 小镇南口办理通行证';
-  if(r.id==='pass')return exploreState().mine?'已开放':'未解锁 · 森林东北修复矿山';
-  /* 阶段 C：麦田村经小镇主路抵达，修好水轮并交货后记为已开放 */
-  if(r.id==='mill')return exploreState().millWorks&&exploreState().millWorks.inspected?'已开放':'可前往 · 水轮待修复';
-  if(r.id==='heath')return '可前往 · 饮水槽待修';
-  if(r.id==='cloud')return exploreState().mine?'可前往 · 关口开放':'未解锁 · 先到东北山区';
-  if(r.id==='oldroad')return '可前往 · 古道支路';
-  if(r.id==='border')return travelState().discovered['cloud.pass']?'可前往 · 需通关登记':'未解锁 · 先到云峰关口';
-  return '待开放';
+  if (r.id === 'forest') return exploreState().forest ? '已开放' : '未解锁 · 小镇北口清理倒木';
+  if (r.id === 'city') return exploreState().city ? '已开放' : '未解锁 · 小镇南口办理通行证';
+  if (r.id === 'pass') return exploreState().mine ? '已开放' : '未解锁 · 森林东北修复矿山';
+  /* 阶段 C—E：磨坊村、牧场、湿地与 D—E 各地点是独立场景，
+     状态按它们自己的实际进度读，不再按旧场景 id 猜。 */
+  if (r.id === 'mill') return millLifeState().inspected ? '已开放' : '可前往 · 水轮待修复';
+  if (r.id === 'heath') return '已开放 · 牧场';
+  if (r.id === 'vineyard') return professionGateOpen('vineyard') ? '已开放' : '可前往 · 待磨坊验收';
+  if (r.id === 'cloud') return professionGateOpen('cloud_pass') ? '已开放' : '未解锁 · 先到东北山区';
+  if (r.id === 'oldroad') return professionGateOpen('old_road') ? '已开放' : '未解锁 · 先通关口';
+  if (r.id === 'border') return professionGateOpen('neighbor') ? '可前往 · 需通关登记' : '未解锁 · 先到云峰关口';
+  return '规划中';
 }
 function drawWorldAtlas(c) {
   var g=c.getContext('2d'); g.imageSmoothingEnabled=false;
@@ -12645,12 +12645,19 @@ function openWorldMap() {
 
 /* WORLD_REGIONS 的旧 ID → 传送节点。规划中地点返回 null，不给假按钮。 */
 function regionTravelNode(regionId) {
+  /* 区域 → 真实传送节点。节点 id 与 addExtendedNode / 基础节点注册处一致；
+     合并前本地用 millvillage/heath/cloudpass 等旧场景 id，现已全部换成
+     合并后真正存在的节点，避免地图按钮指向一个不存在的地点。 */
   var map = {
     farm: 'farm.home', town: 'town.square', riverside: 'riverside.bank',
     forest: 'forest.gate', city: 'city.gate', pass: 'mine.entrance',
-    /* 磨坊村与牧场合并时只保留一份：本地用 millvillage / heath，
-       远端原用 mill.village / meadow.pasture，同一地点不重复造。 */
-    mill: 'mill.village', meadow: 'meadow.pasture', cloud_pass: 'pass.cloud_peak', old_road: 'road.ancient', neighbor: 'neighbor.market_town'
+    mill: 'mill.village', heath: 'meadow.pasture', vineyard: 'vineyard.estate',
+    cloud: 'pass.cloud_peak', oldroad: 'road.ancient', border: 'neighbor.market_town',
+    /* 直接按场景 id 进来时（不是从地图点的）也能取到节点 */
+    mill_village: 'mill.village', meadow: 'meadow.pasture', wetland: 'wetland.marsh',
+    clinic: 'clinic.white_stork', port: 'port.lower_lock', quarry: 'quarry.limestone',
+    waterworks: 'waterworks.reservoir', cloud_pass: 'pass.cloud_peak',
+    border_camp: 'camp.frontier', old_road: 'road.ancient', neighbor: 'neighbor.market_town'
   };
   return map[regionId] ? travelNodeById(map[regionId]) : null;
 }
@@ -15702,7 +15709,12 @@ function normalizeWetlandLife(raw){var r=raw&&typeof raw==='object'?raw:{},w=new
   if(!w.causeFound)w.habitat=null;
   return w;
 }
-function newProfessionalLife(){return {vineyard:{plan:null,planDay:0,harvestDay:0,pressDay:0,delayed:false,harvested:0,pressed:0,product:null,shipped:0},clinic:{diagnosed:false,sampleVerified:false,receivedJuice:false,medicine:0,patientDay:0,recovered:false},port:{manifestChecked:false,choice:null,shipment:null,settled:false,shipmentDay:0},quarry:{surveyed:false,face:null,props:false,extracted:0,lastExtractDay:0,cut:0},waterworks:{level:0,repair:null,receivedStone:false,millOpinion:false,meadowOpinion:false,portOpinion:false,allocation:null,testDay:0,certified:false},careers:{horticulture:0,medicine:0,trade:0,engineering:0},watershedContract:0,trust:0,access:{vineyard:false,clinic:false,port:false,quarry:false,waterworks:false}};}
+function newProfessionalLife(){return {vineyard:{plan:null,planDay:0,harvestDay:0,pressDay:0,delayed:false,harvested:0,pressed:0,product:null,shipped:0},clinic:{diagnosed:false,sampleVerified:false,receivedJuice:false,medicine:0,patientDay:0,recovered:false},port:{manifestChecked:false,choice:null,shipment:null,settled:false,shipmentDay:0,deliveries:0},quarry:{surveyed:false,face:null,props:false,extracted:0,lastExtractDay:0,cut:0},waterworks:{level:0,repair:null,receivedStone:false,millOpinion:false,meadowOpinion:false,portOpinion:false,allocation:null,testDay:0,certified:false},careers:{horticulture:0,medicine:0,trade:0,engineering:0},watershedContract:0,trust:0,access:{vineyard:false,clinic:false,port:false,quarry:false,waterworks:false},
+/* 第七版规划「给职业提供不同的进入路线」：公共工程链之外再开三条替代入口，
+   免得想做商人或巡林人的玩家必须先走完一整段公共工程。 */
+routes:{engineering:0,trade:0,patrol:0},
+/* 到访、接任务、指挥军队三层授权分开：能进边城做生意不等于能指挥军队。 */
+passes:{visit:false,commission:false,command:false}};}
 function professionalWaterPolicy(){var w=professionalLifeState().waterworks;return w.certified?w.allocation:null;}
 function professionalShippingMinutes(base){var p=professionalLifeState(),policy=professionalWaterPolicy();return Math.max(20,base+(policy==='irrigation'?20:policy==='navigation'?-10:0)+(p.port.choice==='claim'?10:0));}
 function normalizeProfessionalLife(raw){var d=newProfessionalLife(),r=raw&&typeof raw==='object'?raw:{};function n(v,max){return Number.isFinite(v)?clamp(Math.floor(v),0,max):0;}
@@ -15723,6 +15735,14 @@ function normalizeProfessionalLife(raw){var d=newProfessionalLife(),r=raw&&typeo
   if(d.careers.horticulture)d.access.vineyard=true;if(d.clinic.diagnosed)d.access.clinic=true;
   if(d.port.manifestChecked)d.access.port=true;if(d.quarry.surveyed)d.access.quarry=true;
   if(d.waterworks.repair)d.access.waterworks=true;
+  /* 三条替代入口的进度按真实事件累计，不写死；旧档缺字段时从 0 起。 */
+  a=r.routes||{};d.routes={engineering:n(a.engineering,9),trade:n(a.trade,9),patrol:n(a.patrol,9)};
+  /* 三层授权：到访 / 接任务 / 指挥军队。
+     归一化发生在 state 换成新对象之前，这里绝不能读全局 state，
+     只能读 raw 自身；指挥权另由 professionalCanCommand() 实时判断。 */
+  a=r.passes||{};d.passes={visit:!!a.visit,commission:!!a.commission,command:!!a.command};
+  if(d.routes.engineering>=2||d.routes.trade>=2||d.routes.patrol>=2)d.passes.visit=true;
+  if(d.routes.engineering>=4||d.routes.trade>=4||d.routes.patrol>=4)d.passes.commission=true;
   return d;
 }
 function newMilitaryLife(){return {registered:false,trainingDays:[],qualification:0,rank:'resident',commandLimit:0,appointmentDay:0,unit:{id:'frontier_detail',count:0,wounded:0,training:0,equipment:0,morale:0,supply:0,discipline:0,scene:'camp'},campaign:{active:false,startedDay:0,deadlineDay:0,stage:0,scouted:null,scoutedDay:0,prepared:null,preparedDay:0,battle:null,battleDay:0,reported:false,result:null},battleRecords:[],neighbor:{opened:false,oldroadVerified:false,caseFound:false,evidence:0,choice:null,settled:false,signedDay:0,tradeReceived:false,localContract:false},institutionFund:0,followUpDay:0};}
@@ -15938,32 +15958,74 @@ extendedAddResident('water_engineer','诺娅','水务工程师','waterworks_cont
 /* 湿地与职业工作台：每次工作先验证地点、时间、体力、材料和背包，再一次性结算。 */
 function extendedGateAllowed(key){var p=professionalLifeState(),w=wetlandLifeState(),e=exploreState(),m=militaryLifeState();
   if(key==='wetland')return !!state.bridgeRepaired;
-  if(key==='vineyard')return !!millLifeState().inspected;
-  if(key==='clinic')return !!w.causeFound&&(p.vineyard.harvested>0||p.access.clinic);
-  if(key==='port')return !!w.causeFound;
-  if(key==='quarry')return !!e.mine;
-  if(key==='waterworks')return !!p.quarry.surveyed&&!!p.port.manifestChecked&&!!millLifeState().inspected;
-  if(key==='cloud_pass')return !!p.waterworks.certified&&p.trust>0;
-  if(key==='border_camp')return !!p.waterworks.certified;
-  if(key==='old_road')return !!m.campaign.active||!!m.campaign.reported;
-  if(key==='neighbor')return !!m.campaign.reported&&!!m.neighbor.oldroadVerified;
+  /* 葡萄园：磨坊验收，或者走园艺路线拿到露西的引荐 */
+  if(key==='vineyard')return !!millLifeState().inspected||p.routes.engineering>=1||p.routes.trade>=1;
+  /* 医舍：湿地查明原因，或走医事路线 */
+  if(key==='clinic')return !!(w.causeFound&&(p.vineyard.harvested>0||p.access.clinic))||p.routes.patrol>=1;
+  /* 河港：湿地记录，或商旅路线完成两次本地运输后拿到介绍信 */
+  if(key==='port')return !!w.causeFound||p.routes.trade>=2;
+  if(key==='quarry')return !!e.mine||p.routes.engineering>=1;
+  /* 水利：工程路线（采场+河港+磨坊），或工程路线自身走通；贸易路线也可引荐 */
+  if(key==='waterworks')return !!(p.quarry.surveyed&&p.port.manifestChecked&&millLifeState().inspected)||p.routes.engineering>=2||p.routes.trade>=4;
+  /* 关口与边境营地：三条路线任一走通即可到访，不再强制先完成整段公共工程 */
+  if(key==='cloud_pass')return !!(p.waterworks.certified&&p.trust>0)||p.passes.visit;
+  /* 接任务需要第二层授权；指挥军队需要第三层，只看军事登记与委任 */
+  if(key==='border_camp')return !!(p.waterworks.certified)||p.passes.commission||professionalCanCommand();
+  if(key==='old_road')return !!m.campaign.active||!!m.campaign.reported||p.passes.commission;
+  if(key==='neighbor')return !!(m.campaign.reported&&m.neighbor.oldroadVerified)||p.passes.visit;
   return false;
+}
+/* 指挥权独立判断：到访边城做生意不等于可以带兵（规划要求三层授权分开）
+   军衔取自合并后的 militaryLife：resident/patrol/squad_leader/captain/field_commander。
+   MIL_RANKS 是另一张等级表（用于权限分级的说明），两套取值不同，这里读实际军衔。 */
+var MIL_COMMAND_RANKS = ['squad_leader', 'captain', 'field_commander'];
+function professionalCanCommand(){
+  var m=state.militaryLife;
+  if(!m||!m.registered)return false;                 // 没登记就没有军衔
+  if(MIL_COMMAND_RANKS.indexOf(m.rank)<0)return false;
+  return (m.commandLimit||0)>0;                      // 指挥上限为 0 等于没有实际指挥权
 }
 function extendedGateReason(key){var p=professionalLifeState(),w=wetlandLifeState(),e=exploreState();
   if(key==='wetland')return '先修好小镇东侧小桥，再从溪畔河湾沿水路进入。';
-  if(key==='vineyard')return '先完成风铃磨坊试运行验收，露西才开放采收计划。';
-  if(key==='clinic')return '先在湿地查明水鸟减少原因，并完成葡萄园首批采收。';
-  if(key==='port')return '先取得湿地巡护记录，才能进入下游货运区。';
-  if(key==='quarry')return '先修复森林东北的旧矿山入口。';
-  if(key==='waterworks')return '先调查石灰采场、核验河港货单，并完成磨坊试运行。';
-  if(key==='cloud_pass')return '先完成水利站跨地点工程合同，并取得工程资历。';
-  if(key==='border_camp')return '先完成水利站工程合同，之后可以步行进入营地办理巡防登记。';
-  if(key==='old_road')return '先接受云峰关口的巡路任务。';
-  if(key==='neighbor')return '先完成关口巡防任务，并在古道调查站核验两份驿路记录。';
+  if(key==='vineyard')return '先完成风铃磨坊试运行验收；或先在工程／商旅路线上露一次脸，请露西开一张采收引荐。';
+  if(key==='clinic')return '先在湿地查明水鸟减少原因并完成葡萄园首批采收；或先走巡林路线，医舍会按巡护记录收人。';
+  if(key==='port')return '先取得湿地巡护记录；或先完成两次本地运输，让船长出具商旅介绍信。';
+  if(key==='quarry')return '先修复森林东北的旧矿山入口；或先走工程路线，工头会先带你下坑看裂隙。';
+  if(key==='waterworks')return '先调查石灰采场、核验河港货单并完成磨坊验收；或让工程／商旅路线替你担保一次引荐。';
+  if(key==='cloud_pass')return '先完成水利站跨地点工程合同并取得工程资历；或让工程、商旅、巡林三条路线中的任意一条带你过关口。';
+  if(key==='border_camp')return '先完成水利站工程合同；或先拿到一条路线的正式接任务授权，营地才受理巡防登记。';
+  if(key==='old_road')return '先接受云峰关口的巡路任务；或先取得一条路线的接任务授权，古道站才会对你开放。';
+  if(key==='neighbor')return '先完成关口巡防任务并在古道站核验两份驿路记录；或先取得任意一条路线的到访授权，边城市场只认这个。';
   return '这条路线尚未开放。';
 }
+/* 三条替代入口的当前进度：让玩家一眼看见自己走了哪条、还差什么 */
+function professionalRoutePanel() {
+  var p = professionalLifeState();
+  var names = { engineering: '工程路线', trade: '商旅路线', patrol: '巡林路线' };
+  var nexts = { engineering: '完成采场调查或水利一段工程', trade: '完成两次本地运输', patrol: '完成一次道路调查与训练' };
+  var box = el('div', 'panel-box');
+  box.appendChild(el('div', 'section-title', '进入路线（任一条走通都能往下走）'));
+  ['engineering', 'trade', 'patrol'].forEach(function (k) {
+    var v = (p.routes && p.routes[k]) || 0;
+    var line = el('p', v >= 2 ? 'muted' : 'req-chip');
+    line.textContent = names[k] + '：' + (v >= 2 ? '已可作为到访凭证' : '进行中') + (v < 2 ? '（' + nexts[k] + '）' : '');
+    box.appendChild(line);
+  });
+  var auth = el('p', 'muted');
+  auth.textContent = '授权分层：到访 ' + (p.passes.visit ? '✓' : '—') +
+    ' · 接任务 ' + (p.passes.commission ? '✓' : '—') +
+    ' · 指挥军队 ' + (professionalCanCommand() ? '✓' : '（需军事登记与委任）');
+  box.appendChild(auth);
+  return box;
+}
 function openExtendedGate(key){var node=key==='cloud_pass'?PASS_NODE:key==='border_camp'?CAMP_NODE:key==='old_road'?OLDROAD_NODE:key==='neighbor'?NEIGHBOR_NODE:{wetland:WETLAND_NODE,vineyard:VINE_NODE,clinic:CLINIC_NODE,port:PORT_NODE,quarry:QUARRY_NODE,waterworks:WATER_NODE}[key];
-  var allowed=extendedGateAllowed(key);openWindow({id:'extendedgate',kind:'custom',title:(node?node.name:'路线')+' · 通行',build:function(b){b.appendChild(el('p',null,node?node.desc:'这条路线暂不可用。'));b.appendChild(el('p',allowed?'req-chip ok':'req-chip',allowed?'路线已开放；首次步行到访后会登记公共地图节点。':extendedGateReason(key)));},actions:[{label:allowed?'前往 '+(node?node.name:'地点'):'知道了',kind:allowed?'primary':'ghost',onClick:function(){if(!allowed)return;if(key==='wetland')wetlandLifeState().visited=true;if(key==='neighbor')militaryLifeState().neighbor.opened=true;closeWindow();doSwitchScene(node.sceneId,node.safe[0][0],node.safe[0][1]);}}, {label:'返回',kind:'ghost',close:true}]});}
+  var allowed=extendedGateAllowed(key);
+  openWindow({id:'extendedgate',kind:'custom',title:(node?node.name:'路线')+' · 通行',build:function(b){
+    b.appendChild(el('p',null,node?node.desc:'这条路线暂不可用。'));
+    b.appendChild(el('p',allowed?'req-chip ok':'req-chip',allowed?'路线已开放；首次步行到访后会登记公共地图节点。':extendedGateReason(key)));
+    /* 关口以上还会牵到指挥权：能进边城做生意，并不因此能带兵 */
+    if(key==='border_camp'||key==='cloud_pass'||key==='old_road')b.appendChild(professionalRoutePanel());
+  },actions:[{label:allowed?'前往 '+(node?node.name:'地点'):'知道了',kind:allowed?'primary':'ghost',onClick:function(){if(!allowed)return;if(key==='wetland')wetlandLifeState().visited=true;if(key==='neighbor')militaryLifeState().neighbor.opened=true;closeWindow();doSwitchScene(node.sceneId,node.safe[0][0],node.safe[0][1]);}}, {label:'返回',kind:'ghost',close:true}]});}
 function extendedDoorEnter(it){var room=MAPS[it.to];if(!room){toast('室内尚未登记。');return;}doSwitchScene(it.to,Math.floor(room.w/2),room.h-2);}
 function extendedWork(site,label,opts,apply){var p=PROFESSION_SITES[site]||EXTENDED_ACTION_POINTS[site];if(!p){toast('工作台不存在。');return false;}return ruralWorkAction(p,opts,apply);}
 function extendedWorkButton(b,site,label,opts,apply){b.appendChild(mkBtn(label,'',function(){extendedWork(site,label,opts,apply);}));}

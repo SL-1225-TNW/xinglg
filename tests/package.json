@@ -1,16 +1,21 @@
 {
   "name": "tests",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "苔芽农场的自动化试玩台：真实键鼠驱动浏览器，不注入夹具状态。",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "node build-single-file.mjs",
+    "smoke": "node run-single-file-smoke.mjs",
+    "check": "node --check ../game.js",
+    "quick": "npm run check && npm run build && npm run smoke",
+    "ci": "node run-ci.mjs",
+    "test": "node run-ci.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "playwright": "^1.63.0"
+    "playwright": "1.63.0"
   }
 }

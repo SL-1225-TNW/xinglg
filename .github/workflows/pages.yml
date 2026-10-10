@@ -1,10 +1,15 @@
-# 自动开启 GitHub Pages 并部署苔芽农场
-# 推送 main 后自动重新部署；也可在 Actions 页面手动点 "Run workflow"。
+# 部署 GitHub Pages
+#
+# 门禁：不再在 push 上直接部署，而是等「Verify game and save flows」
+# 全部通过后再部署，并且直接复用该次验证上传的 site 产物。
+# 这样上线的就是被验证过的同一提交、同一构建结果；测试失败就不会上线。
+# 需要跳过验证手动发版时，用 workflow_dispatch。
 name: Deploy to GitHub Pages
 
 on:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: ["Verify game and save flows"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -25,32 +30,63 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      # enablement: true 让这一步在仓库上自动启用 Pages，
-      # 否则仓库没开过 Pages 时会直接报 "Get Pages site failed / Not Found"
+      # 门禁检查：workflow_run 触发时，验证必须是成功状态
+      - name: Gate on verification result
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success'
+        run: |
+          echo "::error::验证工作流结果为 ${{ github.event.workflow_run.conclusion }}，不部署。"
+          exit 1
+
+      - name: Resolve the verified commit
+        id: target
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+            echo "run_id=" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+            echo "run_id=${{ github.event.workflow_run.id }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout the verified commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.target.outputs.sha }}
+
       - name: Configure Pages
         id: pages
         uses: actions/configure-pages@v5
         with:
           enablement: true
 
-      - name: Checkout
-        uses: actions/checkout@v4
+      # 复用验证阶段构建好的产物，不在这里重新构建，避免两份构建不一致
+      - name: Download the verified site artifact
+        id: fetch
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          name: game-dist
+          path: site
+          run-id: ${{ steps.target.outputs.run_id }}
 
-      - name: Prepare site
+      # 手动发版没有上游验证产物时才本地构建，并在日志里标明
+      - name: Build the site (manual dispatch only)
+        if: steps.fetch.outcome != 'success'
+        run: node tests/prepare-site.mjs
+
+      - name: Verify the artifact matches this commit
         run: |
-          mkdir -p site/assets
-          cp index.html styles.css game.js site/
-          node tests/build-single-file.mjs
-          # 顺带把单文件版也放上去，朋友可以直接在网页里下载
-          cp "苔芽农场-单文件版.html" site/ 2>/dev/null || true
-          # 装饰素材：百合花枝条/樱花/边框 SVG
-          cp -r assets/*.svg site/assets/ 2>/dev/null || true
-          cp -r assets/*.png site/assets/ 2>/dev/null || true
+          set -e
+          test -f site/index.html
+          test -f site/game.js
+          test -f site/styles.css
+          ls site/*单文件版*.html >/dev/null
+          echo "已取到产物：$(head -1 site/BUILD-INFO.txt)"
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+          artifact_name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
           path: site
 
       - name: Deploy to GitHub Pages
