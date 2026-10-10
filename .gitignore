@@ -22,3 +22,6 @@ tests/_gh*
 Thumbs.db
 .vscode/
 .idea/
+
+# 站点构建产物（由 tests/prepare-site.mjs 生成，CI 里不入库）
+site/
