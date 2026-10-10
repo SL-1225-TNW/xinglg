@@ -914,9 +914,8 @@ function newGameState() {
   /* 第七版：农场从新档已知，小镇作为相邻生活节点一并登记（§33.2）。
      其余地点必须真实到访后自动登记，不因为地图上见过就解锁。 */
   s.travel = { discovered: { 'farm.home': true, 'town.square': true }, home: 'farm.home', txLog: {} };
-  /* 第七版 §32.2：旧档田区肥力按正常值起步，不追溯处罚历史种植 */
-  s.soil = { zones: {}, compost: 0 };
-  FARM_ZONES.forEach(function (z) { s.soil.zones[z.id] = 60; });
+  /* 田区肥力已统一到每块地的 plots[key].fertility，这里不再单建 soil 容器：
+     建了又不同步写盘，会让「读一次」和「读两次」的存档对不上。 */
   return s;
 }
 
@@ -983,8 +982,8 @@ function serialize() {
     migratedFrom: state.migratedFrom,
     overloaded: state.overloaded,
     travel: state.travel,
-    /* 合并：本地 soil 田区肥力 + 远端 millLife / meadowLife 生产账本，各存各的 */
-    soil: state.soil,
+    /* 肥力真值在 plots[key].fertility；旧档的 soil 田区值在归一化时折算进去，
+       不再单独存 soil，避免序列化丢弃、归一化写回造成往返不一致。 */
     millLife: state.millLife || newMillLife(),
     meadowLife: state.meadowLife || newMeadowLife(),
     savedAt: Date.now()
@@ -1139,7 +1138,8 @@ function normalizeSave(raw) {
       if (!(raw.plots[k] && Number.isFinite(raw.plots[k].fertility)) && Number.isFinite(old))
         s.plots[k].fertility=clamp(Math.round(old),0,100);
     });
-    s.soil = { zones: {}, compost: 0 };
+    /* 旧田区值已折算进每块地，soil 本身不再写回：
+       否则序列化会丢它、归一化又会写它，读一次和读两次的结果对不上。 */
   }
   /* 合并：远端养鱼账本的旧档迁移也要跑 */
   migrateFishpondForOldSaves(s);

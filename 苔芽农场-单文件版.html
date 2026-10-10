@@ -4780,30 +4780,8 @@ function openCityService(it) {
      下面 15 个地标服务共用三个小工具，保持与既有服务一致的
      "扣材料 / 扣体力 / 推进时间 / 给产出" 事务模型。 */
 
-  /* 完成一次加工：扣料、扣体力、耗时、结算、存档 */
-  function cityWork(opts) {
-    if (!canSpendGameMinutes(opts.minutes || 30)) return false;
-    var need = opts.need || [];
-    var outQty = opts.qty || 1;
-    var afterMaterials = Object.assign({}, state.inventory);
-    for (var i = 0; i < need.length; i++) {
-      if ((afterMaterials[need[i][0]] || 0) < need[i][1]) {
-        toast('材料不够：' + itemName(need[i][0]) + ' ×' + need[i][1] + '（现有 ' + invCount(need[i][0]) + '）。');
-        return false;
-      }
-      afterMaterials[need[i][0]] -= need[i][1];
-    }
-    if (state.energy < (opts.energy || 0)) { toast('太累了，体力不足。'); return false; }
-    /* 先确认产物放得下，再扣材料/体力/时间，避免"料被扣光却没拿到东西" */
-    if (!canAccept(afterMaterials, opts.out, outQty)) { toast('背包满了，产物放不下。'); return false; }
-    for (i = 0; i < need.length; i++) invRemove(need[i][0], need[i][1]);
-    state.energy -= (opts.energy || 0);
-    spendGameMinutes(opts.minutes || 30);
-    invAdd(opts.out, outQty);
-    markDirty(); refreshHud(); saveNow(); refreshWindow();
-    toast((opts.done || '完成了') + '，获得 ' + itemName(opts.out) + ' ×' + outQty + '。');
-    return true;
-  }
+  /* 完成一次加工：走全局统一的 performAction（校验→算成本→执行→保存），
+     这里只负责把城市服务的旧参数格式翻译过去，并保留原有的完成提示文案。 */
   /* 列出背包里某组材料，供"卖 X"按钮用 */
   function sellRow(b, ids, markup) {
     var row = el('div', 'row'), any = false;
@@ -15540,16 +15518,90 @@ TRAVEL_NODES.push(MILL_TRAVEL_NODE);NODE_BY_ID[MILL_TRAVEL_NODE.id]=MILL_TRAVEL_
 WORLD_REGIONS.filter(function(r){return r.id==='mill';})[0].desc=MILL_TRAVEL_NODE.desc+' 修好小桥后，从小镇东南乡道路牌首次进入；到访后可直接传送。';
 function millLifeNear(site){var p=MILL_LIFE_SITES[site];return !!p&&state.sceneId===p.scene&&Math.abs(state.player.x-p.x)+Math.abs(state.player.y-p.y)<=1;}
 function millLifeAction(site,opts,apply) { return ruralWorkAction(MILL_LIFE_SITES[site],opts,apply); }
-function ruralWorkAction(point,opts,apply) {
-  if(!point||state.sceneId!==point.scene||Math.abs(state.player.x-point.x)+Math.abs(state.player.y-point.y)>1){toast('请到'+(point?point.label:'设施')+'旁操作。');return false;}
-  if(opts.guard&&!opts.guard()){toast(opts.reason||'当前条件尚未满足。');return false;}
-  if(!canSpendGameMinutes(opts.minutes||0)||!hasEnergy(opts.energy||0))return false;
-  if(state.coins<(opts.coins||0)){toast('金币不足，尚未扣费。');return false;}
-  var next=Object.assign({},state.inventory),need=opts.need||{};
-  for(var k in need){if((next[k]||0)<need[k]){toast('材料不足：'+itemName(k)+' ×'+need[k]);return false;}next[k]-=need[k];}
-  if(opts.out&&!canAccept(next,opts.out,opts.qty||1)){toast('背包满了，先整理一下；尚未扣除材料。');return false;}
-  Object.keys(need).forEach(function(k){invRemove(k,need[k]);});state.coins-=opts.coins||0;state.energy-=opts.energy||0;
-  spendGameMinutes(opts.minutes||0);if(opts.out)invAdd(opts.out,opts.qty||1);if(apply)apply();markDirty();saveNow();refreshHud();refreshWindow();Audio2.play('place');return true;
+/* ============================================================
+   统一行动结算接口（规划 P1：多处入口必须共用同一套计算）
+   ------------------------------------------------------------
+   所有「点一下会消耗东西的行动」都走这里，分四步且顺序固定：
+     1. 校验：站位、前置条件、时间、体力、金币、材料、产物是否放得下
+     2. 算成本：在「扣完材料的背包」上判断产物能不能装下，避免料被扣光
+        却没拿到东西
+     3. 执行：扣料 → 扣钱 → 扣体力 → 推时间 → 给产物 → 跑 apply()
+     4. 保存：标脏 → 存档 → 刷新界面
+   预览（costPreview）与实际执行调用的是同一个 costOf()，
+   所以「界面上写的花费」和「实际扣的花费」不可能不一致。 */
+function actionCostOf(opts) {
+  opts = opts || {};
+  var need = opts.need || {};
+  var after = Object.assign({}, state.inventory);
+  var i, k;
+  for (k in need) {
+    if (!Object.prototype.hasOwnProperty.call(need, k)) continue;
+    if ((after[k] || 0) < need[k]) return { ok: false, reason: '材料不足：' + itemName(k) + ' ×' + need[k] + '（现有 ' + ((after[k] || 0)) + '）。', shortItem: k };
+    after[k] -= need[k];
+  }
+  return {
+    ok: true, after: after, need: need,
+    minutes: opts.minutes || 0, energy: opts.energy || 0, coins: opts.coins || 0,
+    out: opts.out || null, qty: opts.qty || 1
+  };
+}
+function actionValidate(opts, cost) {
+  if (state.coins < cost.coins) return '金币不足，尚未扣费。';
+  if (!hasEnergy(cost.energy)) return false;
+  if (cost.out && !canAccept(cost.after, cost.out, cost.qty)) return '背包满了，产物放不下；尚未扣除材料。';
+  return true;
+}
+/* 只算不扣：给界面做预览用。与执行走同一份 costOf()。 */
+function costPreview(opts) {
+  var c = actionCostOf(opts);
+  if (!c.ok) return { ok: false, reason: c.reason };
+  var parts = [];
+  if (c.minutes) parts.push(c.minutes + ' 分钟');
+  if (c.energy) parts.push(c.energy + ' 体力');
+  if (c.coins) parts.push(c.coins + ' 金');
+  for (var k in c.need) if (Object.prototype.hasOwnProperty.call(c.need, k)) parts.push(itemName(k) + ' ×' + c.need[k]);
+  return { ok: true, text: parts.join(' · ') || '无消耗', minutes: c.minutes, coins: c.coins, energy: c.energy };
+}
+/* 统一执行入口。site 检查与 guard 属于「在哪里／凭什么」，也收在这里。 */
+function performAction(opts) {
+  opts = opts || {};
+  if (opts.point && (state.sceneId !== opts.point.scene ||
+      Math.abs(state.player.x - opts.point.x) + Math.abs(state.player.y - opts.point.y) > (opts.point.leash || 1))) {
+    toast('请到' + (opts.point.label || '设施') + '旁操作。'); return false;
+  }
+  if (opts.guard && !opts.guard()) { toast(opts.reason || '当前条件尚未满足。'); return false; }
+  var cost = actionCostOf(opts);
+  if (!cost.ok) { toast(cost.reason); return false; }
+  if (!canSpendGameMinutes(cost.minutes)) return false;
+  var v = actionValidate(opts, cost);
+  if (v !== true) { if (v) toast(v); return false; }
+  for (var k in cost.need) if (Object.prototype.hasOwnProperty.call(cost.need, k)) invRemove(k, cost.need[k]);
+  state.coins -= cost.coins;
+  state.energy -= cost.energy;
+  spendGameMinutes(cost.minutes);
+  if (cost.out) invAdd(cost.out, cost.qty);
+  if (opts.apply) opts.apply();
+  markDirty(); saveNow(); refreshHud(); refreshWindow();
+  if (opts.silent !== true) Audio2.play('place');
+  return true;
+}
+/* 既有入口一律转调 performAction，逐步收回重复实现 */
+function ruralWorkAction(point, opts, apply) {
+  var o = {};
+  for (var k in opts) if (Object.prototype.hasOwnProperty.call(opts, k)) o[k] = opts[k];
+  o.point = point; o.apply = apply; o.silent = true;
+  return performAction(o);
+}
+function cityWork(opts) {
+  var need = {};
+  (opts.need || []).forEach(function (p) { need[p[0]] = (need[p[0]] || 0) + p[1]; });
+  var ok = performAction({
+    need: need, out: opts.out, qty: opts.qty || 1,
+    energy: opts.energy || 0, minutes: opts.minutes || 30,
+    guard: opts.guard, reason: opts.reason
+  });
+  if (ok) toast((opts.done || '完成了') + '，获得 ' + itemName(opts.out) + ' ×' + (opts.qty || 1) + '。');
+  return ok;
 }
 function millLifeButton(b,site,label,opts,apply){b.appendChild(mkBtn(label,'',function(){millLifeAction(site,opts,apply);}));}
 function millLifeTaskText(){var m=millLifeState();return m.delivery?'村庄早餐已交付 · 水轮继续按协定工作':m.inspected?'水轮已验收 · 向面包房交付乡村面包 ×2':m.trialDay?(state.totalDay>m.trialDay?'试运行结束 · 到议事屋验收':'试运行中 · 睡过一夜后到议事屋验收'):m.allocation?'用水协议已定 · 到议事屋启动试运行':m.repair?'水轮已修 · 听取麦田与面包房意见，到议事屋选择用水协议':'调查进水渠与机房齿轮，再到马丁工作台选择修法';}

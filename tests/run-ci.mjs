@@ -32,7 +32,8 @@ const BROWSER = [
   'run-v7-stageE-rules.mjs', 'run-v7-stageE-cloudpass.mjs', 'run-v7-stageE-extras.mjs',
   'run-v7-stageB.mjs', 'run-v7-stageB-soil.mjs', 'run-v7-audit-regressions.mjs',
   'run-v7-stageC.mjs', 'run-v7-stageC-heath.mjs', 'run-v7-stageC-interiors.mjs',
-  'run-world-map.mjs', 'run-fast-travel.mjs', 'run-v3.mjs', 'run-guide.mjs',
+  'run-world-map.mjs', 'run-fast-travel.mjs', 'run-save-invariants.mjs',
+  'run-v3.mjs', 'run-guide.mjs',
   'run-edge.mjs', 'run-main.mjs', 'run-responsive-layout.mjs'
 ].filter((f) => fs.existsSync(path.join(here, f)));
 
