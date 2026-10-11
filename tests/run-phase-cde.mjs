@@ -129,7 +129,17 @@ try {
   eq('裁判以相同种子可逐字段复现', replay[0], replay[1]);
   const overLimit = await evaluate(() => { try { __MOSS__.battleJudge({own:[{type:'guard',count:13}],enemy:[{type:'scout',count:2}],commandLimit:12,seed:1}); return false; } catch (e) { return /委任上限/.test(e.message); } });
   eq('超出签发人数的编队被拒绝', overLimit, true);
-  eq('报告前旧路未授权邻领', await evaluate(() => __MOSS__.extendedGateAllowed('neighbor')), false);
+  // 邻领现在有两条开通方式：完成巡防+两份档案复核，或凭任一路线的到访授权。
+  // 本测试前面已经把工程与商旅路线走到 2，因此到访授权已成立。
+  eq('凭到访授权可先抵邻领（商旅/巡林不必等公共工程全链）', await evaluate(() => __MOSS__.extendedGateAllowed('neighbor')), true);
+  eq('但回到访授权之前，邻领仍需巡防报告与档案复核', await evaluate(() => {
+    const p = __MOSS__.routeInfo();
+    const was = p.passes.visit;
+    __MOSS__.state.professionalLife.passes.visit = false;
+    const open = __MOSS__.extendedGateAllowed('neighbor');
+    __MOSS__.state.professionalLife.passes.visit = was;
+    return open;
+  }), false);
   await pose('old_road', 23, 16); await panel('openOldRoadSite', 'oldroad_marker'); await click('记录旧界碑两种读法 · 20分钟');
   await pose('oldroad_survey', 8, 7); await panel('openOldRoadSite', 'oldroad_station'); await click('比对拓片与两省旧驿册 · 路况簿 ×1');
   eq('古道的界碑记录和驿册分开核验', await evaluate(() => [__MOSS__.militaryLifeState().neighbor.oldroadVerified, __MOSS__.state.inventory.route_evidence]), [true, 1]);
