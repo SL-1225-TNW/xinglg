@@ -69,7 +69,8 @@ try{
  ok('成熟待办显示三株',(await daily()).includes('可收获 3 株'));
  await tool(4,9,8);await title('9/9');ok('收获一株后待办减一',(await daily()).includes('可收获 2 株'));
  for(const [x,y] of plots.slice(1))await tool(4,x,y);
- eq('正常收获三颗萝卜',(await snap(page)).inv.radish,3);
+ const perPlot=await page.evaluate(()=>__MOSS__.expectedYield('radish'));
+ eq('正常收获三株萝卜',(await snap(page)).inv.radish,perPlot*3);
  await walk(31,10);await page.waitForTimeout(400);await walk(14,10);await faceTowards(page,14,9);await page.keyboard.press('e');
  await page.locator('.win .quest').filter({hasText:'第一份收成'}).getByRole('button',{name:'交付材料',exact:true}).click();await closeWin(page);await page.waitForTimeout(300);
  eq('提交真实委托完成教程',(await guide()).status,'done');eq('完成后卡片自动收起',await page.locator('#tutorialCard').isVisible(),false);

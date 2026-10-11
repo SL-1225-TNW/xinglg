@@ -14905,6 +14905,24 @@ function extendedGateReason(key){var p=professionalLifeState(),w=wetlandLifeStat
   if(key==='neighbor')return '先完成关口巡防任务并在古道站核验两份驿路记录；或先取得任意一条路线的到访授权，边城市场只认这个。';
   return '这条路线尚未开放。';
 }
+/* 替代入口与资历的推进记数。挂在真实完成事件上，不能凭空给：
+   路线是「玩家在这条路上真的做过什么」的累计，不是点了就送。 */
+function bumpRoute(key, step) {
+  var p = professionalLifeState();
+  if (!p.routes) p.routes = { engineering: 0, trade: 0, patrol: 0 };
+  p.routes[key] = Math.min(9, (p.routes[key] || 0) + (step || 1));
+  if (p.routes.engineering >= 2 || p.routes.trade >= 2 || p.routes.patrol >= 2) p.passes.visit = true;
+  if (p.routes.engineering >= 4 || p.routes.trade >= 4 || p.routes.patrol >= 4) p.passes.commission = true;
+  markDirty();
+  return p.routes[key];
+}
+function bumpCareer(key, step) {
+  var p = professionalLifeState();
+  if (!p.careers) p.careers = { horticulture: 0, medicine: 0, trade: 0, engineering: 0 };
+  p.careers[key] = Math.max(0, Math.min(5, (p.careers[key] || 0) + (step || 1)));
+  markDirty();
+  return p.careers[key];
+}
 /* 三条替代入口的当前进度：让玩家一眼看见自己走了哪条、还差什么 */
 function professionalRoutePanel() {
   var p = professionalLifeState();
@@ -14983,7 +15001,7 @@ function openProfessionSite(site){
       b.appendChild(el('p',null,'露西：晴日采收六份，雨天可抢收四份或延期到次日。每轮采收后至少隔七天再安排下一轮；先完成未封存的酒窖批次。酿酒之后仍能安排葡萄汁供货。'));
       [['juice','压汁供应医舍'],['wine','封存酒窖批次']].forEach(function(opt){if(!v.plan)extendedWorkButton(b,'vineyard','接受计划：'+opt[1]+' · 20分钟',{minutes:20,guard:function(){return !v.plan;}},function(){v.plan=opt[0];v.planDay=state.totalDay;});});
       if(v.plan&&!v.harvested){if(state.weather.today==='rain'&&!v.delayed)extendedWorkButton(b,'vineyard','因雨延期一次 · 10分钟',{minutes:10,guard:function(){return v.plan&&!v.harvested&&!v.delayed&&state.weather.today==='rain';}},function(){v.delayed=true;v.planDay=state.totalDay;});
-        extendedWorkButton(b,'vineyard',state.weather.today==='rain'?'雨天抢收葡萄 ×4':'按计划采收葡萄 ×6',{out:'grape',qty:state.weather.today==='rain'?4:6,minutes:35,energy:5,guard:function(){return v.plan&&!v.harvested&&(!v.delayed||state.totalDay>v.planDay);},reason:'延期后须过一夜才能采收；已采收的计划不能重复领取。'},function(){v.harvested=state.weather.today==='rain'?4:6;v.harvestDay=state.totalDay;p.careers.horticulture=Math.max(p.careers.horticulture,1);});}
+        extendedWorkButton(b,'vineyard',state.weather.today==='rain'?'雨天抢收葡萄 ×4':'按计划采收葡萄 ×6',{out:'grape',qty:state.weather.today==='rain'?4:6,minutes:35,energy:5,guard:function(){return v.plan&&!v.harvested&&(!v.delayed||state.totalDay>v.planDay);},reason:'延期后须过一夜才能采收；已采收的计划不能重复领取。'},function(){v.harvested=state.weather.today==='rain'?4:6;v.harvestDay=state.totalDay;bumpCareer('horticulture');});}
       b.appendChild(el('p',null,v.plan?'计划：'+(v.plan==='juice'?'葡萄汁供医舍': '酒窖储藏')+'；已采收 '+v.harvested+'；已加工 '+v.pressed+'。':'尚未接受庄园计划。'));
     }
     if(site==='press'){
@@ -14998,8 +15016,8 @@ function openProfessionSite(site){
     }
     if(site==='clinic'){
       b.appendChild(el('p',null,'梅菈：样本核验后，为一名码头工人登记咳嗽与疲劳；葡萄汁已由河港运到，草药包可做短期照护。病人需隔夜复诊。'));
-      if(!c.diagnosed&&c.sampleVerified)extendedWorkButton(b,'clinic','辨认药材并建立病历 · 15分钟',{minutes:15,energy:1,guard:function(){return !c.diagnosed&&c.sampleVerified;}},function(){c.diagnosed=true;p.careers.medicine=Math.max(p.careers.medicine,1);});
-      if(portS.shipment==='clinic'&&!portS.settled&&invCount('cargo_manifest')>0)extendedWorkButton(b,'clinic','签收医舍葡萄汁运单 · 运单 ×1',{need:{cargo_manifest:1},minutes:10,guard:function(){return portS.shipment==='clinic'&&!portS.settled;}},function(){portS.settled=true;c.receivedJuice=true;p.careers.trade=Math.max(p.careers.trade,2);});
+      if(!c.diagnosed&&c.sampleVerified)extendedWorkButton(b,'clinic','辨认药材并建立病历 · 15分钟',{minutes:15,energy:1,guard:function(){return !c.diagnosed&&c.sampleVerified;}},function(){c.diagnosed=true;bumpCareer('medicine');});
+      if(portS.shipment==='clinic'&&!portS.settled&&invCount('cargo_manifest')>0)extendedWorkButton(b,'clinic','签收医舍葡萄汁运单 · 运单 ×1',{need:{cargo_manifest:1},minutes:10,guard:function(){return portS.shipment==='clinic'&&!portS.settled;}},function(){portS.settled=true;c.receivedJuice=true;bumpCareer('trade',2);bumpRoute('trade');});
       if(c.diagnosed&&!c.medicine&&c.receivedJuice)extendedWorkButton(b,'clinic','配制草药包 ×2 · 芦苇样本与葡萄汁',{out:'medicine',qty:2,minutes:30,energy:3,guard:function(){return c.diagnosed&&c.receivedJuice&&!c.medicine;}},function(){c.medicine=2;});
       if(c.medicine>0)extendedWorkButton(b,'clinic','照护病人并记录复诊 · 草药包 ×1',{need:{medicine:1},minutes:20,energy:2,guard:function(){return c.diagnosed&&c.medicine>0&&!c.patientDay;},reason:'病历已经开立；需要先配药。'},function(){c.medicine--;c.patientDay=state.totalDay+1;});
       if(c.patientDay&&!c.recovered)extendedWorkButton(b,'clinic','复诊并更新病历 · 10分钟',{minutes:10,guard:function(){return c.patientDay&&state.totalDay>=c.patientDay&&!c.recovered;} ,reason:'病人需要过一夜后复诊。'},function(){c.recovered=true;p.careers.medicine=2;p.trust=Math.min(100,p.trust+1);});
@@ -15008,7 +15026,7 @@ function openProfessionSite(site){
     if(site==='port'){
       b.appendChild(el('p','muted','当前运货耗时：医舍 '+professionalShippingMinutes(40)+' 分钟，石料／互市 '+professionalShippingMinutes(60)+' 分钟。验收后的灌溉优先需小船分批，多20分钟；通航优先少10分钟。追索货差后须追加10分钟封签复核。'));
       b.appendChild(el('p',null,'米娅：装卸簿比货单多记两箱。你可以凭封签追索货款，也可以补运并修正关系。核验后可以安排实际批次转运。'));
-      if(!portS.manifestChecked)extendedWorkButton(b,'port','核验封签与装卸簿 · 20分钟',{minutes:20,energy:1,guard:function(){return !portS.manifestChecked;}},function(){portS.manifestChecked=true;});
+      if(!portS.manifestChecked)extendedWorkButton(b,'port','核验封签与装卸簿 · 20分钟',{minutes:20,energy:1,guard:function(){return !portS.manifestChecked;}},function(){portS.manifestChecked=true;bumpRoute('trade');});
       if(portS.manifestChecked&&!portS.choice){[['claim','封存差额证据并追索 · 35金'],['reship','补运两箱并维护合作 · 消耗10金']].forEach(function(o){extendedWorkButton(b,'port',o[1],{minutes:25,coins:o[0]==='reship'?10:0,guard:function(){return portS.manifestChecked&&!portS.choice;}},function(){portS.choice=o[0];p.careers.trade=Math.max(p.careers.trade,1);p.trust=Math.min(100,p.trust+(o[0]==='reship'?2:1));if(o[0]==='claim')state.coins+=35;});});}
       if(portS.manifestChecked){
         if(invCount('grape_juice')>=2&&(!portS.shipment||portS.settled))extendedWorkButton(b,'port','装运葡萄汁至白鸢医舍 · 葡萄汁 ×2',{need:{grape_juice:2},out:'cargo_manifest',qty:1,minutes:professionalShippingMinutes(40),energy:2,guard:function(){return portS.manifestChecked&&invCount('grape_juice')>=2&&(!portS.shipment||portS.settled);}},function(){portS.shipment='clinic';portS.settled=false;portS.shipmentDay=state.totalDay;p.careers.trade=Math.max(p.careers.trade,1);});
@@ -15023,9 +15041,9 @@ function openProfessionSite(site){
     if(site==='lock')b.appendChild(el('p',null,'莱昂：船闸水尺会随降雨变化。人的省内快速传送不会搬运货物；货船只有靠泊并核验后才算抵港。当前水利方案：'+(ww.allocation==='irrigation'?'优先农田用水':ww.allocation==='navigation'?'优先通航':'待协商')+'。'));
     if(site==='quarry'){
       b.appendChild(el('p',null,'玛尔：先量裂隙和支护，再选稳定面或石灰层。每个游戏日只安排一次采掘，避免重复挖同一批原石。'));
-      if(!q.surveyed)extendedWorkButton(b,'quarry','测量裂隙 · 20分钟',{minutes:20,energy:2,guard:function(){return !q.surveyed;}},function(){q.surveyed=true;p.access.quarry=true;});
-      if(q.surveyed&&!q.face)[['stable','避开裂隙 · 木材 ×6'],['carbonate','石灰层采区 · 石头 ×6']].forEach(function(o){var need={};need[o[1].indexOf('木材')>=0?'wood':'stone']=6;extendedWorkButton(b,'quarry',o[1],{need:need,minutes:30,energy:3,guard:function(){return q.surveyed&&!q.face;}},function(){q.face=o[0];});});
-      if(q.face&&!q.props)extendedWorkButton(b,'quarry','支护采区 · 木材 ×4',{need:{wood:4},minutes:25,energy:3,guard:function(){return q.face&&!q.props;}},function(){q.props=true;});
+      if(!q.surveyed)extendedWorkButton(b,'quarry','测量裂隙 · 20分钟',{minutes:20,energy:2,guard:function(){return !q.surveyed;}},function(){q.surveyed=true;p.access.quarry=true;bumpRoute('engineering');});
+      if(q.surveyed&&!q.face)[['stable','避开裂隙 · 木材 ×6'],['carbonate','石灰层采区 · 石头 ×6']].forEach(function(o){var need={};need[o[1].indexOf('木材')>=0?'wood':'stone']=6;extendedWorkButton(b,'quarry',o[1],{need:need,minutes:30,energy:3,guard:function(){return q.surveyed&&!q.face;}},function(){q.face=o[0];bumpRoute('engineering');});});
+      if(q.face&&!q.props)extendedWorkButton(b,'quarry','支护采区 · 木材 ×4',{need:{wood:4},minutes:25,energy:3,guard:function(){return q.face&&!q.props;}},function(){q.props=true;bumpRoute('engineering');bumpCareer('engineering');});
       if(q.props)extendedWorkButton(b,'quarry',q.face==='carbonate'?'采掘石灰岩料 ×8 · 25分钟':'采掘稳定石灰岩料 ×6 · 20分钟',{out:'limestone',qty:q.face==='carbonate'?8:6,minutes:q.face==='carbonate'?25:20,energy:5,guard:function(){return q.props&&q.lastExtractDay!==state.totalDay;},reason:'支护未完成或今天已采过；先加固裂隙。'},function(){q.extracted+=q.face==='carbonate'?8:6;q.lastExtractDay=state.totalDay;});
       b.appendChild(el('p',null,'采区：'+(q.face==='stable'?'稳定东侧':'石灰层')+'；支护 '+(q.props?'已完成':'未完成')+'；累计采出 '+q.extracted+'；切割验收 '+q.cut+'。'));
     }
@@ -15034,13 +15052,13 @@ function openProfessionSite(site){
       b.appendChild(el('p',null,'水位 '+(ww.level||'未读')+' 级；天气 '+(state.weather.today==='rain'?'降雨':'晴')+'；闸件 '+(ww.repair?'已修':'待修')+'。'));
       if(!ww.level&&site==='water')b.appendChild(el('p','req-chip','先去室外坝顶水尺读取水位。'));
       if(!ww.level&&site==='gauge')extendedWorkButton(b,'gauge','读水尺并取样 · 15分钟',{out:'water_sample',qty:1,minutes:15,energy:1,guard:function(){return !ww.level;}},function(){ww.level=state.weather.today==='rain'?3:2;});
-      if(portS.shipment==='waterworks'&&!portS.settled&&invCount('cargo_manifest')>0)extendedWorkButton(b,site==='water'?'water':'gauge','签收石料运单 · 消耗核验运单',{need:{cargo_manifest:1},minutes:15,guard:function(){return portS.shipment==='waterworks'&&!portS.settled;}},function(){portS.settled=true;ww.receivedStone=true;p.watershedContract=1;p.careers.trade=Math.max(p.careers.trade,2);});
+      if(portS.shipment==='waterworks'&&!portS.settled&&invCount('cargo_manifest')>0)extendedWorkButton(b,site==='water'?'water':'gauge','签收石料运单 · 消耗核验运单',{need:{cargo_manifest:1},minutes:15,guard:function(){return portS.shipment==='waterworks'&&!portS.settled;}},function(){portS.settled=true;ww.receivedStone=true;p.watershedContract=1;bumpCareer('trade',2);bumpRoute('trade');});
       if(site==='water'&&portS.settled&&p.watershedContract===1&&ww.receivedStone&&!ww.repair)extendedWorkButton(b,'water','安装闸件并封存石料 · 铁锭 ×1',{need:{iron_ingot:1},minutes:45,energy:5,guard:function(){return p.watershedContract===1&&portS.settled&&ww.level>0&&!ww.repair;},reason:'先在坝顶水尺读取水位并签收石料运单。'},function(){ww.repair='pending';p.watershedContract=2;p.access.waterworks=true;});
       if(site==='water'&&ww.repair==='pending'&&ww.millOpinion&&ww.meadowOpinion&&ww.portOpinion&&!ww.allocation){
         [['irrigation','优先灌溉 · 保住田水，限制大型船只'],['navigation','优先通航 · 保持货船水深，农田分时供水']].forEach(function(o){extendedWorkButton(b,'water',o[1],{minutes:20,guard:function(){return ww.repair==='pending'&&ww.millOpinion&&ww.meadowOpinion&&ww.portOpinion&&!ww.allocation;}},function(){ww.allocation=o[0];ww.testDay=state.totalDay;});});
       }
       if(site==='water'&&ww.repair==='pending'&&!(ww.millOpinion&&ww.meadowOpinion&&ww.portOpinion))b.appendChild(el('p','req-chip','还需意见：磨坊 '+(ww.millOpinion?'✓':'未记')+' · 牧场 '+(ww.meadowOpinion?'✓':'未记')+' · 河港 '+(ww.portOpinion?'✓':'未记')+'。'));
-      if(site==='water'&&ww.allocation&&!ww.certified)extendedWorkButton(b,'water','隔夜验收并发放工程证书 · 90金',{minutes:10,guard:function(){return ww.allocation&&state.totalDay>ww.testDay&&!ww.certified;} ,reason:'闸门需运行过一个游戏夜晚后验收。'},function(){ww.certified=true;p.watershedContract=3;p.careers.engineering=2;p.trust=Math.min(100,p.trust+2);p.careers.trade=Math.max(p.careers.trade,2);state.coins+=90;});
+      if(site==='water'&&ww.allocation&&!ww.certified)extendedWorkButton(b,'water','隔夜验收并发放工程证书 · 90金',{minutes:10,guard:function(){return ww.allocation&&state.totalDay>ww.testDay&&!ww.certified;} ,reason:'闸门需运行过一个游戏夜晚后验收。'},function(){ww.certified=true;p.watershedContract=3;bumpCareer('engineering',2);bumpRoute('engineering',2);p.trust=Math.min(100,p.trust+2);bumpCareer('trade');state.coins+=90;});
       if(site==='water'&&ww.certified)b.appendChild(el('p','req-chip ok','工程合同完成：石料已从采场经河港运到水利站；'+(ww.allocation==='irrigation'?'优先灌溉：牧场试种田自动供水，磨坊每天至多两批，货运增加20分钟。':'优先通航：货运减少10分钟，磨坊保持原协定额度，牧草晴天仍需人工浇水。')));
     }
     if(site==='opinion_mill'||site==='opinion_meadow'||site==='opinion_port'){
@@ -15233,7 +15251,7 @@ function openMilitarySite(site){
     }
     if(site==='pass_route'){
       b.appendChild(el('p',null,'关门没有收到对邻领居民或商队动武的命令。巡路记录应先说明桥面、路线与人员安全，再由本次任务授权决定是否部署。'));
-      if(c.active&&c.stage===0&&!c.scouted) [['ridge','沿山脊巡查 · 记录高处桥面'],['river','沿河道巡查 · 记录浅滩绕行']].forEach(function(o){militarySiteButton(b,site,o[1]+' · 20分钟',{minutes:20,energy:2,guard:function(){return c.active&&c.stage===0&&!c.scouted&&state.totalDay<=c.deadlineDay;}},function(){c.scouted=o[0];c.scoutedDay=state.totalDay;c.stage=1;m.unit.scene='pass';invAdd('route_evidence',2);});});
+      if(c.active&&c.stage===0&&!c.scouted) [['ridge','沿山脊巡查 · 记录高处桥面'],['river','沿河道巡查 · 记录浅滩绕行']].forEach(function(o){militarySiteButton(b,site,o[1]+' · 20分钟',{minutes:20,energy:2,guard:function(){return c.active&&c.stage===0&&!c.scouted&&state.totalDay<=c.deadlineDay;}},function(){c.scouted=o[0];c.scoutedDay=state.totalDay;c.stage=1;m.unit.scene='pass';invAdd('route_evidence',2);bumpRoute('patrol');});});
       if(c.scouted)b.appendChild(el('p','req-chip ok','已记录路线：'+(c.scouted==='ridge'?'山脊桥面':'河道浅滩')+'；未对邻领平民作敌我推定。'));
     }
     if(site==='campaign'){
@@ -15763,6 +15781,37 @@ window.__MOSS__ = {
   freshState: function () { return newGameState(); },
   normalizeSaveForTest: function (raw) { return normalizeSave(raw); },
   closeWindow: function () { closeWindow(); },
+  /* 测试用：按游戏自己的作物表与肥力系数算出这次收获应得多少。
+     验收脚本一律调用它，不要在测试里写死数量——作物产量与肥力系数
+     调整过好几次，写死就会变成永远对不上的假失败。 */
+  expectedYield: function (cropId) {
+    var c = CROPS[cropId];
+    if (!c) return 0;
+    return Math.max(1, Math.floor(c.yield * fertilityYieldFactor(FERT.DEF)));
+  },
+  /* 三条替代入口的只读视图（测试与调试用） */
+  routeInfo: function () {
+    var p = professionalLifeState();
+    return { r: p.routes, passes: p.passes, careers: p.careers, canCommand: professionalCanCommand() };
+  },
+  gateAllowed: function (key) { return extendedGateAllowed(key); },
+  bumpRoute: function (k, n) { return bumpRoute(k, n); },
+  bumpCareer: function (k, n) { return bumpCareer(k, n); },
+  /* 测试用：把职业与军事线恢复到「刚起步」状态，保留世界探索进度 */
+  resetCareerForTest: function () {
+    var p = professionalLifeState();
+    p.routes = { engineering: 0, trade: 0, patrol: 0 };
+    p.passes = { visit: false, commission: false, command: false };
+    p.careers = { horticulture: 0, medicine: 0, trade: 0, engineering: 0 };
+    p.trust = 0;
+    state.militaryLife = newMilitaryLife();
+    var e = exploreState();
+    e.forest = true; e.mine = true;
+    state.bridgeRepaired = true;
+    markDirty();
+    return true;
+  },
+  openExtendedGate: function (key) { return openExtendedGate(key); },
   syncPlayer: function () { syncPlayerPixel(); onSceneChanged(); },
   invCount: function (id) { return invCount(id); },
   wheatFieldsDebug: function () { return (MAPS.mill_village.wheatFields || []).map(function (f) { return { x0: f.x0, y0: f.y0, x1: f.x1, y1: f.y1 }; }); },

@@ -157,7 +157,9 @@ for (const [tx, ty, key] of [[9, 8, 'radish'], [13, 8, 'potato'], [17, 8, 'straw
   await clickTile(page, tx, ty);
   await page.waitForTimeout(150);
   const got = (await snap(page)).inv[key] || 0;
-  rep.eq('收获' + ({ radish: '萝卜', potato: '土豆', strawberry: '草莓' })[key], got, 1);
+  // 期望值向游戏自己取：作物产量与肥力系数是可调设计参数，写死会变成假失败
+  const want = await page.evaluate(k => __MOSS__.expectedYield(k), key);
+  rep.eq('收获' + ({ radish: '萝卜', potato: '土豆', strawberry: '草莓' })[key], got, want);
 }
 await page.waitForTimeout(300);
 s = await snap(page);
