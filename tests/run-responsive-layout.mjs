@@ -1,7 +1,5 @@
 /* 真实浏览器验证：尺寸、无遮挡按钮、旋转，以及打包版与源码版一致。 */
 import assert from 'node:assert/strict';
-import { pathToFileURL } from 'node:url';
-import path from 'node:path';
 import { launch, boot } from './harness.mjs';
 
 const cases = [
@@ -12,7 +10,7 @@ const cases = [
 for (const file of ['index.html', '苔芽农场-单文件版.html']) {
   for (const [width,height,touch] of cases) {
     const {browser,page,errors} = await launch({viewport:{width,height},touch,
-      url:pathToFileURL(path.resolve(file)).href});
+      url:new URL('../'+file,import.meta.url).href});
     try {
       await page.addInitScript(() => { Element.prototype.requestFullscreen = async () => { throw new Error('emulated fullscreen unavailable'); }; });
       await boot(page);

@@ -10,6 +10,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 const outDir = path.resolve(root, process.argv[2] || 'site');
 
+// Only this generated directory may be recursively replaced.
+if (outDir !== path.join(root, 'site')) throw new Error('输出目录必须是项目内的 site');
+
 fs.rmSync(outDir, { recursive: true, force: true });
 fs.mkdirSync(path.join(outDir, 'assets'), { recursive: true });
 
@@ -53,7 +56,7 @@ if (ext.length) {
   process.exit(1);
 }
 
-const rev = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root }).toString().trim().slice(0, 12);
+const rev = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root }).toString().trim();
 fs.writeFileSync(path.join(outDir, 'BUILD-INFO.txt'),
   `commit ${rev}\nsingle-file ${singles[0]}\nbuilt-by tests/prepare-site.mjs\n`);
 console.log(`站点产物就绪：${outDir}（commit ${rev}）`);

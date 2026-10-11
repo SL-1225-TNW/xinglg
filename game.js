@@ -9455,6 +9455,142 @@ function drawInteriorFurniture(g, f) {
   }
 }
 
+/* ============================================================
+   工程师职业章节（规划：先做透一条职业线）
+   见习调查 → 独立完成项目 → 处理一次事故 → 获得正式岗位 → 主持争议工程
+   每一次晋升都改变一种实际玩法，不是只涨一个数字。
+   ============================================================ */
+var ENG_STAGES = [
+  { id: 0, name: '见习', desc: '跟班学习：只能跟着记录，不能独自下判断。' },
+  { id: 1, name: '独立项目', desc: '水利合同由你独立负责，从测量到验收署名是你。' },
+  { id: 2, name: '事故处置', desc: '闸门出事，你要选择先保什么，并承担后果。' },
+  { id: 3, name: '正式岗位', desc: '拿到岗位后可以申请机构预算、委托他人施工。' },
+  { id: 4, name: '主持公共工程', desc: '有争议的方案要向居民解释预算与取舍。' }
+];
+function engCareer() {
+  var p = professionalLifeState();
+  if (!p.eng) p.eng = { stage: 0, post: '', incident: '', hearing: '', choice: '', budget: 0, memories: {} };
+  if (!p.eng.memories) p.eng.memories = {};
+  return p.eng;
+}
+/* 岗位带来的实际权限，不只是一个称谓 */
+function engCan() {
+  var e = engCareer();
+  return {
+    signReport: e.stage >= 1,      // 独立署名工程报告
+    emergencyRepair: e.stage >= 2, // 事故处置权，可跳过常规审批先止损
+    requestBudget: e.stage >= 3,   // 可申请机构预算（公共账，不动私房钱）
+    delegate: false,             // 委托施工流程尚未实现，不能宣称已经获得
+    chairHearing: e.stage >= 4     // 可主持争议工程的公开说明会
+  };
+}
+/* 人物记住你做过的选择；关键引荐会检查这段经历 */
+function rememberChoice(who, what) {
+  var e = engCareer();
+  if (!e.memories[who]) e.memories[who] = [];
+  if (e.memories[who].indexOf(what) < 0) e.memories[who].push(what);
+  markDirty();
+}
+function remembers(who, what) {
+  var e = engCareer();
+  return !!(e.memories[who] && e.memories[who].indexOf(what) >= 0);
+}
+
+/* 水利控制室的职业章节面板 */
+function openEngineeringChapter(b, ww) {
+  var e = engCareer(), p = professionalLifeState();
+  var box = el('div', 'panel-box');
+  box.appendChild(el('div', 'section-title', '工程师资历 · ' + (ENG_STAGES[e.stage] || ENG_STAGES[0]).name));
+  box.appendChild(el('p', 'muted', (ENG_STAGES[e.stage] || ENG_STAGES[0]).desc));
+
+  if (e.stage === 0 && ww.certified) {
+    extendedWorkButton(b, 'water', '签署第一份独立工程报告 · 40分钟', { minutes: 40, energy: 2, guard: function () { return e.stage === 0 && ww.certified; } }, function () {
+      e.stage = 1; rememberChoice('noya', '独立署名水利报告');
+      p_trustUp && p_trustUp(2);
+    });
+  }
+  if (e.stage === 1 && !e.incident) {
+    box.appendChild(el('p', 'req-chip', '工程已交付，但闸门在一次夜雨中崩了销。接下来要处理事故。'));
+  }
+  if (e.stage >= 2 && !e.post) {
+    extendedWorkButton(b, 'water', '接受正式工程岗位 · 60分钟', { minutes: 60, energy: 3, guard: function () { return e.stage >= 2 && !e.post; } }, function () {
+      e.post = 'waterworks_engineer';
+      e.stage = 4;
+      rememberChoice('noya', '事故后接下工程岗位');
+    });
+  }
+  if (e.stage >= 3 && !e.hearing) {
+    box.appendChild(el('p', 'muted', '有了岗位，你可以申请本项目的一次机构预算，并主持一次有争议的公共说明会。委托施工仍待开放。'));
+    extendedWorkButton(b, 'water', '申请机构工程预算 · 150金', { minutes: 20, guard: function () { return e.stage >= 3 && !e.hearing && !e.budgetGranted; }, reason: '本项目预算只拨付一次。' }, function () {
+      e.budgetGranted = true;
+      e.budget += 150;
+      rememberChoice('council', '以岗位身份申请机构预算');
+    });
+  }
+  if (e.stage >= 4 && !e.hearing) {
+    box.appendChild(el('p', 'req-chip', '灌溉与通航之争拖了很久，这场说明会要由你主持：两边都缺钱，只能保一头。'));
+    box.appendChild(el('p', 'muted', '你可以把岗位预算投向一边；另一边的诉求要向居民解释为什么这次没排上。'));
+    extendedWorkButton(b, 'water', '把预算投向灌溉 · 牧场优先', { minutes: 60, energy: 2, guard: function () { return e.stage >= 4 && !e.hearing && e.budget >= 150; }, reason: '需要先申请150金机构预算。' }, function () {
+      e.hearing = 'irrigation'; e.budget = Math.max(0, e.budget - 150);
+      p.waterworks.allocation = 'irrigation';
+      rememberChoice('noya', '主持说明会时把预算给了灌溉');
+      rememberChoice('council', '主持说明会时把预算给了灌溉');
+    });
+    extendedWorkButton(b, 'water', '把预算投向通航 · 船队优先', { minutes: 60, energy: 2, guard: function () { return e.stage >= 4 && !e.hearing && e.budget >= 150; }, reason: '需要先申请150金机构预算。' }, function () {
+      e.hearing = 'navigation'; e.budget = Math.max(0, e.budget - 150);
+      p.waterworks.allocation = 'navigation';
+      rememberChoice('noya', '主持说明会时把预算给了通航');
+      rememberChoice('martin', '主持说明会时把预算给了通航');
+    });
+  }
+  // 三位核心人物是否记得你的做法
+  var mem = e.memories;
+  var who = [];
+  if (mem.noya && mem.noya.length) who.push('诺娅：' + mem.noya.join('、'));
+  if (mem.martin && mem.martin.length) who.push('马丁：' + mem.martin.join('、'));
+  if (mem.council && mem.council.length) who.push('柯里：' + mem.council.join('、'));
+  if (who.length) box.appendChild(el('p', 'muted', '他们记得——' + who.join('；')));
+  b.appendChild(box);
+}
+function p_trustUp(n) {
+  var p = professionalLifeState();
+  p.trust = Math.min(100, (p.trust || 0) + n);
+  markDirty();
+}
+
+/* 事故处置：两个选项各自改变真实的系统状态，不是换个说法 */
+function openIncidentChoice(b) {
+  var e = engCareer();
+  var box = el('div', 'panel-box');
+  box.appendChild(el('div', 'section-title', '事故 · 夜雨冲垮闸门销'));
+  box.appendChild(el('p', null, '水从缺口直冲下游，麦田刚返青，船闸也断了航。村民要你先保一样。'));
+  box.appendChild(el('p', 'muted', '你的处理会被三方记住：诺娅看工程，马丁看磨坊额度，柯里看村里怎么评这次取舍。'));
+  extendedWorkButton(b, 'water', '先堵缺口保麦田 · 记牺牲通航', { minutes: 120, energy: 4, guard: function () { return e.stage === 1 && !e.incident; } }, function () {
+    e.incident = 'field'; e.choice = 'field'; e.stage = 2;
+    rememberChoice('noya', '事故中先保农田'); rememberChoice('martin', '事故中先保农田');
+    professionalLifeState().watershedContract = 2;
+    applyEngChoice();
+  });
+  extendedWorkButton(b, 'water', '先泄水保船闸 · 记麦田延灌', { minutes: 120, energy: 4, guard: function () { return e.stage === 1 && !e.incident; } }, function () {
+    e.incident = 'channel'; e.choice = 'channel'; e.stage = 2;
+    rememberChoice('noya', '事故中先保通航'); rememberChoice('martin', '事故中先保通航');
+    professionalLifeState().watershedContract = 2;
+    applyEngChoice();
+  });
+  b.appendChild(box);
+}
+
+/* 事故与争议的后果真的改到系统上，不是换个说法：
+   选了保农田，牧草与麦田供水恢复但货运变慢；选了保通航，航路恢复但牧草仍靠人工。 */
+function applyEngChoice() {
+  var e = engCareer(), p = professionalLifeState();
+  if (e.choice === 'field') {
+    p.waterworks.allocation = 'irrigation';
+  } else if (e.choice === 'channel') {
+    p.waterworks.allocation = 'navigation';
+  }
+  markDirty();
+}
 function openWorkRecords(initial) {
   clearKeys();var tab=initial==='mine'?'mine':'farm',selected=null;
   openWindow({id:'workrecords',kind:'custom',wide:true,title:'农务与矿山记录',build:function(b){
@@ -14650,6 +14786,19 @@ function normalizeProfessionalLife(raw){var d=newProfessionalLife(),r=raw&&typeo
   a=r.passes||{};d.passes={visit:!!a.visit,commission:!!a.commission,command:!!a.command};
   if(d.routes.engineering>=2||d.routes.trade>=2||d.routes.patrol>=2)d.passes.visit=true;
   if(d.routes.engineering>=4||d.routes.trade>=4||d.routes.patrol>=4)d.passes.commission=true;
+  /* 工程师章节：阶段、事故、岗位与人物记忆都随存档保存 */
+  var eg=r.eng||{};
+  d.eng={stage:(Number.isFinite(eg.stage)?Math.max(0,Math.min(4,Math.floor(eg.stage))):0),post:String(eg.post||''),incident:['field','channel'].indexOf(eg.incident)>=0?eg.incident:'',
+    hearing:['irrigation','navigation'].indexOf(eg.hearing)>=0?eg.hearing:'',choice:['field','channel'].indexOf(eg.choice)>=0?eg.choice:'',budget:n(eg.budget,150),budgetGranted:!!eg.budgetGranted||eg.budget>0||!!eg.hearing,
+    memories:(eg.memories&&typeof eg.memories==='object')?JSON.parse(JSON.stringify(eg.memories)):{}};
+  /* 自洽：没工程证书就不可能越过见习；没处置事故不可能有岗位；没岗位不可能主持说明会 */
+  if(!d.waterworks||!d.waterworks.certified){d.eng.stage=0;d.eng.post='';d.eng.incident='';d.eng.hearing='';d.eng.budget=0;}
+  else{
+    if(d.eng.stage>=2&&!d.eng.incident){d.eng.stage=1;d.eng.post='';d.eng.hearing='';}
+    if(d.eng.stage>=3&&!d.eng.post){d.eng.stage=2;d.eng.hearing='';}
+  }
+  if(d.eng.stage<3){d.eng.post='';d.eng.budget=0;d.eng.budgetGranted=false;d.eng.hearing='';}
+  ['noya','martin','council'].forEach(function(who){d.eng.memories[who]=Array.isArray(d.eng.memories[who])?d.eng.memories[who].filter(function(x){return typeof x==='string';}).slice(-20):[];});
   return d;
 }
 function newMilitaryLife(){return {registered:false,trainingDays:[],qualification:0,rank:'resident',commandLimit:0,appointmentDay:0,unit:{id:'frontier_detail',count:0,wounded:0,training:0,equipment:0,morale:0,supply:0,discipline:0,scene:'camp'},campaign:{active:false,startedDay:0,deadlineDay:0,stage:0,scouted:null,scoutedDay:0,prepared:null,preparedDay:0,battle:null,battleDay:0,reported:false,result:null},battleRecords:[],neighbor:{opened:false,oldroadVerified:false,caseFound:false,evidence:0,choice:null,settled:false,signedDay:0,tradeReceived:false,localContract:false},institutionFund:0,followUpDay:0};}
@@ -15058,8 +15207,8 @@ function openProfessionSite(site){
         [['irrigation','优先灌溉 · 保住田水，限制大型船只'],['navigation','优先通航 · 保持货船水深，农田分时供水']].forEach(function(o){extendedWorkButton(b,'water',o[1],{minutes:20,guard:function(){return ww.repair==='pending'&&ww.millOpinion&&ww.meadowOpinion&&ww.portOpinion&&!ww.allocation;}},function(){ww.allocation=o[0];ww.testDay=state.totalDay;});});
       }
       if(site==='water'&&ww.repair==='pending'&&!(ww.millOpinion&&ww.meadowOpinion&&ww.portOpinion))b.appendChild(el('p','req-chip','还需意见：磨坊 '+(ww.millOpinion?'✓':'未记')+' · 牧场 '+(ww.meadowOpinion?'✓':'未记')+' · 河港 '+(ww.portOpinion?'✓':'未记')+'。'));
-      if(site==='water'&&ww.allocation&&!ww.certified)extendedWorkButton(b,'water','隔夜验收并发放工程证书 · 90金',{minutes:10,guard:function(){return ww.allocation&&state.totalDay>ww.testDay&&!ww.certified;} ,reason:'闸门需运行过一个游戏夜晚后验收。'},function(){ww.certified=true;p.watershedContract=3;bumpCareer('engineering',2);bumpRoute('engineering',2);p.trust=Math.min(100,p.trust+2);bumpCareer('trade');state.coins+=90;});
-      if(site==='water'&&ww.certified)b.appendChild(el('p','req-chip ok','工程合同完成：石料已从采场经河港运到水利站；'+(ww.allocation==='irrigation'?'优先灌溉：牧场试种田自动供水，磨坊每天至多两批，货运增加20分钟。':'优先通航：货运减少10分钟，磨坊保持原协定额度，牧草晴天仍需人工浇水。')));
+      if(site==='water'&&ww.allocation&&!ww.certified)extendedWorkButton(b,'water','隔夜验收并发放工程证书 · 90金',{minutes:10,guard:function(){return ww.allocation&&state.totalDay>ww.testDay&&!ww.certified;} ,reason:'闸门需运行过一个游戏夜晚后验收。'},function(){ww.certified=true;p.watershedContract=3;bumpCareer('engineering',2);bumpRoute('engineering',2);p.trust=Math.min(100,p.trust+2);bumpCareer('trade');state.coins+=90;});      if(site==='water'&&ww.certified)b.appendChild(el('p','req-chip ok','工程合同完成：石料已从采场经河港运到水利站；'+(ww.allocation==='irrigation'?'优先灌溉：牧场试种田自动供水，磨坊每天至多两批，货运增加20分钟。':'优先通航：货运减少10分钟，磨坊保持原协定额度，牧草晴天仍需人工浇水。')));
+    if(site==='water'&&ww.certified){openEngineeringChapter(b,ww);if(engCareer().stage===1&&!engCareer().incident)openIncidentChoice(b);}
     }
     if(site==='opinion_mill'||site==='opinion_meadow'||site==='opinion_port'){
       var flag=site==='opinion_mill'?'millOpinion':site==='opinion_meadow'?'meadowOpinion':'portOpinion',who=site==='opinion_mill'?'磨坊麦田':'石楠牧场';b.appendChild(el('p',null,'把水利站的方案送到'+who+'与航运代表，记录他们愿意接受的供水时段。'));if(!ww[flag])extendedWorkButton(b,site,'记录上下游意见 · 10分钟',{minutes:10,guard:function(){return !ww[flag];}},function(){ww[flag]=true;});
@@ -15377,17 +15526,17 @@ drawMillLifeFurniture=function(g,f){if(!f||!f.extended)return baseDrawMillLifeFu
 
 function extendedSceneAllowed(s,region){
   if(!s||!s.professionalLife||!s.wetlandLife||!s.militaryLife)return false;
-  var p=s.professionalLife,w=s.wetlandLife,m=s.militaryLife;
+  var p=s.professionalLife,w=s.wetlandLife,m=s.militaryLife,r=p.routes||{},passes=p.passes||{};
   if(region==='wetland')return !!s.bridgeRepaired;
-  if(region==='vineyard')return !!(s.millLife&&s.millLife.inspected);
-  if(region==='clinic')return !!w.causeFound&&(p.vineyard.harvested>0||p.access.clinic);
-  if(region==='port')return !!w.causeFound;
-  if(region==='quarry')return !!(s.exploration&&s.exploration.mine);
-  if(region==='waterworks')return !!p.quarry.surveyed&&!!p.port.manifestChecked&&!!(s.millLife&&s.millLife.inspected);
-  if(region==='cloud_pass')return !!p.waterworks.certified&&p.trust>0;
-  if(region==='border_camp')return !!p.waterworks.certified;
-  if(region==='old_road')return !!m.campaign.active||!!m.campaign.reported;
-  if(region==='neighbor')return !!m.campaign.reported&&!!m.neighbor.oldroadVerified;
+  if(region==='vineyard')return !!(s.millLife&&s.millLife.inspected)||r.engineering>=1||r.trade>=1;
+  if(region==='clinic')return !!w.causeFound&&(p.vineyard.harvested>0||p.access.clinic)||r.patrol>=1;
+  if(region==='port')return !!w.causeFound||r.trade>=2;
+  if(region==='quarry')return !!(s.exploration&&s.exploration.mine)||r.engineering>=1;
+  if(region==='waterworks')return !!p.quarry.surveyed&&!!p.port.manifestChecked&&!!(s.millLife&&s.millLife.inspected)||r.engineering>=2||r.trade>=4;
+  if(region==='cloud_pass')return !!p.waterworks.certified&&p.trust>0||!!passes.visit;
+  if(region==='border_camp')return !!p.waterworks.certified||!!passes.commission||(m.registered&&MIL_COMMAND_RANKS.indexOf(m.rank)>=0);
+  if(region==='old_road')return !!m.campaign.active||!!m.campaign.reported||!!passes.commission;
+  if(region==='neighbor')return !!m.campaign.reported&&!!m.neighbor.oldroadVerified||!!passes.visit;
   return true;
 }
 var EXTENDED_REGION_NODE={wetland:'wetland.marsh',vineyard:'vineyard.estate',clinic:'clinic.white_stork',port:'port.lower_lock',quarry:'quarry.limestone',waterworks:'waterworks.reservoir',cloud_pass:'pass.cloud_peak',border_camp:'camp.frontier',old_road:'road.ancient',neighbor:'neighbor.market_town'};
@@ -15632,6 +15781,7 @@ window.__MOSS__ = {
   get state() { return state; },
   CFG: CFG, ITEMS: ITEMS, CROPS: CROPS, QUESTS: QUESTS, RECIPES: RECIPES, FISHES: FISHES, NPCS: NPCS,
   MAPS: MAPS, INTERACTABLES: INTERACTABLES, CITY_ROOMS: CITY_ROOMS, CITY_INFO: CITY_INFO,
+  registeredRegions: function () { return WORLD_REGIONS.map(function(r){return {id:r.id,name:r.name};}); },
   CITY_BUILDINGS: CITY_BUILDINGS,
   /* npcRuntime 在 loadScene 时填充，用 getter 保证读到的是当前实例 */
   get npcRuntime() { return npcRuntime; },
@@ -15792,7 +15942,8 @@ window.__MOSS__ = {
   /* 三条替代入口的只读视图（测试与调试用） */
   routeInfo: function () {
     var p = professionalLifeState();
-    return { r: p.routes, passes: p.passes, careers: p.careers, canCommand: professionalCanCommand() };
+    return { r: p.routes, passes: p.passes, careers: p.careers, canCommand: professionalCanCommand(),
+      waterAllocation: p.waterworks ? p.waterworks.allocation : null };
   },
   gateAllowed: function (key) { return extendedGateAllowed(key); },
   bumpRoute: function (k, n) { return bumpRoute(k, n); },
@@ -15804,6 +15955,8 @@ window.__MOSS__ = {
     p.passes = { visit: false, commission: false, command: false };
     p.careers = { horticulture: 0, medicine: 0, trade: 0, engineering: 0 };
     p.trust = 0;
+    p.eng = { stage: 0, post: '', incident: '', hearing: '', choice: '', budget: 0, memories: {} };
+    p.waterworks = Object.assign({}, p.waterworks, { certified: false, repair: null, allocation: null });
     state.militaryLife = newMilitaryLife();
     var e = exploreState();
     e.forest = true; e.mine = true;
@@ -15812,6 +15965,50 @@ window.__MOSS__ = {
     return true;
   },
   openExtendedGate: function (key) { return openExtendedGate(key); },
+  normalizeProfessionalLife: function (raw) { return normalizeProfessionalLife(raw); },
+  syncWater: function () { var p = professionalLifeState(); p.waterworks.certified = true; return p.waterworks.certified; },
+  /* 测试用：给出一个自洽的「水利已验收」状态（repair/allocation/receivedStone 三者齐备） */
+  grantWaterworksCertificate: function () {
+    var p = professionalLifeState();
+    p.waterworks.repair = 'irrigation';
+    p.waterworks.allocation = 'irrigation';
+    p.waterworks.receivedStone = true;
+    p.waterworks.millOpinion = true;
+    p.waterworks.meadowOpinion = true;
+    p.waterworks.portOpinion = true;
+    p.waterworks.testDay = 0;
+    p.waterworks.certified = true;
+    return true;
+  },
+  engInfo: function () {
+    var e = engCareer();
+    return { stage: e.stage, post: e.post, incident: e.incident, choice: e.choice,
+      hearing: e.hearing, budget: e.budget, memories: e.memories, can: engCan(), playerCoins: state.coins };
+  },
+  engStep: function (what, arg) {
+    var e = engCareer();
+    if (what === 'sign') { if (e.stage !== 0 || !professionalLifeState().waterworks.certified) return false; e.stage = 1; rememberChoice('noya', '独立署名水利报告'); return true; }
+    if (what === 'incident') {
+      if (e.stage !== 1 || e.incident || ['field','channel'].indexOf(arg)<0) return false;
+      e.incident = arg; e.choice = arg; e.stage = 2;
+      rememberChoice('noya', arg === 'field' ? '事故中先保农田' : '事故中先保通航');
+      rememberChoice('martin', arg === 'field' ? '事故中先保农田' : '事故中先保通航');
+      professionalLifeState().watershedContract = 2;
+      applyEngChoice();
+      return true;
+    }
+    if (what === 'post') { if (e.stage < 2 || e.post) return false; e.post = 'waterworks_engineer'; e.stage = 4; rememberChoice('noya', '事故后接下工程岗位'); return true; }
+    if (what === 'budget') { if (e.stage < 3 || e.hearing || e.budgetGranted) return false; e.budgetGranted=true; e.budget += 150; rememberChoice('council', '以岗位身份申请机构预算'); return true; }
+    if (what === 'hearing') {
+      if (e.stage < 4 || e.hearing || e.budget<150 || ['irrigation','navigation'].indexOf(arg)<0) return false;
+      e.hearing = arg; e.budget = Math.max(0, e.budget - 150);
+      professionalLifeState().waterworks.allocation = arg;
+      rememberChoice('noya', arg === 'irrigation' ? '主持说明会时把预算给了灌溉' : '主持说明会时把预算给了通航');
+      rememberChoice(arg === 'irrigation' ? 'martin' : 'council', arg === 'irrigation' ? '主持说明会时把预算给了灌溉' : '主持说明会时把预算给了通航');
+      markDirty(); return true;
+    }
+    return false;
+  },
   syncPlayer: function () { syncPlayerPixel(); onSceneChanged(); },
   invCount: function (id) { return invCount(id); },
   wheatFieldsDebug: function () { return (MAPS.mill_village.wheatFields || []).map(function (f) { return { x0: f.x0, y0: f.y0, x1: f.x1, y1: f.y1 }; }); },

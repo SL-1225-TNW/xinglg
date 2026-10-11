@@ -103,6 +103,13 @@ try {
   ok('关口窗口列出三条进入路线', ['工程路线', '商旅路线', '巡林路线'].every(x => txt.includes(x)), true);
   ok('关口窗口写明授权分层', txt.includes('到访') && txt.includes('接任务') && txt.includes('指挥军队'), true);
 
+  // Actual reload must preserve a scene entered through the alternate route.
+  for (const [route, count, scene] of [['trade',2,'cloud_pass'],['trade',2,'neighbor_border'],['engineering',2,'waterworks_control'],['patrol',4,'border_camp'],['patrol',4,'old_road']]) {
+    await reset();
+    await v(a=>{const m=__MOSS__;m.closeWindow();m.bumpRoute(a.route,a.count);m.devSwitchScene(a.scene,3,6);m.saveNow();},{route,count,scene});
+    await p.reload();await p.getByRole('button',{name:'继续游戏',exact:true}).click();
+    ok(route+' 替代入口重载保留 '+scene,await v(()=>__MOSS__.state.sceneId),scene);
+  }
   ok('无控制台错误', run.errors.length, 0);
 } finally {
   await run.browser.close();

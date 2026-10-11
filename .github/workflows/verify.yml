@@ -31,7 +31,8 @@ jobs:
           node --check game.js
           for file in tests/*.mjs; do node --check "$file"; done
       - name: Build the offline single-file game
-        run: node tests/build-single-file.mjs      - name: Verify mill and meadow
+        run: node tests/prepare-site.mjs
+      - name: Verify mill and meadow
         run: |
           node tests/run-phase-c-mill.mjs
           node tests/run-phase-c-meadow.mjs
@@ -56,20 +57,14 @@ jobs:
           node tests/run-responsive-layout.mjs
       - name: Smoke test the single-file build
         run: node tests/run-single-file-smoke.mjs
+      - name: Verify save, routes, and engineering chapter
+        run: |
+          node tests/run-save-invariants.mjs
+          node tests/run-alt-routes.mjs
+          node tests/run-engineering-career.mjs
+          node tests/run-engineering-ui.mjs
 
-  # 站点产物在这里构建并上传；Pages 直接复用这份产物，
-  # 保证「上线的就是验证过的同一提交、同一构建结果」。
-  site-artifact:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: browser-regressions
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Build the deployable site
-        run: node tests/prepare-site.mjs
+      # 上传验证前已构建的站点，部署直接复用。
       - name: Upload verified site
         uses: actions/upload-artifact@v4
         with:

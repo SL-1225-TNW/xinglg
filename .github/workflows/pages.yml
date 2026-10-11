@@ -3,50 +3,42 @@
 # 门禁：不再在 push 上直接部署，而是等「Verify game and save flows」
 # 全部通过后再部署，并且直接复用该次验证上传的 site 产物。
 # 这样上线的就是被验证过的同一提交、同一构建结果；测试失败就不会上线。
-# 需要跳过验证手动发版时，用 workflow_dispatch。
+# 手动验证请运行 Verify 工作流；正式发布仅接受 main 的 push 验证。
 name: Deploy to GitHub Pages
 
 on:
   workflow_run:
     workflows: ["Verify game and save flows"]
     types: [completed]
-  workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
-# 同一时间只跑一次；用 true 让新推送取消排队中的旧部署，
-# 否则一次失败会一直占着锁，后续推送全部堆在队列里永远发不出去
+# 部署串行执行；不让无关分支的验证事件中断正在发布的版本。
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      # 门禁检查：workflow_run 触发时，验证必须是成功状态
-      - name: Gate on verification result
-        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success'
-        run: |
-          echo "::error::验证工作流结果为 ${{ github.event.workflow_run.conclusion }}，不部署。"
-          exit 1
-
       - name: Resolve the verified commit
         id: target
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
-            echo "run_id=" >> "$GITHUB_OUTPUT"
-          else
-            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
-            echo "run_id=${{ github.event.workflow_run.id }}" >> "$GITHUB_OUTPUT"
-          fi
+          echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          echo "run_id=${{ github.event.workflow_run.id }}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout the verified commit
         uses: actions/checkout@v4
@@ -62,17 +54,12 @@ jobs:
       # 复用验证阶段构建好的产物，不在这里重新构建，避免两份构建不一致
       - name: Download the verified site artifact
         id: fetch
-        if: github.event_name == 'workflow_run'
         uses: actions/download-artifact@v4
         with:
           name: game-dist
           path: site
           run-id: ${{ steps.target.outputs.run_id }}
-
-      # 手动发版没有上游验证产物时才本地构建，并在日志里标明
-      - name: Build the site (manual dispatch only)
-        if: steps.fetch.outcome != 'success'
-        run: node tests/prepare-site.mjs
+          github-token: ${{ github.token }}
 
       - name: Verify the artifact matches this commit
         run: |
@@ -81,12 +68,13 @@ jobs:
           test -f site/game.js
           test -f site/styles.css
           ls site/*单文件版*.html >/dev/null
-          echo "已取到产物：$(head -1 site/BUILD-INFO.txt)"
+          test "$(head -1 site/BUILD-INFO.txt)" = "commit ${{ steps.target.outputs.sha }}"
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "${{ steps.target.outputs.sha }}"
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          artifact_name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+          name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
           path: site
 
       - name: Deploy to GitHub Pages

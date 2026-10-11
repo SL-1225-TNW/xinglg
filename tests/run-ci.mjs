@@ -1,11 +1,10 @@
-/* 统一测试入口：把「快速规则测试」与「浏览器流程测试」分层。
+/* 统一测试入口：把构建冒烟与完整浏览器流程分层。
  *
- *   node tests/run-ci.mjs            跑两层（与 CI 一致）
- *   node tests/run-ci.mjs --quick    只跑快速层（语法 + 构建 + 冒烟 + 纯规则）
+ *   node tests/run-ci.mjs            跑两层（包含 CI 套件及历史回归）
+ *   node tests/run-ci.mjs --quick    只跑快速层（语法 + 构建 + 浏览器冒烟）
  *   node tests/run-ci.mjs --only=E   只跑名字里含 E 的用例
  *
- * 分层理由：纯规则测试不需要浏览器，秒级返回，适合每次改动都跑；
- * 浏览器流程测试要装 Chromium、耗时以分钟计，放到提交前与 CI 跑。
+ * 快速层包含浏览器冒烟，需要安装 Chromium；完整流程放到提交前与 CI 跑。
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -16,7 +15,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const only = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7);
 const quickOnly = process.argv.includes('--quick');
 
-/* 第一层：不启动浏览器 */
+/* 第一层：语法、构建与浏览器冒烟 */
 const FAST = [
   { name: '语法：game.js', cmd: ['--check', path.join(here, '..', 'game.js')] },
   { name: '语法：测试脚本', each: fs.readdirSync(here).filter((f) => f.endsWith('.mjs')).map((f) => path.join(here, f)) },
@@ -33,6 +32,7 @@ const BROWSER = [
   'run-v7-stageB.mjs', 'run-v7-stageB-soil.mjs', 'run-v7-audit-regressions.mjs',
   'run-v7-stageC.mjs', 'run-v7-stageC-heath.mjs', 'run-v7-stageC-interiors.mjs',
   'run-world-map.mjs', 'run-fast-travel.mjs', 'run-save-invariants.mjs', 'run-alt-routes.mjs',
+  'run-engineering-career.mjs', 'run-engineering-ui.mjs',
   'run-v3.mjs', 'run-guide.mjs',
   'run-edge.mjs', 'run-main.mjs', 'run-responsive-layout.mjs'
 ].filter((f) => fs.existsSync(path.join(here, f)));
