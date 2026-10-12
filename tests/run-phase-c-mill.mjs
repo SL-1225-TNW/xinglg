@@ -41,7 +41,7 @@ try{
  await close();ok('步行抵达面包房',await walkTo(p,10,18));await faceTowards(p,10,17);await p.keyboard.press('e');await p.waitForFunction(()=>__MOSS__.state.sceneId==='mill_bakery');await p.waitForTimeout(450);
  await contact('baker',9,7);await click('记录面包房意见 · 10分钟');
  eq('两方用水意见均记录',await v(()=>[__MOSS__.millLifeState().farmOpinion,__MOSS__.millLifeState().breadOpinion]),[true,true]);
- await close();ok('走出面包房',await walkTo(p,9,11));await p.waitForFunction(()=>__MOSS__.state.sceneId==='mill_village');await p.waitForTimeout(450);
+ await close();const bakeryExit=await v(()=>{const d=__MOSS__.MAPS.mill_bakery.doors.find(d=>d.id==='main');return [d.x,d.y];});ok('走出面包房',await walkTo(p,...bakeryExit));await p.waitForFunction(()=>__MOSS__.state.sceneId==='mill_village');await p.waitForTimeout(450);
  ok('步行抵达议事屋',await walkTo(p,19,12));await faceTowards(p,19,11);await p.keyboard.press('e');await p.waitForFunction(()=>__MOSS__.state.sceneId==='mill_hall');await p.waitForTimeout(450);
  await contact('hall',9,6);await click('轮流取水 · 每天磨3批');await click('启动试运行 · 20分钟');
  const money=await v(()=>__MOSS__.state.coins);await click('验收试运行 · 奖励90金');

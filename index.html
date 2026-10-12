@@ -24,6 +24,7 @@
     </div>
     <div class="topbar-actions">
       <span id="saveState" class="save-state" role="status" aria-live="polite">已保存</span>
+      <button type="button" class="icon-btn wide" id="btnCharacter" aria-label="角色 (P)" title="角色 (P)">角色</button>
       <button type="button" class="icon-btn" id="btnRecords" aria-label="农务与矿山记录 (N)" title="农务与矿山记录 (N)">册</button>
       <button type="button" class="icon-btn" id="btnMenu" aria-label="暂停菜单" title="暂停菜单 (Esc)">☰</button>
     </div>
@@ -31,6 +32,7 @@
 
   <aside id="farmAssist" class="farm-assist" hidden aria-label="农场助手">
     <div id="dailyTasks" class="daily-tasks" role="status" aria-live="polite"></div>
+    <div id="todayPlan" class="today-plan" aria-label="今日安排" hidden></div>
     <button id="quickFood" class="btn sm primary" type="button" hidden>吃点东西</button>
     <section id="tutorialCard" class="tutorial-card" hidden aria-label="新手引导">
       <div class="tutorial-copy" aria-live="polite">
@@ -76,6 +78,7 @@
       <button type="button" class="tbtn tact-sm" id="touchCraft" aria-label="制作 (C)">制作</button>
       <button type="button" class="tbtn tact-sm" id="touchQuest" aria-label="任务 (J)">任务</button>
       <button type="button" class="tbtn tact-sm" id="touchMap" aria-label="全境地图与快速传送 (M)">地图</button>
+      <button type="button" class="tbtn tact-sm" id="touchChar" aria-label="角色 (P)">角色</button>
     </div>
   </div>
 

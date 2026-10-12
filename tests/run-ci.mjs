@@ -26,8 +26,9 @@ const FAST = [
 
 /* 第二层：真实浏览器流程 */
 const BROWSER = [
+  'run-r0-character-entry.mjs',
   'run-phase-c-mill.mjs', 'run-phase-c-meadow.mjs', 'run-phase-cde.mjs',
-  'run-phase-d-review.mjs', 'run-indoor-weather.mjs',
+  'run-phase-d-review.mjs', 'run-indoor-weather.mjs', 'run-indoor-doors.mjs',
   'run-v7-stageE-rules.mjs', 'run-v7-stageE-cloudpass.mjs', 'run-v7-stageE-extras.mjs',
   'run-v7-stageB.mjs', 'run-v7-stageB-soil.mjs', 'run-v7-audit-regressions.mjs',
   'run-v7-stageC.mjs', 'run-v7-stageC-heath.mjs', 'run-v7-stageC-interiors.mjs',

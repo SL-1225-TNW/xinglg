@@ -39,95 +39,95 @@
 | mine1 | 旧矿山 · 第 1 层 | 2 | 0 |
 | mine2 | 旧矿山 · 第 2 层 | 5 | 0 |
 | mine3 | 旧矿山 · 第 3 层 | 1 | 0 |
-| house | 农舍 | 5 | 0 |
-| city_castle | 白蔷薇城堡 | 1 | 0 |
-| city_library | 蔷薇图书馆 | 1 | 0 |
-| city_academy | 河岸学院 | 1 | 0 |
-| city_greenhouse | 蔷薇温室 | 1 | 0 |
-| city_bakery | 暖炉面包房 | 1 | 0 |
-| city_market | 城市商会 | 1 | 0 |
-| city_tailor | 丝带裁缝铺 | 1 | 0 |
-| city_bandstand | 蔷薇音乐亭 | 1 | 0 |
-| city_teahouse | 公园茶亭 | 1 | 0 |
-| city_keeper | 园丁小屋 | 1 | 0 |
-| city_cafe | 河岸茶室 | 1 | 0 |
-| city_smith | 白蔷薇铁匠铺 | 1 | 0 |
-| city_hall | 居民议事厅 | 1 | 0 |
-| city_inn | 南门旅馆 | 1 | 0 |
-| city_post | 驿站邮局 | 1 | 0 |
-| city_carriage | 南门马车站 | 1 | 0 |
-| city_stable | 南门马厩 | 1 | 0 |
-| city_quay_store | 河岸长条货仓 | 1 | 0 |
-| city_sawmill | 东岸锯木厂 | 1 | 0 |
-| city_foundry | 白蔷薇铸造车间 | 1 | 0 |
-| city_watermill | 河湾水力磨坊 | 1 | 0 |
-| city_boiler | 厂区锅炉房 | 1 | 0 |
-| city_shipyard | 船具修理棚 | 1 | 0 |
-| city_uni_main | 白蔷薇大学主楼 | 1 | 0 |
-| city_uni_wing | 大学教学楼 | 1 | 0 |
-| city_uni_lab | 自然史实验楼 | 1 | 0 |
-| city_uni_dorm | 学生宿舍院 | 1 | 0 |
-| city_bank | 白蔷薇国立银行 | 1 | 0 |
-| city_exchange | 谷物交易所 | 1 | 0 |
-| city_gold | 金库与票据所 | 1 | 0 |
-| city_market_hall | 中央市场大厅 | 1 | 0 |
-| city_townhall | 市政厅 | 1 | 0 |
-| city_home1 | 蔷薇街 1 号 | 1 | 0 |
-| city_home2 | 蔷薇街 2 号 | 1 | 0 |
-| city_home3 | 蔷薇街 3 号 | 1 | 0 |
-| city_home4 | 蔷薇街 4 号 | 1 | 0 |
-| city_home5 | 蔷薇街 5 号 | 1 | 0 |
-| city_home6 | 蔷薇街 6 号 | 1 | 0 |
-| city_home7 | 蔷薇街 7 号 | 1 | 0 |
-| city_home8 | 蔷薇街 8 号 | 1 | 0 |
-| city_home9 | 蔷薇街 9 号 | 1 | 0 |
-| city_home10 | 蔷薇街 10 号 | 1 | 0 |
-| city_home11 | 蔷薇街 11 号 | 1 | 0 |
-| city_home12 | 蔷薇街 12 号 | 1 | 0 |
-| city_home13 | 蔷薇街 13 号 | 1 | 0 |
-| city_home14 | 蔷薇街 14 号 | 1 | 0 |
-| city_home15 | 蔷薇街 15 号 | 1 | 0 |
-| city_home16 | 蔷薇街 16 号 | 1 | 0 |
-| city_home17 | 蔷薇街 17 号 | 1 | 0 |
-| city_home18 | 蔷薇街 18 号 | 1 | 0 |
-| city_home19 | 蔷薇街 19 号 | 1 | 0 |
-| city_home20 | 蔷薇街 20 号 | 1 | 0 |
-| city_home21 | 蔷薇街 21 号 | 1 | 0 |
-| city_home22 | 蔷薇街 22 号 | 1 | 0 |
-| city_home23 | 蔷薇街 23 号 | 1 | 0 |
-| city_home24 | 蔷薇街 24 号 | 1 | 0 |
+| house | 农舍 | 6 | 0 |
+| city_castle | 白蔷薇城堡 | 2 | 0 |
+| city_library | 蔷薇图书馆 | 2 | 0 |
+| city_academy | 河岸学院 | 2 | 0 |
+| city_greenhouse | 蔷薇温室 | 2 | 0 |
+| city_bakery | 暖炉面包房 | 2 | 0 |
+| city_market | 城市商会 | 2 | 0 |
+| city_tailor | 丝带裁缝铺 | 2 | 0 |
+| city_bandstand | 蔷薇音乐亭 | 2 | 0 |
+| city_teahouse | 公园茶亭 | 2 | 0 |
+| city_keeper | 园丁小屋 | 2 | 0 |
+| city_cafe | 河岸茶室 | 2 | 0 |
+| city_smith | 白蔷薇铁匠铺 | 2 | 0 |
+| city_hall | 居民议事厅 | 2 | 0 |
+| city_inn | 南门旅馆 | 2 | 0 |
+| city_post | 驿站邮局 | 2 | 0 |
+| city_carriage | 南门马车站 | 2 | 0 |
+| city_stable | 南门马厩 | 2 | 0 |
+| city_quay_store | 河岸长条货仓 | 2 | 0 |
+| city_sawmill | 东岸锯木厂 | 2 | 0 |
+| city_foundry | 白蔷薇铸造车间 | 2 | 0 |
+| city_watermill | 河湾水力磨坊 | 2 | 0 |
+| city_boiler | 厂区锅炉房 | 2 | 0 |
+| city_shipyard | 船具修理棚 | 2 | 0 |
+| city_uni_main | 白蔷薇大学主楼 | 2 | 0 |
+| city_uni_wing | 大学教学楼 | 2 | 0 |
+| city_uni_lab | 自然史实验楼 | 2 | 0 |
+| city_uni_dorm | 学生宿舍院 | 2 | 0 |
+| city_bank | 白蔷薇国立银行 | 2 | 0 |
+| city_exchange | 谷物交易所 | 2 | 0 |
+| city_gold | 金库与票据所 | 2 | 0 |
+| city_market_hall | 中央市场大厅 | 2 | 0 |
+| city_townhall | 市政厅 | 2 | 0 |
+| city_home1 | 蔷薇街 1 号 | 2 | 0 |
+| city_home2 | 蔷薇街 2 号 | 2 | 0 |
+| city_home3 | 蔷薇街 3 号 | 2 | 0 |
+| city_home4 | 蔷薇街 4 号 | 2 | 0 |
+| city_home5 | 蔷薇街 5 号 | 2 | 0 |
+| city_home6 | 蔷薇街 6 号 | 2 | 0 |
+| city_home7 | 蔷薇街 7 号 | 2 | 0 |
+| city_home8 | 蔷薇街 8 号 | 2 | 0 |
+| city_home9 | 蔷薇街 9 号 | 2 | 0 |
+| city_home10 | 蔷薇街 10 号 | 2 | 0 |
+| city_home11 | 蔷薇街 11 号 | 2 | 0 |
+| city_home12 | 蔷薇街 12 号 | 2 | 0 |
+| city_home13 | 蔷薇街 13 号 | 2 | 0 |
+| city_home14 | 蔷薇街 14 号 | 2 | 0 |
+| city_home15 | 蔷薇街 15 号 | 2 | 0 |
+| city_home16 | 蔷薇街 16 号 | 2 | 0 |
+| city_home17 | 蔷薇街 17 号 | 2 | 0 |
+| city_home18 | 蔷薇街 18 号 | 2 | 0 |
+| city_home19 | 蔷薇街 19 号 | 2 | 0 |
+| city_home20 | 蔷薇街 20 号 | 2 | 0 |
+| city_home21 | 蔷薇街 21 号 | 2 | 0 |
+| city_home22 | 蔷薇街 22 号 | 2 | 0 |
+| city_home23 | 蔷薇街 23 号 | 2 | 0 |
+| city_home24 | 蔷薇街 24 号 | 2 | 0 |
 | city | 白蔷薇城 | 56 | 56 |
-| mill_village | 风铃磨坊与麦田村 | 8 | 3 |
-| mill_workshop | 风铃磨坊 · 机房 | 2 | 0 |
-| mill_bakery | 麦田村 · 面包房 | 2 | 0 |
-| mill_hall | 麦田村 · 议事屋 | 1 | 0 |
+| mill_village | 风铃磨坊与麦田村 | 9 | 4 |
+| mill_workshop | 风铃磨坊 · 机房 | 4 | 0 |
+| mill_bakery | 麦田村 · 面包房 | 3 | 0 |
+| mill_hall | 麦田村 · 议事屋 | 2 | 0 |
 | meadow | 石楠草甸与牧场 | 9 | 2 |
-| meadow_barn | 石楠牧场 · 畜棚与工作间 | 1 | 0 |
-| meadow_vet | 石楠草甸 · 兽医小屋 | 1 | 0 |
+| meadow_barn | 石楠牧场 · 畜棚与工作间 | 2 | 0 |
+| meadow_vet | 石楠草甸 · 兽医小屋 | 2 | 0 |
 | wetland | 芦苇湿地与观测栈道 | 5 | 1 |
-| wetland_observation | 芦苇湿地 · 观测屋 | 2 | 0 |
+| wetland_observation | 芦苇湿地 · 观测屋 | 3 | 0 |
 | vineyard | 金叶葡萄园与乡村庄园 | 3 | 2 |
 | clinic | 白鸢修道院与医舍 | 2 | 2 |
 | port | 下游河港与船闸 | 2 | 2 |
 | quarry | 石灰采场与材料工地 | 2 | 1 |
 | waterworks | 水库堤坝与水利站 | 2 | 1 |
-| vineyard_press | 金叶庄园 · 压榨房 | 1 | 0 |
-| vineyard_cellar | 金叶庄园 · 酒窖与储藏室 | 1 | 0 |
-| clinic_ward | 白鸢医舍 · 诊疗室 | 1 | 0 |
-| clinic_archive | 白鸢修道院 · 档案室 | 1 | 0 |
-| port_office | 下游河港 · 船务屋 | 1 | 0 |
-| port_lockhouse | 河港船闸 · 值守室 | 2 | 0 |
-| quarry_shed | 石灰采场 · 测量与石料棚 | 1 | 0 |
-| waterworks_control | 水利站 · 闸门控制室 | 1 | 0 |
+| vineyard_press | 金叶庄园 · 压榨房 | 2 | 0 |
+| vineyard_cellar | 金叶庄园 · 酒窖与储藏室 | 2 | 0 |
+| clinic_ward | 白鸢医舍 · 诊疗室 | 2 | 0 |
+| clinic_archive | 白鸢修道院 · 档案室 | 2 | 0 |
+| port_office | 下游河港 · 船务屋 | 2 | 0 |
+| port_lockhouse | 河港船闸 · 值守室 | 3 | 0 |
+| quarry_shed | 石灰采场 · 测量与石料棚 | 2 | 0 |
+| waterworks_control | 水利站 · 闸门控制室 | 2 | 0 |
 | cloud_pass | 云峰山口 | 3 | 0 |
 | border_camp | 云峰边境营地 | 3 | 2 |
 | old_road | 古道遗址调查区 | 3 | 1 |
 | neighbor_border | 北境邻领边城 | 3 | 2 |
-| border_barracks | 云峰营地 · 值守与指挥室 | 4 | 0 |
-| border_depot | 云峰营地 · 军需库 | 3 | 0 |
-| oldroad_survey | 古道遗址 · 调查站 | 1 | 0 |
-| neighbor_office | 北境边城 · 领地联络处 | 1 | 0 |
-| neighbor_exchange | 北境边城 · 互市行栈 | 1 | 0 |
+| border_barracks | 云峰营地 · 值守与指挥室 | 5 | 0 |
+| border_depot | 云峰营地 · 军需库 | 4 | 0 |
+| oldroad_survey | 古道遗址 · 调查站 | 2 | 0 |
+| neighbor_office | 北境边城 · 领地联络处 | 2 | 0 |
+| neighbor_exchange | 北境边城 · 互市行栈 | 2 | 0 |
 
 门／出口只统计交互对象的 to 引用；不包含地图边缘 exits，不能据此判断是否可达。
 
@@ -159,5 +159,9 @@
 - 工程师：签署、事故两分支、任职、一次预算和说明会已有界面回归；施工委托尚未实现，事故目前为即时脚本事件。
 - 替代路线：授权分层与读档已测试；巡林入门仍循环依赖边境巡防，商旅首个事件仍依赖湿地开放河港。尚不能宣称三条路线均可独立从新档走通。
 - 军队招募和装备合同已有首轮玩法；账本以 militaryLife.core 和 institution 为准，旧职级字段是兼容视图。
-- 五属性、天赋、新年历、完整职业任期和银行家金融系统仍待实施。
-- 详细接手审查与后续顺序见 docs/takeover-review-2026-10-11.md。
+- 角色常驻入口已交付：顶栏「角色」、键盘 P、手机按钮与暂停菜单都能打开，属性/天赋/武器/经历四页始终可查看。角色等级与五属性、经验、天赋点数、个人刀剑及装备/升级/战斗界面仍待实施；军需装备合同不是个人武器系统。
+- R0 的交付范围与证据见 [R0 入口与真实状态](r0-entry-and-honest-status.md)；入口已交付不等于角色系统完成。
+- 新年历、长期照料委托、完整职业任期和银行家金融系统仍待实施。
+- 室内门已统一配置；具体门洞、通行与双入口验收见 docs/indoor-doors-plan.md。
+- 当前唯一总规为 [第八版](../游戏总体规划.md)，按 R0—R5 实施；旧 A—E 只表示历史地区批次。
+- 当前玩家视角与证据边界见 [2026-10-12 审查](player-review-20261012.md)，历史接手审查见 takeover-review-2026-10-11.md。

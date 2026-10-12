@@ -13,7 +13,7 @@ try{
  const click=n=>p.getByRole('button',{name:n,exact:true}).click();
  const contact=async(site,x,y)=>{await close();const s=await p.evaluate(site=>__MOSS__.meadowSites[site],site);ok('实际步行到 '+site,await walkTo(p,x,y));await faceTowards(p,s.x,s.y);await p.keyboard.press('e');await p.waitForFunction(()=>__MOSS__.ui.window?.id==='meadowlife');};
  const enter=async(x,y,scene)=>{await close();ok('步行至 '+scene+' 门',await walkTo(p,x,y+1));await faceTowards(p,x,y);await p.keyboard.press('e');await p.waitForFunction(sc=>__MOSS__.state.sceneId===sc,scene);await p.waitForTimeout(450);};
- const exit=async()=>{await close();const dest=await v(()=>[Math.floor(__MOSS__.MAPS[__MOSS__.state.sceneId].w/2),__MOSS__.MAPS[__MOSS__.state.sceneId].h-1]);ok('步行离开室内',await walkTo(p,...dest));await p.waitForFunction(()=>__MOSS__.state.sceneId==='meadow');await p.waitForTimeout(450);};
+ const exit=async()=>{await close();const dest=await v(()=>{const d=__MOSS__.MAPS[__MOSS__.state.sceneId].doors.find(d=>d.id==='main');return [d.x,d.y];});ok('步行离开室内',await walkTo(p,...dest));await p.waitForFunction(()=>__MOSS__.state.sceneId==='meadow');await p.waitForTimeout(450);};
  const night=async()=>{await close();await v(()=>{__MOSS__.performSettlement(false);__MOSS__.closeWindow();});};
  eq('旧档缺草甸字段默认为空',await v(()=>__MOSS__.normalizeSaveForTest({...__MOSS__.serialize(),meadowLife:undefined}).meadowLife.feedDays),[]);
  eq('未到访不能地图传送',await v(()=>__MOSS__.travelPreview('meadow.pasture').ok),false);

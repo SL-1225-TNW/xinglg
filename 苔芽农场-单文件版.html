@@ -136,6 +136,8 @@ button{font-family:inherit}
 }
 .icon-btn:hover{background:var(--panel-3)}
 .icon-btn:active{transform:translateY(1px)}
+/* 第八版 §3.1：角色入口必须能被读出来，不能只留一个含义不明的单字图标。 */
+.icon-btn.wide{width:auto;min-width:38px;padding:0 10px;font-size:14px}
 
 /* ---------------- 舞台 ---------------- */
 .farm-assist{
@@ -144,6 +146,30 @@ button{font-family:inherit}
 }
 .farm-assist[hidden],.tutorial-card[hidden],.tutorial-actions button[hidden]{display:none}
 .daily-tasks{padding:3px 10px;color:#c8dcb6;font-size:12px}
+/* 第八版 §3.2：今日安排只保留三行——一个追踪目标、一件可选的事、
+   以及未开放预告。不把磨坊、牧场、湿地和军队同时堆上来催人。 */
+.today-plan{
+  display:flex;flex-wrap:wrap;gap:6px;padding:0 10px 3px;font-size:12px;
+}
+.today-plan[hidden]{display:none}
+/* 委托日志内联的同一份三行：窗口里有自己的底色，不吃农场助手那层浮层 */
+.today-plan.in-window{background:#1e3129;border:1px solid #4e6a56;border-radius:6px;padding:5px 7px}
+.today-plan.in-window .today-item{background:rgba(40,62,50,.85)}
+.today-item{
+  display:inline-flex;align-items:center;gap:6px;max-width:100%;
+  padding:2px 8px;border:1px solid #4e6a56;border-radius:6px;
+  background:rgba(26,42,34,.72);color:#e4e0c8;cursor:pointer;
+  font:inherit;font-size:12px;text-align:left;
+}
+.today-item:hover{background:rgba(46,70,56,.9)}
+.today-item .tier{
+  flex:0 0 auto;padding:0 5px;border-radius:4px;font-size:11px;
+  background:#3d5a4b;color:#dfe8c8;
+}
+.today-item.must .tier{background:#7a4a33;color:#ffe9d6}
+.today-item.soon .tier{background:#4a5f33;color:#e8f2cf}
+.today-item.later .tier{background:#3a4a5a;color:#d6e2ee}
+.today-item .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tutorial-card{
   display:flex;align-items:center;gap:12px;padding:10px 12px;
   border:1px solid #968052;border-left:3px solid var(--hint);border-radius:8px;
@@ -161,6 +187,8 @@ button{font-family:inherit}
   .tutorial-actions{margin-left:auto}
   .tutorial-actions .btn{min-height:44px;padding:4px 10px}
   .daily-tasks{padding:2px 5px;font-size:11px}
+  .today-plan{padding:0 5px 2px;font-size:11px;gap:4px}
+  .today-item{padding:1px 6px;font-size:11px}
 }
 /* 横屏手机：垂直空间紧张，引导卡改为贴在舞台顶部的浮层，不占布局高度，
    画布因此不再被压矮；--assist-top 由 resizeCanvas 按舞台实际位置写入。 */
@@ -401,6 +429,7 @@ button{font-family:inherit}
 .travel-panel{margin-top:10px;padding:10px 12px;background:#f3ecd6;border:1px solid #a99b74;border-radius:5px;display:flex;flex-direction:column;gap:7px}
 .travel-panel p{margin:0}
 .travel-line{font-size:14px;color:#33452f;font-variant-numeric:tabular-nums}
+.travel-note{font-size:12px;color:#5c6a4e;line-height:1.5}
 .travel-cost{font-size:13px;color:#5c6a4e}
 .travel-cost.free{color:#2f6b3d;font-weight:600}
 .travel-blocked{font-size:13px;color:#8a5a2b;background:#f0e2c4;border:1px dashed #b08d55;border-radius:4px;padding:7px 9px}
@@ -491,6 +520,36 @@ button{font-family:inherit}
 }
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .row.end{justify-content:flex-end}
+
+/* ---------------- 角色窗口（第八版 §3 / §4 R0） ---------------- */
+.char-tabs{gap:6px;margin-bottom:2px}
+.quest-next{font-size:12px;color:var(--hint);line-height:1.5;margin-top:3px}
+.char-note{margin:4px 0 6px}
+.char-box{margin-top:8px}
+.char-row{padding:3px 0;border-bottom:1px dashed rgba(120,150,110,.22)}
+.char-row:last-child{border-bottom:none}
+.char-key{font-size:13px;color:var(--paper)}
+.char-val{font-size:12px;color:var(--hint);text-align:right;max-width:62%}
+.char-val.ok{color:#9ed08a}
+.char-val.muted{color:var(--text-dim)}
+.char-attr{padding:6px 0;border-bottom:1px dashed rgba(120,150,110,.22)}
+.char-attr:last-child{border-bottom:none}
+.char-attr-name{font-size:13px;color:var(--paper)}
+.char-attr-use,.char-attr-edge{font-size:12px;color:var(--text-dim);line-height:1.5}
+.char-talent{padding:7px 0;border-bottom:1px dashed rgba(120,150,110,.22)}
+.char-talent:last-child{border-bottom:none}
+.char-talent-name{font-size:13px;color:var(--paper)}
+.char-talent-desc{font-size:12px;color:var(--paper);line-height:1.5}
+.char-talent-meta,.char-talent-where{font-size:11px;color:var(--text-dim);line-height:1.5}
+.char-later{
+  margin-top:6px;padding:6px 8px;font-size:12px;line-height:1.5;
+  border:1px dashed #4e6a56;border-radius:6px;color:var(--text-dim);
+}
+.char-chain{margin-top:6px}
+.char-chain-row{padding:4px 0}
+.char-chain-stage{font-size:12px;color:var(--paper)}
+.char-chain-cost{font-size:12px;color:var(--hint);text-align:right}
+.char-chain-gate{font-size:11px;color:var(--text-dim);padding-bottom:4px}
 .row.between{justify-content:space-between}
 .spacer{flex:1 1 auto}
 .muted{color:var(--text-dim);font-size:12px}
@@ -877,6 +936,7 @@ html.immersive .quest-strip{top:auto;bottom:80px;left:6px}
   .tutorial-card{flex-wrap:wrap;padding:3px 6px}
   .tutorial-actions{margin-left:auto}
   .daily-tasks{display:none}
+  .today-plan{display:none}
   .touch{bottom:calc(var(--dock-h) + env(safe-area-inset-bottom) + 4px)}
 }
 
@@ -1060,6 +1120,7 @@ html.compact-play[data-device="tablet"] .tact-sm{width:44px;height:44px}
     </div>
     <div class="topbar-actions">
       <span id="saveState" class="save-state" role="status" aria-live="polite">已保存</span>
+      <button type="button" class="icon-btn wide" id="btnCharacter" aria-label="角色 (P)" title="角色 (P)">角色</button>
       <button type="button" class="icon-btn" id="btnRecords" aria-label="农务与矿山记录 (N)" title="农务与矿山记录 (N)">册</button>
       <button type="button" class="icon-btn" id="btnMenu" aria-label="暂停菜单" title="暂停菜单 (Esc)">☰</button>
     </div>
@@ -1067,6 +1128,7 @@ html.compact-play[data-device="tablet"] .tact-sm{width:44px;height:44px}
 
   <aside id="farmAssist" class="farm-assist" hidden aria-label="农场助手">
     <div id="dailyTasks" class="daily-tasks" role="status" aria-live="polite"></div>
+    <div id="todayPlan" class="today-plan" aria-label="今日安排" hidden></div>
     <button id="quickFood" class="btn sm primary" type="button" hidden>吃点东西</button>
     <section id="tutorialCard" class="tutorial-card" hidden aria-label="新手引导">
       <div class="tutorial-copy" aria-live="polite">
@@ -1112,6 +1174,7 @@ html.compact-play[data-device="tablet"] .tact-sm{width:44px;height:44px}
       <button type="button" class="tbtn tact-sm" id="touchCraft" aria-label="制作 (C)">制作</button>
       <button type="button" class="tbtn tact-sm" id="touchQuest" aria-label="任务 (J)">任务</button>
       <button type="button" class="tbtn tact-sm" id="touchMap" aria-label="全境地图与快速传送 (M)">地图</button>
+      <button type="button" class="tbtn tact-sm" id="touchChar" aria-label="角色 (P)">角色</button>
     </div>
   </div>
 
@@ -3184,6 +3247,123 @@ function findPath(sceneId, sx, sy, tx, ty) {
 }
 
 /* --- 出口 --- */
+/* 门配置是室内门洞、外观、出口与落点的唯一来源；保留 exits 供移动引擎使用。 */
+function doorTiles(door) {
+  var tiles = [];
+  for (var i = 0; i < door.width; i++) tiles.push([
+    door.x + ((door.side === 'north' || door.side === 'south') ? i : 0),
+    door.y + ((door.side === 'east' || door.side === 'west') ? i : 0)
+  ]);
+  return tiles;
+}
+function doorInward(side) {
+  return side === 'north' ? [0, 1] : side === 'south' ? [0, -1] : side === 'west' ? [1, 0] : [-1, 0];
+}
+function doorFurnitureAt(sceneId, x, y) {
+  var map = MAPS[sceneId], list = (map.roomDef && map.roomDef.props) ||
+    (sceneId === 'house' ? HOUSE_FURNITURE : INTERIOR_FURNITURE[sceneId]) ||
+    (typeof MILL_LIFE_FURNITURE !== 'undefined' && MILL_LIFE_FURNITURE[sceneId]) || [];
+  return list.some(function (f) {
+    if (f.flat) return false;
+    if (f.tiles) return f.tiles.some(function (t) { return t[0] === x && t[1] === y; });
+    return x >= f.x && x < f.x + f.w && y >= f.y && y < f.y + f.h;
+  });
+}
+function installIndoorDoors(sceneId, definitions) {
+  var map = MAPS[sceneId];
+  if (!map || !map.indoor) throw new Error('门必须属于室内：' + sceneId);
+  if (!Array.isArray(definitions) || !definitions.length) throw new Error('室内必须保留至少一扇门：' + sceneId);
+  var occupied = {}, ids = {};
+  var doors = definitions.map(function (def) {
+    var d = Object.assign({ width: 1, style: 'wood' }, def), inward = doorInward(d.side);
+    if (!d.id || ids[d.id] || ['north', 'south', 'east', 'west'].indexOf(d.side) < 0 ||
+        !Number.isInteger(d.width) || d.width < 1) throw new Error('无效门配置：' + sceneId);
+    ids[d.id] = true;
+    if (!MAPS[d.to] || !Number.isInteger(d.tx) || !Number.isInteger(d.ty) ||
+        d.tx < 0 || d.ty < 0 || d.tx >= MAPS[d.to].w || d.ty >= MAPS[d.to].h ||
+        MAPS[d.to].solid[d.tx][d.ty] || doorFurnitureAt(d.to, d.tx, d.ty) ||
+        (MAPS[d.to].exits || []).some(function (e) { return e.x === d.tx && e.y === d.ty; }))
+      throw new Error('门外落点不可用：' + sceneId + '/' + d.id);
+    var tiles = doorTiles(d);
+    d.stand = tiles.map(function (t) { return [t[0] + inward[0], t[1] + inward[1]]; });
+    tiles.forEach(function (t, i) {
+      var x = t[0], y = t[1], s = d.stand[i];
+      var onWall = d.side === 'north' ? y === 0 : d.side === 'south' ? y === map.h - 1 :
+        d.side === 'west' ? x === 0 : x === map.w - 1;
+      if (!Number.isInteger(x) || !Number.isInteger(y) || !onWall ||
+          x < 0 || y < 0 || x >= map.w || y >= map.h ||
+          ((x === 0 || x === map.w - 1) && (y === 0 || y === map.h - 1)) || occupied[x + ',' + y] ||
+          doorFurnitureAt(sceneId, x, y) || doorFurnitureAt(sceneId, s[0], s[1]) || map.solid[s[0]][s[1]])
+        throw new Error('门洞或门前通道被占用：' + sceneId + '/' + d.id);
+      occupied[x + ',' + y] = true;
+    });
+    d.enter = d.enter || { x: d.stand[0][0], y: d.stand[0][1] };
+    if (!d.stand.some(function (s) { return s[0] === d.enter.x && s[1] === d.enter.y; }))
+      throw new Error('进门落点必须在门内侧：' + sceneId + '/' + d.id);
+    d.label = d.label || '返回' + MAPS[d.to].name;
+    return d;
+  });
+  // 全部验证后才更新，配置失败不会留下半扇门或擦掉家具碰撞。
+  (map.exits || []).forEach(function (e) {
+    if (e.x === 0 || e.y === 0 || e.x === map.w - 1 || e.y === map.h - 1) {
+      map.solid[e.x][e.y] = 1;
+      map.t[e.x][e.y] = map.roomDef ? T_BUILDING : T_WALL;
+    }
+  });
+  map.doors = doors;
+  map.exits = [];
+  INTERACTABLES[sceneId] = (INTERACTABLES[sceneId] || []).filter(function (it) { return it.kind !== 'indoorExit'; });
+  doors.forEach(function (d) {
+    doorTiles(d).forEach(function (t) {
+      map.solid[t[0]][t[1]] = 0;
+      map.t[t[0]][t[1]] = map.roomDef ? T_PATH : T_FLOOR;
+      map.exits.push({ x: t[0], y: t[1], to: d.to, tx: d.tx, ty: d.ty, doorId: d.id, side: d.side });
+    });
+    INTERACTABLES[sceneId].push({ id: 'exit_' + d.id, kind: 'indoorExit', x: d.x, y: d.y,
+      stand: d.stand, label: d.label, doorId: d.id });
+  });
+  map.enter = doors.length ? doors[0].enter : null;
+  delete map._roomCanvas;
+  if (typeof groundChunks !== 'undefined') { delete groundChunks[sceneId]; delete groundChunkOrder[sceneId]; }
+}
+function enterIndoorDoor(it) {
+  var room = MAPS[it.to];
+  var door = room && (room.doors || []).filter(function (d) { return d.id === (it.doorId || 'main'); })[0];
+  if (!door) { toast('这扇门尚未连接。'); return; }
+  if (it.stand && !it.stand.concat([[it.x, it.y]]).some(function (p) {
+    return p[0] === state.player.x && p[1] === state.player.y;
+  })) { toast('请走到门旁再进入。'); return; }
+  doSwitchScene(it.to, door.enter.x, door.enter.y);
+}
+function useIndoorExit(it) {
+  var map = MAPS[state.sceneId];
+  var d = (map.doors || []).filter(function (door) { return door.id === it.doorId; })[0];
+  if (!d || !doorTiles(d).concat(d.stand).some(function (p) {
+    return p[0] === state.player.x && p[1] === state.player.y;
+  })) { toast('请走到门旁再出门。'); return; }
+  doSwitchScene(d.to, d.tx, d.ty);
+}
+function drawIndoorDoors(g, map) {
+  (map.doors || []).forEach(function (d) {
+    var x = d.x * TILE, y = d.y * TILE, w = d.width * TILE;
+    var frame = d.style === 'stone' ? '#B2AAA0' : d.style === 'iron' ? '#89958D' : '#98734C';
+    g.save();
+    if (d.side === 'north') g.translate(x, y);
+    else if (d.side === 'south') g.transform(1, 0, 0, -1, x, y + TILE);
+    else if (d.side === 'west') g.transform(0, 1, 1, 0, x, y);
+    else g.transform(0, 1, -1, 0, x + TILE, y);
+    // 暗门洞盖住墙线，框与门槛围住真正可走的格子；地垫朝向室内。
+    px(g, 0, 0, w, TILE, '#302820');
+    px(g, 1, 1, w - 2, TILE - 2, '#544537');
+    px(g, 0, 0, 2, TILE, frame); px(g, w - 2, 0, 2, TILE, frame);
+    px(g, 0, 0, w, 2, frame); px(g, 2, TILE - 3, w - 4, 3, '#C2AE7A');
+    px(g, 2, TILE + 1, w - 4, 7, '#6B7960'); px(g, 4, TILE + 3, w - 8, 1, '#ADAA78');
+    var cx = Math.floor(w / 2);
+    px(g, cx - 1, 5, 2, 6, '#EFD18B'); px(g, cx - 3, 7, 6, 2, '#EFD18B');
+    px(g, cx - 2, 6, 4, 1, '#EFD18B');
+    g.restore();
+  });
+}
 var sceneSwitch = { busy: false };
 function checkExit() {
   var map = MAPS[state.sceneId];
@@ -6525,6 +6705,7 @@ function cityRoomCanvas(map) {
     var f = CITY_PROPS[p.t];
     if (f) f(g, p);
   });
+  drawIndoorDoors(g, map);
   map._roomCanvas = c;
   return c;
 }
@@ -8213,6 +8394,40 @@ function currentQuest() {
   for (var i = 0; i < QUESTS.length; i++) if (questState(QUESTS[i].id) === 'unlocked') return QUESTS[i];
   return null;
 }
+/* 第八版 §12.1：任务要写清"下一步"和真正卡住的地方。
+   材料不足、时间不足、背包满、离设施太远是四种不同的原因，
+   不能都只显示成"不能交付"。
+
+   这里直接读 q.need 和背包，不去反向解析 questNeedText 的展示字符串：
+   展示格式一改，解析就会静默变成 NaN 并永远显示"材料不足"。 */
+function questMissingText(q) {
+  var out = [];
+  Object.keys(q.need).forEach(function (k) {
+    if (k === 'anyFish') {
+      var n = anyFishIn(state.inventory);
+      if (n < 1) out.push('任意鱼 ' + (n > 0 ? n : 0) + ' / 1');
+      return;
+    }
+    var have = state.inventory[k] || 0;
+    if (have < q.need[k]) out.push(itemName(k) + ' ' + have + ' / ' + q.need[k]);
+  });
+  return out;
+}
+function questNextStepText(q) {
+  var st = questState(q.id);
+  if (st === 'done') return '已完成 · ' + q.rewardText;
+  if (st === 'locked') {
+    var prev = null;
+    for (var i = 0; i < QUESTS.length; i++) if (QUESTS[i].id < q.id) prev = QUESTS[i];
+    return '未解锁 · 先完成「' + (prev ? prev.name : '第一份收成') + '」';
+  }
+  if (!questReady(q)) return '先凑齐材料 → ' + questMissingText(q).join('、');
+  var t = questTargetOf(q);
+  if (!t) return '材料已齐 · 前往任务板交付';
+  var here = t.scene === state.sceneId;
+  var where = here ? '走到' + t.label : '前往' + MAPS[t.scene].name + '的' + t.label;
+  return '材料已齐 · ' + where + ' 交付' + (here ? '（' + questDistText(t.x - state.player.x, t.y - state.player.y) + '）' : '');
+}
 function questStripText() {
   var q = currentQuest();
   if (!q) return '所有委托都完成了，去钓鱼或继续经营农场吧。';
@@ -8647,6 +8862,90 @@ function setTutorialStatus(status) {
   toast(status === 'skipped' ? '已跳过教程，可从暂停菜单继续。' : status === 'paused' ? '引导已暂停，进度已保存。' : '继续新手引导，已完成的操作会保留。');
 }
 function assistText(id, text) { var n = $(id); if (n && n.textContent !== text) n.textContent = text; }
+
+/* 第八版 §3.2：今日安排只保留三件事——一个当前追踪、一件今天
+   有空可做的、一个未开放预告。磨坊、牧场、湿地和军队不会同时
+   出现在新档的第一天；没接的长期合同不催办。 */
+function todayPlanItems() {
+  var out = [], e = exploreState();
+  /* 真有紧急才用"必办"：体力见底，或追踪目标已经可以直接交付。
+     没有紧急时不硬凑一档红色，避免把普通的一天说成必须马上处理。 */
+  if (state.energy <= 20) {
+    out.push({
+      tier: 'must', tag: '必办', text: '体力 ' + state.energy + ' · 吃点东西或早点休息',
+      open: function () { openBag(); }
+    });
+  }
+  var q = currentQuest();
+  if (q) {
+    var ready = questReady(q);
+    out.push({
+      tier: ready ? 'must' : 'soon', tag: '追踪',
+      text: (ready ? '可交付 · ' : '') + q.id + '. ' + q.name,
+      open: function () { QUEST_TAB = 'main'; openQuestLog(null); }
+    });
+  } else if (questState(1) !== 'done') {
+    out.push({ tier: 'soon', tag: '追踪', text: '第一份收成 · 带 3 颗萝卜去小镇任务板', open: function () { QUEST_TAB = 'main'; openQuestLog(null); } });
+  }
+
+  var ids = [], i;
+  try { ids = activeDailyJobIds() || []; } catch (err) { ids = []; }
+  for (i = 0; i < ids.length; i++) {
+    var job = LIVING_JOBS[ids[i]];
+    if (!job || e.jobs[ids[i]] === state.totalDay) continue;
+    out.push({
+      tier: 'soon', tag: '可做', text: job.title + ' · ' + job.coins + ' 金',
+      open: function () { QUEST_TAB = 'daily'; openQuestLog('board'); }
+    });
+    break;                                   // 只给一件，避免把一天摊成清单
+  }
+
+  var later;
+  if (!state.bridgeRepaired) later = '雾杉森林与旧矿山 · 先修好小镇东侧小桥';
+  else if (!e.forest) later = '雾杉森林 · 到小镇北口路牌修复入口';
+  else if (!e.mine) later = '旧矿山 · 修复支撑梁与轨道（木材 20、石料 10）';
+  else if (!e.city) later = '白蔷薇城 · 修好桥后办理通行证（150 金）';
+  else if (!professionalLifeState().passes.visit) later = '云峰山口与邻领边城 · 先走通工程、商旅或巡林任一路线';
+  if (later) out.push({ tier: 'later', tag: '未开放', text: later, open: function () { openWorldMap(); } });
+  return out;
+}
+var TODAY_PLAN_SIG = '';
+function renderTodayPlan() {
+  var box = $('#todayPlan');
+  if (!box) return;
+  var items = todayPlanItems();
+  /* 助手每 0.2 秒刷新一次；内容没变就不重建，否则会打断键盘焦点
+     并反复重排三个按钮。只在真的变了才动 DOM。 */
+  var sig = items.map(function (it) { return it.tier + ':' + it.text; }).join('|');
+  if (sig === TODAY_PLAN_SIG) return;
+  TODAY_PLAN_SIG = sig;
+  if (!items.length) { box.hidden = true; box.innerHTML = ''; return; }
+  box.hidden = false;
+  box.innerHTML = '';
+  items.forEach(function (it) {
+    var b = el('button', 'today-item ' + it.tier);
+    b.type = 'button';
+    b.appendChild(el('span', 'tier', it.tag));
+    b.appendChild(el('span', 'txt', it.text));
+    b.onclick = function () { if (UI.window) closeWindow(); it.open(); };
+    box.appendChild(b);
+  });
+}
+function appendTodayPlan(parent, hint) {
+  var items = todayPlanItems();
+  if (!items.length) return;
+  var box = el('div', 'today-plan in-window');
+  items.forEach(function (it) {
+    var b = el('button', 'today-item ' + it.tier);
+    b.type = 'button';
+    b.appendChild(el('span', 'tier', it.tag));
+    b.appendChild(el('span', 'txt', it.text));
+    b.onclick = function () { it.open(); };
+    box.appendChild(b);
+  });
+  parent.appendChild(el('div', 'muted', hint || '今日安排 · 一个追踪目标、一件可做的事和一个未开放预告'));
+  parent.appendChild(box);
+}
 function refreshFarmAssist() {
   if (!state || !canvas) return;
   var box = $('#farmAssist'), card = $('#tutorialCard');
@@ -8662,6 +8961,7 @@ function refreshFarmAssist() {
   }
   assistText('#dailyTasks', '今日待办 · ' + (a.planted ?
     ('待浇水 ' + a.dry + ' 块 · 可收获 ' + a.ready + ' 株' + (isRaining() ? ' · 雨天自动浇水' : a.dry === 0 ? ' · 田地已照料好' : '')) : '还没种菜，选种子开始吧'));
+  renderTodayPlan();
   card.hidden = t.status !== 'active' && t.status !== 'paused';
   assistText('#tutorialTitle', t.status === 'paused' ? '新手引导已暂停 · 进度保留' : '新手引导 ' + (step + 1) + '/9 · ' + TUTORIAL_TITLES[step]);
   assistText('#tutorialText', t.status === 'paused' ? '可以自由探索，准备好后继续。' : tutorialCopy(step));
@@ -8798,8 +9098,16 @@ function questMarkerTargets() {
 /* 目标在别的场景时，先给出"通往那个场景的出口"，玩家照直走就能到。 */
 function questExitTile() {
   var s = state.sceneId;
+  var map = MAPS[s];
+  if (map && map.indoor && map.doors) {
+    var p = state.player, best = null, distance = Infinity;
+    map.doors.forEach(function (d) {
+      var path = findPath(s, p.x, p.y, d.x, d.y);
+      if (path && path.length < distance) { best = [d.x, d.y]; distance = path.length; }
+    });
+    return best;
+  }
   if (s === 'farm') return [31, 10];
-  if (s === 'house') return [7, 11];
   if (s === 'riverside') return [0, 10];
   if (s === 'town') return [0, 10];
   return null;
@@ -9685,6 +9993,9 @@ function openQuestLog(site) {
         var btn=mkBtn(t[1],QUEST_TAB===t[0]?'primary':'sm',function(){QUEST_TAB=t[0];renderWindow();});
         tabs.appendChild(btn);
       });b.appendChild(tabs);
+      /* 手机横屏（矮屏）下农场助手会隐藏今日安排，这里内联同一份三行，
+         保证"今天该做什么"在任何屏幕上都有可点入口（§3.2）。 */
+      if(QUEST_TAB==='main')appendTodayPlan(b);
       b.appendChild(mkBtn('石楠草甸 · '+meadowTaskText(),'sm',function(){openMeadowLife('journal');}));
       b.appendChild(mkBtn('风铃磨坊 · '+millLifeTaskText(),'sm',function(){openMillLife('journal');}));
       if(QUEST_TAB==='daily'){
@@ -9713,6 +10024,7 @@ function openQuestLog(site) {
           var reqs=el('div','quest-req');questNeedText(q).forEach(function(t){var parts=t.split(' '),have=parseInt(parts[parts.length-3],10),need=parseInt(parts[parts.length-1],10);reqs.appendChild(el('span','req-chip '+(have>=need?'ok':'no'),t));});box.appendChild(reqs);
           var tgt=questTargetOf(q);if(tgt){var distLine;if(tgt.scene===state.sceneId)distLine='交付点：'+tgt.label+' · '+questDistText(tgt.x-state.player.x,tgt.y-state.player.y);else{var ex=questExitTile();distLine='交付点：'+tgt.label+'（在'+MAPS[tgt.scene].name+'）'+(ex?' · 先往出口走，'+questDistText(ex[0]-state.player.x,ex[1]-state.player.y):'');}box.appendChild(el('div','item-desc',distLine));}
           box.appendChild(el('div','item-desc','奖励：'+q.rewardText));
+          box.appendChild(el('div','quest-next','下一步：'+questNextStepText(q)));
           if(stt==='unlocked'){var canHere=site&&(q.scene===site),acts=el('div','item-actions'),btn=mkBtn(canHere?'交付材料':(q.scene==='bridge'?'到小桥施工点交付':'到任务板交付'),canHere?'primary':'sm',function(){if(submitQuest(q.id)){refreshWindow();refreshHotbar();}});btn.disabled=!canHere;acts.appendChild(btn);box.appendChild(acts);}
         }else box.appendChild(el('div','item-desc','完成上一个委托后解锁。'));
         b.appendChild(box);
@@ -10817,6 +11129,7 @@ function openPause() {
       b.appendChild(s);
 
       var row = el('div', 'row');
+      row.appendChild(mkBtn('角色（P）', '', function () { openCharacter(); }));
       row.appendChild(mkBtn('帮助与操作', '', function () { openHelp(); }));
       row.appendChild(mkBtn('全境地图（M）', '', function () { openWorldMap(); }));
       row.appendChild(mkBtn('森林书（F）', '', function () { openFieldJournal(); }));
@@ -10842,12 +11155,267 @@ function openPause() {
       b.appendChild(danger);
     },
     actions: [
+      { label: '角色（P）', close: false, onClick: function () { openCharacter(); } },
       { label: '帮助与操作', close: false, onClick: function () { openHelp(); } },
       { label: '结束今天', close: false, onClick: function () { requestSleep(); } },
       { label: '继续游戏', kind: 'primary', close: true }
     ]
   });
 }
+
+/* ============================================================
+   第八版 §3 / §4 · R0：角色常驻入口与四页真实状态
+   ------------------------------------------------------------
+   R0 只负责两件事：玩家找得到入口，并且看到的都是真话。
+
+   角色等级、五属性、经验与天赋点数属于 R1；个人刀剑、装备槽
+   与训练属于 R2。在它们真正接通之前，这一节只列出规划规则和
+   游戏里已经存在的真实记录，不放可购买的按钮，也不把探索度、
+   军衔或军需采购写成角色成长（§4.1、§5.1、§6、§15）。
+
+   四个页签始终可以查看：找不到入口的页签，等于把状态藏起来。 */
+
+var CHAR_TABS = [
+  { id: 'attr', name: '属性' },
+  { id: 'talent', name: '天赋' },
+  { id: 'weapon', name: '武器' },
+  { id: 'history', name: '经历' }
+];
+var CHAR_TAB = 'attr';
+
+/* §4.1 的规划规则常量：只用来如实展示预算和开放阶段。
+   玩家此时并没有这些点数，页面不会把它们显示成已经分配。 */
+var CHAR_RULE = {
+  attrBase: 5, attrCap: 20, createPoints: 10,
+  levelCap: 25, phase1Level: 10,
+  budgetPhase1: 44, budgetTotal: 59,
+  thresholds: [8, 12, 16, 20],
+  expPerLevel: function (lv) { return 60 + 15 * (lv - 1); }
+};
+var CHAR_ATTRS = [
+  { name: '智力', use: '研究耗时、维修分析与材料方案说明', edge: '提供更好的办法，基础主线仍有可承担的办法' },
+  { name: '感知', use: '近处足迹、水位、矿样和隐藏线索', edge: '不收走普通作物信息、地图和基本交互提示' },
+  { name: '胆量', use: '危机中承担责任、危险环境中的稳定行动', edge: '不自动成为军官，也不变成万能说服属性' },
+  { name: '健康', use: '生命与体力上限、协作和远行准备', edge: '基础健康足够经营，不强迫玩家先加点才能浇水' },
+  { name: '幸运', use: '有限普通材料额外收获、指定偶遇', edge: '不决定主线关键物、资格、武器升级成功或金融收益' }
+];
+/* §5.1 首批十个入门节点：条件、效果上限和支持地点都照实写出。
+   状态恒为"未接入"——R1—R2 真正接上真实玩法之前不可购买。 */
+var CHAR_TALENTS = [
+  { tree: '智力', name: '专注研读', need: '智力 ≥ 8', desc: '指定矿样或水样研究耗时减少 10%。', cap: '与属性合计最多减少 25%', where: '矿层取样、水利站水尺研究' },
+  { tree: '智力', name: '工艺理解', need: '智力 ≥ 8', desc: '指定维修方案的智力检定视为 +2。', cap: '检定加成最多 +20', where: '风铃磨坊、水泵的维修方案' },
+  { tree: '感知', name: '辨迹', need: '感知 ≥ 8', desc: '森林入门任务显示足迹方向与新旧。', cap: '只提供方向与新旧，不靠随机刷出关键足迹', where: '雾杉森林林缘调查' },
+  { tree: '感知', name: '识矿', need: '感知 ≥ 8', desc: '在普通矿层辨认已设计的富集迹象。', cap: '只提供信息，不远程挖走矿脉', where: '旧矿山各层矿脉' },
+  { tree: '胆量', name: '沉着', need: '胆量 ≥ 8', desc: '个人遭遇中的受击硬直再减 10%。', cap: '含属性合计最多减少 25%', where: '个人遭遇；战斗上线前不可购买' },
+  { tree: '胆量', name: '挺身而出', need: '胆量 ≥ 8', desc: '在公共协商或工程预警中打开有实际责任的行动分支。', cap: '不得只是多一句对白', where: '磨坊公共协商、水利站工程预警' },
+  { tree: '健康', name: '节省力气', need: '健康 ≥ 8', desc: '指定农事或采集的体力消耗减少。', cap: '每日最多减 10 点，每次最多减 1，单次最终耗费至少 1', where: '浇水、采集与照料' },
+  { tree: '健康', name: '均衡饮食', need: '健康 ≥ 8', desc: '食物的生命与体力恢复增加 15%。', cap: '按明确取整并受上限约束，不改变售价', where: '厨房与随身食物' },
+  { tree: '幸运', name: '顺手所得', need: '幸运 ≥ 8', desc: '合格普通采集额外产物的概率增加 3 个百分点。', cap: '总概率最多 17%，每节点每周期一次', where: '野外合格采集' },
+  { tree: '幸运', name: '好时相逢', need: '幸运 ≥ 8', desc: '小镇指定生活事件每七个世界日最多一次友善偶遇。', cap: '不发稀有主线必需物', where: '芽芽小镇日常' }
+];
+/* §5.2 后续十五节点：有名字、有方向，在对应内容存在之前不卖点数。 */
+var CHAR_TALENTS_LATER = '智力：替代方案、据理说明、山谷设计者；感知：察隙、实地测绘、山谷观察家；胆量：果断反击、带头行动、蔷薇守望者；健康：长途准备、稳健照料、山谷支柱；幸运：转机、意外门路、行路有缘。';
+/* §6.2 个人武器升级链：材料与金币都写清楚，但训练未开放就不出现购买入口。 */
+var CHAR_WEAPON_CHAIN = [
+  { stage: '修整旧刀 / 旧剑', dmg: '8', cost: '小镇训练赠送', gate: '小镇基础训练，无城市前置' },
+  { stage: '铜装', dmg: '10', cost: '铜锭 ×2、木材 ×2、50 金', gate: '小镇共用工坊' },
+  { stage: '铁刃', dmg: '14', cost: '铁锭 ×4、煤 ×2、120 金', gate: '普通矿层材料，小镇可委托' },
+  { stage: '精钢', dmg: '19', cost: '钢锭 ×4、硬木 ×2、240 金', gate: '城市铁匠与铸造服务；基础升级随 R2 接入，专业故事随 R3' },
+  { stage: '陨铁', dmg: '25', cost: '陨铁锭 ×4、钢锭 ×2、500 金', gate: '远期保留：资源与地区完成前不出现可购买升级' }
+];
+
+function charRow(parent, label, value, chip) {
+  var row = el('div', 'row between char-row');
+  row.appendChild(el('span', 'char-key', label));
+  row.appendChild(el('span', chip || 'char-val', value));
+  parent.appendChild(row);
+  return row;
+}
+function charNote(parent, text) { parent.appendChild(el('p', 'muted char-note', text)); }
+function charLater(parent, text) {
+  parent.appendChild(el('div', 'char-later', '后续内容 · ' + text));
+}
+function charBox(parent, title) {
+  var box = el('div', 'panel-box char-box');
+  box.appendChild(el('div', 'section-title', title));
+  parent.appendChild(box);
+  return box;
+}
+
+function openCharacter(tab) {
+  if (tab && CHAR_TABS.some(function (t) { return t.id === tab; })) CHAR_TAB = tab;
+  openWindow({
+    id: 'character', kind: 'character', wide: true, title: '角色',
+    build: function (b) {
+      b.classList.add('char-panel');
+      var tabs = el('div', 'row char-tabs');
+      CHAR_TABS.forEach(function (t) {
+        tabs.appendChild(mkBtn(t.name, CHAR_TAB === t.id ? 'primary' : 'sm', function () {
+          CHAR_TAB = t.id; renderWindow();
+        }));
+      });
+      b.appendChild(tabs);
+      b.appendChild(el('p', 'muted char-note', '第八版 §3.1：四个页签始终可以查看。尚未实现的部分写明状态和开放阶段，不用空白页或假数据充数。'));
+      (CHAR_BUILD[CHAR_TAB] || CHAR_BUILD.attr)(b);
+    },
+    actions: [
+      { label: '委托日志（J）', close: false, onClick: function () { openQuestLog(null); } },
+      { label: '关闭', kind: 'ghost', close: true }
+    ]
+  });
+}
+
+var CHAR_BUILD = {};
+
+CHAR_BUILD.attr = function (b) {
+  var e = exploreState();
+  var live = charBox(b, '当前真实生效的数值');
+  charRow(live, '体力', state.energy + ' / ' + CFG.maxEnergy);
+  charRow(live, '探索阶位', '阶 ' + (explorationTier() + 1) + ' / 3（探索度 ' + (e.explorePoints || 0) + '）', 'char-val muted');
+  charRow(live, '城市声望', String(e.cityReputation || 0));
+  var best = Object.keys(NPCS).map(function (id) { return { id: id, v: state.npcFriendship[id] || 0 }; })
+    .sort(function (a, c) { return c.v - a.v; })[0];
+  charRow(live, '居民关系', best && best.v > 0 ? '最高：' + NPCS[best.id].name + ' ' + best.v : '还没有建立关系');
+  charNote(live, '探索阶位只反映探索度分级，不是角色等级。军衔代表机构授权，也不是个人成长（§4.2、§15）。');
+
+  var plan = charBox(b, '规划中的五项属性（R1 待实现）');
+  charRow(plan, '规则', '基础 ' + CHAR_RULE.attrBase + ' · 单项上限 ' + CHAR_RULE.attrCap +
+    ' · 创建自由点 ' + CHAR_RULE.createPoints + '（创建时单项最多 10；跳过创建细节可采用五项各 7）· 每次升级 1 点');
+  charRow(plan, '点数预算', '首批 10 级共 ' + CHAR_RULE.budgetPhase1 + ' 点；最终上限 ' + CHAR_RULE.levelCap +
+    ' 级共 ' + CHAR_RULE.budgetTotal + ' 点（25 基础 + 10 创建 + 24 升级）');
+  charRow(plan, '经验曲线', '第 ' + CHAR_RULE.phase1Level + ' 级前每级 ' + CHAR_RULE.expPerLevel(2) +
+    ' 点起算；仅是可调初值', 'char-val muted');
+  CHAR_ATTRS.forEach(function (a) {
+    var box = el('div', 'char-attr');
+    box.appendChild(el('div', 'char-attr-name', a.name));
+    box.appendChild(el('div', 'char-attr-use', '用途：' + a.use));
+    box.appendChild(el('div', 'char-attr-edge', '边界：' + a.edge));
+    box.appendChild(el('span', 'req-chip', '未分配 · 待实现'));
+    plan.appendChild(box);
+  });
+  charNote(plan, '达到阶段等级上限时暂停发放角色经验，不会把存量经验一次性变成满级。旧档首次迁移给等级 1、基础各 5 和未分配创建点 ' +
+    CHAR_RULE.createPoints + '，不按历史天数补发无法核实的经验。');
+};
+
+CHAR_BUILD.talent = function (b) {
+  var box = charBox(b, '首批十个入门节点（R1—R2 分批接入）');
+  charNote(box, '天赋点数在角色等级 3/6/9/12/15/18/21/24 级各获得 1 点，全角色最多 8 点，允许跨树。' +
+    '入门节点要求对应属性至少 ' + CHAR_RULE.thresholds[0] + '，进阶要求 12 且已学本树任一入门，精通要求 16 且已学两个并含进阶。');
+  CHAR_TALENTS.forEach(function (t) {
+    var card = el('div', 'char-talent');
+    var head = el('div', 'row between');
+    head.appendChild(el('span', 'char-talent-name', t.tree + ' · ' + t.name));
+    head.appendChild(el('span', 'req-chip no', '未接入 · 不可购买'));
+    card.appendChild(head);
+    card.appendChild(el('div', 'char-talent-desc', t.desc));
+    card.appendChild(el('div', 'char-talent-meta', '条件：' + t.need + ' · 上限：' + t.cap));
+    card.appendChild(el('div', 'char-talent-where', '支持地点：' + t.where));
+    box.appendChild(card);
+  });
+  charLater(charBox(b, '后续十五节点'), CHAR_TALENTS_LATER);
+  charNote(b, '每个节点在可购买前至少要有一处真实体验和回归证据；未接上的节点保留查看，但不消耗点数。' +
+    '十个入门节点全部可购买，是第二个成长里程碑的验收条件，不是现在。');
+};
+
+CHAR_BUILD.weapon = function (b) {
+  var e = exploreState();
+  var live = charBox(b, '现在真正在用的工具');
+  TOOLS.forEach(function (t) {
+    charRow(live, t.name, state.selectedTool === t.tool ? '使用中' : (toolLocked(t) ? '未解锁' : '在快捷栏 ' + t.slot), 'char-val muted');
+  });
+  charRow(live, '钢制斧镐', e.tools ? '已升级：采集力度翻倍' : '尚未升级（伐木屋 → 小镇铁匠）');
+  charNote(live, '这些是农用工具，不是武器。营地军需采购、武器架陈设和钢制斧镐都不算个人刀剑系统。');
+
+  var w = charBox(b, '个人刀剑（R2 待开放）');
+  charRow(w, '状态', '尚未开放：还没有免费自卫训练，也没有武器装备槽', 'char-val');
+  charNote(w, '计划路径是小镇可追踪的"第一次自卫训练"——可免费试刀试剑，完成后任选旧刀或旧剑带走。' +
+    '它不要求城市通行证、边境委任或先完成湿地与水利全链。武器放在独立装备槽，不会替换第六格镐子，也不要求农夫丢掉唯一工具。');
+  var chain = el('div', 'char-chain');
+  CHAR_WEAPON_CHAIN.forEach(function (c) {
+    var row = el('div', 'row between char-chain-row');
+    row.appendChild(el('span', 'char-chain-stage', c.stage + '（伤害 ' + c.dmg + '）'));
+    row.appendChild(el('span', 'char-chain-cost', c.cost));
+    chain.appendChild(row);
+    chain.appendChild(el('div', 'char-chain-gate', c.gate));
+  });
+  w.appendChild(chain);
+  charNote(w, '剑：0.70 秒间隔、1.00 伤害系数、约 1.3 格较窄前方范围；刀：0.60 秒、0.85 系数、约 1.1 格较宽范围。' +
+    '顺序升级保留名字与纪念外观；失败不扣费，没有强化失败、耐久或随机词条。');
+  charNote(w, '第一段危险体验优先做森林／旧矿山短支路：有可见警告、训练后的尝试空间、一个有预兆的敌人或环境危险，以及撤回安全区的方法。' +
+    '基础遭遇用旧武器就能处理，升级不是入场税。');
+};
+
+CHAR_BUILD.history = function (b) {
+  var p = professionalLifeState(), m = militaryLifeState(), e = exploreState();
+  var eng = engCareer();
+
+  var q = charBox(b, '主线委托');
+  QUESTS.forEach(function (item) {
+    var st = questState(item.id);
+    charRow(q, item.id + '. ' + item.name,
+      st === 'done' ? '已完成' : st === 'unlocked' ? '进行中 · ' + item.rewardText : '未解锁',
+      'char-val ' + (st === 'done' ? 'ok' : st === 'unlocked' ? '' : 'muted'));
+  });
+  if (!QUESTS.length) charNote(q, '没有登记主线委托。');
+
+  var daily = charBox(b, '今日居民委托（每天 3 份，次日刷新）');
+  var ids = (typeof activeDailyJobIds === 'function') ? activeDailyJobIds() : [];
+  if (!ids.length) charNote(daily, '今天还没有可接的居民委托。');
+  ids.forEach(function (id) {
+    var job = LIVING_JOBS[id];
+    if (!job) return;
+    charRow(daily, NPCS[id] ? NPCS[id].name : id,
+      job.title + ' · ' + job.coins + ' 金 · ' + (e.jobs[id] === state.totalDay ? '今天已交付' : '待完成'), 'char-val muted');
+  });
+
+  var wq = charBox(b, '探索委托与城市故事');
+  (WORLD_QUESTS || []).forEach(function (item) {
+    var done = specialQuestDone(item, 'explore'), unlocked = specialQuestUnlocked(item, 'explore');
+    charRow(wq, item.title, done ? '已完成' : unlocked ? '进行中' : '未解锁（探索阶位未到）',
+      'char-val ' + (done ? 'ok' : unlocked ? '' : 'muted'));
+  });
+  (CITY_STORY_QUESTS || []).forEach(function (item) {
+    var st = e.cityStories[item.id];
+    charRow(wq, '城市：' + item.title, st === 'done' ? '已完成' : st === 'accepted' ? '已接受' : '未接受', 'char-val muted');
+  });
+
+  var bond = charBox(b, '居民关系');
+  Object.keys(NPCS).forEach(function (id) {
+    charRow(bond, NPCS[id].name, '好感 ' + (state.npcFriendship[id] || 0), 'char-val muted');
+  });
+
+  var career = charBox(b, '职业资历与授权（首轮样板）');
+  charRow(career, '资历', '园艺 ' + p.careers.horticulture + ' · 医务 ' + p.careers.medicine +
+    ' · 商运 ' + p.careers.trade + ' · 工程 ' + p.careers.engineering);
+  charRow(career, '公共信任', String(p.trust));
+  ['engineering', 'trade', 'patrol'].forEach(function (k) {
+    var names = { engineering: '工程路线', trade: '商旅路线', patrol: '巡林路线' };
+    var v = (p.routes && p.routes[k]) || 0;
+    /* 按阈值从高到低取最高档：先判 >=2 会让 >=4 永远落在"到访凭证"，
+     "可接任务"那一档就成了永远走不到的死分支。 */
+    var mark = v >= 4 ? ' · 可接任务' : v >= 2 ? ' · 可作到访凭证' : '';
+    charRow(career, names[k], '进度 ' + v + ' / 9' + mark, 'char-val muted');
+  });
+  charRow(career, '工程章节', '阶段 ' + eng.stage + ' / 4' +
+    (eng.post ? ' · 岗位 ' + eng.post : '') + (eng.incident ? ' · 已处置事故' : ''));
+  charRow(career, '工程预算', eng.budget > 0 ? eng.budget + ' 金（项目单独记账）' : '尚未拨付', 'char-val muted');
+  charRow(career, '授权分层', '到访 ' + (p.passes.visit ? '有' : '无') + ' · 接任务 ' + (p.passes.commission ? '有' : '无') +
+    ' · 指挥 ' + (p.passes.command ? '有' : '无'), 'char-val muted');
+  charNote(career, '工程样板目前止于签署、事故两分支、任职、一次预算和说明会；施工委托与真实预警尚未完成（R3 补齐）。');
+
+  var mil = charBox(b, '军队记录（机构授权，不等于个人战力）');
+  charRow(mil, '登记', m.registered ? '已登记' : '未登记');
+  charRow(mil, '军衔', militaryRankLabel() + (m.registered ? ' · 指挥上限 ' + m.commandLimit + ' 人' : ''), 'char-val muted');
+  charRow(mil, '部队', m.unit.count > 0 ? m.unit.count + ' 人（可战 ' + Math.max(0, m.unit.count - m.unit.wounded) +
+    '，伤 ' + m.unit.wounded + '）' : '没有直属部队', 'char-val muted');
+  charRow(mil, '战报', (m.battleRecords || []).length + ' 份历史记录 · 当前巡防：' + (m.campaign.active ? '进行中' : '无'), 'char-val muted');
+  charRow(mil, '邻领往来', m.neighbor.settled ? '已达成互市协议' : m.neighbor.opened ? '已开放' : '尚未抵达', 'char-val muted');
+  charNote(mil, '带一把精钢剑不等于装备一支部队，巡林资格也不自动等于军官身份（§15）。');
+
+  charLater(charBox(b, '尚未存在的记录'),
+    '完整职业任期、市长任期、听证与财政责任、爵位封授；角色经验与属性变更记录要等 R1 才有权威账本。');
+  charNote(b, '一项事实一个权威记录：这里全部是读取游戏里已经在结算的数据，不额外发奖、不复制第二份真相（§18）。');
+};
 
 /* ============================================================
    第七版 §26—§29：军队系统与本地规则裁判
@@ -12776,18 +13344,46 @@ function regionTravelNode(regionId) {
   return map[regionId] ? travelNodeById(map[regionId]) : null;
 }
 
-/* 传送面板：显示落点、耗时与可用状态；不可用时给出具体解锁条件。 */
+/* 第八版 §3.3：地图选中地点要回答"这里能做什么、第一次怎么到、
+   回家要多久"。这三行直接读场景里真实登记的交互点和在场人物，
+   不另写一份服务清单——否则清单会和场景各说各话。 */
+function nodeServiceSummary(node, limit) {
+  if (!node) return '';
+  var max = limit || 6, labels = [], seen = {}, people = [];
+  var its = (typeof INTERACTABLES === 'object' && INTERACTABLES) ? INTERACTABLES[node.sceneId] : null;
+  (its || []).forEach(function (it) {
+    if (!it.label || seen[it.label]) return;
+    seen[it.label] = 1;
+    labels.push(it.label);
+  });
+  Object.keys(NPCS).forEach(function (id) {
+    if (NPCS[id] && NPCS[id].scene === node.sceneId) people.push(NPCS[id].name);
+  });
+  var parts = [];
+  if (labels.length) parts.push('可去：' + labels.slice(0, max).join('、') + (labels.length > max ? ' 等 ' + labels.length + ' 处' : ''));
+  if (people.length) parts.push('常驻人物：' + people.join('、'));
+  return parts.join(' · ');
+}
+
+/* 传送面板：显示落点、耗时与可用状态；不可用时给出具体解锁条件。
+   新增的说明行走 .travel-note，不复用 .travel-line——后者表示
+   "行程时间行"，旧回归测试按它做单元素断言。 */
 function buildTravelPanel(node, pv) {
   var box = el('div', 'travel-panel');
+  /* 地点描述由 openWorldMap 的区域标题下方统一渲染，这里不再重复一次 */
+  var svc = nodeServiceSummary(node);
+  if (svc) box.appendChild(el('div', 'travel-note', svc));
   if (!pv.ok) {
     box.appendChild(el('div', 'travel-blocked', pv.reason));
     if (node && travelNodeUnlocked(node) && !travelState().discovered[node.id]) {
-      box.appendChild(el('p', 'muted', '首次到访该地点后会自动登记为公共站。'));
+      box.appendChild(el('p', 'muted', '第一次怎么到：按真实路线步行抵达，首次到访后自动登记为公共站。'));
     }
     return box;
   }
-  box.appendChild(el('p', null, '落点：' + node.name + ' 公共入口 · 用途：' + (node.desc || '').slice(0, 18) + '…'));
+  box.appendChild(el('p', null, '落点：' + node.name + ' 公共入口'));
   box.appendChild(el('div', 'travel-line', '现在 ' + fmtTime(pv.startMin) + ' → 到达 ' + pv.arrivalText));
+  var back = travelMinutesBetween(node.id, 'farm.home');
+  box.appendChild(el('div', 'travel-note', '回家耗时：' + (back === 0 ? '0 分钟（同一片公共街区）' : back + ' 分钟') + ' · 传送免费、无冷却'));
   box.appendChild(el('div', 'travel-cost ' + (pv.zeroMinutes ? 'free' : ''), pv.effectText));
   if (pv.crossesDay) {
     if (node.id === 'farm.home') box.appendChild(mkBtn('夜归并休息', 'primary', requestNightReturn));
@@ -12841,6 +13437,7 @@ function openHelp() {
         ['C', '制作'],
         ['J', '委托日志'],
         ['M', '全境地图 / 快速传送'],
+        ['P', '角色（属性 / 天赋 / 武器 / 经历；未实现的部分会写明状态）'],
         ['Esc', '关闭窗口 / 暂停菜单']
       ].forEach(function (p) {
         var r = el('div', 'kbd-row');
@@ -12862,7 +13459,7 @@ function openHelp() {
       ].forEach(function (t) { b.appendChild(el('p', 'muted', '· ' + t)); });
       b.appendChild(el('div', 'hr'));
       b.appendChild(el('div', 'section-title', '触屏'));
-      b.appendChild(el('p', 'muted', '左下方向键移动，右下「使用工具 / 交互」，底部快捷栏可直接点击。横屏视野更大。'));
+      b.appendChild(el('p', 'muted', '左下方向键移动，右下「使用工具 / 交互」，底部快捷栏可直接点击；顶栏「角色」与右下「角色」按钮在手机上同样打开角色窗口。横屏视野更大。'));
     },
     actions: [
       { label: '音效开关', close: false, onClick: function () { state.settings.sound = !state.settings.sound; state.settings.soundConfigured = true; Audio2.setEnabled(state.settings.sound); saveNow(); openHelp(); } },
@@ -13033,17 +13630,18 @@ function openStructure(st) {
   });
 }
 function activateInteractable(it) {
+  if (it.kind === 'indoorExit') { useIndoorExit(it); return; }
+  if (it.kind === 'indoorEntrance') { enterIndoorDoor(it); return; }
   if (it.kind === 'meadowLife') { openMeadowLife(it.work); return; }
   if (it.kind === 'millLife') { openMillLife(it.work); return; }
-  if (it.kind === 'millDoor') { doSwitchScene(it.to,Math.floor(MAPS[it.to].w/2),MAPS[it.to].h-2); return; }
+  if (it.kind === 'millDoor') { enterIndoorDoor(it); return; }
   if(it.kind==='cityGate'){openCityGate();return;}
-  if(it.kind==='cityDoor'){var room=MAPS[it.to];doSwitchScene(it.to,Math.floor(room.w/2),room.h-2);return;}
+  if(it.kind==='cityDoor'){enterIndoorDoor(it);return;}
   if(it.kind==='cityService'){openCityService(it);return;}
   Audio2.unlock();
   if (it.kind === 'sleep') { requestSleep(); return; }
   if (it.kind === 'enterHouse') {
-    var e = MAPS.house.enter;
-    doSwitchScene('house', e.x, e.y);
+    enterIndoorDoor(Object.assign({}, it, { to: 'house', doorId: it.doorId || 'main' }));
     toast('推门进了农舍。');
     return;
   }
@@ -13069,8 +13667,7 @@ function activateInteractable(it) {
   if(it.kind==='meadowShed'){openShed(it);return;}
   if(it.kind==='meadowShear'){openShear(it);return;}
   if(it.kind==='meadowVet'){openVet(it);return;}
-  if(it.kind==='millDoor'){var mr=MAPS.millroom;doSwitchScene('millroom',mr.enter.x,mr.enter.y);return;}
-  if(it.kind==='vetDoor'){var vr=MAPS.vetroom;doSwitchScene('vetroom',vr.enter.x,vr.enter.y);return;}
+  if(it.kind==='vetDoor'){enterIndoorDoor(it);return;}
   if(it.kind==='interiorProp'){openInteriorProp(it);return;}
   if(it.kind==='cpDrill'){openDrillGround(it);return;}
   if(it.kind==='cpSupply'){openSupplyDepot(it);return;}
@@ -13858,6 +14455,7 @@ function paintGroundRegion(g, sceneId, rx, ry, rw, rh) {
   });
   var allExits = (map.exits || []).concat(map.eastExits || []);
   allExits.forEach(function (e) {
+    if (map.indoor && map.doors) return; // 室内方向箭头由门的朝向绘制。
     if (!inBox(e.x, e.y, 1)) return;
     var sx = e.x * TILE, sy = e.y * TILE;
     var right = e.x > map.w / 2;
@@ -14420,16 +15018,6 @@ function drawHouseShell(g) {
     g.fillStyle = '#5E4630';
     g.fillRect(sx + 7, sy + 3, 2, 10); g.fillRect(sx + 2, sy + 7, 12, 2);
   });
-  HOUSE_DOOR_TILES.forEach(function (t) {
-    var sx = t[0] * TILE, sy = t[1] * TILE;
-    g.fillStyle = '#3A2A1C'; g.fillRect(sx, sy + 1, TILE, TILE - 1);
-    g.fillStyle = '#7A5236'; g.fillRect(sx + 1, sy + 2, TILE - 2, TILE - 3);
-    g.fillStyle = '#5A3A24'; g.fillRect(sx + 7, sy + 2, 2, TILE - 3);
-    g.fillStyle = '#8A6A46'; g.fillRect(sx + 1, sy + 2, 2, TILE - 3);
-    g.fillRect(sx + TILE - 3, sy + 2, 2, TILE - 3);
-    g.fillStyle = '#E0C060'; g.fillRect(sx + 4, sy + 8, 2, 2);
-    g.fillRect(sx + 10, sy + 8, 2, 2);
-  });
 }
 
 /* 门前 / 家具前的“E 进入…”提示 */
@@ -14441,6 +15029,7 @@ function drawEnterHint(g, ox, oy) {
   if (!hit) return;
   var text = '';
   if (hit.kind === 'enterHouse') text = 'E 进入农舍';
+  else if (hit.kind === 'indoorExit') text = '走到门口 / ' + (touchDevice() ? '交互' : 'E') + ' ' + hit.label;
   else if (hit.kind === 'bed') text = 'E 睡觉';
   else if (hit.kind === 'houseChest') text = 'E 打开储物箱';
   else if (hit.kind === 'calendar') text = 'E 看日历';
@@ -14988,6 +15577,7 @@ function drawScene(g, dt) {
 
 
   if(state.sceneId.indexOf('city_')===0)drawCityInterior(g,map);
+  else if (map.indoor) drawIndoorDoors(g, map);
   ents.sort(function(a,b){return a.z-b.z;});
   ents.forEach(function (e) { e.f(g, e.a[0], e.a[1], e.a[2], e.a[3], e.a[4]); });
 
@@ -15137,7 +15727,9 @@ function onKeyDown(e) {
     if (t) { if (toolLocked(t)) { toast(t.name + '还没有解锁。'); Audio2.play('fail'); } else selectTool(t.tool); }
     return;
   }
-  if (k === 'p' || k === 'P') { openPause(); return; }
+  /* 第八版 §3.1：P 改为角色入口。暂停仍在 Esc 和顶栏 ☰ 上，
+     两个键位原本同义，分开之后玩家才有一个常驻的个人入口。 */
+  if (k === 'p' || k === 'P') { openCharacter(); return; }
 }
 function onKeyUp(e) {
   var k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
@@ -15515,6 +16107,8 @@ function bindInput() {
   canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
   $('#btnMenu').onclick = function () { if (UI.window) closeWindow(); else openPause(); };
+  $('#btnCharacter').onclick = function () { if (UI.window && UI.window.id === 'character') closeWindow(); else openCharacter(); };
+  $('#touchChar').onclick = function () { if (UI.window && UI.window.id === 'character') closeWindow(); else openCharacter(); };
   $('#btnRecords').onclick = function () { UI.window&&UI.window.id==='workrecords'?closeWindow():openWorkRecords(); };
   $('#touchUse').addEventListener('pointerdown', function (e) {
     e.preventDefault(); Audio2.unlock();
@@ -15794,6 +16388,14 @@ function drawMillLifeFurniture(g,f){var x=f.x*TILE,y=f.y*TILE,w=f.w*TILE,h=f.h*T
   else{px(g,x+8,y+5,10,6,'#D8CA9D');px(g,x+w-20,y+5,10,4,'#B5A078');if(f.type==='counter'){for(var i=20;i<w-18;i+=18){px(g,x+i,y+5,12,5,'#C79859');px(g,x+i+4,y+5,1,3,'#ECD6A0');}}}
 }
 function addMillLifeEntities(ents,R){var sc=state.sceneId;
+  (INTERACTABLES[sc] || []).forEach(function (it) {
+    if (it.kind !== 'indoorEntrance') return;
+    ents.push({ z: (it.y + 1) * TILE, f: function (g) {
+      var x = it.x * TILE, y = it.y * TILE;
+      px(g, x + 1, y, 14, 16, '#98734C'); px(g, x + 3, y + 2, 10, 12, '#302820');
+      px(g, x + 3, y + 14, 10, 2, '#C2AE7A'); px(g, x - 5, y + 4, 5, 8, '#6B7960');
+    }, a: [] });
+  });
   if(MILL_LIFE_FURNITURE[sc])ents.push({z:0,f:function(g){var map=MAPS[sc];[3,map.w-5].forEach(function(x){px(g,x*TILE,TILE,2*TILE,2*TILE,'#DBC69D');px(g,x*TILE+3,TILE+3,2*TILE-6,2*TILE-6,'#678B92');px(g,x*TILE+TILE-1,TILE+3,2,2*TILE-6,'#E4D7B5');px(g,x*TILE+3,2*TILE-1,2*TILE-6,2,'#E4D7B5');});},a:[]});
   (MILL_LIFE_FURNITURE[sc]||[]).forEach(function(f){ents.push({z:(f.y+f.h)*TILE,f:drawMillLifeFurniture,a:[f]});});
   Object.keys(MILL_LIFE_SITES).forEach(function(k){var p=MILL_LIFE_SITES[k];if(p.scene!==sc||p.x<R.x0||p.x>R.x1||p.y<R.y0||p.y>R.y1)return;ents.push({z:(p.y+1)*TILE,f:drawBoard,a:[p.x,p.y]});});
@@ -16245,7 +16847,7 @@ function openExtendedGate(key){var node=key==='cloud_pass'?PASS_NODE:key==='bord
     /* 关口以上还会牵到指挥权：能进边城做生意，并不因此能带兵 */
     if(key==='border_camp'||key==='cloud_pass'||key==='old_road')b.appendChild(professionalRoutePanel());
   },actions:[{label:allowed?'前往 '+(node?node.name:'地点'):'知道了',kind:allowed?'primary':'ghost',onClick:function(){if(!allowed)return;if(key==='wetland')wetlandLifeState().visited=true;if(key==='neighbor')militaryLifeState().neighbor.opened=true;closeWindow();doSwitchScene(node.sceneId,node.safe[0][0],node.safe[0][1]);}}, {label:'返回',kind:'ghost',close:true}]});}
-function extendedDoorEnter(it){var room=MAPS[it.to];if(!room){toast('室内尚未登记。');return;}doSwitchScene(it.to,Math.floor(room.w/2),room.h-2);}
+function extendedDoorEnter(it){enterIndoorDoor(it);}
 function extendedWork(site,label,opts,apply){var p=PROFESSION_SITES[site]||EXTENDED_ACTION_POINTS[site];if(!p){toast('工作台不存在。');return false;}return ruralWorkAction(p,opts,apply);}
 function extendedWorkButton(b,site,label,opts,apply){b.appendChild(mkBtn(label,'',function(){extendedWork(site,label,opts,apply);}));}
 function wetlandTaskText(){var w=wetlandLifeState();return w.habitat?'栖息地已恢复 · 今日水鸟 '+w.birdCount+' 只 · 继续巡护与记录':w.causeFound?'原因已确认 · 选择一种栖息地修复方案':w.surveyCount?'水鸟记录已建立 · 采样并查找水路变化':'先登记巡护许可，再做首次水鸟调查';}
@@ -16884,7 +17486,77 @@ militarySiteButton=function(b,site,label,opts,apply){return militaryButtonUnifie
   m.battleRecords.forEach(function(rec){var key='published:'+rec.id,a=rec.audit;if(a&&a.version===2&&!core.appliedEffectIds[key]){m.unit.dead+=a.casualties.own.dead;m.unit.missing+=a.casualties.own.missing;core.battles[key]=a.rules;core.appliedEffectIds[key]=true;}});
 });};
 
+/* 在场景合并和家具安装完成后迁移门，避免为废弃室内生成第二套入口。 */
+function configureIndoorDoors() {
+  Object.keys(MAPS).forEach(function (sceneId) {
+    var map = MAPS[sceneId];
+    if (!map.indoor || !(map.exits || []).length) return;
+    // 旧城市生成器曾强制擦掉中央门前的家具碰撞；先恢复真实布局，再找空门位。
+    if (map.roomDef) (map.roomDef.props || []).forEach(function (p) {
+      if (!p.flat) fillRect(map, p.x, p.y, p.x + p.w - 1, p.y + p.h - 1, T_BUILDING, true);
+    });
+    var groups = [];
+    map.exits.forEach(function (e) {
+      var side = e.y === 0 ? 'north' : e.y === map.h - 1 ? 'south' :
+        e.x === 0 ? 'west' : e.x === map.w - 1 ? 'east' : null;
+      if (!side) throw new Error('室内出口必须在墙上：' + sceneId);
+      var previous = groups[groups.length - 1];
+      if (previous && previous.side === side && previous.to === e.to && previous.tx === e.tx && previous.ty === e.ty &&
+          ((side === 'south' || side === 'north') ? e.x === previous.x + previous.width && e.y === previous.y :
+            e.y === previous.y + previous.width && e.x === previous.x)) previous.width++;
+      else groups.push({ id: groups.length ? 'door_' + groups.length : 'main', side: side,
+        x: e.x, y: e.y, width: 1, to: e.to, tx: e.tx, ty: e.ty,
+        style: map.roomTheme === 'castle' ? 'stone' : map.roomTheme === 'workshop' ? 'iron' : 'wood' });
+    });
+    // 面包房的门靠近顾客通道；不再把每一间房都绑在中央。
+    if (sceneId === 'mill_bakery') { groups[0].x = 7; groups[0].width = 2; }
+    if (sceneId === 'city_bakery') { groups[0].x = 7; groups[0].width = 2; }
+    if (sceneId === 'meadow_vet') groups[0].x = 7;
+    if (sceneId === 'city_townhall') { groups[0].width = 2; groups[0].style = 'stone'; }
+    if (sceneId === 'city_castle') { groups[0].x = 16; groups[0].width = 2; }
+    if (sceneId === 'mill_workshop') {
+      groups[0].width = 2; groups[0].style = 'iron';
+      groups.push({ id: 'service', side: 'west', x: 0, y: 7, width: 1, to: 'mill_village',
+        tx: 25, ty: 14, style: 'iron', label: '返回磨坊侧巷' });
+    }
+    groups.forEach(function (d) {
+      var alongX = d.side === 'north' || d.side === 'south', origin = alongX ? d.x : d.y;
+      var limit = alongX ? map.w : map.h, inward = doorInward(d.side), found = false;
+      for (var distance = 0; distance < limit && !found; distance++) {
+        var candidates = distance ? [origin - distance, origin + distance] : [origin];
+        for (var i = 0; i < candidates.length && !found; i++) {
+          var candidate = candidates[i];
+          if (candidate < 1 || candidate + d.width >= limit) continue;
+          var trial = Object.assign({}, d, alongX ? { x: candidate } : { y: candidate });
+          if (doorTiles(trial).every(function (t) {
+            var x = t[0] + inward[0], y = t[1] + inward[1];
+            return !doorFurnitureAt(sceneId, t[0], t[1]) && !doorFurnitureAt(sceneId, x, y) && !map.solid[x][y];
+          })) { d.x = trial.x; d.y = trial.y; found = true; }
+        }
+      }
+      if (!found) throw new Error('房间没有可用门前通道：' + sceneId + '/' + d.id);
+    });
+    if (map.enter && doorTiles(groups[0]).some(function (t) {
+      var v = doorInward(groups[0].side); return t[0] + v[0] === map.enter.x && t[1] + v[1] === map.enter.y;
+    })) groups[0].enter = map.enter;
+    installIndoorDoors(sceneId, groups);
+  });
+  // 侧门在厂房西墙外，落点和交互站位都在真实可走的侧巷里。
+  fillRect(MAPS.mill_village, 24, 13, 25, 16, T_PATH, false);
+  INTERACTABLES.mill_village.push({ id: 'mill_service_door', kind: 'indoorEntrance',
+    to: 'mill_workshop', doorId: 'service', x: 25, y: 14, label: '进入磨坊侧门',
+    stand: [[25,14], [24,14], [25,13], [25,15]] });
+  Object.keys(INTERACTABLES).forEach(function (sceneId) {
+    INTERACTABLES[sceneId].forEach(function (it) {
+      if (['cityDoor', 'millDoor', 'vetDoor', 'extendedDoor', 'enterHouse'].indexOf(it.kind) >= 0) it.doorId = it.doorId || 'main';
+    });
+  });
+}
+configureIndoorDoors();
+
 window.__MOSS__ = {
+  doorTiles: doorTiles, installIndoorDoors: installIndoorDoors, drawIndoorDoors: drawIndoorDoors,
+  questExitTile: questExitTile,
   wetlandLifeState:wetlandLifeState, professionalLifeState:professionalLifeState, militaryLifeState:militaryLifeState,
   openWetlandSite:openWetlandSite, openProfessionSite:openProfessionSite, openMilitarySite:openMilitarySite,
   openOldRoadSite:openOldRoadSite, openNeighborSite:openNeighborSite, openExtendedJournal:openExtendedJournal,
