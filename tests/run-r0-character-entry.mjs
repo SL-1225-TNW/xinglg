@@ -28,16 +28,24 @@ try {
 
   /* --- R0-B 四页：真实数据 + 诚实状态，没有假按钮 --- */
   const attr = await body();
-  ok(/当前真实生效的数值/.test(attr) && /体力/.test(attr), '属性页列出当前真实生效的数值');
-  ok(/R1 待实现/.test(attr) && /未分配/.test(attr), '属性页把五属性标成待实现、未分配');
-  ok(/探索阶位/.test(attr) && !/角色等级\s*[:：]?\s*\d/.test(attr), '探索阶位没有冒充角色等级');
+  ok(/角色等级与当前状态/.test(attr) && /体力/.test(attr), '属性页列出当前真实生效的数值');
+  ok(/五项属性/.test(attr) && /智力/.test(attr) && /\+1 点/.test(attr), '属性页是可加点界面，不再是待实现占位');
+  ok(/未分配 10/.test(attr), '新档给出未分配创建点 10');
+  ok(/探索阶位/.test(attr) && !/角色等级\s*[:：]?\s*\d+\s*$/m.test(attr.split('\n')[0] || ''), '探索阶位没有冒充角色等级');
 
   await p.getByRole('button', { name: '天赋', exact: true }).click();
   const talent = await body();
   ok(/专注研读/.test(talent) && /好时相逢/.test(talent), '天赋页列出首批十个入门节点');
   ok(/后续内容/.test(talent), '后续十五节点标成后续内容');
-  const talentBtns = await p.locator('.win-body button').allTextContents();
-  notOk(talentBtns.some(t => /学习|购买|投入|加点/.test(t)), '未接入的天赋不能购买');
+  /* R1 起：已接入阶段的节点可学，未接入阶段（R2）仍必须没有购买按钮。
+     新档没有天赋点，所以「学习」按钮此刻应当是禁用状态。 */
+  const learnBtns = p.locator('.win-body button', { hasText: '学习（1 点）' });
+  const learnCount = await learnBtns.count();
+  ok(learnCount === 2, '只给 2 个已接真实玩法的 R1 节点学习入口，其余只可查看');
+  const disabled = await learnBtns.evaluateAll(bs => bs.every(b => b.disabled));
+  ok(disabled, '新档没有天赋点，学习按钮为禁用而不是可点');
+  const buyBtns = await p.locator('.win-body button').allTextContents();
+  notOk(buyBtns.some(t => /购买|投入|加点/.test(t)), '没有绕过点数或阶段的购买入口');
 
   await p.getByRole('button', { name: '武器', exact: true }).click();
   const weapon = await body();

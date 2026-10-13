@@ -900,7 +900,8 @@ function newGameState() {
     nextStructureId: 1,
     settings: { sound: true, soundConfigured: false, showHelpOnce: true },
     migratedFrom: null,
-    overloaded: false
+    overloaded: false,
+    char: newCharState()
   };
   s.inventory.seed_radish = 8;
   s.inventory.seed_potato = 2;
@@ -986,6 +987,7 @@ function serialize() {
        不再单独存 soil，避免序列化丢弃、归一化写回造成往返不一致。 */
     millLife: state.millLife || newMillLife(),
     meadowLife: state.meadowLife || newMeadowLife(),
+    char: state.char || newCharState(),
     savedAt: Date.now()
   };
 }
@@ -1078,6 +1080,11 @@ function normalizeSave(raw) {
   // DS 小姐：没有该字段的旧存档视为尚未相遇，她会在玩家解锁钓竿后的第一次钓鱼时出现。
   s.dsMet = !!raw.dsMet;
   s.exploration = normalizeExploration(raw.exploration);
+  /* 角色成长账本（R1）。没有 char 字段的旧档从这里拿到等级 1、基础各 5、
+     未分配创建点 10，不按历史天数补发经验（§4.1）。
+     刻意不升 SCHEMA_VERSION：版本号一变，旧档会被 loadGame 判为损坏
+     并搬进 CORRUPT_KEY，玩家存档就丢了。 */
+  s.char = normalizeChar(raw.char, s.totalDay);
   s.millLife = normalizeMillLife(raw.millLife);
   s.meadowLife = normalizeMeadowLife(raw.meadowLife);
   if (raw.sceneId && raw.sceneId.indexOf('mill_') === 0 && !raw.bridgeRepaired && !(raw.millLife&&raw.millLife.legacyAccess)) { s.sceneId='town'; s.player={x:22,y:21,face:'up'}; }
@@ -1679,10 +1686,10 @@ function gatherExplore(tool,x,y){
  if(tool!==expected){toast('请用'+(expected==='axe'?'斧头':expected==='pickaxe'?'镐子':'收获篮')+'采集'+itemName(n.def.item)+'。');return false;}
  if(n.saved.hp<=0){toast('这里的资源尚未恢复：蘑菇隔天、木材和矿石 3 天、硬木 5 天。');return false;}
  var cost=expected==='harvest'?2:CFG.energyCost[expected],damage=exploreState().tools&&expected!=='harvest'?2:1;
- if(!hasEnergy(cost))return false;
  if(n.saved.hp<=damage&&!bagAccepts(n.def.item,n.def.qty)){toast('背包满了，先整理一下。');return false;}
- state.energy-=cost;n.saved.hp=Math.max(0,n.saved.hp-damage);
- if(n.saved.hp===0){invAdd(n.def.item,n.def.qty);n.saved.day=state.totalDay;toast('获得'+itemName(n.def.item)+' ×'+n.def.qty+'。');}
+ if(!charSpendEnergy(cost))return false;
+ n.saved.hp=Math.max(0,n.saved.hp-damage);
+ if(n.saved.hp===0){grantCharExpDaily('gather',CHAR_EXP.harvest);invAdd(n.def.item,n.def.qty);n.saved.day=state.totalDay;toast('获得'+itemName(n.def.item)+' ×'+n.def.qty+'。');}
  else toast(itemName(n.def.item)+'：还需 '+Math.ceil(n.saved.hp/damage)+' 次。');
  addParticle(x,y,expected==='axe'?'wood':'stone');Audio2.play(expected==='axe'?'chop':'breakrock');markDirty();refreshHud();refreshHotbar();return true;
 }
@@ -3494,7 +3501,7 @@ function submitSpecialQuest(q,kind){
   exploreState()[kind==='bond'?'bondDone':'storyDone'][q.id]=true;
   exploreState().explorePoints+=reward.explorePoints||0;
   if(kind==='bond')state.npcFriendship[q.npc]=clamp((state.npcFriendship[q.npc]||0)+5,0,100);
-  markDirty();refreshHud();saveNow();toast('委托完成：'+q.title+'。');return true;
+  grantCharExpOnce('explore.'+kind+'.'+q.id,CHAR_EXP.chapter,'explore');markDirty();refreshHud();saveNow();toast('委托完成：'+q.title+'。');return true;
 }
 function renderSpecialQuestCard(b,q,kind){
   var done=specialQuestDone(q,kind),unlocked=specialQuestUnlocked(q,kind),ready=unlocked&&!done&&specialQuestReady(q);
@@ -3658,6 +3665,16 @@ function openCityGate(){
     {label:'办理通行证 · 150 金',kind:'primary',close:false,onClick:function(){if(!state.bridgeRepaired){toast('先完成修桥委托，再去城市。');return;}if(!payExplore({coins:150}))return;exploreState().city=true;exploreState().explorePoints+=25;markDirty();saveNow();closeWindow();toast('已获得通行证，向南走可到白蔷薇城。');}},
     {label:'稍后再来',close:true}]});
 }
+/* 日常委托经验：每日最多前三件给经验，之后仍给正常钱物（§4.2）。
+   e.jobs[id] 只记「今天做没做过」，不记第几个，所以要单独计数。 */
+function grantDailyJobExp(id) {
+  var c=charState(),key='dailyjob.'+state.totalDay+'.'+id;
+  if(!c.expGrants)c.expGrants={};
+  if(Object.prototype.hasOwnProperty.call(c.expGrants,key))return 0;
+  c.expGrants[key]=state.totalDay;
+  return grantCharExpDaily('daily',CHAR_EXP.daily);
+}
+
 function openResidentJob(id){
   var job=LIVING_JOBS[id];if(!job)return;
   if(!dailyJobAvailable(id)){openWindow({id:'resident_job',kind:'custom',title:NPCS[id].name+' · 今日安排',build:function(b){b.appendChild(el('p',null,'今天的居民委托由其他人负责。'));b.appendChild(el('p','muted','打开委托日志的“每日”页，可以查看今天的 3 份委托。'));},actions:[{label:'查看每日委托',kind:'primary',close:false,onClick:function(){QUEST_TAB='daily';openQuestLog('board');}},{label:'离开',close:true}]});return;}
@@ -3672,7 +3689,7 @@ function openResidentJob(id){
       Object.keys(job.reward).forEach(function(k){next[k]=(next[k]||0)+job.reward[k];});
       if(countSlots(next)>CFG.bagSlots){toast('背包放不下奖励，先整理一下。');return;}
       Object.keys(job.cost).forEach(function(k){invRemove(k,job.cost[k]);});Object.keys(job.reward).forEach(function(k){invAdd(k,job.reward[k]);});
-      state.coins+=job.coins;e.jobs[id]=state.totalDay;markDirty();refreshHud();saveNow();toast('帮助了'+NPCS[id].name+'，获得 '+job.coins+' 金。');refreshWindow();}},
+      state.coins+=job.coins;e.jobs[id]=state.totalDay;grantDailyJobExp(id);markDirty();refreshHud();saveNow();toast('帮助了'+NPCS[id].name+'，获得 '+job.coins+' 金。');refreshWindow();}},
     {label:'离开',close:true}]});
 }
 function cityStoryQuest(id){for(var i=0;i<CITY_STORY_QUESTS.length;i++)if(CITY_STORY_QUESTS[i].id===id)return CITY_STORY_QUESTS[i];return null;}
@@ -3693,6 +3710,8 @@ function openCityStoryQuest(id){
     Object.keys(q.cost).forEach(function(k){invRemove(k,q.cost[k]);});Object.keys(q.rewardItems||{}).forEach(function(k){invAdd(k,q.rewardItems[k]);});state.coins+=q.coins||0;
     if(q.npc){state.npcFriendship=state.npcFriendship||{};state.npcFriendship[q.npc]=clamp((state.npcFriendship[q.npc]||0)+(q.friendship||0),0,100);}
     e.cityStories[q.id]='done';e.cityReputation+=q.reputation||0;if(q.smithCoupon)e.smithCoupon=true;
+    /* 城市故事结算写在闭包里，容易漏掉经验发放，这里单独挂上 */
+    grantCharExpOnce('citystory.'+q.id,CHAR_EXP.chapter,'city');
     markDirty();refreshHud();saveNow();closeWindow();toast('完成「'+q.title+'」！城市声望 +'+(q.reputation||0)+'。');openCityStoryQuest(id);}});
   actions.push({label:'关闭',close:true});openWindow({id:'city_story_'+q.id,kind:'custom',title:q.buildingName+' · '+q.title,build:render,actions:actions});
 }
@@ -5792,7 +5811,10 @@ function eatItem(id) {
   if (invCount(id) <= 0) { toast('背包里没有' + itemName(id) + '了。'); return false; }
   if (state.energy >= CFG.maxEnergy) { toast('体力已经满了，先干点活吧。'); return false; }
   invRemove(id, 1);
-  var recovered=Math.min(ITEMS[id].food,CFG.maxEnergy-state.energy);
+  /* 天赋「均衡饮食」（R1）：食物恢复 +15%，按 floor 取整并受体力上限约束，
+     不改变售价，也不影响物品本身（§5.1）。 */
+  var base = hasTalent('balanced_meal') ? Math.floor(ITEMS[id].food * 1.15) : ITEMS[id].food;
+  var recovered=Math.min(base,CFG.maxEnergy-state.energy);
   state.energy += recovered;
   Audio2.play('eat');
   toast('吃掉了' + itemName(id) + '，恢复 ' + recovered + ' 点体力。');
@@ -5814,12 +5836,34 @@ function inPlantArea(x, y) {
   var a = MAPS.farm.plantArea;
   return x >= a.x0 && x <= a.x1 && y >= a.y0 && y <= a.y1;
 }
+/* 天赋「节省力气」（R1）：指定农事/采集的体力消耗每日最多减免 10 点，
+   每次最多减 1，单次最终耗费至少 1（§5.1）。
+
+   做成统一入口而不是逐处改 state.energy-=：项目里二十多处扣体力
+   都写成 hasEnergy(X) 紧跟 state.energy -= X，改入口才不会漏，
+   也不会让某个动作绕过封顶（§18：同一件事只有一个结算路径）。 */
+var CHAR_SAVE_STRENGTH_DAILY = 10;
+function charEnergyCost(base) {
+  if(!hasTalent('save_strength'))return base;
+  var c=charState(),used=c.expDailyDay===state.totalDay&&c.expDaily?c.expDaily.__saveStrength||0:0;
+  return base-Math.min(1,Math.max(0,CHAR_SAVE_STRENGTH_DAILY-used),Math.max(0,base-1));
+}
+
 function hasEnergy(cost) {
   if (state.energy < cost) {
     toast('体力不足，吃点东西或休息吧。');
     Audio2.play('fail');
     return false;
   }
+  return true;
+}
+/* 扣体力的唯一入口：先校验够不够，再按天赋算出实际耗费并扣除。
+   调用方改成 charSpendEnergy(X) 后不再自己减，避免两处口径不一致。 */
+function charSpendEnergy(cost) {
+  var actual=charEnergyCost(cost);
+  if(!hasEnergy(actual))return false;
+  state.energy-=actual;
+  if(actual<cost){var d=charDailyCounters();d.__saveStrength=(d.__saveStrength||0)+cost-actual;}
   return true;
 }
 
@@ -5854,8 +5898,7 @@ function useTool(tool, tx, ty, opts) {
 function toolHoe(tx, ty) {
   if (!inPlantArea(tx, ty)) { toast('这里不能耕种。'); return false; }
   if (state.plots[key2(tx, ty)]) { toast('这块土地已经松好了。'); return false; }
-  if (!hasEnergy(CFG.energyCost.hoe)) return false;
-  state.energy -= CFG.energyCost.hoe;
+  if (!charSpendEnergy(CFG.energyCost.hoe)) return false;
   state.plots[key2(tx, ty)] = {
     tilled: true, water: isRaining() && state.sceneId === 'farm', crop: null,
     age: 0, mature: false, harvested: false, regrow: 0,
@@ -5911,8 +5954,7 @@ function toolShovel(tx, ty) {
   if (!crop) { p.crop = null; return true; }
   var young = !p.harvested && p.age <= 0;          // 刚种下：种子还能收回
   if (young && !bagAccepts(crop.seed, 1)) { toast('背包满了，先腾出一格再来铲。'); Audio2.play('fail'); return false; }
-  if (!hasEnergy(CFG.energyCost.shovel)) return false;
-  state.energy -= CFG.energyCost.shovel;
+  if (!charSpendEnergy(CFG.energyCost.shovel)) return false;
   if (young) invAdd(crop.seed, 1);
   p.crop = null; p.age = 0; p.mature = false; p.harvested = false; p.regrow = 0;
   addParticle(tx, ty, 'soil');
@@ -5943,8 +5985,7 @@ function toolWater(tx, ty) {
   if (!p) { toast('这里还没有翻过土。'); return false; }
   if (p.water) { toast('这块地已经浇过水了。'); return false; }
   if (isRaining()) { toast('正在下雨，不用浇水。'); return false; }
-  if (!hasEnergy(CFG.energyCost.water)) return false;
-  state.energy -= CFG.energyCost.water;
+  if (!charSpendEnergy(CFG.energyCost.water)) return false;
   p.water = true;
   if (p.crop) tutorialEvent('watered');
   Game.plotSplash[key2(tx, ty)] = { t: 0.7, max: 0.7 };
@@ -5959,11 +6000,10 @@ function toolCompost(tx, ty) {
   var p = state.plots[key2(tx, ty)];
   if (!p) { toast('这里还没有翻过土。'); return false; }
   if (invCount('compost') <= 0) { toast('没有熟肥了，先用堆肥箱沤一箱。'); return false; }
-  if (!hasEnergy(CFG.energyCost.compost)) return false;
+  if (!charSpendEnergy(CFG.energyCost.compost)) return false;
   var before = plotFertility(p);
   if (before >= FERT.MAX) { toast('这块地肥力已经满了，撒下去也是浪费。'); return false; }
   if (!bagAccepts('compost', 0)) { toast('背包放不下。'); return false; }
-  state.energy -= CFG.energyCost.compost;
   invRemove('compost', 1);
   p.fertility = Math.min(FERT.MAX, before + FERT.COMPOST_BONUS);
   Game.plotSplash[key2(tx, ty)] = { t: 0.7, max: 0.7 };
@@ -6014,6 +6054,9 @@ function toolHarvest(tx, ty) {
     p.crop = null; p.age = 0; p.mature = false; p.harvested = false; p.regrow = 0;
     toast('收获了' + crop.name + ' ×' + y + fertNote + '，地块保留，需要重新播种。');
   }
+  /* 收获经验按株数给，但农事类每日封顶 20（§4.2）。
+     经验封顶不影响产物：y 颗该收多少还是多少。 */
+  grantCharExpDaily('farm', CHAR_EXP.harvest);
   markDirty(); refreshHud();
   return true;
 }
@@ -6038,34 +6081,26 @@ function toolNode(tx, ty, type) {
     return false;
   }
   if (!node.active) { toast(type === 'tree' ? '这棵树已经被砍掉了。' : '这块石头已经敲碎了。'); return false; }
-  if (!hasEnergy(CFG.energyCost[type === 'tree' ? 'axe' : 'pickaxe'])) return false;
-  state.energy -= CFG.energyCost[type === 'tree' ? 'axe' : 'pickaxe'];
+  var damage=exploreState().tools?2:1;
+  if(node.hp<=damage&&!bagAccepts(type==='tree'?'wood':'stone',type==='tree'?5:3)){
+    toast('背包满了，先整理一下。');return false;
+  }
+  if (!charSpendEnergy(CFG.energyCost[type === 'tree' ? 'axe' : 'pickaxe'])) return false;
   node.hp -= exploreState().tools ? 2 : 1;
   addParticle(tx, ty, type === 'tree' ? 'wood' : 'stone');
   addShake(tx, ty, type);
   Audio2.play(type === 'tree' ? 'chop' : 'breakrock');
   if (node.hp <= 0) {
     if (type === 'tree') {
-      if (!bagAccepts('wood', 5)) {
-        node.hp = 1;                       // 装不下则保留节点，最终命中不扣体力
-        state.energy += CFG.energyCost.axe;
-        toast('背包放不下 5 份木材，先整理一下。');
-        Audio2.play('fail');
-        markDirty(); return false;
-      }
+
       invAdd('wood', 5); node.active = false;
       toast('砍倒了树，获得木材 ×5。');
     } else {
-      if (!bagAccepts('stone', 3)) {
-        node.hp = 1;
-        state.energy += CFG.energyCost.pickaxe;
-        toast('背包放不下 3 份石头，先整理一下。');
-        Audio2.play('fail');
-        markDirty(); return false;
-      }
+
       invAdd('stone', 3); node.active = false;
       toast('敲碎了石头，获得石头 ×3。');
     }
+    grantCharExpDaily('gather',CHAR_EXP.harvest);
     Audio2.play('harvest');
   } else {
     toast((type === 'tree' ? '木头' : '石头') + '裂开了（还需 ' + node.hp + ' 次）。');
@@ -7272,6 +7307,8 @@ function submitQuest(id) {
   }
   state.questProgress[id] = 'done';
   questLogPush('完成委托 ' + id + '「' + q.name + '」，交付 ' + cost.join('、') + '。');
+  /* 重要任务经验：同一任务一次，解法不同主经验相同（§4.2） */
+  grantCharExpOnce('quest.' + id, CHAR_EXP.quest, 'quest');
   var next = questById(id + 1);
   if (next && state.questProgress[next.id] === 'locked') {
     state.questProgress[next.id] = 'unlocked';
@@ -7325,8 +7362,7 @@ function toolFish(tx, ty) {
   if (!atBank || Math.abs(tx-p.x)+Math.abs(ty-p.y) > 3) { toast('站在岸边，点击 3 格以内的水面抛竿。'); return false; }
   if (!isWater(state.sceneId, tx, ty)) { toast('对着水面才能抛竿。'); return false; }
   if (freeSlots(state.inventory) < 1) { toast('背包满了，先整理一下。'); Audio2.play('fail'); return false; }
-  if (!hasEnergy(CFG.energyCost.fish)) return false;
-  state.energy -= CFG.energyCost.fish;
+  if (!charSpendEnergy(CFG.energyCost.fish)) return false;
   var f = pickFish();
   Game.fishing = {
     active: true, phase: 'cast', t: 0, wait: 0, fish: f,
@@ -7415,6 +7451,9 @@ function succeedFish() {
     F.caught = F.fish.id;
     if (bagAccepts(F.fish.id, 1)) invAdd(F.fish.id, 1);
     else { F.overflow = true; }
+    /* 钓获经验跟鱼获同条件：DS 小姐那一次没有鱼，也就不给经验，
+       否则玩家会被白送一级。捕鱼类每日封顶 20。 */
+    grantCharExpDaily('fish', CHAR_EXP.harvest);
   }
   Audio2.play('fish');
   markDirty(); refreshHud();
@@ -7680,12 +7719,16 @@ function todayPlanItems() {
     out.push({ tier: 'soon', tag: '追踪', text: '第一份收成 · 带 3 颗萝卜去小镇任务板', open: function () { QUEST_TAB = 'main'; openQuestLog(null); } });
   }
 
+  var entryKeys=Object.keys(rookieState());
+  var entry=entryKeys.filter(function(k){return rookieState()[k]>0&&rookieState()[k]<ROOKIE_JOBS[k].steps.length;})[0];
+  if(!entry)entry=entryKeys.filter(function(k){return rookieState()[k]===0;})[0];
+  if(entry){out.push({tier:'soon',tag:'可做',text:ROOKIE_JOBS[entry].name+' · 委托日志 → 小镇入门',open:function(){QUEST_TAB='rookie';openQuestLog(null);}});}
   var ids = [], i;
   try { ids = activeDailyJobIds() || []; } catch (err) { ids = []; }
   for (i = 0; i < ids.length; i++) {
     var job = LIVING_JOBS[ids[i]];
     if (!job || e.jobs[ids[i]] === state.totalDay) continue;
-    out.push({
+    if(!entry)out.push({
       tier: 'soon', tag: '可做', text: job.title + ' · ' + job.coins + ' 金',
       open: function () { QUEST_TAB = 'daily'; openQuestLog('board'); }
     });
@@ -8781,12 +8824,13 @@ function openQuestLog(site) {
     id:'quest',kind:'quest',wide:true,title:'委托日志',
     build:function(b){
       var tabs=el('div','row quest-tabs');
-      [['main','主线'],['daily','每日'],['explore','探索'],['bond','居民']].forEach(function(t){
+      [['main','主线'],['rookie','小镇入门'],['daily','每日'],['explore','探索'],['bond','居民']].forEach(function(t){
         var btn=mkBtn(t[1],QUEST_TAB===t[0]?'primary':'sm',function(){QUEST_TAB=t[0];renderWindow();});
         tabs.appendChild(btn);
       });b.appendChild(tabs);
       /* 手机横屏（矮屏）下农场助手会隐藏今日安排，这里内联同一份三行，
          保证"今天该做什么"在任何屏幕上都有可点入口（§3.2）。 */
+      if(QUEST_TAB==='rookie'){renderRookieJobs(b);return;}
       if(QUEST_TAB==='main')appendTodayPlan(b);
       b.appendChild(mkBtn('石楠草甸 · '+meadowTaskText(),'sm',function(){openMeadowLife('journal');}));
       b.appendChild(mkBtn('风铃磨坊 · '+millLifeTaskText(),'sm',function(){openMillLife('journal');}));
@@ -9982,29 +10026,29 @@ var CHAR_RULE = {
   levelCap: 25, phase1Level: 10,
   budgetPhase1: 44, budgetTotal: 59,
   thresholds: [8, 12, 16, 20],
+  respecCost: 50,
   expPerLevel: function (lv) { return 60 + 15 * (lv - 1); }
 };
-var CHAR_ATTRS = [
-  { name: '智力', use: '研究耗时、维修分析与材料方案说明', edge: '提供更好的办法，基础主线仍有可承担的办法' },
-  { name: '感知', use: '近处足迹、水位、矿样和隐藏线索', edge: '不收走普通作物信息、地图和基本交互提示' },
-  { name: '胆量', use: '危机中承担责任、危险环境中的稳定行动', edge: '不自动成为军官，也不变成万能说服属性' },
-  { name: '健康', use: '生命与体力上限、协作和远行准备', edge: '基础健康足够经营，不强迫玩家先加点才能浇水' },
-  { name: '幸运', use: '有限普通材料额外收获、指定偶遇', edge: '不决定主线关键物、资格、武器升级成功或金融收益' }
-];
+/* R0 时期的 CHAR_ATTRS（无 id）已并入 CHAR_ATTR_DEFS。
+   CHAR_ATTR_DEFS 定义在后面的 R1 段里，所以这里不能在顶部直接赋值，
+   否则会拿到 undefined；用取值函数延迟解析。属性定义仍然只有一份。 */
+function CHAR_ATTRS() { return CHAR_ATTR_DEFS; }
 /* §5.1 首批十个入门节点：条件、效果上限和支持地点都照实写出。
-   状态恒为"未接入"——R1—R2 真正接上真实玩法之前不可购买。 */
+   id 是存档与代码的稳定标识；阶段为 R1 的节点才允许真正生效，
+   其余保持「未接入 · 不可购买」。 */
 var CHAR_TALENTS = [
-  { tree: '智力', name: '专注研读', need: '智力 ≥ 8', desc: '指定矿样或水样研究耗时减少 10%。', cap: '与属性合计最多减少 25%', where: '矿层取样、水利站水尺研究' },
-  { tree: '智力', name: '工艺理解', need: '智力 ≥ 8', desc: '指定维修方案的智力检定视为 +2。', cap: '检定加成最多 +20', where: '风铃磨坊、水泵的维修方案' },
-  { tree: '感知', name: '辨迹', need: '感知 ≥ 8', desc: '森林入门任务显示足迹方向与新旧。', cap: '只提供方向与新旧，不靠随机刷出关键足迹', where: '雾杉森林林缘调查' },
-  { tree: '感知', name: '识矿', need: '感知 ≥ 8', desc: '在普通矿层辨认已设计的富集迹象。', cap: '只提供信息，不远程挖走矿脉', where: '旧矿山各层矿脉' },
-  { tree: '胆量', name: '沉着', need: '胆量 ≥ 8', desc: '个人遭遇中的受击硬直再减 10%。', cap: '含属性合计最多减少 25%', where: '个人遭遇；战斗上线前不可购买' },
-  { tree: '胆量', name: '挺身而出', need: '胆量 ≥ 8', desc: '在公共协商或工程预警中打开有实际责任的行动分支。', cap: '不得只是多一句对白', where: '磨坊公共协商、水利站工程预警' },
-  { tree: '健康', name: '节省力气', need: '健康 ≥ 8', desc: '指定农事或采集的体力消耗减少。', cap: '每日最多减 10 点，每次最多减 1，单次最终耗费至少 1', where: '浇水、采集与照料' },
-  { tree: '健康', name: '均衡饮食', need: '健康 ≥ 8', desc: '食物的生命与体力恢复增加 15%。', cap: '按明确取整并受上限约束，不改变售价', where: '厨房与随身食物' },
-  { tree: '幸运', name: '顺手所得', need: '幸运 ≥ 8', desc: '合格普通采集额外产物的概率增加 3 个百分点。', cap: '总概率最多 17%，每节点每周期一次', where: '野外合格采集' },
-  { tree: '幸运', name: '好时相逢', need: '幸运 ≥ 8', desc: '小镇指定生活事件每七个世界日最多一次友善偶遇。', cap: '不发稀有主线必需物', where: '芽芽小镇日常' }
+  { id: 'focus_read', tree: '智力', attr: 'int', stage: 'R2', name: '专注研读', need: '智力 ≥ 8', desc: '指定矿样或水样研究耗时减少 10%。', cap: '与属性合计最多减少 25%', where: '矿层取样、水利站水尺研究' },
+  { id: 'craft_grasp', tree: '智力', attr: 'int', stage: 'R2', name: '工艺理解', need: '智力 ≥ 8', desc: '指定维修方案的智力检定视为 +2。', cap: '检定加成最多 +20', where: '风铃磨坊、水泵的维修方案' },
+  { id: 'read_tracks', tree: '感知', attr: 'sense', stage: 'R2', name: '辨迹', need: '感知 ≥ 8', desc: '森林入门任务显示足迹方向与新旧。', cap: '只提供方向与新旧，不靠随机刷出关键足迹', where: '雾杉森林林缘调查' },
+  { id: 'read_ore', tree: '感知', attr: 'sense', stage: 'R2', name: '识矿', need: '感知 ≥ 8', desc: '在普通矿层辨认已设计的富集迹象。', cap: '只提供信息，不远程挖走矿脉', where: '旧矿山各层矿脉' },
+  { id: 'steady', tree: '胆量', attr: 'nerve', stage: 'R2', name: '沉着', need: '胆量 ≥ 8', desc: '个人遭遇中的受击硬直再减 10%。', cap: '含属性合计最多减少 25%', where: '个人遭遇；战斗上线前不可购买' },
+  { id: 'stand_forward', tree: '胆量', attr: 'nerve', stage: 'R2', name: '挺身而出', need: '胆量 ≥ 8', desc: '在公共协商或工程预警中打开有实际责任的行动分支。', cap: '不得只是多一句对白', where: '磨坊公共协商、水利站工程预警' },
+  { id: 'save_strength', tree: '健康', attr: 'body', stage: 'R1', name: '节省力气', need: '健康 ≥ 8', desc: '指定农事或采集的体力消耗减少。', cap: '每日最多减 10 点，每次最多减 1，单次最终耗费至少 1', where: '浇水、采集与照料' },
+  { id: 'balanced_meal', tree: '健康', attr: 'body', stage: 'R1', name: '均衡饮食', need: '健康 ≥ 8', desc: '食物的生命与体力恢复增加 15%。', cap: '按明确取整并受上限约束，不改变售价', where: '厨房与随身食物' },
+  { id: 'lucky_find', tree: '幸运', attr: 'luck', stage: 'R2', name: '顺手所得', need: '幸运 ≥ 8', desc: '合格普通采集额外产物的概率增加 3 个百分点。', cap: '总概率最多 17%，每节点每周期一次', where: '野外合格采集' },
+  { id: 'good_meeting', tree: '幸运', attr: 'luck', stage: 'R2', name: '好时相逢', need: '幸运 ≥ 8', desc: '小镇指定生活事件每七个世界日最多一次友善偶遇。', cap: '不发稀有主线必需物', where: '芽芽小镇日常' }
 ];
+var CHAR_TALENT_IDS = CHAR_TALENTS.map(function (t) { return t.id; });
 /* §5.2 后续十五节点：有名字、有方向，在对应内容存在之前不卖点数。 */
 var CHAR_TALENTS_LATER = '智力：替代方案、据理说明、山谷设计者；感知：察隙、实地测绘、山谷观察家；胆量：果断反击、带头行动、蔷薇守望者；健康：长途准备、稳健照料、山谷支柱；幸运：转机、意外门路、行路有缘。';
 /* §6.2 个人武器升级链：材料与金币都写清楚，但训练未开放就不出现购买入口。 */
@@ -10059,49 +10103,375 @@ function openCharacter(tab) {
 
 var CHAR_BUILD = {};
 
+/* ============================================================
+   第八版 §4 · R1：角色等级、五属性、经验与点数
+   ------------------------------------------------------------
+   R0 只给了入口和诚实状态；这一期把真正能算的东西接上。
+
+   一项事实一个权威记录：属性点、天赋点、等级、经验只存在
+   state.char 这一份，界面和测试都走 charState() / grantCharExp()，
+   不另建第二套算法（§18）。
+
+   预算是不变量：基础 25 + 创建 10 + 升级点 = 已分配 + 未分配，
+   任何洗点、重载、坏档都不能让它越界。 */
+
+/* §4.1 属性定义。id 用于存档与代码，name 用于界面。 */
+var CHAR_ATTR_DEFS = [
+  { id: 'int',   name: '智力', use: '研究耗时、维修分析与材料方案说明', edge: '提供更好的办法，基础主线仍有可承担的办法' },
+  { id: 'sense', name: '感知', use: '近处足迹、水位、矿样和隐藏线索', edge: '不收走普通作物信息、地图和基本交互提示' },
+  { id: 'nerve', name: '胆量', use: '危机中承担责任、危险环境中的稳定行动', edge: '不自动成为军官，也不变成万能说服属性' },
+  { id: 'body',  name: '健康', use: '生命与体力上限、协作和远行准备', edge: '基础健康足够经营，不强迫玩家先加点才能浇水' },
+  { id: 'luck',  name: '幸运', use: '有限普通材料额外收获、指定偶遇', edge: '不决定主线关键物、资格、武器升级成功或金融收益' }
+];
+var CHAR_ATTR_IDS = CHAR_ATTR_DEFS.map(function (a) { return a.id; });
+var CHAR_ATTR_BASE_TOTAL = CHAR_ATTR_DEFS.length * CHAR_RULE.attrBase;   // 25
+
+/* §4.2 六类来源的首轮初值。区间的下沿作为当前发放值，
+   留出按实际体验上调的空间；防刷规则不在这里实现，在发放函数里。 */
+var CHAR_EXP = { quest: 60, chapter: 120, daily: 20, discovery: 10, harvest: 2, danger: 10 };
+
+function newCharState() {
+  var c = { level: 1, exp: 0, attr: {}, attrPoints: CHAR_RULE.createPoints, talentPoints: 0, talents: {}, spentTalents: 0, washFree: true };
+  CHAR_ATTR_IDS.forEach(function (id) { c.attr[id] = CHAR_RULE.attrBase; });
+  return c;
+}
+function charState() {
+  if (!state.char) state.char = newCharState();
+  return state.char;
+}
+function charAttr(id) { return charState().attr[id] || CHAR_RULE.attrBase; }
+
+/* 属性额外预算 = 创建 10 + 升级点；天赋预算单独按等级计算。
+   两类点数分别守恒，洗点不能把天赋点换成属性点。 */
+function charBudget() {
+  var c=charState(), allocated=CHAR_ATTR_IDS.reduce(function(n,id){return n+c.attr[id]-CHAR_RULE.attrBase;},0);
+  var earned=CHAR_RULE.createPoints+c.level-1;
+  return {allocated:allocated,spentTalents:c.spentTalents||0,attrUnspent:c.attrPoints,
+    talentUnspent:c.talentPoints,earned:earned,spentTotal:allocated+c.attrPoints,
+    talentEarned:charTalentBudget(c.level)};
+}
+function charTalentBudget(level){return CHAR_TALENT_LEVELS.filter(function(l){return l<=level;}).length;}
+function charAttributeCap(level){return Math.min(CHAR_RULE.attrCap,10+level-1);}
+
+/* 当前阶段的等级上限。首批只开放到 10 级：达到后暂停发放经验，
+   不把存量经验在扩容后一次性变成满级（§4.1）。 */
+function charLevelCap() { return CHAR_RULE.phase1Level; }
+function charExpToNext(level) { return CHAR_RULE.expPerLevel(level); }
+
+/* §5：3/6/9/12/15/18/21/24 级各得 1 点天赋点，全角色最多 8 点。 */
+var CHAR_TALENT_LEVELS = [3, 6, 9, 12, 15, 18, 21, 24];
+
+/* 唯一发经验的入口。所有来源都走这里，防刷上限也在里面判，
+   所以「同一个事件发两次」和「刷日常刷爆」不可能绕过检查。 */
+function grantCharExp(amount, reason) {
+  var c = charState();
+  if (!Number.isFinite(amount) || amount < 1) return 0;
+  var cap = charLevelCap();
+  if (c.level >= cap) { c.expPausedAtCap = true; return 0; }
+  c.exp = (c.exp || 0) + Math.floor(amount);
+  var gained = [], talentGained = 0;
+  while (c.level < cap) {
+    var need = charExpToNext(c.level);
+    if (c.exp < need) break;
+    c.exp -= need;
+    c.level += 1;
+    c.attrPoints += 1;
+    if (CHAR_TALENT_LEVELS.indexOf(c.level) >= 0 && (c.talentPoints + c.spentTalents) < 8) {
+      c.talentPoints += 1;
+      talentGained += 1;
+    }
+    gained.push(c.level);
+  }
+  if (c.level >= cap) { c.exp = 0; c.expPausedAtCap = true; }
+  if (gained.length) {
+    charNotice('升到 ' + gained[gained.length - 1] + ' 级，获得 ' + gained.length + ' 点属性' + (talentGained ? ' 和 ' + talentGained + ' 点天赋' : '') + '。可在角色页分配。', reason);
+  }
+  markDirty();
+  return amount;
+}
+
+/* 一次性来源用稳定 ID 去重：同一个任务、同一处发现、同一场战斗，
+   不管走哪条路径进来都只发一次（§4.2「稳定发现 ID 一次」）。 */
+function grantCharExpOnce(id, amount, reason) {
+  var c = charState();
+  if (!c.expGrants) c.expGrants = {};
+  if (Object.prototype.hasOwnProperty.call(c.expGrants,id)) return 0;
+  c.expGrants[id] = state.totalDay;
+  return grantCharExp(amount, reason);
+}
+
+/* 每日计数：农事、捕鱼、资源三类各封顶，超出只影响经验，
+   不影响正常产物（§4.2「重复上限只限制经验，不限制正常产物」）。
+
+   惰性重置，沿用项目里 npcDaily() 的既有范式：不在日结算里手动清空，
+   跨天自动失效。这样漏挂一个日切钩子也不会让封顶永久卡死。 */
+var CHAR_DAILY_CAP = { farm: 20, fish: 20, gather: 20, danger: 40, daily: 60 };
+function charDailyCounters() {
+  var c = charState();
+  if (c.expDailyDay !== state.totalDay) {
+    c.expDailyDay = state.totalDay;
+    c.expDaily = {};
+  }
+  if (!c.expDaily) c.expDaily = {};
+  return c.expDaily;
+}
+function grantCharExpDaily(kind, amount) {
+  var cap = CHAR_DAILY_CAP[kind];
+  if (!cap) return 0;
+  var used = charDailyCounters()[kind] || 0;
+  if (used >= cap) return 0;
+  var give = Math.min(Math.floor(amount), cap - used);
+  if (give <= 0) return 0;
+  charDailyCounters()[kind] = used + give;
+  return grantCharExp(give, kind);
+}
+
+/* 旧档迁移：没有 char 账本的存档一律从「等级 1、基础各 5、
+   未分配创建点 10」开始，不按历史天数补发无法核实的经验（§4.1）。
+   任务、资格、关系、旧成就一律不动。
+
+   today 显式传入，不读全局 state：归一化必须只依赖 raw，
+   否则读一次和读两次会得到不同结果（存档往返不变式）。 */
+function normalizeChar(raw, today) {
+  var d = newCharState();
+  if (!raw || typeof raw !== 'object') return d;
+  var n = function (v, dflt, max) {
+    if (typeof v !== 'number' || !isFinite(v)) return dflt;
+    v = Math.floor(v);
+    if (v < 0) return 0;
+    return max ? Math.min(v, max) : v;
+  };
+  d.level = Math.max(1, Math.min(charLevelCap(), n(raw.level, 1)));
+  d.exp = n(raw.exp, 0, 100000);
+  var a=raw.attr&&typeof raw.attr==='object'?raw.attr:{};
+  var remaining=CHAR_RULE.createPoints+d.level-1;
+  CHAR_ATTR_IDS.forEach(function(id){
+    var extra=Math.min(remaining,Math.max(0,n(a[id],CHAR_RULE.attrBase)-CHAR_RULE.attrBase),charAttributeCap(d.level)-CHAR_RULE.attrBase);
+    d.attr[id]=CHAR_RULE.attrBase+extra;remaining-=extra;
+  });
+  d.attrPoints=remaining;
+  d.talents={};
+  var talentBudget=charTalentBudget(d.level);
+  CHAR_TALENTS.forEach(function(t){
+    if(talentBudget>0&&raw.talents&&raw.talents[t.id]&&charTalentStageOpen(t)&&d.attr[t.attr]>=8){d.talents[t.id]=true;talentBudget--;}
+  });
+  d.spentTalents=Object.keys(d.talents).length;
+  d.talentPoints=talentBudget;
+
+  var g = raw.expGrants && typeof raw.expGrants === 'object' ? raw.expGrants : {};
+  d.expGrants = {};
+  Object.keys(g).slice(0, 5000).forEach(function (k) { d.expGrants[k] = n(g[k], 1, 1000000); });
+  var daily = raw.expDaily && typeof raw.expDaily === 'object' ? raw.expDaily : {};
+  d.expDailyDay = (typeof raw.expDailyDay === 'number') ? Math.floor(raw.expDailyDay) : -1;
+  /* 读档跨天：昨日的封顶计数直接作废，今天从头开始。
+     同一天读档则原样保留，否则「重开游戏刷满经验」就成了漏洞。 */
+  d.expDaily = {};
+  if (typeof today === 'number' && d.expDailyDay === today) {
+    Object.keys(CHAR_DAILY_CAP).concat(['__saveStrength']).forEach(function (k) {
+      d.expDaily[k] = Math.max(0, Math.min(k==='__saveStrength'?CHAR_SAVE_STRENGTH_DAILY:CHAR_DAILY_CAP[k], n(daily[k], 0)));
+    });
+  }
+  d.washFree = raw.washFree === undefined ? true : !!raw.washFree;
+  d.expPausedAtCap = !!raw.expPausedAtCap;
+  /* 坏档不能造出满级满点：超出阶段上限的经验清零 */
+  d.exp = d.level >= charLevelCap() ? 0 : Math.min(d.exp,charExpToNext(d.level)-1);
+  return d;
+}
+
+/* 升级提示走 toast 但不打断：正在钓鱼或战斗时也要弹（§4.2）。 */
+function charNotice(text, reason) {
+  if (typeof toast === 'function') toast(text);
+}
+
+/* 洗点（§4.3）：首次免费，之后 50 金。预览全部返还后才一次应用；
+   结算事务、战斗和需要强制决策时不可洗点。 */
+function charWashCost() { return CHAR_RULE.respecCost; }
+function charBusyForRespec() {
+  return (Game && Game.busy) || (Game && Game.fishing && Game.fishing.active) ||
+    (Game && Game.swingT > 0) || (sceneSwitch && sceneSwitch.busy) || !!UI.window && UI.window.kind === 'pause';
+}
+function charRespecPreview() {
+  var c = charState();
+  var refund = c.attrPoints + CHAR_ATTR_IDS.reduce(function(n,id){return n+c.attr[id]-CHAR_RULE.attrBase;},0);
+  openWindow({
+    id: 'char_respec', kind: 'character', narrow: true, title: '洗点预览',
+    build: function (b) {
+      if (charBusyForRespec()) {
+        b.appendChild(el('p', 'muted', '结算事务、战斗或需要立即决策的时候不能洗点。结束当前动作后再来。'));
+        return;
+      }
+      b.appendChild(el('p', null, '洗点会把五项属性退回基础 ' + CHAR_RULE.attrBase + '，并返还全部点数。'));
+      CHAR_ATTR_DEFS.forEach(function (a) {
+        charRow(b, a.name, c.attr[a.id] + ' → ' + CHAR_RULE.attrBase + '（返还 ' + (c.attr[a.id] - CHAR_RULE.attrBase) + ' 点）');
+      });
+      charRow(b, '未分配属性点', String(c.attrPoints));
+      charRow(b, '已花天赋点', (c.spentTalents || 0) + ' 点会一并返还，天赋学习被清空');
+      charRow(b, '返还属性点', refund + ' 点', 'char-val ok');
+      charRow(b, '返还天赋点', (c.talentPoints+c.spentTalents)+' 点');
+      charNote(b, '已完成任务、公共贡献、职业资格和关系不会随洗点删除；当前能力只影响新的专业动作。' +
+        '生命与体力上限会夹在新上限里，不借反复洗点恢复。');
+      if (!c.washFree) charNote(b, '费用 ' + charWashCost() + ' 金，当前持有 ' + state.coins + ' 金。');
+      else charNote(b, '首次洗点免费。');
+    },
+    actions: [
+      { label: '确认洗点' + (c.washFree ? '（免费）' : '（' + charWashCost() + ' 金）'), kind: 'primary', close: false, onClick: function () {
+        if (charBusyForRespec()) { toast('现在不能洗点，请先结束当前动作。'); return; }
+        var err = charApplyRespec();
+        if (err) { toast(err); Audio2.play('fail'); return; }
+        closeWindow(); openCharacter('attr');
+      } },
+      { label: '取消', kind: 'ghost', close: true }
+    ]
+  });
+}
+function charApplyRespec() {
+  var c = charState();
+  if (charBusyForRespec()) return '现在不能洗点。';
+  if (!c.washFree && state.coins < charWashCost()) return '金币不足，需要 ' + charWashCost() + ' 金。';
+  var normalized=normalizeChar(c,state.totalDay);
+  var points=CHAR_RULE.createPoints+normalized.level-1;
+  var talents=charTalentBudget(normalized.level);
+  if(!c.washFree)state.coins-=charWashCost();
+  c.washFree=false;
+  CHAR_ATTR_IDS.forEach(function(id){c.attr[id]=CHAR_RULE.attrBase;});
+  c.talents={};c.spentTalents=0;c.attrPoints=points;c.talentPoints=talents;
+
+  /* 下调上限时把当前体力夹进新上限，不借反复洗点恢复 */
+  state.energy = Math.min(state.energy, CFG.maxEnergy);
+  markDirty(); saveNow(); refreshHud();
+  return '';
+}
+
+/* 属性加点：先校验再一次应用，失败不扣点（§18）。 */
+function charSpendAttrPoint(id) {
+  var c = charState();
+  if (CHAR_ATTR_IDS.indexOf(id) < 0) return '没有这项属性。';
+  if (!(c.attrPoints > 0)) return '没有可分配的属性点。';
+  if (c.attr[id] >= charAttributeCap(c.level)) return CHAR_ATTR_DEFS.filter(function (a) { return a.id === id; })[0].name + ' 已达当前上限 ' + charAttributeCap(c.level) + '。';
+  c.attr[id] += 1;
+  c.attrPoints -= 1;
+  markDirty();
+  return '';
+}
+
 CHAR_BUILD.attr = function (b) {
-  var e = exploreState();
-  var live = charBox(b, '当前真实生效的数值');
+  var e = exploreState(), c = charState(), bud = charBudget();
+  var live = charBox(b, '角色等级与当前状态');
+  charRow(live, '角色等级', c.level + ' / ' + charLevelCap() + '（经验 ' + c.exp + ' / ' + charExpToNext(c.level) + '）');
   charRow(live, '体力', state.energy + ' / ' + CFG.maxEnergy);
+  charRow(live, '可分配属性点', c.attrPoints > 0 ? c.attrPoints + ' 点待分配' : '暂无', c.attrPoints > 0 ? 'char-val ok' : 'char-val muted');
+  charRow(live, '天赋点', c.talentPoints > 0 ? c.talentPoints + ' 点待使用' : '暂无', 'char-val muted');
   charRow(live, '探索阶位', '阶 ' + (explorationTier() + 1) + ' / 3（探索度 ' + (e.explorePoints || 0) + '）', 'char-val muted');
   charRow(live, '城市声望', String(e.cityReputation || 0));
   var best = Object.keys(NPCS).map(function (id) { return { id: id, v: state.npcFriendship[id] || 0 }; })
-    .sort(function (a, c) { return c.v - a.v; })[0];
+    .sort(function (a, c2) { return c2.v - a.v; })[0];
   charRow(live, '居民关系', best && best.v > 0 ? '最高：' + NPCS[best.id].name + ' ' + best.v : '还没有建立关系');
   charNote(live, '探索阶位只反映探索度分级，不是角色等级。军衔代表机构授权，也不是个人成长（§4.2、§15）。');
+  if (c.expPausedAtCap && c.level >= charLevelCap()) {
+    charNote(live, '已到本阶段等级上限 ' + charLevelCap() + '，暂停发放角色经验；后续材料和钱物照常取得。');
+  }
 
-  var plan = charBox(b, '规划中的五项属性（R1 待实现）');
+  var plan = charBox(b, '五项属性');
   charRow(plan, '规则', '基础 ' + CHAR_RULE.attrBase + ' · 单项上限 ' + CHAR_RULE.attrCap +
     ' · 创建自由点 ' + CHAR_RULE.createPoints + '（创建时单项最多 10；跳过创建细节可采用五项各 7）· 每次升级 1 点');
-  charRow(plan, '点数预算', '首批 10 级共 ' + CHAR_RULE.budgetPhase1 + ' 点；最终上限 ' + CHAR_RULE.levelCap +
-    ' 级共 ' + CHAR_RULE.budgetTotal + ' 点（25 基础 + 10 创建 + 24 升级）');
-  charRow(plan, '经验曲线', '第 ' + CHAR_RULE.phase1Level + ' 级前每级 ' + CHAR_RULE.expPerLevel(2) +
-    ' 点起算；仅是可调初值', 'char-val muted');
-  CHAR_ATTRS.forEach(function (a) {
+  charNote(plan, '当前属性用于对应天赋的学习门槛；研究、感知线索、生命上限等直接收益随后续场景接入，不会仅因加点就改变尚未开放的玩法。');
+  charRow(plan, '点数预算', '当前共 ' + (bud.earned+CHAR_ATTR_BASE_TOTAL) + ' 点 = 基础 ' + CHAR_ATTR_BASE_TOTAL +
+    ' + 创建 ' + CHAR_RULE.createPoints + ' + 升级 ' + (c.level - 1) +
+    '；已分配 ' + bud.allocated + '，未分配 ' + bud.attrUnspent);
+  charRow(plan, '经验曲线', '升级所需经验 = 60 + 15 ×（当前等级 − 1）', 'char-val muted');
+  CHAR_ATTR_DEFS.forEach(function (a) {
+    var v = c.attr[a.id];
+    var tier = CHAR_RULE.thresholds.filter(function (t) { return v >= t; }).length;
     var box = el('div', 'char-attr');
-    box.appendChild(el('div', 'char-attr-name', a.name));
+    var head = el('div', 'row between');
+    head.appendChild(el('span', 'char-attr-name', a.name));
+    head.appendChild(el('span', 'req-chip ' + (tier ? 'ok' : ''),
+      v + ' · ' + (tier >= 4 ? '大师' : tier === 3 ? '精通' : tier === 2 ? '专长' : tier === 1 ? '擅长' : '基础')));
+    box.appendChild(head);
     box.appendChild(el('div', 'char-attr-use', '用途：' + a.use));
     box.appendChild(el('div', 'char-attr-edge', '边界：' + a.edge));
-    box.appendChild(el('span', 'req-chip', '未分配 · 待实现'));
+    var acts = el('div', 'item-actions');
+    var cap=charAttributeCap(c.level);
+    var can = c.attrPoints > 0 && v < cap;
+    var btn = mkBtn(v >= cap ? '已达当前上限 ' + cap : (can ? '+1 点（剩 ' + c.attrPoints + '）' : '没有可分配的点'), can ? 'primary sm' : 'sm', function () {
+      var err = charSpendAttrPoint(a.id);
+      if (err) { toast(err); Audio2.play('fail'); return; }
+      toast(a.name + ' 提升到 ' + charAttr(a.id) + '。');
+      refreshWindow(); refreshHud();
+    });
+    btn.disabled = !can;
+    acts.appendChild(btn);
+    box.appendChild(acts);
     plan.appendChild(box);
   });
-  charNote(plan, '达到阶段等级上限时暂停发放角色经验，不会把存量经验一次性变成满级。旧档首次迁移给等级 1、基础各 5 和未分配创建点 ' +
-    CHAR_RULE.createPoints + '，不按历史天数补发无法核实的经验。');
+  var acts = el('div', 'row');
+  var cost = charWashCost();
+  var canWash = c.washFree || state.coins >= cost;
+  var wb = mkBtn(c.washFree ? '首次洗点免费 · 预览' : '洗点（' + cost + ' 金）· 预览', canWash ? 'sm' : 'sm', function () { charRespecPreview(); });
+  wb.disabled = !canWash;
+  acts.appendChild(wb);
+  plan.appendChild(acts);
+  charNote(plan, '洗点返还创建、升级和已花天赋点，但不突破原预算；已完成任务、公共贡献、职业资格和关系不会随洗点删除（§4.3）。');
 };
 
+/* 天赋是否可学：必须同时满足已接入阶段、等级门槛、属性门槛和点数。
+   未接入阶段的节点保留查看，但不消耗点数（§5）。 */
+function charTalentStageOpen(t) { return t.stage === 'R1'; }
+function charAttrName(id) { return CHAR_ATTR_DEFS.filter(function (a) { return a.id === id; })[0].name; }
+function charTalentUnlockText(t) {
+  var c = charState();
+  if (!charTalentStageOpen(t)) return '后续内容 · ' + t.stage + ' 接入';
+  if (charAttr(t.attr) < CHAR_RULE.thresholds[0]) return '需要' + charAttrName(t.attr) + ' ≥ ' + CHAR_RULE.thresholds[0] + '（当前 ' + charAttr(t.attr) + '）';
+  if (!(c.talentPoints > 0)) return '没有可用的天赋点（3/6/9/12/15/18/21/24 级各 1 点）';
+  return '';
+}
+function charLearnTalent(id) {
+  var c = charState();
+  var t = CHAR_TALENTS.filter(function (x) { return x.id === id; })[0];
+  if (!t) return '没有这个天赋。';
+  if (c.talents[id]) return '已经学会了。';
+  var why = charTalentUnlockText(t);
+  if (why) return why;
+  c.talents[id] = true;
+  c.talentPoints -= 1;
+  c.spentTalents = (c.spentTalents || 0) + 1;
+  markDirty();
+  return '';
+}
+function hasTalent(id) { return !!charState().talents[id]; }
+
 CHAR_BUILD.talent = function (b) {
-  var box = charBox(b, '首批十个入门节点（R1—R2 分批接入）');
-  charNote(box, '天赋点数在角色等级 3/6/9/12/15/18/21/24 级各获得 1 点，全角色最多 8 点，允许跨树。' +
-    '入门节点要求对应属性至少 ' + CHAR_RULE.thresholds[0] + '，进阶要求 12 且已学本树任一入门，精通要求 16 且已学两个并含进阶。');
+  var box = charBox(b, '首批十个入门节点');
+  var c = charState();
+  charRow(box, '天赋点', c.talentPoints > 0 ? c.talentPoints + ' 点可用' : '暂无（3/6/9/12/15/18/21/24 级各 1 点，全角色最多 8 点）');
+  charNote(box, '入门节点要求对应属性至少 ' + CHAR_RULE.thresholds[0] + '，进阶要求 12 且已学本树任一入门，精通要求 16 且已学两个并含进阶。' +
+    '标为 R2 的节点仍只可查看，不消耗点数。');
   CHAR_TALENTS.forEach(function (t) {
-    var card = el('div', 'char-talent');
+    var attrName = CHAR_ATTR_DEFS.filter(function (a) { return a.id === t.attr; })[0].name;
+    var learned = !!c.talents[t.id];
+    var why = charTalentUnlockText(t);
+    var card = el('div', 'char-talent' + (learned ? ' learned' : ''));
     var head = el('div', 'row between');
     head.appendChild(el('span', 'char-talent-name', t.tree + ' · ' + t.name));
-    head.appendChild(el('span', 'req-chip no', '未接入 · 不可购买'));
+    head.appendChild(el('span', 'req-chip ' + (learned ? 'ok' : charTalentStageOpen(t) ? '' : 'no'),
+      learned ? '已学习' : (why || '可学习')));
     card.appendChild(head);
     card.appendChild(el('div', 'char-talent-desc', t.desc));
-    card.appendChild(el('div', 'char-talent-meta', '条件：' + t.need + ' · 上限：' + t.cap));
-    card.appendChild(el('div', 'char-talent-where', '支持地点：' + t.where));
+    card.appendChild(el('div', 'char-talent-meta', '条件：' + t.need + '（当前' + attrName + ' ' + charAttr(t.attr) + '）· 上限：' + t.cap));
+    card.appendChild(el('div', 'char-talent-where', '支持地点：' + t.where + ' · 阶段 ' + t.stage));
+    if (!learned && charTalentStageOpen(t)) {
+      var acts = el('div', 'item-actions');
+      var btn = mkBtn('学习（1 点）', why ? 'sm' : 'primary sm', function () {
+        var err = charLearnTalent(t.id);
+        if (err) { toast(err); Audio2.play('fail'); return; }
+        toast('学会了「' + t.name + '」。');
+        refreshWindow(); refreshHud();
+      });
+      btn.disabled = !!why;
+      acts.appendChild(btn);
+      card.appendChild(acts);
+      if (why) card.appendChild(el('div', 'char-talent-why', why));
+    }
     box.appendChild(card);
   });
   charLater(charBox(b, '后续十五节点'), CHAR_TALENTS_LATER);
@@ -11729,7 +12099,11 @@ function travelState() {
 function registerArrival(sceneId) {
   var t = travelState();
   var node = NODE_BY_SCENE[sceneId];
-  if (node && !t.discovered[node.id]) { t.discovered[node.id] = true; markDirty(); }
+  if (node && !t.discovered[node.id]) {
+    t.discovered[node.id] = true; markDirty();
+    /* 新地点与真实发现：稳定节点 ID 一次，反复穿门不给（§4.2） */
+    grantCharExpOnce('discover.' + node.id, CHAR_EXP.discovery, 'discovery');
+  }
   if (sceneId === 'city') registerCityDistrict();
   if (sceneId === 'mine2' && exploreState().depth >= 2 && !t.discovered['mine.level2']) { t.discovered['mine.level2'] = true; markDirty(); return 'mine.level2'; }
   if (sceneId === 'mine3' && exploreState().depth >= 3 && !t.discovered['mine.level3']) { t.discovered['mine.level3'] = true; markDirty(); return 'mine.level3'; }
@@ -12522,6 +12896,8 @@ function openHandbook() {
   openWindow({
     id: 'handbook', kind: 'help', wide: true, title: '农场手册',
     build: function (b) {
+      b.appendChild(mkBtn('角色与成长', 'primary', function(){openCharacter('attr');}));
+      b.appendChild(mkBtn('洗点预览', '', function(){charRespecPreview();}));
       b.appendChild(el('div', 'section-title', '一天的循环'));
       [
         '早晨从床上起来，走出农舍门。',
@@ -15294,7 +15670,7 @@ function normalizeWetlandLife(raw){var r=raw&&typeof raw==='object'?raw:{},w=new
 function newProfessionalLife(){return {vineyard:{plan:null,planDay:0,harvestDay:0,pressDay:0,delayed:false,harvested:0,pressed:0,product:null,shipped:0},clinic:{diagnosed:false,sampleVerified:false,receivedJuice:false,medicine:0,patientDay:0,recovered:false},port:{manifestChecked:false,choice:null,shipment:null,settled:false,shipmentDay:0,deliveries:0},quarry:{surveyed:false,face:null,props:false,extracted:0,lastExtractDay:0,cut:0},waterworks:{level:0,repair:null,receivedStone:false,millOpinion:false,meadowOpinion:false,portOpinion:false,allocation:null,testDay:0,certified:false},careers:{horticulture:0,medicine:0,trade:0,engineering:0},watershedContract:0,trust:0,access:{vineyard:false,clinic:false,port:false,quarry:false,waterworks:false},
 /* 第七版规划「给职业提供不同的进入路线」：公共工程链之外再开三条替代入口，
    免得想做商人或巡林人的玩家必须先走完一整段公共工程。 */
-routes:{engineering:0,trade:0,patrol:0},
+routes:{engineering:0,trade:0,patrol:0},rookie:{engineering:0,trade:0,patrol:0},
 /* 到访、接任务、指挥军队三层授权分开：能进边城做生意不等于能指挥军队。 */
 passes:{visit:false,commission:false,command:false}};}
 function professionalWaterPolicy(){var w=professionalLifeState().waterworks;return w.certified?w.allocation:null;}
@@ -15318,6 +15694,7 @@ function normalizeProfessionalLife(raw){var d=newProfessionalLife(),r=raw&&typeo
   if(d.port.manifestChecked)d.access.port=true;if(d.quarry.surveyed)d.access.quarry=true;
   if(d.waterworks.repair)d.access.waterworks=true;
   /* 三条替代入口的进度按真实事件累计，不写死；旧档缺字段时从 0 起。 */
+  a=r.rookie||{};d.rookie={engineering:n(a.engineering,5),trade:n(a.trade,6),patrol:n(a.patrol,5)};
   a=r.routes||{};d.routes={engineering:n(a.engineering,9),trade:n(a.trade,9),patrol:n(a.patrol,9)};
   /* 三层授权：到访 / 接任务 / 指挥军队。
      归一化发生在 state 换成新对象之前，这里绝不能读全局 state，
@@ -15615,7 +15992,7 @@ function bumpCareer(key, step) {
 function professionalRoutePanel() {
   var p = professionalLifeState();
   var names = { engineering: '工程路线', trade: '商旅路线', patrol: '巡林路线' };
-  var nexts = { engineering: '完成采场调查或水利一段工程', trade: '完成两次本地运输', patrol: '完成一次道路调查与训练' };
+  var nexts = { engineering: '在小镇任务板报名公共水泵维修', trade: '在小镇任务板报名本地货单交付', patrol: '在小镇任务板报名林缘足迹调查' };
   var box = el('div', 'panel-box');
   box.appendChild(el('div', 'section-title', '进入路线（任一条走通都能往下走）'));
   ['engineering', 'trade', 'patrol'].forEach(function (k) {
@@ -16346,6 +16723,74 @@ function configureIndoorDoors() {
 }
 configureIndoorDoors();
 
+
+/* R1：全部起步点在公开小镇；阶段、货物保管和完成事实只存一份。 */
+var ROOKIE_JOBS={
+  engineering:{name:'松动的公共水泵',person:'阿栎',reward:25,steps:[
+    ['board','报名公共水泵维修',5,0,'阿栎需要助手检查作坊门前的公共手压水泵；工具由作坊提供。'],
+    ['workshop','检查手柄与固定栓',15,2,'手柄空转，固定栓松动；先询问取水居民，确认不是地下水断流。'],
+    ['board','核对居民用水记录',10,0,'记录显示昨日仍能出水。可以用作坊的扳手紧固手柄，无须购买零件。'],
+    ['workshop','借用扳手紧固并试水',30,3,'紧固后连续试压三次，出水恢复。阿栎在维修记录上签字。'],
+    ['board','提交维修记录并领取报酬',5,0,'完成工程入门，获得两项工程路线记录、25 金与 60 经验。']
+  ]},
+  trade:{name:'没有署名的货单',person:'芽芽与阿栎',reward:25,steps:[
+    ['board','报名本地货单核验',5,0,'芽芽有一包给木工作坊的种植标签，货单缺署名。请先找双方核实。'],
+    ['shop','向芽芽核对包裹来源',10,0,'芽芽确认是木制花圃标签的样单；收件人应是阿栎。'],
+    ['workshop','向阿栎核对收件数量',10,0,'阿栎确认订过一包样签。数量与来源相符，现在可回种子铺领封包。'],
+    ['shop','领取已核验的封包',10,1,'封包记在任务货物栏，不占普通背包，也不能出售。请亲手交给阿栎。'],
+    ['workshop','交付封包并取得回执',15,1,'阿栎签收封包，任务货物转为回执。带回任务板结清。'],
+    ['board','提交回执并领取报酬',5,0,'完成商旅入门，获得两项商旅路线记录、25 金与 60 经验。']
+  ]},
+  patrol:{name:'林缘的足迹',person:'林口巡护员与集市居民',reward:25,steps:[
+    ['board','报名林缘安全调查',5,0,'只调查小镇北侧公开林口，不需要清理森林倒木或参加军队。'],
+    ['forest_gate','观察林口泥地与车辙',15,1,'泥地有犬爪印和新车辙，路旁有松动的警示绳。到集市询问见过货车的人。'],
+    ['market','核对集市居民的见闻',10,0,'居民确认这是送货犬与手推车，危险来自路旁湿滑，不是野兽袭击。'],
+    ['forest_gate','系好警示绳并标记安全侧',20,2,'已标出干燥一侧。巡护只恢复林口安全，不开放倒木后的森林区域。'],
+    ['board','提交巡护记录并领取报酬',5,0,'完成巡林入门，获得两项巡林路线记录、25 金与 60 经验；没有军事委任。']
+  ]}
+};
+function rookieState(){var p=professionalLifeState();if(!p.rookie)p.rookie={engineering:0,trade:0,patrol:0};return p.rookie;}
+function rookieSite(id){return INTERACTABLES.town.filter(function(it){return it.id===id;})[0];}
+function rookieNear(id){var it=rookieSite(id);return !!it&&state.sceneId==='town'&&Math.abs(state.player.x-it.x)+Math.abs(state.player.y-it.y)<=1;}
+function rookieStep(key,expected){
+  if(Game.busy||sceneSwitch.busy||(Game.fishing&&Game.fishing.active))return false;
+  var job=ROOKIE_JOBS[key],r=rookieState(),step=job&&job.steps[expected];
+  if(!step||r[key]!==expected)return false;
+  var it=rookieSite(step[0]);
+  return performAction({point:{scene:'town',x:it.x,y:it.y,label:it.label},minutes:step[2],energy:step[3],
+    guard:function(){return rookieState()[key]===expected;},apply:function(){
+      r[key]=expected+1;
+      if(r[key]===job.steps.length){bumpRoute(key,2);if(key!=='patrol')bumpCareer(key);state.coins+=job.reward;grantCharExpOnce('rookie.'+key,60,'rookie');}
+      toast(step[4]);
+    }});
+}
+function renderRookieJobs(b){
+  b.appendChild(el('p','muted','三份工作都能直接从新档开始，无需修桥、办城门证或军事资格。先在小镇任务板报名；任务工具免费借用。'));
+  Object.keys(ROOKIE_JOBS).forEach(function(key){
+    var job=ROOKIE_JOBS[key],n=rookieState()[key],step=job.steps[n],box=el('div','panel-box');
+    box.appendChild(el('div','section-title',job.name+' · '+(step?(n?'进行中':'可报名'):'已完成')));
+    box.appendChild(el('p','muted','联系人：'+job.person+' · 报酬 '+job.reward+' 金 / 60 经验 · 完成后取得到访引荐，不授予军事指挥权。'));
+    if(step){var it=rookieSite(step[0]);
+      box.appendChild(el('p',null,'下一步：'+step[1]+'。小镇 '+it.label+'（'+it.x+','+it.y+'），走到相邻格按 E。'));
+      box.appendChild(el('p','muted',(n?job.steps[n-1][4]:step[4])));
+      if(key==='trade')box.appendChild(el('p','req-chip',n===4?'任务货物：已核验封包 ×1':n===5?'任务货物：签收回执 ×1':'任务货物：无'));
+      var btn=mkBtn(step[1]+' · '+step[2]+'分钟 / '+step[3]+'体力','primary',function(){rookieStep(key,n);});
+      btn.disabled=!rookieNear(step[0]);box.appendChild(btn);
+    }else{
+      box.appendChild(el('p','req-chip ok',job.steps[job.steps.length-1][4]));
+      box.appendChild(el('p','muted',key==='engineering'?'水泵维修记录已归档，可凭工程引荐继续采场与水利工作。':key==='trade'?'封包已签收，回执已归档；河港与邻领到访路线开放。':'林口警示绳与安全侧已经登记；可继续医舍、关口的公开调查，军队另行登记。'));
+    }b.appendChild(box);
+  });
+}
+function openRookieJobs(site,original){openWindow({id:'rookie_jobs',kind:'quest',wide:true,title:'小镇入门工作',build:renderRookieJobs,
+  actions:[{label:'原有服务',close:false,onClick:function(){closeWindow();original(site);}},{label:'离开',close:true}]});}
+var rookieBaseInteract=activateInteractable;
+activateInteractable=function(it){
+  if(state.sceneId==='town'&&it&&it.id!=='board'&&Object.keys(ROOKIE_JOBS).some(function(k){var n=rookieState()[k],step=ROOKIE_JOBS[k].steps[n];return n>0&&step&&step[0]===it.id;})){
+    openRookieJobs(it,rookieBaseInteract);return;
+  }rookieBaseInteract(it);
+};
+
 window.__MOSS__ = {
   doorTiles: doorTiles, installIndoorDoors: installIndoorDoors, drawIndoorDoors: drawIndoorDoors,
   questExitTile: questExitTile,
@@ -16363,6 +16808,25 @@ window.__MOSS__ = {
 
   fertilityTier: fertilityTier,
   fertilityYieldFactor: fertilityYieldFactor,
+
+  /* 角色成长账本（R1）。用 getter 导出，避免测试拿到的是快照。 */
+  Game: Game,
+  charState: charState,
+  charBudget: charBudget,
+  charLevelCap: charLevelCap,
+  charAttr: charAttr,
+  charExpToNext: charExpToNext,
+  grantCharExp: grantCharExp, grantDailyJobExp: grantDailyJobExp, rookieStep:rookieStep, rookieState:rookieState,
+  grantCharExpOnce: grantCharExpOnce,
+  grantCharExpDaily: grantCharExpDaily,
+  charSpendAttrPoint: charSpendAttrPoint,
+  charApplyRespec: charApplyRespec,
+  charLearnTalent: charLearnTalent,
+  charSpendEnergy: charSpendEnergy,
+  hasTalent: hasTalent,
+  normalizeChar: normalizeChar,
+  eatItem: eatItem,
+  ITEMS: ITEMS,
 
   /* 肥力观测面：audit-fertility-logic 直接驱动 plotFertility/rotationHint，
      之前未导出导致 lint-self 报孤儿引用、审计脚本只能靠间接路径。 */

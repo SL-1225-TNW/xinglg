@@ -7,6 +7,8 @@ tests/*.log
 tests/*.err
 output/playwright/*.log
 output/playwright/*.err
+output/*.log
+output/*.err
 
 # 只在用例失败时才写出的排查截图，不是验收证据
 output/playwright/guide-failed.png

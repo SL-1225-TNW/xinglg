@@ -32,6 +32,14 @@ jobs:
           for file in tests/*.mjs; do node --check "$file"; done
       - name: Build the offline single-file game
         run: node tests/prepare-site.mjs
+      - name: Verify character growth and independent rookie routes
+        run: |
+          node tests/run-r0-character-entry.mjs
+          node tests/run-r1-character-growth.mjs
+          node tests/run-r1-accounting.mjs
+          node tests/run-r1-rookie-routes.mjs
+          node tests/run-r1-mobile.mjs
+          node tests/run-indoor-doors.mjs
       - name: Verify mill and meadow
         run: |
           node tests/run-phase-c-mill.mjs
