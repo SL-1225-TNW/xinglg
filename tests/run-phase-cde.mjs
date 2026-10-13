@@ -96,12 +96,12 @@ try {
   await pose('port_office', 10, 6); await panel('openProfessionSite', 'port'); await click('装运验收石料至水利站 · 石料 ×3');
   await pose('waterworks', 20, 18); await panel('openProfessionSite', 'gauge'); await click('读水尺并取样 · 15分钟'); await click('签收石料运单 · 消耗核验运单');
   eq('货物在水利站实物签收', await evaluate(() => [__MOSS__.professionalLifeState().waterworks.receivedStone, __MOSS__.professionalLifeState().watershedContract]), [true, 1]);
-  await pose('waterworks_control', 8, 6); await panel('openProfessionSite', 'water'); await click('安装闸件并封存石料 · 铁锭 ×1');
   await pose('mill_village', 17, 24); await panel('openProfessionSite', 'opinion_mill'); await click('记录上下游意见 · 10分钟');
   await pose('meadow', 18, 17); await panel('openProfessionSite', 'opinion_meadow'); await click('记录上下游意见 · 10分钟');
   await pose('port_lockhouse', 14, 5); await panel('openProfessionSite', 'opinion_port'); await click('记录上下游意见 · 10分钟');
-  await pose('waterworks_control', 8, 6); await panel('openProfessionSite', 'water'); await click('优先灌溉 · 保住田水，限制大型船只');
-  await night(); await pose('waterworks_control', 8, 6); await panel('openProfessionSite', 'water'); await click('隔夜验收并发放工程证书 · 90金');
+  eq('磨坊、牧场、河港三方意见都记在册', await evaluate(() => { const w = __MOSS__.professionalLifeState().waterworks; return [w.millOpinion, w.meadowOpinion, w.portOpinion]; }), [true, true, true]);
+  // 工程内部的勘测→认证→说明会→施工由 run-r3-project 逐键验证；这里只关心交付后的下游后果
+  await evaluate(() => __MOSS__.engFixtureAccepted('conservative'));
   eq('跨采场、河港、磨坊和牧场的水利合同验收', await evaluate(() => [__MOSS__.professionalLifeState().waterworks.certified, __MOSS__.professionalLifeState().waterworks.allocation, __MOSS__.professionalLifeState().watershedContract]), [true, 'irrigation', 3]);
 
   // E: signed authority, separate institutional funds, real deployment, three reproducible battle phases, and neighbor settlement.

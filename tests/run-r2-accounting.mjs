@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import {launch,boot,closeWin} from './harness.mjs';
+let n=0;const eq=(a,b,msg)=>{assert.deepEqual(a,b,msg);n++;console.log('PASS',msg);};
+const r=await launch(),p=r.page,v=f=>p.evaluate(f);
+try{
+ await boot(p);await p.locator('#tutorialSkip').click();
+ const norm=await v(()=>{const m=__MOSS__;let raw={trained:true,weapons:{sword:{tier:999,name:'晨光',memento:'训练'},bad:{tier:9}},equipped:'bad',hp:-4,meetingDay:999999,resolved:{hollow:{method:'fight',day:1},canal:{method:'unknown'}},luckCycles:{'forest:11,9':1,'garbage':1}};let a=m.normalizePersonal(raw,5,10),b=m.normalizePersonal(a,5,10);return {a,b};});
+ eq(norm.a,norm.b,'个人存档归一化幂等');eq(norm.a.weapons.sword.tier,3,'坏档武器不超过精钢');eq(norm.a.equipped,'sword','装备只能引用已持有武器');eq(norm.a.hp,1,'无效负血不会形成永久死亡档');
+ eq(Object.keys(norm.a.resolved),['hollow'],'只保留合法遭遇结案');eq(Object.keys(norm.a.luckCycles),['forest:11,9'],'只保留真实节点格式');
+ await v(()=>{const m=__MOSS__;m.devSwitchScene('town',20,8);const s=m.personalState();s.trained=true;s.equipped='sword';s.weapons.sword={tier:0,name:'晨光',memento:'训练'};m.state.inventory.copper_ingot=2;m.state.inventory.wood=2;m.state.coins=50;m.state.timeMinutes=m.CFG.dayEnd-10;m.openPersonalWorkshop();});
+ const before=await v(()=>JSON.stringify([__MOSS__.state.inventory,__MOSS__.state.coins,__MOSS__.state.timeMinutes,__MOSS__.personalState().weapons]));
+ eq(await v(()=>__MOSS__.personalUpgrade('sword',0)),false,'时间不足不能截断升级');eq(await v(()=>JSON.stringify([__MOSS__.state.inventory,__MOSS__.state.coins,__MOSS__.state.timeMinutes,__MOSS__.personalState().weapons])),before,'跨日失败升级完全不扣费');await closeWin(p);
+ await v(()=>{const m=__MOSS__;m.state.timeMinutes=600;m.devSwitchScene('farm',9,10);});
+ eq(await v(()=>__MOSS__.personalUpgrade('sword',0)),false,'在家不能远程整修');
+ await v(()=>{const m=__MOSS__;m.devSwitchScene('town',20,8);m.state.inventory={};let ids=Object.keys(m.ITEMS).filter(k=>m.ITEMS[k].kind!=='tool'&&k!=='copper_ingot');ids.slice(0,m.CFG.bagSlots).forEach(k=>m.state.inventory[k]=m.CFG.stack);m.state.inventory.copper_ore=m.CFG.stack;m.state.inventory.coal=m.CFG.stack;});
+ const inv=await v(()=>JSON.stringify(__MOSS__.state.inventory));eq(await v(()=>__MOSS__.personalSmelt('copper_ingot')),false,'熔炼完整产物放不下则拒绝');eq(await v(()=>JSON.stringify(__MOSS__.state.inventory)),inv,'满包熔炼不消耗燃料和矿石');
+ await v(()=>{const m=__MOSS__;m.state.inventory={copper_ore:3,coal:1};});eq(await v(()=>__MOSS__.personalSmelt('copper_ingot')),true,'小镇实际熔炼途径可用');eq(await v(()=>[__MOSS__.state.inventory.copper_ingot,__MOSS__.state.inventory.copper_ore||0,__MOSS__.state.inventory.coal||0]),[1,0,0],'小镇熔炼产物与成本一致');
+ await v(()=>{const m=__MOSS__;m.state.inventory={copper_ingot:2,wood:2,iron_ingot:4,coal:2};m.state.coins=200;m.state.timeMinutes=600;});
+ await p.keyboard.press('p');await p.getByRole('button',{name:'武器',exact:true}).click();await p.getByRole('button',{name:'委托升级为铜装',exact:true}).evaluate(b=>{b.click();b.click();});
+ eq(await v(()=>[__MOSS__.personalState().weapons.sword.tier,__MOSS__.state.coins,__MOSS__.state.inventory.iron_ingot]),[1,150,4],'旧界面按钮快速双击只升级一次，不误扣下一阶段材料');await closeWin(p);
+ await v(()=>{const m=__MOSS__;m.state.exploration.mine=m.state.exploration.forest=true;m.devSwitchScene('mine1',14,21);m.personalStart('canal');});
+ const frozen=await v(()=>{Object.defineProperty(document,'hidden',{value:true,configurable:true});let m=__MOSS__,a=JSON.stringify(m.personalCombat);m.tickPersonal(1);let b=JSON.stringify(m.personalCombat);delete document.hidden;return [a,b];});eq(frozen[0],frozen[1],'后台暂停冻结个人模拟');
+ await v(()=>{__MOSS__.saveNow();});await p.reload();await p.locator('.boot-actions button').first().click();eq(await v(()=>[__MOSS__.state.sceneId,__MOSS__.personalCombat.active]),['mine1',false],'途中重载回安全入口且不保存临时敌人');
+ await v(()=>{let m=__MOSS__;m.personalState().hp=1;m.state.timeMinutes=m.CFG.dayEnd-10;m.personalStart('hollow');m.personalTakeHit();});
+ eq(await v(()=>__MOSS__.state.totalDay),2,'晚间失败经过正常日终而非停钟');eq(await v(()=>__MOSS__.state.timeMinutes),360,'晚间失败正常重置次日时间');
+ await closeWin(p);
+ await v(()=>{let m=__MOSS__;m.devSwitchScene('town',17,14);m.personalState().training.sword={hit:true,dodge:true};m.personalStart('training','blade');m.saveNow();});
+ await p.reload();await p.locator('.boot-actions button').first().click();eq(await v(()=>[__MOSS__.state.sceneId,__MOSS__.personalCombat.trial,__MOSS__.personalState().weapons.sword.name]),['town',null,'晨光'],'训练重载撤回安全区，不泄漏临时试用武器');
+ await p.keyboard.press('p');await p.getByRole('button',{name:'武器',exact:true}).click();await p.getByLabel('闪避按键',{exact:true}).selectOption('x');await closeWin(p);
+ await p.keyboard.press('e');await p.getByRole('button',{name:'免费试剑',exact:true}).click();await p.keyboard.press('x');eq(await v(()=>__MOSS__.personalCombat.dodge>0),true,'可设置X键并以真实键盘闪避');
+ await p.keyboard.down('ArrowDown');await p.waitForFunction(()=>__MOSS__.state.sceneId==='town');await p.keyboard.up('ArrowDown');await p.waitForTimeout(350);eq(await v(()=>__MOSS__.personalCombat.active),false,'训练场南门真实步行撤回并结束模拟');await v(()=>__MOSS__.saveNow());await p.reload();await p.locator('.boot-actions button').first().click();eq(await v(()=>__MOSS__.personalState().dodgeKey),'x','闪避设置存档保留');
+ eq(r.errors,[],'结算边界浏览器无错误');
+}finally{await r.browser.close();}
+console.log('R2结算边界 '+n+' 项通过');

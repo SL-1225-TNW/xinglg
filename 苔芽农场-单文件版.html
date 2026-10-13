@@ -268,6 +268,21 @@ button{font-family:inherit}
   pointer-events:none;
 }
 
+/* 白蔷薇宫城楼层牌：宫城场景常驻，可点开楼层导览。
+   位置压在场景名下方，两个标签不会互相盖住；触控目标高度与 #touch* 一致，
+   手机横竖屏都够手指点中。 */
+.floor-tag{
+  position:absolute;right:6px;top:26px;
+  min-height:28px;max-width:min(220px,72%);
+  padding:4px 10px;border-radius:6px;
+  background:rgba(28,40,32,.88);border:1px solid #6b7f5f;
+  color:var(--paper);font-size:12px;line-height:1.2;letter-spacing:.5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  cursor:pointer;
+}
+.floor-tag:hover{border-color:var(--hint)}
+.floor-tag:focus-visible{outline:2px solid var(--hint);outline-offset:2px}
+
 /* ---------------- 底部：快捷栏 + 提示 ---------------- */
 #dock{
   flex:0 0 auto;
@@ -784,6 +799,8 @@ textarea.save-box{
   #stage{padding:6px 6px 2px}
   .quest-strip{font-size:11px;bottom:4px;left:4px;right:4px}
   .scene-tag{display:none}
+  /* 窄屏上场景名让位给楼层牌：楼层可点，场景名是纯装饰。 */
+  .floor-tag{top:6px;right:6px;min-height:32px;font-size:12px;padding:5px 10px}
   .window-layer{padding:8px}
   .win{max-height:calc(100vh - 16px)}
   .win-body{padding:10px}
@@ -999,6 +1016,7 @@ html.rotated-play .hud{order:initial;width:auto;flex-wrap:nowrap}
 html.rotated-play .hud-cell{min-width:0;flex:1 1 auto}
 html.rotated-play .hotbar{width:auto;max-width:calc(100% - 16px)}
 html.rotated-play .scene-tag{display:block}
+html.rotated-play .floor-tag{display:block;top:26px}
 html.rotated-play .quest-strip{bottom:80px}
 html.compact-play #topbar{min-height:36px;padding:2px 8px;gap:6px}
 html.compact-play .hud-label{display:none}
@@ -1100,6 +1118,17 @@ html.compact-play[data-device="tablet"] .tact-sm{width:44px;height:44px}
   .forest-journal-foot{display:none}.forest-journal-page{padding:14px 13px 17px}
   .forest-journal-page h2{font-size:22px}.journal-stat-grid{grid-template-columns:1fr}
 }
+/* R2：可读战斗控件在舞台内，沿用现有手机旋转与方向键。 */
+.personal-controls{position:absolute;top:6px;left:50%;transform:translateX(-50%);z-index:5;display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap;width:max-content;max-width:96%;padding:5px;background:#19382fee;border:1px solid #b7ad7f;border-radius:5px;line-height:1.3;font-size:12px;pointer-events:auto}
+.personal-controls[hidden],.personal-controls button[hidden]{display:none}
+.personal-controls button{min-height:36px;touch-action:none;white-space:nowrap}
+.personal-controls span{flex-basis:100%;text-align:center;color:#f1e5be}
+@media(max-width:600px){.personal-controls{top:3px;padding:3px;gap:3px}.personal-controls button{font-size:11px;padding:4px 7px;min-height:36px}}
+html.personal-encounter #farmAssist{display:none!important}
+.personal-controls{z-index:35}
+.personal-controls:not(.active){left:auto;right:6px;transform:none;width:auto}
+.personal-controls:not(.active) #personalAttack,.personal-controls:not(.active) #personalDodge{display:none}
+html.immersive .personal-controls{top:56px}
 
 </style>
 </head>
@@ -1151,6 +1180,7 @@ html.compact-play[data-device="tablet"] .tact-sm{width:44px;height:44px}
       </div>
       <div id="tileTip" class="tile-tip" hidden aria-live="polite"></div>
       <div id="sceneTag" class="scene-tag" aria-hidden="true">农场</div>
+      <button type="button" id="floorTag" class="floor-tag" hidden aria-label="宫城楼层导览">楼层 —</button>
       <div id="fade" class="fade" aria-hidden="true"></div>
     </div>
   </main>
@@ -2109,7 +2139,9 @@ function newGameState() {
     settings: { sound: true, soundConfigured: false, showHelpOnce: true },
     migratedFrom: null,
     overloaded: false,
-    char: newCharState()
+    char: newCharState(),
+    /* 白蔷薇宫城：新建档案直接是当前布局版本，只有旧档才需要迁移。 */
+    palace: { layoutVersion: PALACE_LAYOUT_VERSION, discovered: { palace_grounds: true, palace_f1: true, city_castle: true, palace_f3: true } }
   };
   s.inventory.seed_radish = 8;
   s.inventory.seed_potato = 2;
@@ -2196,6 +2228,8 @@ function serialize() {
     millLife: state.millLife || newMillLife(),
     meadowLife: state.meadowLife || newMeadowLife(),
     char: state.char || newCharState(),
+    /* 白蔷薇宫城布局版本。刻意不升 SCHEMA_VERSION：版本号一变旧档会被判损坏。 */
+    palace: state.palace || newPalaceState(),
     savedAt: Date.now()
   };
 }
@@ -2293,11 +2327,34 @@ function normalizeSave(raw) {
      刻意不升 SCHEMA_VERSION：版本号一变，旧档会被 loadGame 判为损坏
      并搬进 CORRUPT_KEY，玩家存档就丢了。 */
   s.char = normalizeChar(raw.char, s.totalDay);
+  s.personal = normalizePersonal(raw.personal, s.char.attr.body, s.totalDay);
+  // 临时遭遇重开回到入口；武器与已结算事实仍保留。
+  if (s.sceneId === 'r2_training') { s.sceneId='town'; s.player={x:17,y:14,face:'up'}; }
+  if (s.sceneId === 'r2_hollow') { s.sceneId='mine1'; s.player={x:14,y:20,face:'up'}; }
   s.millLife = normalizeMillLife(raw.millLife);
   s.meadowLife = normalizeMeadowLife(raw.meadowLife);
   if (raw.sceneId && raw.sceneId.indexOf('mill_') === 0 && !raw.bridgeRepaired && !(raw.millLife&&raw.millLife.legacyAccess)) { s.sceneId='town'; s.player={x:22,y:21,face:'up'}; }
-  if ((s.sceneId==='city'||s.sceneId.indexOf('city_')===0)&&!s.exploration.city){s.sceneId='town';s.player={x:14,y:22,face:'up'};}
+  if ((s.sceneId==='city'||s.sceneId.indexOf('city_')===0||s.sceneId.indexOf('palace_')===0)&&!s.exploration.city){s.sceneId='town';s.player={x:14,y:22,face:'up'};}
   if ((s.sceneId === 'forest' && !s.exploration.forest) || (s.sceneId.indexOf('mine') === 0 && (!s.exploration.mine || +s.sceneId.slice(4)>s.exploration.depth))) { s.sceneId='town';s.player={x:14,y:2,face:'down'}; }
+  /* 白蔷薇宫城：布局版本只迁移一次。
+     旧档没有 palace 字段、且玩家停在城堡室内时，把他挪到一层门厅的安全落点——
+     任务、好感、供货与已取得许可一律不动，只挪坐标。
+     normalizeSave 本身只钳制边界，不会把卡进墙里的人救出来，所以这一步是必需的。 */
+  s.palace = normalizePalace(raw.palace);
+  if (!s.palace.layoutVersion && s.sceneId === 'city_castle') {
+    var foyer = PALACE_FOYER;
+    s.sceneId = foyer.scene;
+    s.player = { x: foyer.x, y: foyer.y, face: 'up' };
+  }
+  if (!s.palace.layoutVersion && s.sceneId.indexOf('palace_') === 0) s.palace.layoutVersion = PALACE_LAYOUT_VERSION;
+  /* 兜底：宫城任何落点若落在墙或家具上，拉到该场景最近的可走格。
+     不改动别的场景，避免把这次迁移的影响扩散到全游戏。 */
+  if (isPalaceScene(s.sceneId)) {
+    if (MAPS[s.sceneId].solid[s.player.x][s.player.y]) {
+      var safe = nearestWalkable(s.sceneId, s.player.x, s.player.y);
+      s.player.x = safe.x; s.player.y = safe.y;
+    }
+  }
   s.rodLevel = clamp(Math.floor(num(raw.rodLevel, 1, 1, 3)), 1, 3);
   var qp = {};
   QUESTS.forEach(function (q) {
@@ -2920,6 +2977,8 @@ function exploreStairs(next){
 }
 function exploreTreasure(id){var e=exploreState();if(e.treasures[id]){toast('这个宝箱已经打开了。');return;}var amount=id==='forest_cache'?120:200;e.treasures[id]=true;e.explorePoints+=10;state.coins+=amount;markDirty();refreshHud();saveNow();toast('发现隐藏宝箱，获得 '+amount+' 金！');}
 function drawExploreNode(g,x,y,n){
+ if(n.rich&&hasTalent('read_ore')&&Math.abs(x-state.player.x)+Math.abs(y-state.player.y)<=4){px(g,x*TILE,y*TILE-4,16,2,'#EED17D');}
+
  if(n.type==='tree'){drawTree(g,x,y);if(n.item==='hardwood')px(g,x*TILE+6,y*TILE-3,4,12,'#765438');}
  else if(n.type==='stone'){drawRock(g,x,y);var color=n.item==='copper_ore'?'#D48F58':n.item==='iron_ore'?'#94B5CA':'#C59EEA';px(g,x*TILE+5,y*TILE+6,3,3,color);px(g,x*TILE+10,y*TILE+9,2,3,color);}
  else{px(g,x*TILE+4,y*TILE+9,3,5,'#F1DFC4');px(g,x*TILE+1,y*TILE+6,9,4,'#B87759');px(g,x*TILE+3,y*TILE+5,5,2,'#DDA27B');px(g,x*TILE+12,y*TILE+10,2,4,'#EADBBE');px(g,x*TILE+10,y*TILE+8,5,3,'#9E6952');}
@@ -3392,7 +3451,7 @@ function checkExit() {
   return false;
 }
 
-function doSwitchScene(to, tx, ty) {
+function doSwitchScene(to, tx, ty, face) {
   if (sceneSwitch.busy) return;
   sceneSwitch.busy = true;
   var fade = $('#fade');
@@ -3402,6 +3461,9 @@ function doSwitchScene(to, tx, ty) {
     if (to === 'house') tutorialEvent('entered');
     state.player.x = clamp(tx, 0, MAPS[to].w - 1);
     state.player.y = clamp(ty, 0, MAPS[to].h - 1);
+    /* 换层落点的朝向：楼梯落点要求「面朝走出来的那侧」，
+       门类连接保留原朝向不变。 */
+    if (face) state.player.face = face;
     syncPlayerPixel();
     updateNpcPositions(true);
     onSceneChanged();
@@ -3412,6 +3474,8 @@ function doSwitchScene(to, tx, ty) {
 }
 
 function onSceneChanged() {
+  if (personalCombat.active && state.sceneId !== personalCombat.scene) personalResetCombat();
+  personalCombat.mode=false;
   cam.init = false; // 换场景立即按新地图重新取景，避免室内第一帧沿用室外镜头。
   MINE_RECORD_POS='';
   if (isSolid(state.sceneId, state.player.x, state.player.y)) {
@@ -3426,11 +3490,29 @@ function onSceneChanged() {
     }
     if (!found) { state.player.x = state.sceneId === 'city' ? 320 : 9; state.player.y = state.sceneId === 'city' ? 470 : 10; }
   }
+  /* 宫城楼层大、房间多，只在半径 3 内找空位容易把玩家塞进隔壁房间；
+     这里改用全图最近可走格，楼梯落点被家具改动波及也能自救。 */
+  if (isPalaceScene(state.sceneId) && isSolid(state.sceneId, state.player.x, state.player.y)) {
+    var ps = nearestWalkable(state.sceneId, state.player.x, state.player.y);
+    state.player.x = ps.x; state.player.y = ps.y;
+  }
   syncPlayerPixel();
   Game.hoverTile = null;      // 换场景后旧的悬停格已经没有意义
   Game.selectTile = null;
   refreshHud();
   refreshHotbar();
+  refreshFloorTag();
+}
+
+/* 宫城楼层牌：只在宫城场景出现，点开是楼层导览。
+   户外宫苑与两处露台显示所在区域而不是楼层号。 */
+function refreshFloorTag() {
+  var n = document.getElementById('floorTag');
+  if (!n) return;
+  var sid = state && state.sceneId, fl = palaceFloorOf(sid);
+  if (!fl && !(sid && PALACE_OUTDOOR.indexOf(sid) >= 0)) { n.hidden = true; return; }
+  n.hidden = false;
+  n.textContent = fl ? ('楼层 ' + fl.order + '／3 · ' + fl.label.replace(/^[一二三]层 · /, '')) : '宫城 · 地面层';
 }
 
 function syncPlayerPixel() {
@@ -3675,9 +3757,13 @@ var CITY_ROOMS = {
     staff: ['clerk']
   },
   /* 城堡主厅：大理石地面、长毯与挂毯 */
+  /* 白蔷薇宫城 · 二层 王座厅。原 34×24 的王座核心整块搬进 64×48 的楼层平面，
+     陈设坐标一字不改：旧存档停在 (13,6)/(17,7) 时仍落在可走地面上。
+     事务台已迁到一层（PALACE_ROOMS.palace_f1），这里改成观礼与等候。 */
   castle: {
-    w: 34, h: 24, floor: 'marble',
+    w: 64, h: 48, floor: 'marble',
     props: [
+      /* ---- 原王座核心：坐标与旧版完全一致 ---- */
       { t: 'carpet', x: 12, y: 8, w: 10, h: 12, flat: true },
       { t: 'chandelier', x: 13, y: 2, w: 4, h: 2, flat: true },
       { t: 'chandelier', x: 18, y: 2, w: 4, h: 2, flat: true },
@@ -3691,10 +3777,71 @@ var CITY_ROOMS = {
       { t: 'longTable', x: 8, y: 21, w: 8, h: 2 },
       { t: 'longTable', x: 18, y: 21, w: 8, h: 2 },
       { t: 'sofa', x: 9, y: 16, w: 4, h: 2 },
-      { t: 'sofa', x: 21, y: 16, w: 4, h: 2 }
+      { t: 'sofa', x: 21, y: 16, w: 4, h: 2 },
+      /* ---- 隔断：与一、三层同一格网，宽门洞 ---- */
+      { t: 'partition', x: 25, y: 2, w: 1, h: 9 }, { t: 'partition', x: 25, y: 17, w: 1, h: 6 },
+      { t: 'partition', x: 38, y: 2, w: 1, h: 13 },
+      { t: 'partition', x: 25, y: 21, w: 1, h: 11 },
+      { t: 'partition', x: 38, y: 21, w: 1, h: 11 },
+      /* ---- 等候前厅（梯厅北段） ---- */
+      { t: 'sofa', x: 28, y: 3, w: 4, h: 2 }, { t: 'sofa', x: 33, y: 3, w: 4, h: 2 },
+      { t: 'roundTable', x: 30, y: 2, w: 4, h: 3 },
+      { t: 'carpet', x: 28, y: 8, w: 7, h: 3, flat: true },
+      /* ---- 镜廊（东）：面向花园的长廊，固定高光与窗影，不做实时镜面 ---- */
+      { t: 'mirror', x: 40, y: 3, w: 3, h: 5 }, { t: 'mirror', x: 45, y: 3, w: 3, h: 5 },
+      { t: 'mirror', x: 50, y: 3, w: 3, h: 5 }, { t: 'mirror', x: 55, y: 3, w: 3, h: 5 },
+      { t: 'carpet', x: 42, y: 5, w: 14, h: 2, flat: true },
+      { t: 'banner', x: 39, y: 11, w: 2, h: 6 }, { t: 'banner', x: 58, y: 11, w: 2, h: 6 },
+      { t: 'sofa', x: 43, y: 10, w: 5, h: 2 },
+      /* ---- 正式接待厅（西中） ---- */
+      { t: 'receptionDesk', x: 12, y: 24, w: 9, h: 2 },
+      { t: 'sofa', x: 7, y: 28, w: 5, h: 2 }, { t: 'sofa', x: 19, y: 28, w: 5, h: 2 },
+      { t: 'roundTable', x: 13, y: 27, w: 4, h: 3 },
+      { t: 'banner', x: 3, y: 24, w: 2, h: 6 }, { t: 'banner', x: 22, y: 24, w: 2, h: 6 },
+      { t: 'carpet', x: 6, y: 26, w: 17, h: 3, flat: true },
+      /* ---- 宴会厅（东中）：桌席、乐队位置与后勤门 ---- */
+      { t: 'longTable', x: 39, y: 23, w: 10, h: 2 }, { t: 'longTable', x: 51, y: 23, w: 10, h: 2 },
+      { t: 'longTable', x: 39, y: 28, w: 10, h: 2 }, { t: 'longTable', x: 51, y: 28, w: 10, h: 2 },
+      { t: 'longTable', x: 39, y: 38, w: 10, h: 2 }, { t: 'longTable', x: 51, y: 38, w: 10, h: 2 },
+      { t: 'chandelier', x: 43, y: 26, w: 4, h: 2, flat: true },
+      { t: 'chandelier', x: 55, y: 26, w: 4, h: 2, flat: true },
+      { t: 'chandelier', x: 43, y: 41, w: 4, h: 2, flat: true },
+      { t: 'carpet', x: 40, y: 26, w: 20, h: 2, flat: true },
+      /* ---- 音乐沙龙（西南） ---- */
+      { t: 'sofa', x: 4, y: 36, w: 5, h: 2 }, { t: 'sofa', x: 15, y: 36, w: 5, h: 2 },
+      { t: 'roundTable', x: 9, y: 35, w: 4, h: 3 },
+      { t: 'desk', x: 4, y: 42, w: 6, h: 2 }, { t: 'bookshelf', x: 18, y: 41, w: 5, h: 5 },
+      { t: 'carpet', x: 5, y: 35, w: 17, h: 3, flat: true },
+      /* ---- 大楼梯与服务梯：与一层、三层同一坐标带 ---- */
+      { t: 'stairs', x: 27, y: 33, w: 8, h: 5, flat: true },
+      { t: 'stairRail', x: 26, y: 33, w: 1, h: 5 },
+      { t: 'stairRail', x: 35, y: 33, w: 1, h: 5 },
+      { t: 'stairs', x: 39, y: 33, w: 3, h: 5, flat: true },
+      { t: 'stairRail', x: 38, y: 33, w: 1, h: 5 },
+      /* ---- 备餐间（东南）与礼拜堂上层观礼廊 ---- */
+      { t: 'kitchen', x: 40, y: 42, w: 7, h: 3 }, { t: 'genericShelf', x: 48, y: 42, w: 3, h: 4 },
+      { t: 'readingTable', x: 53, y: 42, w: 6, h: 3 }, { t: 'bookshelf', x: 59, y: 42, w: 3, h: 4 },
+      { t: 'carpet', x: 28, y: 27, w: 5, h: 2, flat: true }
     ],
-    spots: [{ x: 17, y: 5, kind: 'cityService', service: 'castle', label: '王座厅', stand: [[17, 6], [13, 5], [21, 5]] }],
-    staff: ['steward']
+    spots: [
+      { x: 16, y: 24, kind: 'interiorProp', label: '正式接待厅',
+        stand: [[16, 26], [14, 26], [18, 26]],
+        note: '接待台后是等候前厅，正式接见从这里进王座厅。长廊与宴会厅对普通访客开放。',
+        note2: '正在进行的宴会或会议只关掉对应房间，不封整层。' },
+      { x: 11, y: 36, kind: 'interiorProp', label: '音乐沙龙',
+        stand: [[11, 39], [9, 39], [13, 39]],
+        note: '小乐团的位置留了一半空：正式宴会时这里不排演，春宴当天由塞琳安排人手。',
+        note2: '沙发与茶具归位，地板上有乐谱压出的印子。' },
+      { x: 43, y: 28, kind: 'interiorProp', label: '宴会厅',
+        stand: [[43, 31], [41, 31], [45, 31]],
+        note: '六张长桌按上菜次序排开，西侧留出乐队与致辞的位置。',
+        note2: '备餐间在东南角，后勤门不通王座厅——搬货不必穿过宴会客席。' },
+      { x: 43, y: 42, kind: 'interiorProp', label: '备餐间',
+        stand: [[43, 45], [41, 45], [45, 45]],
+        note: '菜谱与送货票据钉在墙上，当日的食材按上菜顺序从服务梯那边送进来。',
+        note2: '地下厨房的路线在下一批开通。' }
+    ],
+    staff: []
   },
   /* 马车站：装卸台、售票柜台与待发的货车 */
   carriage: {
@@ -4625,7 +4772,7 @@ function dailyJobsForDay(day){
   var e=exploreState();
   var ids=Object.keys(LIVING_JOBS).filter(function(id){
     var sc=NPCS[id]&&NPCS[id].scene;
-    return sc==='town'||(sc==='forest'&&e.forest)||(sc&&sc.indexOf('city_')===0&&e.city)||(sc&&sc.indexOf('mine')===0&&e.mine);
+    return sc==='town'||(sc==='forest'&&e.forest)||(sc&&(sc.indexOf('city_')===0||sc.indexOf('palace_')===0)&&e.city)||(sc&&sc.indexOf('mine')===0&&e.mine);
   });
   if(ids.length<3)ids=Object.keys(LIVING_JOBS);
   var seed=((day*1103515245+12345)>>>0);
@@ -4954,7 +5101,7 @@ var CITY_INFO = {
   post: { name: '驿站邮局', who: '邮递员小翎在分信柜前', desc: '整面墙的分信柜塞满信件，邮袋堆在柜台边，公告板上贴着今日告示。' },
   carriage: { name: '南门马车站', who: '马车夫守着售票处', desc: '装卸台上堆着待发的货，售票处可以直达各街区。' },
   park: { name: '公园亭舍', who: '园丁在这里照看花坛', desc: '亭子四面敞开，能看见池塘和散步道；长凳上坐着歇脚的人。' },
-  castle: { name: '白蔷薇城堡 · 王座厅', who: '管家塞琳在核对清单', desc: '大理石地面通向王座，四壁挂着旧挂毯，长毯一直铺到大门。' },
+  castle: { name: '白蔷薇宫城 · 一层 门厅事务台', who: '管家塞琳在核对清单', desc: '门厅铺着方砖，正对主门的长毯通向大楼梯；左手是公开档案的借阅桌，右手的案台登记文书与委托。' },
   home: { name: '住处', who: '这里住着一位城市居民', desc: '一张床、一个衣柜和一张餐桌——城里大多数人的家就是这样。' },
   quay_store: { name: '河岸长条货仓', who: '货栈管事格林在核对着货单', desc: '通长开间里货架一路排到河门，每一格都写着入库的批次号，吊臂正把最后一批麻袋从驳船吊上来。' },
   sawmill: { name: '东岸锯木厂', who: '老木工海恩守着锯台', desc: '原木垛从北侧滑道滚进来，锯台把整木剖成板材，锯末铺了满地，成品板料靠南门码好等着装车。' },
@@ -5591,7 +5738,7 @@ function openCityService(it) {
   var extra = {
     library: '翻开地方志：山谷北面是雾杉森林，旧矿山藏在东北；白蔷薇城建在更早的城堡旧址上。',
     inn: '贝尔打听到的消息：今天' + (isRaining() ? '下雨，街上的人都带着伞。' : '天晴，适合往河岸那边走。') + '明天' + ((state.weather && state.weather.tomorrow === 'rain') ? '有雨。' : '放晴。'),
-    castle: '城堡的事务在文书办公室办理：通行证、城堡委托与声望都在那里登记。侧翼与舞厅尚未开放。'
+    castle: '城堡的事务在一层门厅办理：通行证、城堡委托与声望都在这里登记。事务台旁边就是大楼梯，上二层看王座与镜廊，再上一层是起居与客房。地下后勤与东翼尚未开放。'
   };
   openWindow({ id: 'city_service', kind: 'custom', title: info.name, build: function (b) {
     b.appendChild(el('p', null, info.desc));
@@ -6487,6 +6634,23 @@ var CITY_PROPS = {
       pb(g, r, 0, H - 4 - i * 4, w, 1, '#D2B183');
     }
   },
+  /* 宫城专用：楼梯侧栏杆与隔断墙。二者都是实心碰撞，
+     楼上不会「穿过栏杆落到虚空」，回廊与房间之间的墙也是真墙。 */
+  stairRail: function (g, r) {
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, W, 3, '#E2C181');
+    pb(g, r, 0, 0, 2, H, '#C0A15E');
+    pb(g, r, W - 2, 0, 2, H, '#C0A15E');
+    pb(g, r, 2, Math.floor(H / 2), W - 4, 2, '#A9855C');
+    for (var i = 0; i < Math.floor(W / 16) + 1; i++) pb(g, r, 3 + i * 16, 3, 3, H - 4, '#8A6B4C');
+  },
+  partition: function (g, r) {
+    var W = r.w * TILE, H = r.h * TILE;
+    pb(g, r, 0, 0, W, H, '#D6CFBA');
+    pb(g, r, 0, 0, W, 3, '#EDE6D2');
+    pb(g, r, 0, H - 3, W, 3, '#B8B09A');
+    for (var i = 6; i < W; i += 18) pb(g, r, i, 4, 1, H - 8, '#C6BFAA');
+  },
   kitchen: function (g, r) {
     pshadow(g, r);
     var W = r.w * TILE, H = r.h * TILE;
@@ -7017,15 +7181,17 @@ function chestMoveAll(structure, toBox) {
 function eatItem(id) {
   if (!isFood(id)) { toast('这个不能吃。'); return false; }
   if (invCount(id) <= 0) { toast('背包里没有' + itemName(id) + '了。'); return false; }
-  if (state.energy >= CFG.maxEnergy) { toast('体力已经满了，先干点活吧。'); return false; }
+  if (state.energy >= CFG.maxEnergy && (!(PERSONAL_FOOD_HP[id]>0) || personalState().hp>=personalMaxHp())) { toast('生命和可恢复的体力已经满了。'); return false; }
   invRemove(id, 1);
   /* 天赋「均衡饮食」（R1）：食物恢复 +15%，按 floor 取整并受体力上限约束，
      不改变售价，也不影响物品本身（§5.1）。 */
   var base = hasTalent('balanced_meal') ? Math.floor(ITEMS[id].food * 1.15) : ITEMS[id].food;
   var recovered=Math.min(base,CFG.maxEnergy-state.energy);
   state.energy += recovered;
+  var healed=personalHeal((PERSONAL_FOOD_HP[id]||0)*(hasTalent('balanced_meal')?1.15:1));
+  if(hasTalent('balanced_meal')) personalExample('balanced_meal','食用'+itemName(id)+'：体力 '+recovered+'、生命 '+healed+'（向下取整）。');
   Audio2.play('eat');
-  toast('吃掉了' + itemName(id) + '，恢复 ' + recovered + ' 点体力。');
+  toast('吃掉了' + itemName(id) + '，恢复 ' + recovered + ' 点体力、'+healed+' 点生命。');
   markDirty(); refreshHud();
   return true;
 }
@@ -7071,12 +7237,13 @@ function charSpendEnergy(cost) {
   var actual=charEnergyCost(cost);
   if(!hasEnergy(actual))return false;
   state.energy-=actual;
-  if(actual<cost){var d=charDailyCounters();d.__saveStrength=(d.__saveStrength||0)+cost-actual;}
+  if(actual<cost){var d=charDailyCounters();d.__saveStrength=(d.__saveStrength||0)+cost-actual;personalExample('save_strength','本日已节省 '+d.__saveStrength+'/10 点体力。');}
   return true;
 }
 
 /* 统一的工具入口 */
 function useTool(tool, tx, ty, opts) {
+  if(personalCombat.mode){personalAttack();return false;}
   opts = opts || {};
   var p = state.player;
   var d = Math.abs(tx - p.x) + Math.abs(ty - p.y);
@@ -7836,6 +8003,8 @@ function requestSleep() {
 }
 
 function performSettlement(auto) {
+  personalLeave(false);
+  personalState().hp=personalMaxHp();
   if (Game.busy === 'settle') return;
   Game.busy = 'settle';
   var backup = null;
@@ -8927,16 +9096,20 @@ function todayPlanItems() {
     out.push({ tier: 'soon', tag: '追踪', text: '第一份收成 · 带 3 颗萝卜去小镇任务板', open: function () { QUEST_TAB = 'main'; openQuestLog(null); } });
   }
 
+  var trackedTraining=personalState().tracked&&!personalState().trained;
+  var pendingDuty=personalState().dutyDay&&!personalState().dutyDone;
+  if(pendingDuty)out.push({tier:'soon',tag:'可做',text:'水泵安全值守 · '+(state.totalDay>personalState().dutyDay?'可复核':'明日复核')+' · 小镇工坊 (20,7)',open:openPersonalWorkshop});
+  if(trackedTraining&&!pendingDuty)out.push({tier:'soon',tag:'可做',text:'第一次自卫训练 · 小镇训练牌 (17,13)',open:openPersonalTraining});
   var entryKeys=Object.keys(rookieState());
   var entry=entryKeys.filter(function(k){return rookieState()[k]>0&&rookieState()[k]<ROOKIE_JOBS[k].steps.length;})[0];
   if(!entry)entry=entryKeys.filter(function(k){return rookieState()[k]===0;})[0];
-  if(entry){out.push({tier:'soon',tag:'可做',text:ROOKIE_JOBS[entry].name+' · 委托日志 → 小镇入门',open:function(){QUEST_TAB='rookie';openQuestLog(null);}});}
+  if(entry&&!trackedTraining&&!pendingDuty){out.push({tier:'soon',tag:'可做',text:ROOKIE_JOBS[entry].name+' · 委托日志 → 小镇入门',open:function(){QUEST_TAB='rookie';openQuestLog(null);}});}
   var ids = [], i;
   try { ids = activeDailyJobIds() || []; } catch (err) { ids = []; }
   for (i = 0; i < ids.length; i++) {
     var job = LIVING_JOBS[ids[i]];
     if (!job || e.jobs[ids[i]] === state.totalDay) continue;
-    if(!entry)out.push({
+    if(!entry&&!trackedTraining&&!pendingDuty)out.push({
       tier: 'soon', tag: '可做', text: job.title + ' · ' + job.coins + ' 金',
       open: function () { QUEST_TAB = 'daily'; openQuestLog('board'); }
     });
@@ -8950,6 +9123,12 @@ function todayPlanItems() {
   else if (!e.city) later = '白蔷薇城 · 修好桥后办理通行证（150 金）';
   else if (!professionalLifeState().passes.visit) later = '云峰山口与邻领边城 · 先走通工程、商旅或巡林任一路线';
   if (later) out.push({ tier: 'later', tag: '未开放', text: later, open: function () { openWorldMap(); } });
+  /* R3：河湾工程一旦开工就挂在今日安排里，接任、预警与待复查都能直接看到，
+     不必靠翻旧对话去找自己还欠着什么。 */
+  var pj = engProject(), pji = engPhaseIndex(pj), ecur = engCareer();
+  if (pji >= 1 || ecur.stage > 0 || (rookieState().engineering > 0 && rookieState().engineering < ROOKIE_JOBS.engineering.steps.length)) {
+    out.push({ tier: 'soon', tag: '工程', text: '河湾闸门 · ' + ENG_PHASE_NAMES[pji] + ' · ' + engNextStepText(), open: openEngineeringProjectLog });
+  }
   return out;
 }
 var TODAY_PLAN_SIG = '';
@@ -9486,6 +9665,7 @@ function openBag() {
     id: 'bag', kind: 'bag', wide: true, title: '背包',
     build: function (b) {
       var used = countSlots(state.inventory);
+      b.appendChild(mkBtn('个人武器与装备', 'sm', function(){openCharacter('weapon');}));
       b.appendChild(el('p', 'muted', '容量 ' + used + ' / ' + CFG.bagSlots + ' 格（每格最多 ' + CFG.stack + ' 个）。工具不占格。'));
       if (state.overloaded) {
         var w = el('p', 'muted', '⚠ 物品数量超过背包容量，暂时无法再获得新物品。可卖给种子铺、放入农场出货箱、交付委托，或存进储物箱。');
@@ -9516,7 +9696,7 @@ function openBag() {
 }
 
 /* --- 商店 --- */
-var WORKSHOP_GOODS = { wood: 6, stone: 4, hardwood:24, copper_ore:32, iron_ore:60, gem:200, dev_chest: 70 };
+var WORKSHOP_GOODS = { coal:24, charcoal:36, wood: 6, stone: 4, hardwood:24, copper_ore:32, iron_ore:60, gem:200, dev_chest: 70 };
 function buyWorkshopItem(id, qty) {
   if (!Object.prototype.hasOwnProperty.call(WORKSHOP_GOODS, id) || !Number.isInteger(qty) || qty <= 0) return false;
   var price = WORKSHOP_GOODS[id] * qty;
@@ -10042,6 +10222,8 @@ function openQuestLog(site) {
       if(QUEST_TAB==='main')appendTodayPlan(b);
       b.appendChild(mkBtn('石楠草甸 · '+meadowTaskText(),'sm',function(){openMeadowLife('journal');}));
       b.appendChild(mkBtn('风铃磨坊 · '+millLifeTaskText(),'sm',function(){openMillLife('journal');}));
+      /* 河湾工程的统一记录：进度、账本、联系人、材料来源和下一步都在这一页 */
+      b.appendChild(mkBtn('河湾闸门工程 · '+ENG_PHASE_NAMES[engPhaseIndex(engProject())]+' · '+engNextStepText(),'sm',function(){openEngineeringProjectLog();}));
       if(QUEST_TAB==='daily'){
         b.appendChild(el('p','muted','每天从居民委托池抽取 3 份，完成后次日刷新。'));
         activeDailyJobIds().forEach(function(id){renderDailyJobCard(b,id);});return;
@@ -10887,7 +11069,7 @@ function openInteriorProp(it) {
       '剪羊毛的剪子和剪药的不是同一把。'
     ]
   };
-  var tx = texts[it.prop] || ['这里没什么特别的。'];
+  var tx = texts[it.prop] || (it.note ? [it.note, it.note2 || '每层的陈设都记着当天的事务，不是摆样子的装饰。'] : ['这里没什么特别的。']);
   openWindow({
     id: 'interiorprop', kind: 'custom', title: it.label,
     build: function (b) {
@@ -10976,13 +11158,16 @@ function engCareer() {
 }
 /* 岗位带来的实际权限，不只是一个称谓 */
 function engCan() {
-  var e = engCareer();
+  var e = engCareer(), pj = engProject(), i = engPhaseIndex(pj);
   return {
-    signReport: e.stage >= 1,      // 独立署名工程报告
+    signReport: e.stage >= 1,       // 独立署名工程报告
     emergencyRepair: e.stage >= 2, // 事故处置权，可跳过常规审批先止损
     requestBudget: e.stage >= 3,   // 可申请机构预算（公共账，不动私房钱）
-    delegate: false,             // 委托施工流程尚未实现，不能宣称已经获得
-    chairHearing: e.stage >= 4     // 可主持争议工程的公开说明会
+    chairHearing: e.stage >= 4,    // 可主持争议工程的公开说明会
+    /* R3：委托与亲自施工是同一份工程进度的两条路径，不是两个布尔值 */
+    build: i >= 4 && pj.phase !== 'accepted',
+    commission: e.stage >= 4 && i >= 3 && pj.build < engSchemeBuild(pj).length,
+    accept: i >= 5
   };
 }
 /* 人物记住你做过的选择；关键引荐会检查这段经历 */
@@ -10997,21 +11182,61 @@ function remembers(who, what) {
   return !!(e.memories[who] && e.memories[who].indexOf(what) >= 0);
 }
 
-/* 水利控制室的职业章节面板 */
-function openEngineeringChapter(b, ww) {
-  var e = engCareer(), p = professionalLifeState();
+var ENG_PHASE_NAMES = ['勘测', '认证', '方案', '材料', '施工', '试运行', '验收'];
+/* 应急处置的两种口径：先保农田 → 灌溉口径；先保通航 → 通航口径。
+   验收后由工程方案取代，所以它不能和方案写进同一个字段。 */
+function engEmergencyAlloc(pj) {
+  return pj.emergency === 'field' ? 'irrigation' : pj.emergency === 'channel' ? 'navigation' : null;
+}
+function engPolicyText() {
+  var pj = engProject(), sc = ENG_SCHEMES[pj.scheme];
+  if (pj.phase === 'accepted' && sc) return sc.alloc === 'navigation' ? '已验收：通航优先' : '已验收：灌溉优先';
+  var em = engEmergencyAlloc(pj);
+  if (em) return (em === 'navigation' ? '应急处置：通航优先' : '应急处置：灌溉优先') + '（工程验收后将被方案取代）';
+  return '待定：工程验收前不改变地区服务';
+}
+function engPhaseBar(b) {
+  var pj = engProject(), i = engPhaseIndex(pj), row = el('div', 'row');
+  ENG_PHASES.forEach(function (ph, k) {
+    row.appendChild(el('span', 'req-chip ' + (k < i ? 'ok' : k === i ? '' : 'no'), ENG_PHASE_NAMES[k]));
+  });
+  b.appendChild(row);
+}
+/* 机构账：拨付、自愿补记与已花工钱分开显示，个人钱包永远不在这里。 */
+function engFundsPanel(b) {
+  var pj = engProject();
   var box = el('div', 'panel-box');
-  box.appendChild(el('div', 'section-title', '工程师资历 · ' + (ENG_STAGES[e.stage] || ENG_STAGES[0]).name));
+  box.appendChild(el('div', 'section-title', '工程账本 · ' + ENG_PROJECT_ID));
+  box.appendChild(el('p', null, '机构拨付 ' + pj.funds.granted + ' 金 · 个人自愿补记 ' + pj.funds.donated + ' 金 · 已支出 ' + pj.funds.spent + ' 金 · 可用余额 ' + engFundsLeft(pj) + ' 金。'));
+  box.appendChild(el('p', 'muted', '个人钱包 ' + state.coins + ' 金，与机构经费分开记；只有你自己决定补记时才会从钱包出账。'));
+  var ids = Object.keys(pj.funds.tx);
+  if (ids.length) {
+    var list = el('p', 'muted', '已结算事务：' + ids.map(function (k) {
+      var t = pj.funds.tx[k];
+      return k + '（' + t.kind + ' ' + t.amount + ' 金' + (t.day ? ' · 第' + t.day + '天' : '') + '）';
+    }).join('；'));
+    box.appendChild(list);
+  }
+  b.appendChild(box);
+}
+/* 水利控制室：工程师资历与项目账本。方案在这里确认，材料与施工在现场完成。 */
+function openEngineeringChapter(b, ww) {
+  var e = engCareer(), p = professionalLifeState(), pj = engProject();
+  var box = el('div', 'panel-box');
+  box.appendChild(el('div', 'section-title', '河湾闸门与引水改造 · ' + (ENG_STAGES[e.stage] || ENG_STAGES[0]).name));
   box.appendChild(el('p', 'muted', (ENG_STAGES[e.stage] || ENG_STAGES[0]).desc));
+  engPhaseBar(box);
+  box.appendChild(el('p', null, ENG_PHASE_TEXT[pj.phase] || ''));
+  box.appendChild(el('p', 'muted', '工程水位口径：' + engPolicyText() + '。'));
 
-  if (e.stage === 0 && ww.certified) {
-    extendedWorkButton(b, 'water', '签署第一份独立工程报告 · 40分钟', { minutes: 40, energy: 2, guard: function () { return e.stage === 0 && ww.certified; } }, function () {
+  if (e.stage === 0 && engHasCertificate()) {
+    extendedWorkButton(b, 'water', '签署第一份独立工程报告 · 40分钟', { minutes: 40, energy: 2, guard: function () { return e.stage === 0 && engHasCertificate(); } }, function () {
       e.stage = 1; rememberChoice('noya', '独立署名水利报告');
-      p_trustUp && p_trustUp(2);
+      p_trustUp(2);
     });
   }
   if (e.stage === 1 && !e.incident) {
-    box.appendChild(el('p', 'req-chip', '工程已交付，但闸门在一次夜雨中崩了销。接下来要处理事故。'));
+    box.appendChild(el('p', 'req-chip', '旧闸门在一次夜雨中崩了销，下游同时淹了麦田和断航 —— 这就是这项改造的由来。接下来要处理事故。'));
   }
   if (e.stage >= 2 && !e.post) {
     extendedWorkButton(b, 'water', '接受正式工程岗位 · 60分钟', { minutes: 60, energy: 3, guard: function () { return e.stage >= 2 && !e.post; } }, function () {
@@ -11020,37 +11245,271 @@ function openEngineeringChapter(b, ww) {
       rememberChoice('noya', '事故后接下工程岗位');
     });
   }
-  if (e.stage >= 3 && !e.hearing) {
-    box.appendChild(el('p', 'muted', '有了岗位，你可以申请本项目的一次机构预算，并主持一次有争议的公共说明会。委托施工仍待开放。'));
-    extendedWorkButton(b, 'water', '申请机构工程预算 · 150金', { minutes: 20, guard: function () { return e.stage >= 3 && !e.hearing && !e.budgetGranted; }, reason: '本项目预算只拨付一次。' }, function () {
-      e.budgetGranted = true;
-      e.budget += 150;
-      rememberChoice('council', '以岗位身份申请机构预算');
+  /* 机构预算：一次拨付，进项目账，不进个人钱包，也不因为读档再发一次 */
+  if (e.stage >= 3 && !e.budgetGranted) {
+    box.appendChild(el('p', 'muted', '有了岗位，你可以为本项目申请一次机构拨付 ' + ENG_GRANT_MAX + ' 金：闸件代购 24 金 ＋ 班组日薪 40 金。石料要自己从采场经河港运到，机构不替你采。'));
+    extendedWorkButton(b, 'water', '申请机构工程拨付 · ' + ENG_GRANT_MAX + '金', { minutes: 20, guard: function () { return e.stage >= 3 && !e.budgetGranted && pj.funds.granted <= 0; }, reason: '本项目拨付只发生一次。' }, function () {
+      engGrantBudget();
     });
   }
-  if (e.stage >= 4 && !e.hearing) {
+  /* 说明会就是方案确认：两边的诉求只能保一头，另一边要向居民解释 */
+  if (e.stage >= 4 && !pj.scheme && engPhaseIndex(pj) >= 1) {
+    var missing = [];
+    if (!pj.opinions.mill) missing.push('磨坊'); if (!pj.opinions.meadow) missing.push('牧场'); if (!pj.opinions.port) missing.push('河港');
+    if (!e.budgetGranted) missing.push('机构拨付');
     box.appendChild(el('p', 'req-chip', '灌溉与通航之争拖了很久，这场说明会要由你主持：两边都缺钱，只能保一头。'));
-    box.appendChild(el('p', 'muted', '你可以把岗位预算投向一边；另一边的诉求要向居民解释为什么这次没排上。'));
-    extendedWorkButton(b, 'water', '把预算投向灌溉 · 牧场优先', { minutes: 60, energy: 2, guard: function () { return e.stage >= 4 && !e.hearing && e.budget >= 150; }, reason: '需要先申请150金机构预算。' }, function () {
-      e.hearing = 'irrigation'; e.budget = Math.max(0, e.budget - 150);
-      p.waterworks.allocation = 'irrigation';
-      rememberChoice('noya', '主持说明会时把预算给了灌溉');
-      rememberChoice('council', '主持说明会时把预算给了灌溉');
-    });
-    extendedWorkButton(b, 'water', '把预算投向通航 · 船队优先', { minutes: 60, energy: 2, guard: function () { return e.stage >= 4 && !e.hearing && e.budget >= 150; }, reason: '需要先申请150金机构预算。' }, function () {
-      e.hearing = 'navigation'; e.budget = Math.max(0, e.budget - 150);
-      p.waterworks.allocation = 'navigation';
-      rememberChoice('noya', '主持说明会时把预算给了通航');
-      rememberChoice('martin', '主持说明会时把预算给了通航');
-    });
+    if (missing.length) {
+      box.appendChild(el('p', 'muted', '开会前还缺：' + missing.join('、') + '。方案确认要基于三方意见和已经到账的拨付。'));
+    } else {
+      box.appendChild(el('p', 'muted', '勘测基础风险 ' + engRisk(pj) + ' 级。两案都会实际改变供水或货运，不能反悔，也不能在施工中改。'));
+      Object.keys(ENG_SCHEMES).forEach(function (k) {
+        var sc = ENG_SCHEMES[k], short = sc.kitCost + sc.wage * sc.build.length - ENG_GRANT_MAX;
+        extendedWorkButton(b, 'water', '定案：' + sc.name + ' · ' + sc.build.length + '道工序 · ' + (sc.kitCost + sc.wage * sc.build.length) + '金', {
+          minutes: 60, energy: 2,
+          guard: function () { return e.stage >= 4 && !pj.scheme && engPhaseIndex(pj) >= 1 && e.budgetGranted && pj.opinions.mill && pj.opinions.meadow && pj.opinions.port; },
+          reason: '需要三方意见与机构拨付都到位。'
+        }, function () {
+          engConfirmScheme(sc.id);
+        });
+      });
+    }
   }
-  // 三位核心人物是否记得你的做法
+  /* 三位核心人物是否记得你的做法 */
   var mem = e.memories;
   var who = [];
   if (mem.noya && mem.noya.length) who.push('诺娅：' + mem.noya.join('、'));
   if (mem.martin && mem.martin.length) who.push('马丁：' + mem.martin.join('、'));
   if (mem.council && mem.council.length) who.push('柯里：' + mem.council.join('、'));
   if (who.length) box.appendChild(el('p', 'muted', '他们记得——' + who.join('；')));
+  b.appendChild(box);
+  if (pj.funds.granted > 0 || pj.funds.spent > 0 || pj.funds.donated > 0) engFundsPanel(b);
+  /* 施工、试运行与验收都在坝体现场完成，控制室里只留状态与账本 */
+  if (pj.phase === 'build' || pj.phase === 'trial' || pj.phase === 'accepted') engBuildPanel(b, pj);
+}
+/* 方案确认：唯一改写 scheme 的入口，同时结算代购与开工登记 */
+function engConfirmScheme(id) {
+  var p = professionalLifeState(), pj = engProject(), e = engCareer();
+  var sc = ENG_SCHEMES[id];
+  if (!sc || pj.scheme) return false;
+  pj.scheme = id;
+  pj.schemeDay = state.totalDay;
+  pj.build = 0; pj.buildDay = 0; pj.mode = '';
+  pj.crew = { day: 0, paid: 0 };
+  /* 闸件代购在确认方案时就登记事务，只扣项目余额，不碰个人钱包 */
+  if (engFundsLeft(pj) >= sc.kitCost) {
+    engLedger(pj, 'riverbay:kit:' + id, 'procure', sc.kitCost, 'grant', '闸件套装代购');
+    pj.funds.spent += sc.kitCost;
+  }
+  e.hearing = sc.alloc;
+  rememberChoice('noya', '主持说明会时把预算给了' + (sc.alloc === 'navigation' ? '通航' : '灌溉'));
+  rememberChoice(sc.alloc === 'navigation' ? 'martin' : 'council', '主持说明会时把预算给了' + (sc.alloc === 'navigation' ? '通航' : '灌溉'));
+  engAdvance('scheme');
+  return true;
+}
+/* 控制室里的施工进度只读：真正能推进工序的按钮都在坝体现场 */
+function engBuildPanel(b, pj) {
+  var steps = engSchemeBuild(pj), done = pj.build;
+  var box = el('div', 'panel-box');
+  box.appendChild(el('div', 'section-title', '闸基施工 · ' + done + '/' + steps.length + ' 道工序'));
+  steps.forEach(function (s, k) {
+    box.appendChild(el('p', null, (k < done ? '✓ ' : (k === done ? '→ ' : '· ')) + (k + 1) + '. ' + s));
+  });
+  if (pj.phase === 'accepted') {
+    box.appendChild(el('p', 'req-chip ok', '已验收：' + ENG_SCHEMES[pj.scheme].supply + ' ' + ENG_SCHEMES[pj.scheme].freight));
+    box.appendChild(el('p', 'muted', '第 ' + pj.maintDay + ' 天完成最近一次养护检查，累计 ' + pj.maintCount + ' 次。'));
+  } else {
+    box.appendChild(el('p', 'muted', '亲自施工不领工钱，代价是你的时间与体力；委托施工按 ' + ENG_SCHEMES[pj.scheme].wage + ' 金／工日从机构余额里出，余额不够就停工。两条路推进的是同一份工程进度。工序只能在坝体闸基工作面完成。'));
+    if (pj.mode === 'commission') box.appendChild(el('p', null, '河湾施工队 4 人 · 已开工 ' + pj.crew.day + ' 天 · 已付工钱 ' + pj.crew.paid + ' 金 · 机构余额 ' + engFundsLeft(pj) + ' 金。'));
+  }
+  b.appendChild(box);
+}
+
+/* 勘测读数落在哪一格由已保存的水位决定；读完三处就进入认证阶段，
+   不然「缺实践」提示会卡在一个永远进不去的阶段里。 */
+function engSurveyRecorded(which) {
+  var q = engProject();
+  if (which === 'east') q.survey.east = q.survey.level >= 3 ? 'cracked' : 'sound';
+  else if (which === 'silt') q.survey.silt = q.survey.level >= 3 ? 'heavy' : 'light';
+  if (engSurveyDone(q) && engPhaseIndex(q) === 0) engAdvance('certify');
+}
+/* 勘测：坝体三个真实位置各读一次。读数按当天天况判定并存进项目记录，
+   风险只来自这些已保存的读数，打开面板不会凭空造出事故。 */
+function engSurveyPanel(b, pj, site) {
+  if (engPhaseIndex(pj) > 0) return;
+  var box = el('div', 'panel-box');
+  box.appendChild(el('div', 'section-title', '勘测 · ' + (engSurveyDone(pj) ? '已完成' : '未完成')));
+  box.appendChild(el('p', 'muted', '雨天水位 3 级，东岸坡脚会有渗流痕迹，下游淤积偏厚；晴天则相反。三处都要亲自到场。'));
+  box.appendChild(el('p', null, '· 堤坝水尺 (20,18)：' + (pj.survey.level ? '水位 ' + pj.survey.level + ' 级 ✓' : '待读')));
+  box.appendChild(el('p', null, '· 东岸坡脚 (21,20)：' + (pj.survey.east === 'cracked' ? '坡面开裂 ⚠' : pj.survey.east === 'sound' ? '坡体完好 ✓' : '待查')));
+  box.appendChild(el('p', null, '· 下游淤积段 (21,16)：' + (pj.survey.silt === 'heavy' ? '淤积偏厚 ⚠' : pj.survey.silt === 'light' ? '淤积正常 ✓' : '待测')));
+  if (site === 'gauge' && !pj.survey.level) {
+    extendedWorkButton(b, 'gauge', '读水尺并取样 · 15分钟', { out: 'water_sample', qty: 1, minutes: 15, energy: 1, guard: function () { var q = engProject(); return !q.survey.level && engPhaseIndex(q) === 0; } }, function () {
+      var q = engProject();
+      q.survey.level = state.weather.today === 'rain' ? 3 : 2;
+      q.survey.day = state.totalDay;
+      deriveWaterworksFromProject(professionalLifeState(), professionalLifeState().waterworks);
+      if (engSurveyDone(q)) engAdvance('certify');
+    });
+  }
+  if (site === 'riverbay_east' && pj.survey.level && !pj.survey.east) {
+    extendedWorkButton(b, 'riverbay_east', '探查东岸坡脚 · 25分钟', { minutes: 25, energy: 2, guard: function () { var q = engProject(); return !!q.survey.level && !q.survey.east && engPhaseIndex(q) === 0; }, reason: '先读坝体水尺，再判断坡脚有没有渗流。' }, function () {
+      engSurveyRecorded('east');
+    });
+  }
+  if (site === 'riverbay_silt' && pj.survey.level && !pj.survey.silt) {
+    extendedWorkButton(b, 'riverbay_silt', '测量下游淤积 · 30分钟', { minutes: 30, energy: 2, guard: function () { var q = engProject(); return !!q.survey.level && !q.survey.silt && engPhaseIndex(q) === 0; }, reason: '先读坝体水尺，再测下游淤积厚度。' }, function () {
+      engSurveyRecorded('silt');
+    });
+  }
+  if (site !== 'gauge' && site !== 'riverbay_east' && site !== 'riverbay_silt' && !engSurveyDone(pj)) {
+    var left = [pj.survey.level > 0, !!pj.survey.east, !!pj.survey.silt].filter(function (x) { return !x; }).length;
+    box.appendChild(el('p', 'req-chip', '还缺 ' + left + ' 处读数：坝顶水尺、东岸坡脚、下游淤积段，都要到现场取。'));
+  }
+  if (engSurveyDone(pj)) box.appendChild(el('p', 'req-chip ok', '勘测读数已入册，基础风险 ' + engRisk(pj) + ' 级。'));
+  b.appendChild(box);
+}
+/* 基础工程认证：勘测完成，再加矿山排水或磨坊维修任一条实践验收 */
+function engCertPanel(b, pj, site) {
+  var at = site === 'water' ? 'water' : 'gauge';
+  if (engPhaseIndex(pj) !== 1) return;
+  var box = el('div', 'panel-box');
+  box.appendChild(el('div', 'section-title', '基础工程认证 · 待领取'));
+  box.appendChild(el('p', 'muted', '认证范围：闸门与小型输水构筑物的勘测、施工与验收。持有基础认证才能署名工程报告；河湾工程验收后升级为「可主持公共工程」。'));
+  var route = engPracticeRoute();
+  if (!route) {
+    box.appendChild(el('p', 'req-chip', '还缺实践：' + engPracticeText() + '。两条路任选一条，不要求个人战斗。'));
+    b.appendChild(box); return;
+  }
+  box.appendChild(el('p', null, '实践：' + engPracticeText() + '。'));
+  extendedWorkButton(b, at, '领取基础工程认证 · 30分钟', { minutes: 30, energy: 1, guard: function () { return engPhaseIndex(engProject()) === 1 && !!engPracticeRoute(); }, reason: '先完成矿山排水或磨坊维修的实践验收。' }, function () {
+    var r = engPracticeRoute();
+    engProject().practice = r;
+    engAdvance('certify');
+    rememberChoice('noya', '取得基础工程认证（' + (r === 'mine' ? '矿山排水' : '磨坊维修') + '路线）');
+  });
+  b.appendChild(box);
+}
+/* 材料交接：石料自采自运，闸件由项目账代购，埋件自己带 */
+function engMaterialsPanel(b, pj, site) {
+  var at = site === 'water' ? 'water' : 'gauge';
+  var i = engPhaseIndex(pj);
+  if (i !== 2 && i !== 3) return;
+  var sc = ENG_SCHEMES[pj.scheme];
+  var box = el('div', 'panel-box');
+  box.appendChild(el('div', 'section-title', '材料交接'));
+  box.appendChild(el('p', 'muted', '石料：采场采掘 → 测量棚切割成验收石料 ×3 → 河港装运 → 在此凭核验运单签收。闸件套装在确认方案时已由项目账代购（' + sc.kitCost + ' 金）。埋件铁锭要你自己带 ×1。'));
+  box.appendChild(el('p', null, '石料 ' + (pj.stone ? '已签收 ✓' : '未到货') + ' · 闸件套装 ' + (pj.kit ? '已进场 ✓' : '未进场') + ' · 埋件铁锭需 ×1。'));
+  if (pj.stone && pj.kit < 1) {
+    extendedWorkButton(b, at, '安装闸件套装 · 铁锭 ×1', { need: { iron_ingot: 1 }, minutes: 45, energy: 5, guard: function () { var q = engProject(); return engPhaseIndex(q) === 2 && q.stone && q.kit < 1; }, reason: '先在坝顶或控制室签收石料运单。' }, function () {
+      var q = engProject(); q.kit = 1; engAdvance('materials');
+    });
+  }
+  if (i === 2 && !pj.stone) box.appendChild(el('p', 'req-chip', '石料运单还没签收；河港发出的运单必须带到现场签收，传送不能代替货物。'));
+  b.appendChild(box);
+}
+/* 闸基工作面：亲自施工与委托班组推进的是同一份 pj.build */
+function engPitPanel(b, pj) {
+  var i = engPhaseIndex(pj);
+  if (i < 3) {
+    if (i >= 0) b.appendChild(el('p', 'muted', '材料没进场之前，闸基工作面不能开工。'));
+    return;
+  }
+  var steps = engSchemeBuild(pj), sc = ENG_SCHEMES[pj.scheme];
+  var box = el('div', 'panel-box');
+  box.appendChild(el('div', 'section-title', '闸基工作面 · ' + pj.build + '/' + steps.length));
+  steps.forEach(function (s, k) { box.appendChild(el('p', null, (k < pj.build ? '✓ ' : k === pj.build ? '→ ' : '· ') + (k + 1) + '. ' + s)); });
+  if (pj.phase === 'accepted') { box.appendChild(el('p', 'req-chip ok', '闸门已验收并交接维护。')); b.appendChild(box); return; }
+  /* 停工不另存一个布尔值：机构余额不足日薪就是停工，余额一补上自动复工。
+     避免「已停工」和「余额不足」两处判断各说各话。 */
+  var stopped = pj.mode === 'commission' && pj.build < steps.length && engFundsLeft(pj) < sc.wage;
+  if (stopped) {
+    var short = sc.wage - engFundsLeft(pj);
+    box.appendChild(el('p', 'req-chip', '班组因经费停工：机构余额发不出今天的工钱（余额 ' + engFundsLeft(pj) + ' 金，日薪 ' + sc.wage + ' 金，还差 ' + short + ' 金）。已完成的工序不会退回；补足余额或改为自己施工都能继续。'));
+    extendedWorkButton(b, 'riverbay_pit', '自愿补记差额 ' + short + ' 金并复工', { minutes: 20, energy: 1, guard: function () { return engProject().mode === 'commission' && engFundsLeft(engProject()) < sc.wage && state.coins >= sc.wage - engFundsLeft(engProject()); }, reason: '机构余额不足，个人钱包也拿不出工钱；可以改为自己施工。' }, function () {
+      engTopUp(sc.wage);
+    });
+    /* 停工保底：机构余额不足不能变成一条走不通的死路。
+       已经落下多少工序就算多少，剩下的改为自己做完，不再领工钱。 */
+    if (pj.build > 0) {
+      extendedWorkButton(b, 'riverbay_pit', '改为亲自施工，接手剩下 ' + (steps.length - pj.build) + ' 道工序', { minutes: 30, energy: 1, guard: function () { var q = engProject(); return q.mode === 'commission' && engFundsLeft(q) < sc.wage && q.build < steps.length; }, reason: '机构余额还够今天的工钱，先把今天的工开完。' }, function () {
+        engProject().mode = 'self';
+      });
+    }
+  }
+  if (pj.build < steps.length) {
+    if (!pj.mode) {
+      box.appendChild(el('p', 'muted', '开工前可以改主意：亲自施工不领工钱，委托施工按 ' + sc.wage + ' 金／工日从机构余额里出。第一道工序落下就不能再换方式。'));
+      extendedWorkButton(b, 'riverbay_pit', '亲自施工（不用工钱）', { minutes: 30, energy: 1, guard: function () { var q = engProject(); return q.build === 0 && !q.mode && engPhaseIndex(q) === 3; }, reason: '已经开过工就不能再换施工方式。' }, function () { engProject().mode = 'self'; engAdvance('build'); });
+      if (engCareer().stage >= 4) extendedWorkButton(b, 'riverbay_pit', '委托河湾施工队（' + sc.wage + ' 金／工日）', { minutes: 30, energy: 1, guard: function () { var q = engProject(); return q.build === 0 && !q.mode && engPhaseIndex(q) === 3; }, reason: '已经开过工就不能再换施工方式。' }, function () { engProject().mode = 'commission'; engAdvance('build'); });
+    } else if (pj.mode === 'self') {
+      extendedWorkButton(b, 'riverbay_pit', '亲自完成：' + steps[pj.build] + ' · 90分钟', { minutes: 90, energy: 4, guard: function () { var q = engProject(); return q.mode === 'self' && q.build < steps.length && engCanBuild(q); }, reason: '第一道工序落下后不能换方式；工序全部完成后要封闸试运行。' }, function () {
+        var q = engProject(); q.build++; q.buildDay = state.totalDay; bumpCareer('engineering');
+      });
+    } else {
+      box.appendChild(el('p', null, '河湾施工队 4 人 · 已开工 ' + q0(pj.crew.day) + ' 天 · 已付工钱 ' + pj.crew.paid + ' 金 · 机构余额 ' + engFundsLeft(pj) + ' 金。'));
+      if (pj.crew.day === state.totalDay) box.appendChild(el('p', 'req-chip', '今天的工已经开过；明天再来开工。'));
+      else extendedWorkButton(b, 'riverbay_pit', '今日开工：' + steps[pj.build] + ' · 班工 ' + sc.wage + ' 金', {
+        minutes: 40, energy: 1,
+        guard: function () { var q = engProject(); return q.mode === 'commission' && q.build < steps.length && q.crew.day !== state.totalDay && engFundsLeft(q) >= sc.wage && engCanBuild(q); },
+        reason: '机构余额不足 ' + sc.wage + ' 金，今天发不出工钱；可以自愿补记或改为亲自施工。'
+      }, function () {
+        var q = engProject();
+        engLedger(q, 'riverbay:wage:' + (q.build + 1), 'wage', sc.wage, 'grant', '第 ' + (q.build + 1) + ' 道工序工钱');
+        q.funds.spent += sc.wage; q.crew.paid += sc.wage; q.crew.day = state.totalDay;
+        q.build++; q.buildDay = state.totalDay;
+      });
+    }
+  }
+  if (pj.phase === 'build' && pj.build >= steps.length) {
+    box.appendChild(el('p', 'req-chip ok', steps.length + ' 道工序全部完成，可以封闸进入跨日试运行。'));
+    extendedWorkButton(b, 'riverbay_pit', '封闸并启动试运行 · 30分钟', { minutes: 30, energy: 2, guard: function () { var q = engProject(); return q.phase === 'build' && q.build >= steps.length; } }, function () {
+      var q = engProject(); q.trialDay = state.totalDay; engAdvance('trial');
+    });
+  }
+  if (pj.phase === 'trial') {
+    box.appendChild(el('p', 'req-chip', '闸门正在试运行（第 ' + pj.trialDay + ' 天封闸）；' + (state.totalDay > pj.trialDay ? '已跨过一个夜晚，到控制室复核验收。' : '必须跨过一个游戏夜晚才能验收。')));
+  }
+  b.appendChild(box);
+}
+function q0(v) { return v || '0'; }
+/* 验收：跨过一个夜晚才能签；奖励走稳定事务 ID，重复打开面板不会重复发。 */
+function engAcceptProject() {
+  var p = professionalLifeState(), pj = engProject();
+  if (pj.phase !== 'trial' || state.totalDay <= pj.trialDay) return false;
+  if (pj.funds.tx['riverbay:accept']) return false;
+  engLedger(pj, 'riverbay:accept', 'reward', 90, 'grant', '验收报酬');
+  pj.maintDay = state.totalDay;
+  engAdvance('accepted');           /* 单一方向写回：scope 升为 works，方案口径对地区生效 */
+  bumpCareer('engineering', 2); bumpRoute('engineering', 2); bumpCareer('trade');
+  p.trust = Math.min(100, (p.trust || 0) + 2);
+  rememberChoice('noya', '完成河湾闸门验收（' + ENG_SCHEMES[pj.scheme].name + '）');
+  state.coins += 90;
+  markDirty();
+  return true;
+}
+function engAcceptPanel(b, pj, site) {
+  var at = site === 'water' ? 'water' : 'gauge';
+  var i = engPhaseIndex(pj);
+  if (i !== 5 && i !== 6) return;
+  var sc = ENG_SCHEMES[pj.scheme], p = professionalLifeState();
+  var box = el('div', 'panel-box');
+  if (i === 5) {
+    box.appendChild(el('div', 'section-title', '跨日试运行 · 待复核'));
+    box.appendChild(el('p', 'muted', '闸门于第 ' + pj.trialDay + ' 天封闸。试运行要跨过一个游戏夜晚，确认渗水、销钉与水位都稳得住，再由你署名验收。'));
+    if (state.totalDay > pj.trialDay) {
+      extendedWorkButton(b, at, '复核试运行并签署验收 · 报酬 90 金', { minutes: 40, energy: 2, guard: function () { var q = engProject(); return q.phase === 'trial' && state.totalDay > q.trialDay && !q.funds.tx['riverbay:accept']; } }, function () { engAcceptProject(); });
+    } else box.appendChild(el('p', 'req-chip', '今天才封闸；睡一夜再来验收。'));
+  } else {
+    box.appendChild(el('div', 'section-title', '验收完成 · ' + sc.name));
+    box.appendChild(el('p', 'req-chip ok', sc.supply + ' ' + sc.freight));
+    box.appendChild(el('p', 'muted', '第 ' + pj.maintDay + ' 天完成最近一次养护检查，累计 ' + pj.maintCount + ' 次。养护按周期来，不强制每天打卡。'));
+    if (state.totalDay > pj.maintDay) {
+      extendedWorkButton(b, at, '闸门养护检查 · 45分钟', { minutes: 45, energy: 3, guard: function () { var q = engProject(); return q.phase === 'accepted' && state.totalDay > q.maintDay; }, reason: '刚做完养护；下一次要隔一天。' }, function () {
+        var q = engProject(); q.maintDay = state.totalDay; q.maintCount++;
+        p.trust = Math.min(100, (p.trust || 0) + 1); bumpCareer('engineering');
+      });
+    } else box.appendChild(el('p', 'req-chip', '养护检查要隔一天再做，今天没有新的检视项。'));
+  }
   b.appendChild(box);
 }
 function p_trustUp(n) {
@@ -11059,23 +11518,23 @@ function p_trustUp(n) {
   markDirty();
 }
 
-/* 事故处置：两个选项各自改变真实的系统状态，不是换个说法 */
+/* 事故处置：两个选项各自改变真实的系统状态，不是换个说法。
+   处置写入项目记录的 emergency 字段 —— 那是验收前的应急口径，
+   工程验收后会被正式方案取代，所以两边不会互相覆盖。 */
 function openIncidentChoice(b) {
   var e = engCareer();
   var box = el('div', 'panel-box');
   box.appendChild(el('div', 'section-title', '事故 · 夜雨冲垮闸门销'));
   box.appendChild(el('p', null, '水从缺口直冲下游，麦田刚返青，船闸也断了航。村民要你先保一样。'));
-  box.appendChild(el('p', 'muted', '你的处理会被三方记住：诺娅看工程，马丁看磨坊额度，柯里看村里怎么评这次取舍。'));
+  box.appendChild(el('p', 'muted', '你的处理会被三方记住：诺娅看工程，马丁看磨坊额度，柯里看村里怎么评这次取舍。这只是应急口径，河湾工程验收后由正式方案接替。'));
   extendedWorkButton(b, 'water', '先堵缺口保麦田 · 记牺牲通航', { minutes: 120, energy: 4, guard: function () { return e.stage === 1 && !e.incident; } }, function () {
     e.incident = 'field'; e.choice = 'field'; e.stage = 2;
     rememberChoice('noya', '事故中先保农田'); rememberChoice('martin', '事故中先保农田');
-    professionalLifeState().watershedContract = 2;
     applyEngChoice();
   });
   extendedWorkButton(b, 'water', '先泄水保船闸 · 记麦田延灌', { minutes: 120, energy: 4, guard: function () { return e.stage === 1 && !e.incident; } }, function () {
     e.incident = 'channel'; e.choice = 'channel'; e.stage = 2;
     rememberChoice('noya', '事故中先保通航'); rememberChoice('martin', '事故中先保通航');
-    professionalLifeState().watershedContract = 2;
     applyEngChoice();
   });
   b.appendChild(box);
@@ -11083,12 +11542,337 @@ function openIncidentChoice(b) {
 
 /* 事故与争议的后果真的改到系统上，不是换个说法：
    选了保农田，牧草与麦田供水恢复但货运变慢；选了保通航，航路恢复但牧草仍靠人工。 */
+/* ============================================================
+   R3-A／R3-B：河湾闸门与引水改造 —— 第一项「从接单到验收」的完整工程
+
+   项目进度只存在这一份记录里（phase 是有序编号，build 是已完工序数），
+   不再用 repair／allocation／certified 三个布尔值各判一半。
+   waterworks 里的旧字段是给既有读者用的单向镜像：由项目记录写回。
+   旧档只在第一次载入时反向迁移一次，迁移完就不再有第二条写入路径。
+   ============================================================ */
+var ENG_PROJECT_ID = 'riverbay_gate';
+/* 顺序固定，索引即进度；任何一步都不能跳过前一阶段 */
+var ENG_PHASES = ['survey', 'certify', 'scheme', 'materials', 'build', 'trial', 'accepted'];
+var ENG_PHASE_TEXT = {
+  survey: '勘测：水尺、东岸坡脚与下游淤积段还没有完整读数',
+  certify: '勘测完成，到控制室领取基础工程认证',
+  scheme: '方案已确认，等石料与埋件交接进场',
+  materials: '材料已交接，闸基可以开工',
+  build: '施工中，闸门还没通过跨日试运行',
+  trial: '试运行中，睡过一个游戏夜晚后到控制室复核',
+  accepted: '已验收，地区服务按已验收方案读取效果'
+};
+/* 两个方案的费用与工日都来自同一套材料来源与日薪，不另编数字 */
+var ENG_SCHEMES = {
+  conservative: {
+    id: 'conservative', name: '保守排水', alloc: 'irrigation', wage: 40, kitCost: 24, risk: 1,
+    supply: '牧场试种田自动供水；磨坊每天至多两批。',
+    freight: '灌溉优先：大型船队要分批靠岸，货运增加 20 分钟。',
+    build: ['拆除旧闸板并清理淤积', '浇筑东岸新基座', '安装闸件并埋设销钉'],
+    brief: '省工省钱，洪水风险最低；代价是通航水深。'
+  },
+  balanced: {
+    id: 'balanced', name: '兼顾通航', alloc: 'navigation', wage: 40, kitCost: 24, risk: 2,
+    supply: '农田分时供水；晴天牧草仍要人工浇。',
+    freight: '通航优先：货运减少 10 分钟，磨坊保持协定额度。',
+    build: ['拆除旧闸板并清理淤积', '浇筑东岸新基座', '安装闸件并埋设销钉', '浚通引航道并校核水深'],
+    brief: '保住航道与货运；工期更长，勘测不利时更容易出事。'
+  }
+};
+/* 机构拨付上限：24 金闸件代购 ＋ 保守方案三日班组日薪 40 ＝ 144，留 6 金余量。
+   兼顾通航要四日，184 金超出拨付，差额只能由个人自愿补记 —— 这是刻意的。 */
+var ENG_GRANT_MAX = 150;
+
+function newEngProject() {
+  return {
+    id: ENG_PROJECT_ID, phase: 'survey',
+    survey: { level: 0, day: 0, east: '', silt: '' },
+    practice: '',            // 'mine' | 'mill'：取得认证时走的实践路线
+    opinions: { mill: false, meadow: false, port: false },
+    emergency: '',           // 'field' | 'channel'：事故期间的应急处置，验收后被方案取代
+    scheme: '', schemeDay: 0,
+    stone: false, stoneDay: 0, kit: 0,
+    build: 0, buildDay: 0, mode: '',
+    crew: { day: 0, paid: 0 },
+    trialDay: 0, maintDay: 0, maintCount: 0,
+    funds: { granted: 0, spent: 0, donated: 0, tx: {} }
+  };
+}
+/* 归一化。legacy 只在项目记录缺失的旧档上读一次，之后项目记录是唯一事实。 */
+function normalizeEngProject(raw, legacy) {
+  var d = newEngProject(), r = raw && typeof raw === 'object' ? raw : null;
+  function num(v, max) { return Number.isFinite(v) ? clamp(Math.floor(v), 0, max) : 0; }
+  if (!r) {
+    /* --- 旧档迁移：已交付的工程不强迫重做，已发生的读数与选择原样保留 --- */
+    var w = legacy || {};
+    d.survey.level = num(w.level, 3);
+    d.emergency = w.choice === 'field' || w.choice === 'channel' ? w.choice : '';
+    d.opinions.mill = !!w.millOpinion;
+    d.opinions.meadow = !!w.meadowOpinion;
+    d.opinions.port = !!w.portOpinion;
+    d.stone = !!w.receivedStone;
+    d.scheme = w.allocation === 'irrigation' ? 'conservative' : w.allocation === 'navigation' ? 'balanced' : '';
+    d.schemeDay = d.scheme ? num(w.testDay, 100000) : 0;
+    if (w.certified) {
+      /* 旧口径的「已发证」＝ 今天口径的「已验收」，不能退回去重做一遍 */
+      d.practice = 'legacy';
+      d.survey.east = 'sound'; d.survey.silt = 'light';
+      d.kit = 1;
+      d.phase = 'accepted';
+      d.build = d.scheme ? ENG_SCHEMES[d.scheme].build.length : 3;
+      d.mode = 'self';
+      d.trialDay = num(w.testDay, 100000);
+      d.maintDay = d.trialDay;
+    } else if (d.scheme && w.repair) {
+      d.practice = 'legacy';
+      d.survey.east = 'sound'; d.survey.silt = 'light';
+      d.kit = 1;
+      d.phase = 'trial';
+      d.build = ENG_SCHEMES[d.scheme].build.length;
+      d.mode = 'self';
+      d.trialDay = num(w.testDay, 100000);
+    } else if (d.scheme) {
+      d.practice = 'legacy';
+      d.phase = 'materials';
+    } else if (d.stone) {
+      d.phase = 'materials';
+    }
+    /* 旧档手上已经领到的机构预算，记成已结算事务，绝不再发第二次 */
+    if (legacy && typeof legacy.budget === 'number' && legacy.budget > 0) {
+      d.funds.granted = clamp(Math.floor(legacy.budget), 0, ENG_GRANT_MAX);
+      d.funds.spent = 0;
+      d.funds.tx['legacy:grant'] = { kind: 'grant', amount: d.funds.granted, pool: 'grant', day: 0, label: '旧档已领取的机构预算' };
+    }
+    return d;
+  }
+  var s = r.survey || {};
+  d.survey = { level: num(s.level, 3), day: num(s.day, 100000), east: ['sound', 'cracked'].indexOf(s.east) >= 0 ? s.east : '', silt: ['light', 'heavy'].indexOf(s.silt) >= 0 ? s.silt : '' };
+  d.practice = ['mine', 'mill', 'legacy'].indexOf(r.practice) >= 0 ? r.practice : '';
+  var o = r.opinions || {};
+  d.opinions = { mill: !!o.mill, meadow: !!o.meadow, port: !!o.port };
+  d.emergency = ['field', 'channel'].indexOf(r.emergency) >= 0 ? r.emergency : '';
+  d.scheme = ENG_SCHEMES[r.scheme] ? r.scheme : '';
+  d.schemeDay = num(r.schemeDay, 100000);
+  d.stone = !!r.stone; d.stoneDay = num(r.stoneDay, 100000); d.kit = num(r.kit, 2);
+  d.build = num(r.build, 4); d.buildDay = num(r.buildDay, 100000);
+  d.mode = ['self', 'commission'].indexOf(r.mode) >= 0 ? r.mode : '';
+  var cw = r.crew || {};
+  d.crew = { day: num(cw.day, 100000), paid: num(cw.paid, ENG_GRANT_MAX * 4) };
+  d.trialDay = num(r.trialDay, 100000);
+  d.maintDay = num(r.maintDay, 100000); d.maintCount = num(r.maintCount, 100);
+  var f = r.funds || {}, tx = {};
+  if (f.tx && typeof f.tx === 'object') Object.keys(f.tx).forEach(function (k) {
+    var t = f.tx[k];
+    if (t && typeof t === 'object' && Number.isFinite(t.amount)) tx[k] = { kind: String(t.kind || 'grant'), amount: Math.floor(t.amount), pool: String(t.pool || 'grant'), day: num(t.day, 100000), label: String(t.label || '') };
+  });
+  d.funds = { granted: num(f.granted, ENG_GRANT_MAX), spent: num(f.spent, ENG_GRANT_MAX * 4), donated: num(f.donated, ENG_GRANT_MAX * 4), tx: tx };
+  d.phase = ENG_PHASES.indexOf(r.phase) >= 0 ? r.phase : 'survey';
+
+  /* --- 自洽：不可能的组合必须被压回，而不是留下一个能反复领钱的存档 --- */
+  var surveyDone = d.survey.level > 0 && d.survey.east && d.survey.silt;
+  if (ENG_PHASES.indexOf(d.phase) > 0 && !surveyDone) d.phase = 'survey';
+  if (ENG_PHASES.indexOf(d.phase) > 1 && !d.practice) d.phase = 'certify';
+  if (ENG_PHASES.indexOf(d.phase) > 2 && !d.scheme) d.phase = 'scheme';
+  if (!d.scheme) { d.build = 0; d.buildDay = 0; d.mode = ''; d.crew = { day: 0, paid: 0 }; }
+  if (ENG_PHASES.indexOf(d.phase) > 3 && (!d.stone || d.kit < 1)) d.phase = 'materials';
+  if (!d.stone || d.kit < 1) d.build = 0;
+  if (d.scheme && ENG_PHASES.indexOf(d.phase) > 4) d.build = Math.min(d.build, ENG_SCHEMES[d.scheme].build.length);
+  if (ENG_PHASES.indexOf(d.phase) < 4) { d.buildDay = 0; if (d.mode !== 'commission') d.mode = ''; }
+  /* 封闸日属于「试运行」阶段本身，清零会把已经跨过夜的工程退回未封闸 */
+  if (ENG_PHASES.indexOf(d.phase) < 5) { d.trialDay = 0; d.maintDay = 0; }
+  if (d.phase !== 'accepted') d.maintCount = 0;
+  /* 资金守恒：已入账不得超过拨付＋自愿补记；自愿补记永远只能来自个人钱包 */
+  if (d.funds.granted > ENG_GRANT_MAX) d.funds.granted = ENG_GRANT_MAX;
+  var pool = d.funds.granted + d.funds.donated;
+  if (d.funds.spent > pool) d.funds.spent = pool;
+  if (d.crew.paid > d.funds.spent) d.crew.paid = d.funds.spent;
+  return d;
+}
+/* 项目记录 → 水利站旧字段。唯一的写入方向，读旧字段的既有系统因此始终一致。 */
+function deriveWaterworksFromProject(d, w) {
+  var pj = d.projects[ENG_PROJECT_ID], i = ENG_PHASES.indexOf(pj.phase), sc = ENG_SCHEMES[pj.scheme];
+  w.level = pj.survey.level;
+  w.receivedStone = pj.stone;
+  w.millOpinion = pj.opinions.mill;
+  w.meadowOpinion = pj.opinions.meadow;
+  w.portOpinion = pj.opinions.port;
+  /* 基础认证要真的领到手才算：勘测读完只是够资格，实践没验收就没有证书。
+     认证范围随之从「无」→「基础」→「可主持公共工程」。 */
+  w.scope = i >= 6 ? 'works' : pj.practice ? 'survey' : '';
+  w.certified = !!pj.practice && i >= 1;
+  w.repair = i >= 2 ? 'pending' : null;
+  /* 验收后由工程方案决定；验收前只有事故期间的应急处置会真正影响地区服务 */
+  w.allocation = i >= 6 && sc ? sc.alloc : engEmergencyAlloc(pj);
+  w.testDay = pj.phase === 'trial' ? pj.trialDay : 0;
+  d.access.waterworks = i >= 2;
+  /* 水源合同三段：1 石料到货、2 闸件进场开工、3 验收交付 —— 跟着事实走，不跟按钮走 */
+  d.watershedContract = i >= 6 ? 3 : i >= 4 ? 2 : pj.stone ? 1 : 0;
+  return w;
+}
+function engProject() {
+  var p = professionalLifeState();
+  if (!p.projects || !p.projects[ENG_PROJECT_ID]) {
+    p.projects = p.projects || {};
+    p.projects[ENG_PROJECT_ID] = newEngProject();
+    if (!p.projects[ENG_PROJECT_ID].id) p.projects[ENG_PROJECT_ID].id = ENG_PROJECT_ID;
+  }
+  return p.projects[ENG_PROJECT_ID];
+}
+function engPhaseIndex(pj) { return ENG_PHASES.indexOf(pj.phase); }
+/* N 记录里的项目页：进度、账本、联系人、材料来源与下一步集中在一处，
+   不打开任何现场面板也能知道自己接了什么责任、还欠哪一步。 */
+function openEngineeringProjectLog() {
+  var pj = engProject(), e = engCareer(), p = professionalLifeState(), sc = ENG_SCHEMES[pj.scheme];
+  openWindow({
+    id: 'engproject', kind: 'custom', wide: true, title: '河湾闸门与引水改造 · 项目记录',
+    build: function (b) {
+      b.classList.add('mill-life-panel');
+      engPhaseBar(b);
+      b.appendChild(el('p', 'work-summary', ENG_PHASE_NAMES[engPhaseIndex(pj)] + ' / ' + ENG_PHASES.length + ' · ' + (ENG_PHASE_TEXT[pj.phase] || '')));
+      b.appendChild(el('p', null, '下一步：' + engNextStepText()));
+      b.appendChild(el('p', 'muted', '联系人：诺娅（水利站）· 马丁（风铃磨坊）· 柯里（议事屋）。材料来源：石灰采场采掘 → 测量石料棚切割 → 下游河港装运 → 水利站凭核验运单签收。'));
+      var cert = el('div', 'panel-box');
+      cert.appendChild(el('div', 'section-title', '认证与资历'));
+      cert.appendChild(el('p', null, '入门：' + (rookieState().engineering >= ROOKIE_JOBS.engineering.steps.length ? '小镇公共水泵维修已完成' : '小镇公共水泵维修未完成')));
+      cert.appendChild(el('p', null, '实践：' + engPracticeText()));
+      cert.appendChild(el('p', null, '认证范围：' + (pj.practice ? (p.waterworks.scope === 'works' ? '可主持公共工程（河湾工程已验收）' : '基础工程 —— 勘测／施工／验收') : '尚未取得')));
+      cert.appendChild(el('p', null, '资历阶段：' + (ENG_STAGES[e.stage] || ENG_STAGES[0]).name + (e.post ? ' · 岗位 ' + e.post : '')));
+      b.appendChild(cert);
+      var sur = el('div', 'panel-box');
+      sur.appendChild(el('div', 'section-title', '勘测读数'));
+      sur.appendChild(el('p', null, '水位 ' + (pj.survey.level ? pj.survey.level + ' 级（第 ' + pj.survey.day + ' 天）' : '未读') + ' · 东岸坡脚 ' + (pj.survey.east === 'cracked' ? '开裂' : pj.survey.east === 'sound' ? '完好' : '未查') + ' · 下游淤积 ' + (pj.survey.silt === 'heavy' ? '偏厚' : pj.survey.silt === 'light' ? '正常' : '未测')));
+      sur.appendChild(el('p', null, '基础风险 ' + engRisk(pj) + ' / 5 · 三方意见 ' + [pj.opinions.mill && '磨坊', pj.opinions.meadow && '牧场', pj.opinions.port && '河港'].filter(Boolean).join('、')));
+      b.appendChild(sur);
+      if (sc) {
+        var sch = el('div', 'panel-box');
+        sch.appendChild(el('div', 'section-title', '方案 · ' + sc.name));
+        sch.appendChild(el('p', null, sc.brief));
+        sch.appendChild(el('p', null, '工序 ' + sc.build.length + ' 道 · 闸件代购 ' + sc.kitCost + ' 金 · 班组日薪 ' + sc.wage + ' 金 · 机构口径合计 ' + engSchemeCost(pj) + ' 金。'));
+        sch.appendChild(el('p', null, '供水：' + sc.supply));
+        sch.appendChild(el('p', null, '货运：' + sc.freight));
+        sch.appendChild(el('p', 'muted', '当前地区货运耗时（石料／互市）：' + professionalShippingMinutes(60) + ' 分钟。水位口径：' + engPolicyText()));
+        b.appendChild(sch);
+      }
+      var mat = el('div', 'panel-box');
+      mat.appendChild(el('div', 'section-title', '材料与施工'));
+      mat.appendChild(el('p', null, '石料 ' + (pj.stone ? '已签收' : '未到货') + ' · 闸件套装 ' + (pj.kit ? '已进场' : '未进场') + ' · 工序 ' + pj.build + '/' + engSchemeBuild(pj).length + ' · 施工方式 ' + (pj.mode === 'self' ? '亲自施工' : pj.mode === 'commission' ? '委托河湾施工队' : '未定')));
+      if (pj.mode === 'commission') mat.appendChild(el('p', null, '河湾施工队 4 人 · 已开工 ' + pj.crew.day + ' 天 · 已付工钱 ' + pj.crew.paid + ' 金' + (engFundsLeft(pj) < ENG_SCHEMES[pj.scheme].wage && pj.build < engSchemeBuild(pj).length ? ' · 已停工：机构余额不足' : '')));
+      mat.appendChild(el('p', null, '试运行：' + (pj.trialDay ? '第 ' + pj.trialDay + ' 天封闸' : '未启动') + ' · 养护 ' + pj.maintCount + ' 次'));
+      b.appendChild(mat);
+      engFundsPanel(b);
+      var mem = e.memories, who = [];
+      if (mem.noya && mem.noya.length) who.push('诺娅：' + mem.noya.join('、'));
+      if (mem.martin && mem.martin.length) who.push('马丁：' + mem.martin.join('、'));
+      if (mem.council && mem.council.length) who.push('柯里：' + mem.council.join('、'));
+      if (who.length) b.appendChild(el('p', 'muted', '他们记得——' + who.join('；')));
+    },
+    actions: [{ label: '返回游戏', kind: 'primary', close: true }]
+  });
+}
+/* 唯一的前进入口：改完立刻把镜像写回，旧字段与项目进度不可能各说各话。
+   阶段已经更靠前时只重写镜像 —— 领认证正是这种情况。 */
+function engAdvance(to) {
+  var p = professionalLifeState(), pj = engProject();
+  if (ENG_PHASES.indexOf(to) > engPhaseIndex(pj)) pj.phase = to;
+  deriveWaterworksFromProject(p, p.waterworks);
+  markDirty();
+  return true;
+}
+/* 稳定事务 ID：同一笔拨付／采购／工钱／奖励／地区效果只结算一次。 */
+function engLedger(pj, txId, kind, amount, pool, label) {
+  if (!pj.funds.tx[txId]) {
+    pj.funds.tx[txId] = { kind: kind, amount: amount, pool: pool || 'grant', day: state.totalDay, label: label || '' };
+  }
+  return pj.funds.tx[txId];
+}
+function engGrantBudget() {
+  var e = engCareer(), pj = engProject();
+  if (e.stage < 3 || e.budgetGranted || pj.funds.granted > 0) return false;
+  e.budgetGranted = true;
+  engLedger(pj, 'riverbay:grant', 'grant', ENG_GRANT_MAX, 'grant', '机构一次性拨付');
+  pj.funds.granted = ENG_GRANT_MAX;
+  e.budget = ENG_GRANT_MAX;
+  rememberChoice('council', '以岗位身份申请机构预算');
+  markDirty();
+  return true;
+}
+/* 经费不够时由个人自愿补记：从私房钱出账，和机构经费分开记。 */
+function engTopUp(need) {
+  var pj = engProject();
+  var short = need - (pj.funds.granted + pj.funds.donated - pj.funds.spent);
+  if (short <= 0) return true;
+  if (state.coins < short) return false;
+  state.coins -= short;
+  pj.funds.donated += short;
+  engLedger(pj, 'riverbay:donate', 'donate', short, 'donate', '个人自愿补记');
+  return true;
+}
+function engFundsLeft(pj) { return pj.funds.granted + pj.funds.donated - pj.funds.spent; }
+/* 勘测结论决定基础风险；方案再叠一层。风险值只来自已保存的勘测与天气，不凭空造事故。 */
+function engRisk(pj) {
+  var r = 1;
+  if (pj.survey.level >= 3) r++;
+  if (pj.survey.east === 'cracked') r++;
+  if (pj.survey.silt === 'heavy') r++;
+  var sc = ENG_SCHEMES[pj.scheme];
+  return Math.min(5, r + (sc ? sc.risk - 1 : 0));
+}
+function engSurveyDone(pj) { return pj.survey.level > 0 && !!pj.survey.east && !!pj.survey.silt; }
+/* 基础工程认证：勘测读完只是够资格，实践验收通过并领证后才真的有证书 */
+function engHasCertificate() { var q = engProject(); return engPhaseIndex(q) >= 1 && !!q.practice; }
+/* 能不能推进工序：材料进场之后、封闸试运行之前 */
+function engCanBuild(q) { var i = engPhaseIndex(q); return i >= 3 && i <= 4; }
+function engPracticeRoute() {
+  /* 实践两条路：矿山排水或磨坊维修，任一条走通都能拿到认证，不额外强制个人战斗 */
+  if (mineWorks().inspected) return 'mine';
+  if (millLifeState().inspected) return 'mill';
+  return '';
+}
+function engPracticeText() {
+  if (mineWorks().inspected) return '矿山第二层排水（已验收）';
+  if (millLifeState().inspected) return '风铃磨坊水轮（已验收）';
+  return '矿山第二层排水，或风铃磨坊水轮 —— 任一条验收通过即可';
+}
+function engSchemeBuild(pj) { var sc = ENG_SCHEMES[pj.scheme]; return sc ? sc.build : ENG_SCHEMES.conservative.build; }
+/* 一份「下一步」文案，三个地方共用：角色经历、N 记录、今日安排 */
+function engNextStepText() {
+  var pj = engProject(), e = engCareer(), i = engPhaseIndex(pj), sc = ENG_SCHEMES[pj.scheme];
+  if (i < 1) {
+    if (!pj.survey.level) return '坝顶水尺 (20,18) 读水位';
+    if (!pj.survey.east) return '东岸坡脚 (21,20) 探查坡体';
+    if (!pj.survey.silt) return '下游淤积段 (21,16) 测淤积';
+    return engPracticeRoute() ? '水利控制室领取基础工程认证' : '先去验收' + (mineWorks().inspected ? '矿山排水' : '风铃磨坊水轮') + '，或换另一条实践路线';
+  }
+  if (e.stage === 0) return '水利控制室签署第一份独立工程报告';
+  if (!e.incident) return '处理夜雨冲垮旧闸门销的事故';
+  if (!e.post) return '水利控制室接受正式工程岗位';
+  if (!e.budgetGranted) return '申请本项目一次性机构拨付 ' + ENG_GRANT_MAX + ' 金';
+  if (!pj.scheme) {
+    if (!pj.opinions.mill || !pj.opinions.meadow || !pj.opinions.port) return '记录磨坊／牧场／河港三方意见';
+    return '主持说明会，确认「保守排水」或「兼顾通航」';
+  }
+  if (!pj.stone) return '采场采掘 → 测量棚切割 → 河港装运 → 水利站签收石料运单';
+  if (pj.kit < 1) return '水利控制室安装闸件套装（需铁锭 ×1）';
+  if (pj.build < engSchemeBuild(pj).length) {
+    var stoppedNow = pj.mode === 'commission' && engFundsLeft(pj) < ENG_SCHEMES[pj.scheme].wage;
+    return '闸基工作面 (22,14) 施工：' + engSchemeBuild(pj)[pj.build] + (stoppedNow ? '（已停工，先补记工钱）' : '');
+  }
+  if (pj.phase === 'build') return '闸基工作面封闸并启动跨日试运行';
+  if (pj.phase === 'trial') return state.totalDay > pj.trialDay ? '水利控制室复核试运行并签署验收' : '睡过一个游戏夜晚再回来验收';
+  return state.totalDay > pj.maintDay ? '水利控制室做一次闸门养护检查' : '养护检查要隔一天；日常维护按周期出现';
+}
+function engSchemeCost(pj) {
+  var sc = ENG_SCHEMES[pj.scheme];
+  return sc ? sc.kitCost + sc.wage * sc.build.length : 0;
+}
+
 function applyEngChoice() {
-  var e = engCareer(), p = professionalLifeState();
-  if (e.choice === 'field') {
-    p.waterworks.allocation = 'irrigation';
-  } else if (e.choice === 'channel') {
-    p.waterworks.allocation = 'navigation';
+  /* 事故处置写入项目记录的 emergency，地区服务按它临时改变口径；
+     工程验收后由方案取代，两者不写进同一个字段，也就没有互相覆盖的问题。 */
+  var e = engCareer(), p = professionalLifeState(), pj = engProject();
+  if (e.choice === 'field' || e.choice === 'channel') {
+    pj.emergency = e.choice;
+    deriveWaterworksFromProject(p, p.waterworks);
   }
   markDirty();
 }
@@ -11245,12 +12029,12 @@ function CHAR_ATTRS() { return CHAR_ATTR_DEFS; }
    id 是存档与代码的稳定标识；阶段为 R1 的节点才允许真正生效，
    其余保持「未接入 · 不可购买」。 */
 var CHAR_TALENTS = [
-  { id: 'focus_read', tree: '智力', attr: 'int', stage: 'R2', name: '专注研读', need: '智力 ≥ 8', desc: '指定矿样或水样研究耗时减少 10%。', cap: '与属性合计最多减少 25%', where: '矿层取样、水利站水尺研究' },
-  { id: 'craft_grasp', tree: '智力', attr: 'int', stage: 'R2', name: '工艺理解', need: '智力 ≥ 8', desc: '指定维修方案的智力检定视为 +2。', cap: '检定加成最多 +20', where: '风铃磨坊、水泵的维修方案' },
+  { id: 'focus_read', tree: '智力', attr: 'int', stage: 'R2', name: '专注研读', need: '智力 ≥ 8', desc: '指定矿样或水样研究耗时减少 10%。', cap: '与属性合计最多减少 25%', where: '旧矿山一层南侧 (14,20) 矿样研究' },
+  { id: 'craft_grasp', tree: '智力', attr: 'int', stage: 'R2', name: '工艺理解', need: '智力 ≥ 8', desc: '指定维修方案的智力检定视为 +2。', cap: '有效智力最多 20', where: '小镇工坊的入门水泵分析' },
   { id: 'read_tracks', tree: '感知', attr: 'sense', stage: 'R2', name: '辨迹', need: '感知 ≥ 8', desc: '森林入门任务显示足迹方向与新旧。', cap: '只提供方向与新旧，不靠随机刷出关键足迹', where: '雾杉森林林缘调查' },
   { id: 'read_ore', tree: '感知', attr: 'sense', stage: 'R2', name: '识矿', need: '感知 ≥ 8', desc: '在普通矿层辨认已设计的富集迹象。', cap: '只提供信息，不远程挖走矿脉', where: '旧矿山各层矿脉' },
-  { id: 'steady', tree: '胆量', attr: 'nerve', stage: 'R2', name: '沉着', need: '胆量 ≥ 8', desc: '个人遭遇中的受击硬直再减 10%。', cap: '含属性合计最多减少 25%', where: '个人遭遇；战斗上线前不可购买' },
-  { id: 'stand_forward', tree: '胆量', attr: 'nerve', stage: 'R2', name: '挺身而出', need: '胆量 ≥ 8', desc: '在公共协商或工程预警中打开有实际责任的行动分支。', cap: '不得只是多一句对白', where: '磨坊公共协商、水利站工程预警' },
+  { id: 'steady', tree: '胆量', attr: 'nerve', stage: 'R2', name: '沉着', need: '胆量 ≥ 8', desc: '个人遭遇中的受击硬直再减 10%。', cap: '含属性合计最多减少 25%', where: '矿山可选支路的个人遭遇' },
+  { id: 'stand_forward', tree: '胆量', attr: 'nerve', stage: 'R2', name: '挺身而出', need: '胆量 ≥ 8', desc: '在公共协商或工程预警中打开有实际责任的行动分支。', cap: '不得只是多一句对白', where: '小镇工坊的水泵安全值守与次日复核' },
   { id: 'save_strength', tree: '健康', attr: 'body', stage: 'R1', name: '节省力气', need: '健康 ≥ 8', desc: '指定农事或采集的体力消耗减少。', cap: '每日最多减 10 点，每次最多减 1，单次最终耗费至少 1', where: '浇水、采集与照料' },
   { id: 'balanced_meal', tree: '健康', attr: 'body', stage: 'R1', name: '均衡饮食', need: '健康 ≥ 8', desc: '食物的生命与体力恢复增加 15%。', cap: '按明确取整并受上限约束，不改变售价', where: '厨房与随身食物' },
   { id: 'lucky_find', tree: '幸运', attr: 'luck', stage: 'R2', name: '顺手所得', need: '幸运 ≥ 8', desc: '合格普通采集额外产物的概率增加 3 个百分点。', cap: '总概率最多 17%，每节点每周期一次', where: '野外合格采集' },
@@ -11495,7 +12279,7 @@ function charNotice(text, reason) {
    结算事务、战斗和需要强制决策时不可洗点。 */
 function charWashCost() { return CHAR_RULE.respecCost; }
 function charBusyForRespec() {
-  return (Game && Game.busy) || (Game && Game.fishing && Game.fishing.active) ||
+  return !!personalCombat.active || (Game && Game.busy) || (Game && Game.fishing && Game.fishing.active) ||
     (Game && Game.swingT > 0) || (sceneSwitch && sceneSwitch.busy) || !!UI.window && UI.window.kind === 'pause';
 }
 function charRespecPreview() {
@@ -11508,6 +12292,7 @@ function charRespecPreview() {
         b.appendChild(el('p', 'muted', '结算事务、战斗或需要立即决策的时候不能洗点。结束当前动作后再来。'));
         return;
       }
+      charRow(b,'生命上限',personalMaxHp()+' → 60（当前生命只下调，不恢复）');
       b.appendChild(el('p', null, '洗点会把五项属性退回基础 ' + CHAR_RULE.attrBase + '，并返还全部点数。'));
       CHAR_ATTR_DEFS.forEach(function (a) {
         charRow(b, a.name, c.attr[a.id] + ' → ' + CHAR_RULE.attrBase + '（返还 ' + (c.attr[a.id] - CHAR_RULE.attrBase) + ' 点）');
@@ -11546,6 +12331,7 @@ function charApplyRespec() {
 
   /* 下调上限时把当前体力夹进新上限，不借反复洗点恢复 */
   state.energy = Math.min(state.energy, CFG.maxEnergy);
+  personalState().hp = Math.min(personalState().hp, personalMaxHp());
   markDirty(); saveNow(); refreshHud();
   return '';
 }
@@ -11566,6 +12352,7 @@ CHAR_BUILD.attr = function (b) {
   var e = exploreState(), c = charState(), bud = charBudget();
   var live = charBox(b, '角色等级与当前状态');
   charRow(live, '角色等级', c.level + ' / ' + charLevelCap() + '（经验 ' + c.exp + ' / ' + charExpToNext(c.level) + '）');
+  charRow(live, '生命', personalState().hp + ' / ' + personalMaxHp());
   charRow(live, '体力', state.energy + ' / ' + CFG.maxEnergy);
   charRow(live, '可分配属性点', c.attrPoints > 0 ? c.attrPoints + ' 点待分配' : '暂无', c.attrPoints > 0 ? 'char-val ok' : 'char-val muted');
   charRow(live, '天赋点', c.talentPoints > 0 ? c.talentPoints + ' 点待使用' : '暂无', 'char-val muted');
@@ -11582,7 +12369,7 @@ CHAR_BUILD.attr = function (b) {
   var plan = charBox(b, '五项属性');
   charRow(plan, '规则', '基础 ' + CHAR_RULE.attrBase + ' · 单项上限 ' + CHAR_RULE.attrCap +
     ' · 创建自由点 ' + CHAR_RULE.createPoints + '（创建时单项最多 10；跳过创建细节可采用五项各 7）· 每次升级 1 点');
-  charNote(plan, '当前属性用于对应天赋的学习门槛；研究、感知线索、生命上限等直接收益随后续场景接入，不会仅因加点就改变尚未开放的玩法。');
+  charNote(plan, '智力减少矿样研究耗时，胆量缩短受击硬直，健康增加生命上限，幸运影响普通采集；感知天赋提供足迹和矿脉信息。体力上限仍为原有数值。');
   charRow(plan, '点数预算', '当前共 ' + (bud.earned+CHAR_ATTR_BASE_TOTAL) + ' 点 = 基础 ' + CHAR_ATTR_BASE_TOTAL +
     ' + 创建 ' + CHAR_RULE.createPoints + ' + 升级 ' + (c.level - 1) +
     '；已分配 ' + bud.allocated + '，未分配 ' + bud.attrUnspent);
@@ -11598,6 +12385,7 @@ CHAR_BUILD.attr = function (b) {
     box.appendChild(head);
     box.appendChild(el('div', 'char-attr-use', '用途：' + a.use));
     box.appendChild(el('div', 'char-attr-edge', '边界：' + a.edge));
+    box.appendChild(el('div', 'char-attr-use', '当前效果：' + personalAttrEffect(a.id,v) + '；下一点：' + personalAttrEffect(a.id,Math.min(20,v+1))));
     var acts = el('div', 'item-actions');
     var cap=charAttributeCap(c.level);
     var can = c.attrPoints > 0 && v < cap;
@@ -11624,7 +12412,7 @@ CHAR_BUILD.attr = function (b) {
 
 /* 天赋是否可学：必须同时满足已接入阶段、等级门槛、属性门槛和点数。
    未接入阶段的节点保留查看，但不消耗点数（§5）。 */
-function charTalentStageOpen(t) { return t.stage === 'R1'; }
+function charTalentStageOpen(t) { return t.stage === 'R1' || t.stage === 'R2'; }
 function charAttrName(id) { return CHAR_ATTR_DEFS.filter(function (a) { return a.id === id; })[0].name; }
 function charTalentUnlockText(t) {
   var c = charState();
@@ -11653,7 +12441,7 @@ CHAR_BUILD.talent = function (b) {
   var c = charState();
   charRow(box, '天赋点', c.talentPoints > 0 ? c.talentPoints + ' 点可用' : '暂无（3/6/9/12/15/18/21/24 级各 1 点，全角色最多 8 点）');
   charNote(box, '入门节点要求对应属性至少 ' + CHAR_RULE.thresholds[0] + '，进阶要求 12 且已学本树任一入门，精通要求 16 且已学两个并含进阶。' +
-    '标为 R2 的节点仍只可查看，不消耗点数。');
+    '首批十个节点已接入真实场景；后续十五节点暂不开放。');
   CHAR_TALENTS.forEach(function (t) {
     var attrName = CHAR_ATTR_DEFS.filter(function (a) { return a.id === t.attr; })[0].name;
     var learned = !!c.talents[t.id];
@@ -11667,6 +12455,7 @@ CHAR_BUILD.talent = function (b) {
     card.appendChild(el('div', 'char-talent-desc', t.desc));
     card.appendChild(el('div', 'char-talent-meta', '条件：' + t.need + '（当前' + attrName + ' ' + charAttr(t.attr) + '）· 上限：' + t.cap));
     card.appendChild(el('div', 'char-talent-where', '支持地点：' + t.where + ' · 阶段 ' + t.stage));
+    card.appendChild(el('div', 'char-talent-meta', '最近实例：' + (personalState().examples[t.id] || '尚未使用；到支持地点体验。')));
     if (!learned && charTalentStageOpen(t)) {
       var acts = el('div', 'item-actions');
       var btn = mkBtn('学习（1 点）', why ? 'sm' : 'primary sm', function () {
@@ -11684,35 +12473,7 @@ CHAR_BUILD.talent = function (b) {
   });
   charLater(charBox(b, '后续十五节点'), CHAR_TALENTS_LATER);
   charNote(b, '每个节点在可购买前至少要有一处真实体验和回归证据；未接上的节点保留查看，但不消耗点数。' +
-    '十个入门节点全部可购买，是第二个成长里程碑的验收条件，不是现在。');
-};
-
-CHAR_BUILD.weapon = function (b) {
-  var e = exploreState();
-  var live = charBox(b, '现在真正在用的工具');
-  TOOLS.forEach(function (t) {
-    charRow(live, t.name, state.selectedTool === t.tool ? '使用中' : (toolLocked(t) ? '未解锁' : '在快捷栏 ' + t.slot), 'char-val muted');
-  });
-  charRow(live, '钢制斧镐', e.tools ? '已升级：采集力度翻倍' : '尚未升级（伐木屋 → 小镇铁匠）');
-  charNote(live, '这些是农用工具，不是武器。营地军需采购、武器架陈设和钢制斧镐都不算个人刀剑系统。');
-
-  var w = charBox(b, '个人刀剑（R2 待开放）');
-  charRow(w, '状态', '尚未开放：还没有免费自卫训练，也没有武器装备槽', 'char-val');
-  charNote(w, '计划路径是小镇可追踪的"第一次自卫训练"——可免费试刀试剑，完成后任选旧刀或旧剑带走。' +
-    '它不要求城市通行证、边境委任或先完成湿地与水利全链。武器放在独立装备槽，不会替换第六格镐子，也不要求农夫丢掉唯一工具。');
-  var chain = el('div', 'char-chain');
-  CHAR_WEAPON_CHAIN.forEach(function (c) {
-    var row = el('div', 'row between char-chain-row');
-    row.appendChild(el('span', 'char-chain-stage', c.stage + '（伤害 ' + c.dmg + '）'));
-    row.appendChild(el('span', 'char-chain-cost', c.cost));
-    chain.appendChild(row);
-    chain.appendChild(el('div', 'char-chain-gate', c.gate));
-  });
-  w.appendChild(chain);
-  charNote(w, '剑：0.70 秒间隔、1.00 伤害系数、约 1.3 格较窄前方范围；刀：0.60 秒、0.85 系数、约 1.1 格较宽范围。' +
-    '顺序升级保留名字与纪念外观；失败不扣费，没有强化失败、耐久或随机词条。');
-  charNote(w, '第一段危险体验优先做森林／旧矿山短支路：有可见警告、训练后的尝试空间、一个有预兆的敌人或环境危险，以及撤回安全区的方法。' +
-    '基础遭遇用旧武器就能处理，升级不是入场税。');
+    '当前最多取得 3 点，需要选择或洗点体验不同路线。');
 };
 
 CHAR_BUILD.history = function (b) {
@@ -11768,10 +12529,19 @@ CHAR_BUILD.history = function (b) {
   });
   charRow(career, '工程章节', '阶段 ' + eng.stage + ' / 4' +
     (eng.post ? ' · 岗位 ' + eng.post : '') + (eng.incident ? ' · 已处置事故' : ''));
-  charRow(career, '工程预算', eng.budget > 0 ? eng.budget + ' 金（项目单独记账）' : '尚未拨付', 'char-val muted');
+  /* 联系人、认证范围、材料来源和下一步统一在这里显示，不让人翻旧对白找责任 */
+  charRow(career, '河湾闸门工程', ENG_PHASE_NAMES[engPhaseIndex(engProject())] + ' / ' + ENG_PHASE_NAMES.length +
+    ' · ' + (ENG_SCHEMES[engProject().scheme] ? ENG_SCHEMES[engProject().scheme].name : '方案未定'), 'char-val muted');
+  charRow(career, '认证范围', engProject().practice
+    ? (professionalLifeState().waterworks.scope === 'works' ? '可主持公共工程（已验收）' : '基础工程：勘测／施工／验收')
+    : '尚未取得基础工程认证', 'char-val muted');
+  charRow(career, '工程账本', '机构拨付 ' + engProject().funds.granted + ' 金 · 自愿补记 ' + engProject().funds.donated +
+    ' 金 · 已支出 ' + engProject().funds.spent + ' 金（与个人钱包 ' + state.coins + ' 金分开）', 'char-val muted');
+  charRow(career, '工程联系人', '诺娅（水利站）· 马丁（磨坊）· 柯里（议事屋）；材料走采场—测量棚—河港—水利站', 'char-val muted');
+  charRow(career, '下一步', engNextStepText(), 'char-val muted');
   charRow(career, '授权分层', '到访 ' + (p.passes.visit ? '有' : '无') + ' · 接任务 ' + (p.passes.commission ? '有' : '无') +
     ' · 指挥 ' + (p.passes.command ? '有' : '无'), 'char-val muted');
-  charNote(career, '工程样板目前止于签署、事故两分支、任职、一次预算和说明会；施工委托与真实预警尚未完成（R3 补齐）。');
+  charNote(career, '河湾闸门已打通勘测 → 方案 → 材料 → 施工 → 跨日试运行 → 验收 → 养护的完整闭环；真实预警与失败复查仍待 R3-C。');
 
   var mil = charBox(b, '军队记录（机构授权，不等于个人战力）');
   charRow(mil, '登记', m.registered ? '已登记' : '未登记');
@@ -14031,6 +14801,12 @@ function activateInteractable(it) {
   if(it.kind==='mineGate'){openExploreSite('mine');return;}
   if(it.kind==='lumberHut'){openExploreSite('hut');return;}
   if(it.kind==='mineStairs'){exploreStairs(it.next);return;}
+  /* 白蔷薇宫城：大楼梯、宫苑门与尚未开放的区域。
+     楼梯是「按 E 才走」的交互物，不是踩上去就触发的出口，
+     所以落点可以和触发格彻底分开，刚上楼不会自动弹回。 */
+  if(it.kind==='palaceStair'){usePalaceStair(it);return;}
+  if(it.kind==='palaceGate'){usePalaceGate(it);return;}
+  if(it.kind==='palaceLocked'){openPalaceLocked(it);return;}
   if(it.kind==='mineWork'){openMineWork(it);return;}
   if(it.kind==='millGate'){openMillGate(it);return;}
   if(it.kind==='millWheel'){openMillWheel(it);return;}
@@ -15755,6 +16531,17 @@ function drawScene(g, dt) {
       }
     }
   }
+  /* 宫苑同理：主宫与门楼都是高立面，站在南边时常规跟随会把建筑顶出画面。
+     玩家越靠近中轴与建筑，镜头越往上偏；同样是平滑偏置，不动坐标系与点击映射。 */
+  if (state.sceneId === 'palace_grounds') {
+    var axisDx = Math.abs(ppos.x - 60 * TILE);
+    var palaceFocus = clamp(1 - axisDx / (TILE * 26), 0, 1) *
+      clamp((96 * TILE - ppos.y) / (TILE * 34), 0, 1);
+    if (palaceFocus > 0) {
+      var palaceFramedY = clamp(ppos.y - VIEW_H + TILE / 2 + TILE * 6, 0, maxY);
+      tY += (palaceFramedY - tY) * palaceFocus;
+    }
+  }
   if (!cam.init) { cam.x = tX; cam.y = tY; cam.init = true; }
   else {
     var f = Math.min(1, dt * 12);
@@ -15857,6 +16644,12 @@ function drawScene(g, dt) {
   (map.buildings || []).forEach(function (b) {
     var visualTop=b.y+b.h-Math.ceil((b.visualHeight||64)/TILE);
     if(b.x+b.w<R.x0||b.x>R.x1||b.y+b.h<R.y0||visualTop>R.y1)return;
+    /* 宫苑用专用立面：玩家从城市主门进来第一眼就要分辨出主宫、翼楼、
+       旧堡、礼拜堂与门楼，通用 drawHouse 认不出来。 */
+    if (state.sceneId === 'palace_grounds') {
+      ents.push({ z: (b.y + b.h) * TILE, f: b.kind === 'castle' ? drawWhiteRoseCastle : drawPalaceBuilding, a: [b.x * TILE, b.door.y * TILE, b.w * TILE, b] });
+      return;
+    }
     ents.push({ z: (b.y + b.h) * TILE, f: state.sceneId==='city'?drawCityBuilding:(state.sceneId==='mill_village'||state.sceneId==='meadow')?drawMillLifeBuilding:drawHouse, a: state.sceneId==='city'?[b.x,b.y,b]:[b.x, b.y, b.w, b.h, b.kind] });
   });
   (INTERACTABLES[state.sceneId] || []).forEach(function (it) {
@@ -15869,6 +16662,18 @@ function drawScene(g, dt) {
       ents.push({z:it.y*TILE+TILE,f:function(g,x,y,work){px(g,x*TILE+4,y*TILE+3,8,12,work==='pump'?'#717D70':'#B6AA7D');px(g,x*TILE+6,y*TILE+5,4,6,work==='pump'?'#5C9BA4':'#466B7B');px(g,x*TILE+2,y*TILE+14,12,2,'#4E5049');},a:[it.x,it.y,it.work]});
     } else if(it.kind==='treasure'){ents.push({z:it.y*TILE+TILE,f:function(g,x,y){px(g,x*TILE+2,y*TILE+5,12,9,'#895F38');px(g,x*TILE+2,y*TILE+5,12,3,'#BD9257');px(g,x*TILE+7,y*TILE+7,2,4,'#E5C775');},a:[it.x,it.y]});
     } else if(it.kind==='mineStairs'||it.kind==='mineGate'||it.kind==='forestGate'){ents.push({z:it.y*TILE+TILE,f:function(g,x,y){px(g,x*TILE,y*TILE,16,16,'#544A3D');px(g,x*TILE+3,y*TILE+2,10,14,'#272C32');for(var i=0;i<4;i++)px(g,x*TILE+4,y*TILE+5+i*3,8,1,'#A8A18C');},a:[it.x,it.y]});
+    } else if(it.kind==='palaceStair'){
+      /* 楼梯面已由 CITY_PROPS.stairs 烘进房间画布；这里补台阶口的木牌与上下箭头，
+         让「上楼／下楼」在画面上可读，而不只是一条提示文字。 */
+      ents.push({z:it.y*TILE+TILE+1,f:function(g,x,y,dir){
+        px(g,x*TILE-10,y*TILE-22,36,15,'#3E4A3C');px(g,x*TILE-8,y*TILE-20,32,11,'#5C6B52');
+        g.font='bold 9px sans-serif';g.textAlign='center';g.fillStyle='#F0D990';
+        var txt=dir==='up'?'↑ 上楼':dir==='down'?'↓ 下楼':'◇ 楼层';
+        g.fillText(txt,x*TILE+8,y*TILE-11);g.textAlign='left';
+        px(g,x*TILE+4,y*TILE-26,16,3,'#C0A15E');
+      },a:[it.x,it.y,it.dir]});
+    } else if(it.kind==='palaceLocked'){
+      ents.push({z:it.y*TILE+TILE,f:function(g,x,y){px(g,x*TILE+3,y*TILE+4,10,12,'#6E5A41');px(g,x*TILE+2,y*TILE+3,12,3,'#8B7355');px(g,x*TILE+7,y*TILE+8,2,3,'#C2AE7A');},a:[it.x,it.y]});
     } else if(it.kind==='cityGate'){ents.push({z:it.y*TILE+TILE,f:drawCityGateSite,a:[it.x,it.y]});
     } else if(it.kind==='meadowTrough'||it.kind==='meadowShed'||it.kind==='meadowShear'||it.kind==='meadowVet'){
       ents.push({z:it.y*TILE+TILE,f:function(g,x,y,kind){
@@ -15952,7 +16757,10 @@ function drawScene(g, dt) {
   if(state.sceneId==='city')drawCityCrowd(ents,R);
 
 
-  if(state.sceneId.indexOf('city_')===0)drawCityInterior(g,map);
+  /* roomDef 才是「城市房间式室内」的真实判据：宫殿楼层用 palace_ 前缀，
+     但同样要走 cityRoomCanvas 才能有地板、墙裙与 CITY_PROPS 陈设。
+     改成 roomDef 是严格超集，所有 city_* 场景本来就都带 roomDef。 */
+  if(state.sceneId.indexOf('city_')===0||map.roomDef)drawCityInterior(g,map);
   else if (map.indoor) drawIndoorDoors(g, map);
   ents.sort(function(a,b){return a.z-b.z;});
   ents.forEach(function (e) { e.f(g, e.a[0], e.a[1], e.a[2], e.a[3], e.a[4]); });
@@ -16031,6 +16839,7 @@ function drawScene(g, dt) {
   }
   // 钓鱼
   drawToolRange(g, ox, oy);
+  drawPersonal(g, ox, oy);
   drawFishingHud(g);
 }
 
@@ -16070,6 +16879,8 @@ function onKeyDown(e) {
     e.preventDefault(); return;
   }
   if (e.repeat) return;
+  if (k === 'q') { e.preventDefault(); personalToggle(); return; }
+  if (k === personalState().dodgeKey) { e.preventDefault(); personalDodge(); return; }
   if (k === ' ') {
     e.preventDefault();
     var F = Game.fishing;
@@ -16077,6 +16888,7 @@ function onKeyDown(e) {
       if (F.phase === 'bite') startCatch();
       else if (F.phase === 'catch') F.holding = true;
     } else {
+      if (personalCombat.mode) { personalAttack(); return; }
       var f = facingTile();
       if (useTool(state.selectedTool, f[0], f[1])) Game.swingT = 0.28;
     }
@@ -16120,13 +16932,14 @@ function clearKeys() {
 /* 碰撞：分轴检测将要进入的格子，避免斜向卡死（corner stick）
    只检测脚底所在格；若再往上取一格，脚踩在格子边界时会误判成撞墙而卡住。 */
 function canMoveX(nx) {
-  return !isSolid(state.sceneId, Math.floor(nx / TILE), Math.floor(Game.ppos.y / TILE));
+  return !isSolid(state.sceneId, Math.floor(nx / TILE), Math.floor(Game.ppos.y / TILE)) && personalCanApproach(nx,Game.ppos.y);
 }
 function canMoveY(ny) {
-  return !isSolid(state.sceneId, Math.floor(Game.ppos.x / TILE), Math.floor(ny / TILE));
+  return !isSolid(state.sceneId, Math.floor(Game.ppos.x / TILE), Math.floor(ny / TILE)) && personalCanApproach(Game.ppos.x,ny);
 }
 
 function tickPlayer(dt) {
+  if (personalCombat.stun > 0) { Game.moving = false; return; }
   if (timePaused() || sceneSwitch.busy) { Game.moving = false; return; }
   var dx = 0, dy = 0;
   var up = keys.ArrowUp || keys.w, dn = keys.ArrowDown || keys.s;
@@ -16317,6 +17130,7 @@ function frame(ts) {
   clock += dt;
   if (Game.swingT > 0) Game.swingT = Math.max(0, Game.swingT - dt);
 
+  tickPersonal(dt);
   tickPlayer(dt);
   tickNpc(dt);
   tickAnimals(dt);
@@ -16486,6 +17300,9 @@ function bindInput() {
   $('#btnCharacter').onclick = function () { if (UI.window && UI.window.id === 'character') closeWindow(); else openCharacter(); };
   $('#touchChar').onclick = function () { if (UI.window && UI.window.id === 'character') closeWindow(); else openCharacter(); };
   $('#btnRecords').onclick = function () { UI.window&&UI.window.id==='workrecords'?closeWindow():openWorkRecords(); };
+  /* 宫城楼层牌：宫城场景常驻，点击打开楼层导览。 */
+  $('#floorTag').onclick = function () { openPalaceGuideChip(); };
+  refreshFloorTag();
   $('#touchUse').addEventListener('pointerdown', function (e) {
     e.preventDefault(); Audio2.unlock();
     var F = Game.fishing;
@@ -16875,12 +17692,14 @@ function normalizeWetlandLife(raw){var r=raw&&typeof raw==='object'?raw:{},w=new
   if(!w.causeFound)w.habitat=null;
   return w;
 }
-function newProfessionalLife(){return {vineyard:{plan:null,planDay:0,harvestDay:0,pressDay:0,delayed:false,harvested:0,pressed:0,product:null,shipped:0},clinic:{diagnosed:false,sampleVerified:false,receivedJuice:false,medicine:0,patientDay:0,recovered:false},port:{manifestChecked:false,choice:null,shipment:null,settled:false,shipmentDay:0,deliveries:0},quarry:{surveyed:false,face:null,props:false,extracted:0,lastExtractDay:0,cut:0},waterworks:{level:0,repair:null,receivedStone:false,millOpinion:false,meadowOpinion:false,portOpinion:false,allocation:null,testDay:0,certified:false},careers:{horticulture:0,medicine:0,trade:0,engineering:0},watershedContract:0,trust:0,access:{vineyard:false,clinic:false,port:false,quarry:false,waterworks:false},
+function newProfessionalLife(){return {vineyard:{plan:null,planDay:0,harvestDay:0,pressDay:0,delayed:false,harvested:0,pressed:0,product:null,shipped:0},clinic:{diagnosed:false,sampleVerified:false,receivedJuice:false,medicine:0,patientDay:0,recovered:false},port:{manifestChecked:false,choice:null,shipment:null,settled:false,shipmentDay:0,deliveries:0},quarry:{surveyed:false,face:null,props:false,extracted:0,lastExtractDay:0,cut:0},waterworks:{level:0,repair:null,receivedStone:false,millOpinion:false,meadowOpinion:false,portOpinion:false,allocation:null,testDay:0,certified:false,scope:''},projects:{},careers:{horticulture:0,medicine:0,trade:0,engineering:0},watershedContract:0,trust:0,access:{vineyard:false,clinic:false,port:false,quarry:false,waterworks:false},
 /* 第七版规划「给职业提供不同的进入路线」：公共工程链之外再开三条替代入口，
    免得想做商人或巡林人的玩家必须先走完一整段公共工程。 */
 routes:{engineering:0,trade:0,patrol:0},rookie:{engineering:0,trade:0,patrol:0},
 /* 到访、接任务、指挥军队三层授权分开：能进边城做生意不等于能指挥军队。 */
 passes:{visit:false,commission:false,command:false}};}
+/* 地区服务只读这份由项目记录写回的镜像：验收后是工程方案，验收前只可能是
+   事故期间的应急处置。打开面板、重载或重复签字都不会让它叠加。 */
 function professionalWaterPolicy(){var w=professionalLifeState().waterworks;return w.certified?w.allocation:null;}
 function professionalShippingMinutes(base){var p=professionalLifeState(),policy=professionalWaterPolicy();return Math.max(20,base+(policy==='irrigation'?20:policy==='navigation'?-10:0)+(p.port.choice==='claim'?10:0));}
 function normalizeProfessionalLife(raw){var d=newProfessionalLife(),r=raw&&typeof raw==='object'?raw:{};function n(v,max){return Number.isFinite(v)?clamp(Math.floor(v),0,max):0;}
@@ -16888,19 +17707,23 @@ function normalizeProfessionalLife(raw){var d=newProfessionalLife(),r=raw&&typeo
   a=r.clinic||{};d.clinic={diagnosed:!!a.diagnosed,sampleVerified:!!a.sampleVerified,receivedJuice:!!a.receivedJuice,medicine:n(a.medicine,12),patientDay:n(a.patientDay,100000),recovered:!!a.recovered};
   a=r.port||{};d.port={manifestChecked:!!a.manifestChecked,choice:['claim','reship'].indexOf(a.choice)>=0?a.choice:null,shipment:['quarry','clinic','vineyard','waterworks','neighbor'].indexOf(a.shipment)>=0?a.shipment:null,settled:!!a.settled,shipmentDay:n(a.shipmentDay,100000)};
   a=r.quarry||{};d.quarry={surveyed:!!a.surveyed,face:['stable','carbonate'].indexOf(a.face)>=0?a.face:null,props:!!a.props,extracted:n(a.extracted,100000),lastExtractDay:n(a.lastExtractDay,100000),cut:n(a.cut,100000)};
-  a=r.waterworks||{};d.waterworks={level:clamp(n(a.level,3),0,3),repair:['irrigation','navigation','pending'].indexOf(a.repair)>=0?a.repair:null,receivedStone:!!a.receivedStone,millOpinion:!!a.millOpinion,meadowOpinion:!!a.meadowOpinion,portOpinion:!!a.portOpinion,allocation:['irrigation','navigation'].indexOf(a.allocation)>=0?a.allocation:null,testDay:n(a.testDay,100000),certified:!!a.certified};
+  a=r.waterworks||{};d.waterworks={level:clamp(n(a.level,3),0,3),repair:['irrigation','navigation','pending'].indexOf(a.repair)>=0?a.repair:null,receivedStone:!!a.receivedStone,millOpinion:!!a.millOpinion,meadowOpinion:!!a.meadowOpinion,portOpinion:!!a.portOpinion,allocation:['irrigation','navigation'].indexOf(a.allocation)>=0?a.allocation:null,testDay:n(a.testDay,100000),certified:!!a.certified,scope:['survey','works'].indexOf(a.scope)>=0?a.scope:''};
   d.watershedContract=n(r.watershedContract,3);
   if(!d.quarry.surveyed){d.quarry.face=null;d.quarry.props=false;d.quarry.extracted=0;d.quarry.cut=0;}
-  if(!d.waterworks.repair){d.waterworks.allocation=null;d.waterworks.testDay=0;d.waterworks.certified=false;}
-  if(!d.waterworks.millOpinion||!d.waterworks.meadowOpinion||!d.waterworks.portOpinion)d.waterworks.allocation=null;
-  if(!d.waterworks.receivedStone&&d.watershedContract<1)d.waterworks.repair=null;
-  if(d.waterworks.certified&&(!d.waterworks.repair||!d.waterworks.allocation||!d.waterworks.receivedStone))d.waterworks.certified=false;
+  /* R3-A：项目记录是唯一的进度事实。raw 里没有项目记录时，这就是一次性的旧档迁移；
+     有记录时下面所有 waterworks 字段都会被覆盖回镜像，两条路径不会同时存在。 */
+  var legacyEng=r.eng||{};
+  d.projects={};d.projects[ENG_PROJECT_ID]=normalizeEngProject(
+    (r.projects&&typeof r.projects==='object')?r.projects[ENG_PROJECT_ID]:null,
+    {level:d.waterworks.level,receivedStone:d.waterworks.receivedStone,millOpinion:d.waterworks.millOpinion,
+     meadowOpinion:d.waterworks.meadowOpinion,portOpinion:d.waterworks.portOpinion,allocation:d.waterworks.allocation,
+     repair:d.waterworks.repair,certified:d.waterworks.certified,testDay:d.waterworks.testDay,
+     choice:legacyEng.choice,budget:Number.isFinite(legacyEng.budget)?legacyEng.budget:0});
   a=r.careers||{};['horticulture','medicine','trade','engineering'].forEach(function(k){d.careers[k]=n(a[k],5);});
   d.trust=n(r.trust,100);
   a=r.access||{};Object.keys(d.access).forEach(function(k){d.access[k]=!!a[k];});
   if(d.careers.horticulture)d.access.vineyard=true;if(d.clinic.diagnosed)d.access.clinic=true;
   if(d.port.manifestChecked)d.access.port=true;if(d.quarry.surveyed)d.access.quarry=true;
-  if(d.waterworks.repair)d.access.waterworks=true;
   /* 三条替代入口的进度按真实事件累计，不写死；旧档缺字段时从 0 起。 */
   a=r.rookie||{};d.rookie={engineering:n(a.engineering,5),trade:n(a.trade,6),patrol:n(a.patrol,5)};
   a=r.routes||{};d.routes={engineering:n(a.engineering,9),trade:n(a.trade,9),patrol:n(a.patrol,9)};
@@ -16911,18 +17734,22 @@ function normalizeProfessionalLife(raw){var d=newProfessionalLife(),r=raw&&typeo
   if(d.routes.engineering>=2||d.routes.trade>=2||d.routes.patrol>=2)d.passes.visit=true;
   if(d.routes.engineering>=4||d.routes.trade>=4||d.routes.patrol>=4)d.passes.commission=true;
   /* 工程师章节：阶段、事故、岗位与人物记忆都随存档保存 */
-  var eg=r.eng||{};
+  var eg=legacyEng, pj=d.projects[ENG_PROJECT_ID];
   d.eng={stage:(Number.isFinite(eg.stage)?Math.max(0,Math.min(4,Math.floor(eg.stage))):0),post:String(eg.post||''),incident:['field','channel'].indexOf(eg.incident)>=0?eg.incident:'',
-    hearing:['irrigation','navigation'].indexOf(eg.hearing)>=0?eg.hearing:'',choice:['field','channel'].indexOf(eg.choice)>=0?eg.choice:'',budget:n(eg.budget,150),budgetGranted:!!eg.budgetGranted||eg.budget>0||!!eg.hearing,
+    hearing:pj.scheme?ENG_SCHEMES[pj.scheme].alloc:'',choice:['field','channel'].indexOf(eg.choice)>=0?eg.choice:'',
+    budget:pj.funds.granted,budgetGranted:!!eg.budgetGranted||pj.funds.granted>0,
     memories:(eg.memories&&typeof eg.memories==='object')?JSON.parse(JSON.stringify(eg.memories)):{}};
-  /* 自洽：没工程证书就不可能越过见习；没处置事故不可能有岗位；没岗位不可能主持说明会 */
-  if(!d.waterworks||!d.waterworks.certified){d.eng.stage=0;d.eng.post='';d.eng.incident='';d.eng.hearing='';d.eng.budget=0;}
+  /* 自洽：没基础工程认证就不可能越过见习；没处置事故不可能有岗位；没岗位不可能主持说明会 */
+  if(engPhaseIndex(pj)<1){d.eng.stage=0;d.eng.post='';d.eng.incident='';d.eng.hearing='';d.eng.budget=0;d.eng.budgetGranted=false;}
   else{
     if(d.eng.stage>=2&&!d.eng.incident){d.eng.stage=1;d.eng.post='';d.eng.hearing='';}
     if(d.eng.stage>=3&&!d.eng.post){d.eng.stage=2;d.eng.hearing='';}
   }
   if(d.eng.stage<3){d.eng.post='';d.eng.budget=0;d.eng.budgetGranted=false;d.eng.hearing='';}
   ['noya','martin','council'].forEach(function(who){d.eng.memories[who]=Array.isArray(d.eng.memories[who])?d.eng.memories[who].filter(function(x){return typeof x==='string';}).slice(-20):[];});
+  /* 最后一件事：把项目记录写回水利站镜像。到这里 access 已经完全填好，
+     不会再被 r.access 覆盖，也不会有第二个写入方向。 */
+  deriveWaterworksFromProject(d,d.waterworks);
   return d;
 }
 function newMilitaryLife(){return {registered:false,trainingDays:[],qualification:0,rank:'resident',commandLimit:0,appointmentDay:0,unit:{id:'frontier_detail',count:0,wounded:0,training:0,equipment:0,morale:0,supply:0,discipline:0,scene:'camp'},campaign:{active:false,startedDay:0,deadlineDay:0,stage:0,scouted:null,scoutedDay:0,prepared:null,preparedDay:0,battle:null,battleDay:0,reported:false,result:null},battleRecords:[],neighbor:{opened:false,oldroadVerified:false,caseFound:false,evidence:0,choice:null,settled:false,signedDay:0,tradeReceived:false,localContract:false},institutionFund:0,followUpDay:0};}
@@ -17001,7 +17828,24 @@ function drawExtendedGround(g,R){var sc=state.sceneId,m=MAPS[sc];if(!m||!m.extSt
   }
   if(sc==='vineyard')for(var row=0;row<7;row++){var yy=11+row*2;if(yy<R.y0||yy>R.y1)continue;for(var xx=5;xx<40;xx+=5){if(xx<R.x0||xx>R.x1)continue;px(g,xx*TILE,yy*TILE,2,TILE,'#80664A');px(g,(xx+2)*TILE,yy*TILE+5,3,4,'#587347');px(g,(xx+3)*TILE,yy*TILE+9,3,3,professionalLifeState().vineyard.harvested?'#9C6476':'#7C4B62');}}
   if(sc==='quarry')for(var tier=0;tier<4;tier++){var yy=7+tier*5;if(yy<R.y0||yy>R.y1)continue;px(g,4*TILE,yy*TILE,31*TILE,2,'#858477');px(g,5*TILE,yy*TILE+2,27*TILE,1,'#B8B09B');}
-  if(sc==='waterworks'){var v=professionalLifeState().waterworks.level;for(var y=4;y<16;y++)for(var x=23;x<36;x++){if(x<R.x0||x>R.x1||y<R.y0||y>R.y1||m.t[x][y]!==T_WATER)continue;px(g,x*TILE,y*TILE,TILE,TILE,v>1?'#598A94':'#739FA0');}}
+  if(sc==='waterworks'){
+    var v=professionalLifeState().waterworks.level,pj=professionalLifeState().projects[ENG_PROJECT_ID];
+    for(var y=4;y<16;y++)for(var x=23;x<36;x++){if(x<R.x0||x>R.x1||y<R.y0||y>R.y1||m.t[x][y]!==T_WATER)continue;px(g,x*TILE,y*TILE,TILE,TILE,v>1?'#598A94':'#739FA0');}
+    /* 交付后才出现的闸门实体：检修步道口的旧闸板换成按方案施工的新闸。
+       进度只读项目记录，所以反复打开面板或重读存档都不会叠加出第二道闸。 */
+    if(pj&&pj.phase==='accepted'){
+      var bal=pj.scheme==='balanced';
+      for(var gy=14;gy<=17;gy++){
+        if(23<R.x0||23>R.x1||gy<R.y0||gy>R.y1)continue;
+        px(g,23*TILE,gy*TILE,TILE,TILE,bal?'#6E8C93':'#7C8F84');
+        px(g,23*TILE,gy*TILE+3,TILE,2,bal?'#D8D2BA':'#C9C2A6');
+      }
+      if(22>=R.x0&&22<=R.x1&&14>=R.y0&&17<=R.y1){
+        px(g,22*TILE,14*TILE,1,4*TILE,'#8A8778');
+        for(var b=0;b<4;b++)px(g,21*TILE,14*TILE+b*TILE,1*TILE,2,bal?'#B9AE92':'#A9A48E');
+      }
+    }
+  }
 }
 function addExtendedEntities(g,ents,R){var sc=state.sceneId,m=MAPS[sc];if(!m||!m.extStyle)return;
   (INTERACTABLES[sc]||[]).forEach(function(it){if(it.x<R.x0||it.x>R.x1||it.y<R.y0||it.y>R.y1)return;
@@ -17100,10 +17944,13 @@ var PROFESSION_SITES={
   quarry:{scene:'quarry',x:18,y:18,label:'玛尔的采区调查点'},
   shed:{scene:'quarry_shed',x:8,y:7,label:'测量台与石料验收架'},
   water:{scene:'waterworks_control',x:8,y:6,label:'水位记录与控制台'},
-  gauge:{scene:'waterworks',x:20,y:18,label:'堤坝水尺与检修口'}
+  gauge:{scene:'waterworks',x:20,y:18,label:'堤坝水尺与检修口'},
+  /* R3：勘测与施工都在坝体检修步道上有真实位置，不能在控制室里远程点掉 */
+  riverbay_east:{scene:'waterworks',x:21,y:20,label:'东岸坡脚'},
+  riverbay_silt:{scene:'waterworks',x:21,y:16,label:'下游淤积段'},
+  riverbay_pit:{scene:'waterworks',x:22,y:14,label:'闸基工作面'}
 };
-Object.keys(PROFESSION_SITES).forEach(function(k){var p=PROFESSION_SITES[k];extendedSite(p.scene,p.x,p.y,p.label,'profession:'+k);});
-[['mill_village',36,18,'vineyard','庄园葡萄园入口'],['town',4,22,'clinic','白鸢医舍入口'],
+Object.keys(PROFESSION_SITES).forEach(function(k){var p=PROFESSION_SITES[k];extendedSite(p.scene,p.x,p.y,p.label,'profession:'+k);});[['mill_village',36,18,'vineyard','庄园葡萄园入口'],['town',4,22,'clinic','白鸢医舍入口'],
  ['riverside',7,10,'port','下游河港入口'],['mine1',2,14,'quarry','石灰采场入口'],
  ['mill_village',4,15,'waterworks','水利站乡道入口']
 ].forEach(function(p){extendedGate(p[0],p[1],p[2],p[3],p[4]);});
@@ -17145,12 +17992,13 @@ function extendedGateAllowed(key){var p=professionalLifeState(),w=wetlandLifeSta
   /* 河港：湿地记录，或商旅路线完成两次本地运输后拿到介绍信 */
   if(key==='port')return !!w.causeFound||p.routes.trade>=2;
   if(key==='quarry')return !!e.mine||p.routes.engineering>=1;
-  /* 水利：工程路线（采场+河港+磨坊），或工程路线自身走通；贸易路线也可引荐 */
-  if(key==='waterworks')return !!(p.quarry.surveyed&&p.port.manifestChecked&&millLifeState().inspected)||p.routes.engineering>=2||p.routes.trade>=4;
+  /* 水利：矿山排水或磨坊维修任一条实践验收通过即可进场，两条路线都能解释；
+     不再要求采场、河港、磨坊三份同时到手，避免逼玩家先跑完全图。 */
+  if(key==='waterworks')return !!engPracticeRoute()||!!(p.quarry.surveyed&&p.port.manifestChecked)||p.routes.engineering>=2||p.routes.trade>=4;
   /* 关口与边境营地：三条路线任一走通即可到访，不再强制先完成整段公共工程 */
-  if(key==='cloud_pass')return !!(p.waterworks.certified&&p.trust>0)||p.passes.visit;
+  if(key==='cloud_pass')return (projectAcceptedFlag(p)&&p.trust>0)||p.passes.visit;
   /* 接任务需要第二层授权；指挥军队需要第三层，只看军事登记与委任 */
-  if(key==='border_camp')return !!(p.waterworks.certified)||p.passes.commission||professionalCanCommand();
+  if(key==='border_camp')return projectAcceptedFlag(p)||p.passes.commission||professionalCanCommand();
   if(key==='old_road')return !!m.campaign.active||!!m.campaign.reported||p.passes.commission;
   if(key==='neighbor')return !!(m.campaign.reported&&m.neighbor.oldroadVerified)||p.passes.visit;
   return false;
@@ -17171,7 +18019,7 @@ function extendedGateReason(key){var p=professionalLifeState(),w=wetlandLifeStat
   if(key==='clinic')return '先在湿地查明水鸟减少原因并完成葡萄园首批采收；或先走巡林路线，医舍会按巡护记录收人。';
   if(key==='port')return '先取得湿地巡护记录；或先完成两次本地运输，让船长出具商旅介绍信。';
   if(key==='quarry')return '先修复森林东北的旧矿山入口；或先走工程路线，工头会先带你下坑看裂隙。';
-  if(key==='waterworks')return '先调查石灰采场、核验河港货单并完成磨坊验收；或让工程／商旅路线替你担保一次引荐。';
+  if(key==='waterworks')return '先验收矿山第二层排水或风铃磨坊水轮 —— 任一条走通就能进场；也可以先核验河港货单。';
   if(key==='cloud_pass')return '先完成水利站跨地点工程合同并取得工程资历；或让工程、商旅、巡林三条路线中的任意一条带你过关口。';
   if(key==='border_camp')return '先完成水利站工程合同；或先拿到一条路线的正式接任务授权，营地才受理巡防登记。';
   if(key==='old_road')return '先接受云峰关口的巡路任务；或先取得一条路线的接任务授权，古道站才会对你开放。';
@@ -17321,18 +18169,20 @@ function openProfessionSite(site){
       b.appendChild(el('p',null,'采区：'+(q.face==='stable'?'稳定东侧':'石灰层')+'；支护 '+(q.props?'已完成':'未完成')+'；累计采出 '+q.extracted+'；切割验收 '+q.cut+'。'));
     }
     if(site==='shed'){b.appendChild(el('p',null,'石料编号要和采区测量单一致。合格石料可经河港转运到水利站，不接受背包里未切割的原石。'));if(q.extracted>=4)extendedWorkButton(b,'shed','切割工程石料 ×3 · 石灰岩 ×4',{need:{limestone:4},out:'stone_block',qty:3,minutes:35,energy:4,guard:function(){return q.extracted>=(q.cut/3+1)*4;}},function(){q.cut+=3;p.careers.engineering=Math.max(p.careers.engineering,1);});}
-    if(site==='gauge'||site==='water'){
-      b.appendChild(el('p',null,'水位 '+(ww.level||'未读')+' 级；天气 '+(state.weather.today==='rain'?'降雨':'晴')+'；闸件 '+(ww.repair?'已修':'待修')+'。'));
-      if(!ww.level&&site==='water')b.appendChild(el('p','req-chip','先去室外坝顶水尺读取水位。'));
-      if(!ww.level&&site==='gauge')extendedWorkButton(b,'gauge','读水尺并取样 · 15分钟',{out:'water_sample',qty:1,minutes:15,energy:1,guard:function(){return !ww.level;}},function(){ww.level=state.weather.today==='rain'?3:2;});
-      if(portS.shipment==='waterworks'&&!portS.settled&&invCount('cargo_manifest')>0)extendedWorkButton(b,site==='water'?'water':'gauge','签收石料运单 · 消耗核验运单',{need:{cargo_manifest:1},minutes:15,guard:function(){return portS.shipment==='waterworks'&&!portS.settled;}},function(){portS.settled=true;ww.receivedStone=true;p.watershedContract=1;bumpCareer('trade',2);bumpRoute('trade');});
-      if(site==='water'&&portS.settled&&p.watershedContract===1&&ww.receivedStone&&!ww.repair)extendedWorkButton(b,'water','安装闸件并封存石料 · 铁锭 ×1',{need:{iron_ingot:1},minutes:45,energy:5,guard:function(){return p.watershedContract===1&&portS.settled&&ww.level>0&&!ww.repair;},reason:'先在坝顶水尺读取水位并签收石料运单。'},function(){ww.repair='pending';p.watershedContract=2;p.access.waterworks=true;});
-      if(site==='water'&&ww.repair==='pending'&&ww.millOpinion&&ww.meadowOpinion&&ww.portOpinion&&!ww.allocation){
-        [['irrigation','优先灌溉 · 保住田水，限制大型船只'],['navigation','优先通航 · 保持货船水深，农田分时供水']].forEach(function(o){extendedWorkButton(b,'water',o[1],{minutes:20,guard:function(){return ww.repair==='pending'&&ww.millOpinion&&ww.meadowOpinion&&ww.portOpinion&&!ww.allocation;}},function(){ww.allocation=o[0];ww.testDay=state.totalDay;});});
+    if(site==='gauge'||site==='water'||site==='riverbay_east'||site==='riverbay_silt'||site==='riverbay_pit'){
+      var pj=engProject();
+      b.appendChild(el('p','work-summary','河湾闸门工程 · '+(ENG_PHASE_NAMES[engPhaseIndex(pj)])+' · '+ENG_PHASE_TEXT[pj.phase]));
+      b.appendChild(el('p',null,'水位 '+(ww.level?ww.level+' 级':'未读')+'；今天 '+(state.weather.today==='rain'?'降雨':'晴')+'；方案 '+(ENG_SCHEMES[pj.scheme]?ENG_SCHEMES[pj.scheme].name:'未定')+'；工序 '+pj.build+'/'+engSchemeBuild(pj).length+'。'));
+      engSurveyPanel(b,pj,site);
+      if(site==='gauge'||site==='water'){
+        /* 石料运单必须在场签收：传送不能代替货物 */
+        if(portS.shipment==='waterworks'&&!portS.settled&&invCount('cargo_manifest')>0)extendedWorkButton(b,site==='water'?'water':'gauge','签收石料运单 · 消耗核验运单',{need:{cargo_manifest:1},minutes:15,guard:function(){return portS.shipment==='waterworks'&&!portS.settled;}},function(){portS.settled=true;pj.stone=true;pj.stoneDay=state.totalDay;deriveWaterworksFromProject(p,p.waterworks);bumpCareer('trade',2);bumpRoute('trade');});
+        engCertPanel(b,pj,site);
+        engMaterialsPanel(b,pj,site);
+        engAcceptPanel(b,pj,site);
       }
-      if(site==='water'&&ww.repair==='pending'&&!(ww.millOpinion&&ww.meadowOpinion&&ww.portOpinion))b.appendChild(el('p','req-chip','还需意见：磨坊 '+(ww.millOpinion?'✓':'未记')+' · 牧场 '+(ww.meadowOpinion?'✓':'未记')+' · 河港 '+(ww.portOpinion?'✓':'未记')+'。'));
-      if(site==='water'&&ww.allocation&&!ww.certified)extendedWorkButton(b,'water','隔夜验收并发放工程证书 · 90金',{minutes:10,guard:function(){return ww.allocation&&state.totalDay>ww.testDay&&!ww.certified;} ,reason:'闸门需运行过一个游戏夜晚后验收。'},function(){ww.certified=true;p.watershedContract=3;bumpCareer('engineering',2);bumpRoute('engineering',2);p.trust=Math.min(100,p.trust+2);bumpCareer('trade');state.coins+=90;});      if(site==='water'&&ww.certified)b.appendChild(el('p','req-chip ok','工程合同完成：石料已从采场经河港运到水利站；'+(ww.allocation==='irrigation'?'优先灌溉：牧场试种田自动供水，磨坊每天至多两批，货运增加20分钟。':'优先通航：货运减少10分钟，磨坊保持原协定额度，牧草晴天仍需人工浇水。')));
-    if(site==='water'&&ww.certified){openEngineeringChapter(b,ww);if(engCareer().stage===1&&!engCareer().incident)openIncidentChoice(b);}
+      if(site==='riverbay_pit')engPitPanel(b,pj);
+      if(engPhaseIndex(pj)>=1){openEngineeringChapter(b,ww);if(engCareer().stage===1&&!engCareer().incident)openIncidentChoice(b);}
     }
     if(site==='opinion_mill'||site==='opinion_meadow'||site==='opinion_port'){
       var flag=site==='opinion_mill'?'millOpinion':site==='opinion_meadow'?'meadowOpinion':'portOpinion',who=site==='opinion_mill'?'磨坊麦田':'石楠牧场';b.appendChild(el('p',null,'把水利站的方案送到'+who+'与航运代表，记录他们愿意接受的供水时段。'));if(!ww[flag])extendedWorkButton(b,site,'记录上下游意见 · 10分钟',{minutes:10,guard:function(){return !ww[flag];}},function(){ww[flag]=true;});
@@ -17648,6 +18498,9 @@ function drawExtendedFurniture(g,f){
 }
 drawMillLifeFurniture=function(g,f){if(!f||!f.extended)return baseDrawMillLifeFurniture(g,f);drawExtendedFurniture(g,f);};
 
+/* 「工程已验收并交付」的单一判定读法：只看项目记录的最终阶段，
+   不再用 certified 这种中途就会为真的字段去代表交付完成。 */
+function projectAcceptedFlag(p){return !!(p&&p.projects&&p.projects[ENG_PROJECT_ID]&&p.projects[ENG_PROJECT_ID].phase==='accepted');}
 function extendedSceneAllowed(s,region){
   if(!s||!s.professionalLife||!s.wetlandLife||!s.militaryLife)return false;
   var p=s.professionalLife,w=s.wetlandLife,m=s.militaryLife,r=p.routes||{},passes=p.passes||{};
@@ -17656,9 +18509,15 @@ function extendedSceneAllowed(s,region){
   if(region==='clinic')return !!w.causeFound&&(p.vineyard.harvested>0||p.access.clinic)||r.patrol>=1;
   if(region==='port')return !!w.causeFound||r.trade>=2;
   if(region==='quarry')return !!(s.exploration&&s.exploration.mine)||r.engineering>=1;
-  if(region==='waterworks')return !!p.quarry.surveyed&&!!p.port.manifestChecked&&!!(s.millLife&&s.millLife.inspected)||r.engineering>=2||r.trade>=4;
-  if(region==='cloud_pass')return !!p.waterworks.certified&&p.trust>0||!!passes.visit;
-  if(region==='border_camp')return !!p.waterworks.certified||!!passes.commission||(m.registered&&MIL_COMMAND_RANKS.indexOf(m.rank)>=0);
+  /* R3：与 extendedGateAllowed 同一套口径 —— 矿山排水或磨坊维修任一实践验收
+     通过即可进场。两处必须同步改，否则门口写一种说法、进不去却是另一种。 */
+  if(region==='waterworks'){
+    var minePractice=!!(s.exploration&&s.exploration.mineWorks&&s.exploration.mineWorks.inspected);
+    var millPractice=!!(s.millLife&&s.millLife.inspected);
+    return minePractice||millPractice||!!(p.quarry.surveyed&&p.port.manifestChecked)||r.engineering>=2||r.trade>=4;
+  }
+  if(region==='cloud_pass')return projectAcceptedFlag(p)&&p.trust>0||!!passes.visit;
+  if(region==='border_camp')return projectAcceptedFlag(p)||!!passes.commission||(m.registered&&MIL_COMMAND_RANKS.indexOf(m.rank)>=0);
   if(region==='old_road')return !!m.campaign.active||!!m.campaign.reported||!!passes.commission;
   if(region==='neighbor')return !!m.campaign.reported&&!!m.neighbor.oldroadVerified||!!passes.visit;
   return true;
@@ -17680,14 +18539,14 @@ normalizeSave=function(raw){
   return s;
 };
 var baseSwitchSceneCDE=doSwitchScene;
-doSwitchScene=function(to,tx,ty){var region=EXTENDED_REGION_BY_SCENE[to];if(region&&!extendedSceneAllowed(state,region)){toast(extendedGateReason(region));return false;}return baseSwitchSceneCDE(to,tx,ty);};
+doSwitchScene=function(to,tx,ty,face){var region=EXTENDED_REGION_BY_SCENE[to];if(region&&!extendedSceneAllowed(state,region)){toast(extendedGateReason(region));return false;}return baseSwitchSceneCDE(to,tx,ty,face);};
 var baseRegisterArrivalCDE=registerArrival;
 registerArrival=function(sceneId){var found=baseRegisterArrivalCDE(sceneId),region=EXTENDED_REGION_BY_SCENE[sceneId];if(region&&extendedSceneAllowed(state,region)){var id=EXTENDED_REGION_NODE[region];if(id&&!travelState().discovered[id]){travelState().discovered[id]=true;markDirty();}if(region==='wetland')wetlandLifeState().visited=true;}return found;};
 var baseDrawWorldAtlasCDE=drawWorldAtlas;
 drawWorldAtlas=function(c){baseDrawWorldAtlasCDE(c);var g=c.getContext('2d');g.save();g.strokeStyle='#B79B68';g.lineWidth=3;g.setLineDash([5,5]);[['mill','vineyard'],['town','clinic'],['riverside','port'],['forest','quarry'],['mill','waterworks'],['wetland','clinic'],['wetland','port'],['quarry','waterworks'],['port','waterworks'],['waterworks','cloud_pass'],['cloud_pass','border_camp'],['cloud_pass','old_road'],['old_road','neighbor']].forEach(function(pair){var a=WORLD_REGIONS.filter(function(r){return r.id===pair[0];})[0],b=WORLD_REGIONS.filter(function(r){return r.id===pair[1];})[0];if(!a||!b)return;g.beginPath();g.moveTo(a.x*6.4,a.y*4);g.lineTo(b.x*6.4,b.y*4);g.stroke();});g.restore();};
 function openExtendedJournal(){var w=wetlandLifeState(),p=professionalLifeState(),m=militaryLifeState();openWindow({id:'extendedjournal',kind:'custom',wide:true,title:'省域、湿地与边境记录',build:function(b){
   b.appendChild(el('p','work-summary','芦苇湿地：'+(w.causeFound?'原因已查明':'调查中')+' · 栖息地 '+(w.habitat==='reeds'?'芦苇浅滩':w.habitat==='open_water'?'浅水溢流口':'待修复')+' · 水鸟 '+w.birdCount+'/'+w.baselineBirdCount+' · 调查 '+w.surveyCount+' 次。'));
-  b.appendChild(el('p','work-summary','职业合同：葡萄园 '+(p.vineyard.harvested?'已采收':'未开放')+' · 医舍 '+(p.clinic.recovered?'已复诊':'进行中')+' · 河港 '+(p.port.choice?'已处理货差':'待核单')+' · 采场 '+(p.quarry.cut?'已切料':'待测量')+' · 水利 '+(p.waterworks.certified?'已验收':'建设中')+'。'));
+  b.appendChild(el('p','work-summary','职业合同：葡萄园 '+(p.vineyard.harvested?'已采收':'未开放')+' · 医舍 '+(p.clinic.recovered?'已复诊':'进行中')+' · 河港 '+(p.port.choice?'已处理货差':'待核单')+' · 采场 '+(p.quarry.cut?'已切料':'待测量')+' · 水利 '+(projectAcceptedFlag(p)?'已验收':'建设中')+'。'));
   b.appendChild(el('p','work-summary','边境记录：巡防 '+(m.registered?'已登记':'未登记')+' · 委任 '+militaryRankLabel()+'（'+m.commandLimit+'人） · 七日任务 '+(m.campaign.reported?'已归档':m.campaign.active?'进行中':'未开始')+' · 古道 '+(m.neighbor.oldroadVerified?'已核验':'待核验')+' · 邻领 '+(m.neighbor.settled?'已协定':'协商中')+'。'));
   b.appendChild(el('p','muted','人物传送只移动玩家。货物按运单交接，部队按实际驻地、委任人数和任务种子结算；调查结论保留来源和日期。'));
 },actions:[{label:'返回游戏',close:true}]});}
@@ -17932,6 +18791,658 @@ function configureIndoorDoors() {
 configureIndoorDoors();
 
 
+/* ============================================================
+   白蔷薇宫城（P1 · 多层骨架）
+
+   宫苑立面：玩家从城市主门进来第一眼就要分辨出主宫、翼楼、旧堡、
+   礼拜堂与门楼，通用 drawHouse 认不出来，所以这里按 kind 给各自的形制。
+   主宫与旧堡直接复用城市里那座白蔷薇城堡的立面（drawWhiteRoseCastle）。 */
+function drawPalaceBuilding(g, fx, baseY, fw, b) {
+  var x = fx, w = fw, cx = x + w / 2;
+  var old = b.kind === 'keep';
+  var wall = old ? '#CFC7B2' : '#DCD5C2', side = old ? '#ABA593' : '#B5B4AA';
+  var roof = old ? '#41556B' : '#4C6480', edge = old ? '#2E3E4E' : '#33445A';
+  var roofH = b.chapel ? 30 : (b.h > 12 ? 34 : 26), wallH = b.h > 12 ? 96 : 72;
+  /* 台基与落影：地面层仍然可走，影子只压住贴地的一圈。 */
+  px(g, x + 8, baseY + 3, w - 16, 8, 'rgba(28,35,35,.26)');
+  px(g, x + 2, baseY - 12, w - 4, 14, '#A79C87');
+  px(g, x + 6, baseY - 15, w - 12, 4, '#E8E0CC');
+  /* 墙体：正面 + 侧面收边，做出体块而不是一块色板。 */
+  px(g, x + 4, baseY - 12 - wallH, w - 8, wallH, wall);
+  px(g, x + 4, baseY - 12 - wallH, w - 8, 3, '#F1E9D7');
+  px(g, x + w - 14, baseY - 12 - wallH + 8, 10, wallH - 8, side);
+  /* 壁柱：每隔一段立一道，给立面一个可数的节奏。 */
+  for (var c = x + 16; c < x + w - 16; c += 32) {
+    px(g, c, baseY - 12 - wallH + 6, 5, wallH - 10, '#EDE6D2');
+    px(g, c + 1, baseY - 12 - wallH + 6, 3, wallH - 10, wall);
+  }
+  /* 窗：高窗与方窗，窗棂用蓝灰，与屋顶同族。 */
+  var rows = b.h > 12 ? [baseY - 12 - wallH + 14, baseY - 12 - wallH + 46] : [baseY - 12 - wallH + 14];
+  rows.forEach(function (ry, ri) {
+    for (var wx = x + 22; wx < x + w - 24; wx += 32) {
+      px(g, wx, ry, 14, 18, '#3E5063');
+      px(g, wx + 1, ry + 1, 12, 16, '#5C7B92');
+      px(g, wx + 6, ry + 1, 2, 16, '#3E5063');
+      px(g, wx + 1, ri ? ry + 3 : ry + 6, 12, 2, '#3E5063');
+      px(g, wx - 1, ry - 2, 16, 3, '#EDE6D2');
+    }
+  });
+  var top = baseY - 12 - wallH;
+  /* 礼拜堂带尖塔，其余走四坡加檐口托座。 */
+  if (b.chapel) {
+    px(g, x - 6, top - roofH, w + 12, roofH + 4, roof);
+    px(g, x - 6, top - roofH, w + 12, 4, edge);
+    px(g, cx - 5, top - roofH - 34, 10, 36, '#5C6B52');
+    px(g, cx - 8, top - roofH - 40, 16, 8, '#C0A15E');
+    px(g, cx - 1, top - roofH - 48, 2, 10, '#C0A15E');
+    px(g, cx - 3, top - roofH - 44, 6, 6, '#E2C181');
+  } else {
+    px(g, x - 6, top - roofH, w + 12, roofH, roof);
+    px(g, x - 6, top - roofH, w + 12, 5, edge);
+    px(g, x + 8, top - roofH + 6, w - 16, 3, '#5F7790');
+    for (var d = x + 10; d < x + w - 10; d += 18) px(g, d, top + roofH - 7, 7, 7, '#B8AD98');
+    /* 山花：正面中央的三角山头，是宫殿与普通房子最快的区分。 */
+    for (var k = 0; k < 16; k++) px(g, cx - 26 + k, top - roofH - 16 + k, 52 - k * 2, 2, '#EFE7D3');
+    px(g, cx - 6, top - roofH - 20, 12, 14, '#8E5864');
+  }
+  /* 主门与台阶：台阶向玩家走近，门的位置就是 buildings[].door。 */
+  var doorX = cx - 12, doorY = baseY - 12;
+  px(g, doorX, doorY - 26, 24, 26, '#3B3A34');
+  px(g, doorX + 2, doorY - 24, 20, 24, '#7E5C40');
+  px(g, doorX + 2, doorY - 24, 20, 3, '#A9855C');
+  px(g, doorX + 10, doorY - 12, 4, 12, '#E2C181');
+  for (var st = 0; st < 4; st++) {
+    var sw = 34 + st * 12;
+    px(g, cx - sw / 2, doorY + 2 + st * 4, sw, 4, st % 2 ? '#C7BCA6' : '#D8CEBA');
+  }
+  /* 门牌：让"哪栋是哪栋"在画面上可读。 */
+  var plateW = Math.min(w - 16, 92);
+  px(g, cx - plateW / 2, top + 4, plateW, 13, '#405247');
+  g.font = 'bold 10px sans-serif'; g.textAlign = 'center'; g.fillStyle = '#F0D990';
+  g.fillText(b.label, cx, top + 14); g.textAlign = 'left';
+}
+
+/* ============================================================
+   白蔷薇宫城（P1 · 多层骨架）
+   契约见 docs/palace-p1-contract.md。这里只做三件事：
+
+   1. 建场景：宫苑（户外）+ 一层 + 二层（沿用 city_castle）+ 三层 + 两处露台。
+   2. 建楼梯：palaceStair 是一种交互物，不是走在上面就触发的出口。
+      触发格与落点分开，保证刚上楼不会自动弹回下一层。
+   3. 建存档：state.palace.layoutVersion 记录布局版本，旧档只迁移一次。
+
+   三层同尺寸 64×48，大楼梯坐标带 x=28..35 / y=30..34 逐层对齐。
+   门一律交给 installIndoorDoors 校验：门必须在墙上、落点不能是墙、
+   家具或别的出口，门内站位要空。本段写在 configureIndoorDoors() 之后，
+   所以自动接管逻辑不会再来挪这些门。
+   ============================================================ */
+
+var PALACE_LAYOUT_VERSION = 1;
+var PALACE_FLOORS = [
+  { id: 'palace_f1', label: '一层 · 门厅', sceneId: 'palace_f1', order: 1 },
+  { id: 'city_castle', label: '二层 · 王座厅', sceneId: 'city_castle', order: 2 },
+  { id: 'palace_f3', label: '三层 · 起居', sceneId: 'palace_f3', order: 3 }
+];
+/* 宫苑与两处露台是户外场景，不参与楼层编号。 */
+var PALACE_OUTDOOR = ['palace_grounds', 'palace_gallery', 'palace_terrace'];
+function isPalaceScene(id) { return id.indexOf('palace_') === 0 || id === 'city_castle'; }
+function palaceFloorOf(sceneId) {
+  for (var i = 0; i < PALACE_FLOORS.length; i++) if (PALACE_FLOORS[i].sceneId === sceneId) return PALACE_FLOORS[i];
+  return null;
+}
+/* 按 id 取楼层，避免测试里到处写顺序数组下标。 */
+function palaceFloorById(id) {
+  for (var i = 0; i < PALACE_FLOORS.length; i++) if (PALACE_FLOORS[i].id === id) return PALACE_FLOORS[i];
+  return null;
+}
+
+/* ---------- 房间生成 ----------
+   不复用 building()：它把门固定接到城市街道上。宫城每层的门各连各的，
+   所以这里自建地图，再把门的定义交给 installIndoorDoors 走同一套校验。 */
+function palaceRoom(id, label, def, doorDefs) {
+  var r = mkMap(def.w, def.h, T_PATH);
+  fillRect(r, 0, 0, r.w - 1, 0, T_BUILDING, true);
+  fillRect(r, 0, r.h - 1, r.w - 1, r.h - 1, T_BUILDING, true);
+  fillCol(r, 0, 0, r.h - 1, T_BUILDING, true);
+  fillCol(r, r.w - 1, 0, r.h - 1, T_BUILDING, true);
+  (def.props || []).forEach(function (p) {
+    if (!p.flat) fillRect(r, p.x, p.y, p.x + p.w - 1, p.y + p.h - 1, T_BUILDING, true);
+  });
+  /* 先给门内两侧清出通道，否则门装不上：门洞本身由 installIndoorDoors 打开。 */
+  doorDefs.forEach(function (d) {
+    var inw = doorInward(d.side);
+    for (var i = 0; i < d.width; i++) {
+      var tx = d.x + (inw[0] ? 0 : i), ty = d.y + (inw[1] ? 0 : i);
+      for (var s = 1; s <= 2; s++) fillRect(r, tx + inw[0] * s, ty + inw[1] * s, tx + inw[0] * s, ty + inw[1] * s, T_PATH, false);
+    }
+  });
+  MAPS[id] = { w: r.w, h: r.h, t: r.t, solid: r.solid, name: label, indoor: true,
+    roomTheme: 'castle', roomDef: def, exits: [], buildings: [], decor: [] };
+  SCENE_ORDER.push(id);
+  INTERACTABLES[id] = [];
+  installIndoorDoors(id, doorDefs);
+  return MAPS[id];
+}
+/* 户外宫苑/露台：先铺一圈实心边界，再把门洞那一格开成通路。
+   露台临空边因此是真实碰撞，不会「穿过栏杆落到虚空」。 */
+function palaceOutdoor(id, label, w, h, doorDefs) {
+  var m = mkMap(w, h, T_GRASS);
+  fillRect(m, 0, 0, w - 1, 0, T_BUILDING, true);
+  fillRect(m, 0, h - 1, w - 1, h - 1, T_BUILDING, true);
+  fillCol(m, 0, 0, h - 1, T_BUILDING, true);
+  fillCol(m, w - 1, 0, h - 1, T_BUILDING, true);
+  MAPS[id] = { w: w, h: h, t: m.t, solid: m.solid, name: label, indoor: false,
+    exits: [], buildings: [], decor: [] };
+  SCENE_ORDER.push(id);
+  INTERACTABLES[id] = [];
+  doorDefs.forEach(function (d) {
+    fillRect(m, d.x, d.y, d.x + d.width - 1, d.y, T_PATH, false);
+    MAPS[id].exits.push({ x: d.x, y: d.y, to: d.to, tx: d.tx, ty: d.ty });
+  });
+  return MAPS[id];
+}
+
+/* ---------- 宫苑 ----------
+   120×96 户外。南边接城市，中轴 x=60：门楼 → 荣誉内庭 → 主宫。
+   花园在北，东西两侧分别是后勤院与旧堡礼拜堂历史区。 */
+var PALACE_GROUNDS = {
+  w: 120, h: 96,
+  /* 主宫地基：南墙正中留门洞。 */
+  blocks: [
+    { x0: 40, y0: 30, x1: 80, y1: 46, door: { x: 60, y: 46 } },   // 主宫
+    { x0: 86, y0: 34, x1: 108, y1: 50 },                            // 东翼（P2 开放）
+    { x0: 10, y0: 34, x1: 30, y1: 54 },                            // 旧堡塔楼（P3 开放）
+    { x0: 12, y0: 58, x1: 28, y1: 70 },                            // 礼拜堂（P3 开放）
+    { x0: 50, y0: 78, x1: 70, y1: 88, gap: { x0: 59, x1: 61 } }     // 门楼，中间留通道
+  ],
+  /* 后勤院围墙（东侧），只有北面一个货运缺口。 */
+  yard: { x0: 84, y0: 56, x1: 112, y1: 78 }
+};
+function buildPalaceGrounds() {
+  var G = PALACE_GROUNDS;
+  var m = mkMap(G.w, G.h, T_GRASS);
+  /* 铺装：中轴大道 + 东西支路 + 花园步道，其余留草。
+     中轴宽 9 格，门楼通道与主宫门前都落在这条铺装上。 */
+  fillRect(m, 56, 46, 64, 94, T_PATH, false);         // 中轴大道：主宫门 → 门楼 → 南缘
+  fillRect(m, 20, 48, 58, 52, T_PATH, false);          // 西支路：旧堡/礼拜堂 → 中庭
+  fillRect(m, 62, 48, 104, 52, T_PATH, false);         // 东支路：中庭 → 后勤院
+  fillRect(m, 40, 26, 80, 30, T_PATH, false);          // 北面：主宫背侧 → 花园
+  fillRect(m, 44, 6, 76, 26, T_PATH, false);           // 花园主步道
+  fillRect(m, 56, 12, 64, 22, T_PATH, false);          // 花园纵轴
+  fillRect(m, 34, 76, 86, 80, T_PATH, false);          // 门楼前横向铺装
+  /* 荣誉内庭：主宫与门楼之间的整块铺装。 */
+  fillRect(m, 44, 54, 76, 74, T_PATH, false);
+  /* 后勤院围墙与院内地坪；北墙留一个货运缺口，否则院子与宫苑不连通。 */
+  fillRect(m, G.yard.x0, G.yard.y0, G.yard.x1, G.yard.y0, T_BUILDING, true);
+  fillRect(m, G.yard.x0, G.yard.y1, G.yard.x1, G.yard.y1, T_BUILDING, true);
+  fillCol(m, G.yard.x0, G.yard.y0, G.yard.y1, T_BUILDING, true);
+  fillCol(m, G.yard.x1, G.yard.y0, G.yard.y1, T_BUILDING, true);
+  fillRect(m, G.yard.x0 + 1, G.yard.y0 + 1, G.yard.x1 - 1, G.yard.y1 - 1, T_PATH, false);
+  fillRect(m, 97, G.yard.y0, 99, G.yard.y0, T_PATH, false);
+  /* 建筑地基与门楼通道。地基种草地而不是刷建筑色——
+     立面由 drawPalaceBuilding / drawWhiteRoseCastle 负责，
+     地面若铺成实心色块，从远处看就是一块没有细节的板子。 */
+  G.blocks.forEach(function (b) {
+    fillRect(m, b.x0, b.y0, b.x1, b.y1, T_GRASS, true);
+    if (b.door) fillRect(m, b.door.x, b.y1, b.door.x, b.y1 + 1, T_PATH, false);
+    if (b.gap) fillRect(m, b.gap.x0, b.y0, b.gap.x1, b.y1, T_PATH, false);
+  });
+  /* 花园树篱：沿步道两侧，不挡中轴。 */
+  for (var hx = 46; hx <= 74; hx += 4) {
+    if (hx === 56 || hx === 64) continue;
+    fillRect(m, hx, 8, hx, 8, T_BUILDING, true);
+    fillRect(m, hx, 24, hx, 24, T_BUILDING, true);
+  }
+  MAPS.palace_grounds = { w: G.w, h: G.h, t: m.t, solid: m.solid,
+    name: '白蔷薇宫苑', indoor: false, exits: [{ x: 60, y: 93, to: 'city', tx: 320, ty: 165 }],
+    buildings: [
+      /* visualHeight 供视锥裁剪用，必须覆盖墙体+屋顶+山花，否则宫苑里会把屋顶裁掉。 */
+      { id: 'palace_main', label: '白蔷薇宫城 · 主宫', x: 40, y: 30, w: 41, h: 17, kind: 'castle', visualHeight: 320, door: { x: 60, y: 46 } },
+      { id: 'palace_east', label: '东翼', x: 86, y: 34, w: 23, h: 17, kind: 'palace', visualHeight: 150, door: { x: 97, y: 50 } },
+      { id: 'palace_keep', label: '旧堡塔楼', x: 10, y: 34, w: 21, h: 21, kind: 'keep', visualHeight: 150, door: { x: 20, y: 54 } },
+      { id: 'palace_chapel', label: '宫苑礼拜堂', x: 12, y: 58, w: 17, h: 13, kind: 'palace', chapel: true, visualHeight: 180, door: { x: 20, y: 70 } },
+      { id: 'palace_gate', label: '白蔷薇门楼', x: 50, y: 78, w: 21, h: 11, kind: 'palace', visualHeight: 120, door: { x: 60, y: 88 } }
+    ],
+    /* 内庭不是一块空地：中央喷泉、四角树、沿边长椅与路口指路牌，
+       保证「主路始终可辨、树冠不遮入口」。 */
+    decor: (function () {
+      var d = [{ t: 'fountain', x: 60, y: 64 }];
+      [52, 68].forEach(function (x) { d.push({ t: 'streetTree', x: x, y: 58 }); d.push({ t: 'streetTree', x: x, y: 70 }); });
+      [50, 70].forEach(function (y) { d.push({ t: 'bench', x: 46, y: y }); d.push({ t: 'bench', x: 74, y: y }); });
+      d.push({ t: 'bench', x: 56, y: 72 }, { t: 'bench', x: 64, y: 72 });
+      /* 路口指路牌：东翼、后勤院、旧堡、花园各自写清方向。 */
+      d.push({ t: 'sign', x: 57, y: 75 }, { t: 'sign', x: 64, y: 75 });
+      d.push({ t: 'sign', x: 56, y: 53 });
+      /* 花园步道两侧的行道树。 */
+      [48, 56, 66, 72].forEach(function (x) { d.push({ t: 'streetTree', x: x, y: 10 }); d.push({ t: 'streetTree', x: x, y: 22 }); });
+      d.push({ t: 'bench', x: 50, y: 16 }, { t: 'bench', x: 70, y: 16 });
+      /* 门楼两侧的花箱用花丛，落在草地上。 */
+      d.push({ t: 'flower', x: 52, y: 92, v: 1 }, { t: 'flower', x: 68, y: 92, v: 1 });
+      return d;
+    })() };
+  SCENE_ORDER.push('palace_grounds');
+  INTERACTABLES.palace_grounds = [
+    /* 主门：站在主宫门前的铺装上按 E 进一层门厅。
+       站位全部落在建筑外的铺装上，不踩在墙里。 */
+    { id: 'palace_main_door', kind: 'indoorEntrance', to: 'palace_f1', doorId: 'main',
+      x: 60, y: 46, label: '进入白蔷薇宫城一层门厅', stand: [[60, 47], [59, 47], [61, 47], [60, 48]] },
+    /* 回城：站在南缘按 E 回城市城堡门外。 */
+    { id: 'palace_back_city', kind: 'palaceGate', to: 'city', tx: 320, ty: 165,
+      x: 60, y: 93, label: '返回白蔷薇城 · 城堡前庭', stand: [[60, 92], [59, 92], [61, 92], [60, 94]] },
+    /* 尚未开放的区域写清用途与开放批次，不画一扇假门。 */
+    { id: 'palace_east_wing', kind: 'palaceLocked', x: 97, y: 50, label: '东翼',
+      note: '东翼正在修缮：宴会厅、音乐沙龙与固定服务梯会在下一批开通。',
+      stand: [[97, 51], [96, 51], [98, 51]] },
+    { id: 'palace_keep_site', kind: 'palaceLocked', x: 20, y: 54, label: '旧堡塔楼',
+      note: '旧堡塔楼与宫苑礼拜堂组成历史区，石基与历代纹章正在整理。',
+      stand: [[20, 55], [19, 55], [21, 55]] },
+    { id: 'palace_chapel_site', kind: 'palaceLocked', x: 20, y: 70, label: '宫苑礼拜堂',
+      note: '礼拜堂下层归一层使用，上层观礼廊接二层的礼仪路线。',
+      stand: [[20, 71], [19, 71], [21, 71]] },
+    { id: 'palace_service_yard', kind: 'palaceLocked', x: 98, y: 62, label: '东侧后勤院',
+      note: '后勤院有独立的货物入口：货门 → 地下厨房 → 服务梯 → 备餐间，不必穿过王座厅。',
+      stand: [[98, 61], [97, 61], [99, 61]] }
+  ];
+}
+
+/* ---------- 房间定义 ----------
+   三层同尺寸 64×48，共用同一套格网，房间与通道逐层对齐：
+     中央梯厅 x=26..37（贯穿南北，楼梯带落在 y=33..37）
+     西侧房间 x=3..24   隔断 x=25
+     东侧房间 x=39..62  隔断 x=38
+   隔断一律留 10 格以上的宽门洞：房间读得出来，通勤不被卡。
+   props 里 flat:true 只画不挡，其余是实体碰撞。 */
+
+/* 一层：公开办事与第一次到访。北翼礼拜堂与卫兵，中段公开档案与文书，南端门厅。 */
+var PALACE_ROOMS = {
+  palace_f1: {
+    w: 64, h: 48, floor: 'tile',
+    props: [
+      /* 隔断：上段与中段各留一处宽门洞 */
+      { t: 'partition', x: 25, y: 2, w: 1, h: 9 }, { t: 'partition', x: 25, y: 17, w: 1, h: 6 },
+      { t: 'partition', x: 38, y: 2, w: 1, h: 13 },
+      { t: 'partition', x: 25, y: 21, w: 1, h: 11 },
+      { t: 'partition', x: 38, y: 21, w: 1, h: 11 },
+      /* 北翼西：礼拜堂下厅 */
+      { t: 'archiveShelf', x: 3, y: 3, w: 3, h: 6 },
+      { t: 'bookshelf', x: 3, y: 10, w: 3, h: 7 },
+      { t: 'archiveShelf', x: 7, y: 3, w: 9, h: 3 },
+      { t: 'readingTable', x: 7, y: 8, w: 8, h: 3 },
+      { t: 'desk', x: 7, y: 13, w: 7, h: 2 },
+      { t: 'banner', x: 19, y: 3, w: 2, h: 6 },
+      /* 北翼东：卫兵值房 */
+      { t: 'longTable', x: 40, y: 3, w: 10, h: 3 },
+      { t: 'genericShelf', x: 40, y: 8, w: 3, h: 7 },
+      { t: 'desk', x: 44, y: 9, w: 6, h: 2 },
+      { t: 'banner', x: 53, y: 3, w: 2, h: 6 },
+      { t: 'potPlant', x: 60, y: 11, w: 2, h: 2 },
+      /* 中段西：公开档案阅览 */
+      { t: 'archiveShelf', x: 3, y: 22, w: 3, h: 9 },
+      { t: 'archiveShelf', x: 7, y: 22, w: 9, h: 3 },
+      { t: 'desk', x: 7, y: 27, w: 7, h: 2 },
+      { t: 'longTable', x: 16, y: 22, w: 8, h: 3 },
+      { t: 'banner', x: 19, y: 27, w: 2, h: 6 },
+      /* 中段东：文书与委托 */
+      { t: 'ledgerDesk', x: 40, y: 22, w: 7, h: 3 },
+      { t: 'archiveShelf', x: 53, y: 22, w: 3, h: 9 },
+      { t: 'desk', x: 40, y: 27, w: 7, h: 2 },
+      { t: 'mapCabinet', x: 40, y: 29, w: 11, h: 2 },
+      /* 荣誉内庭：地毯平铺，喷泉是实心，水不踩 */
+      { t: 'fountain', x: 29, y: 24, w: 3, h: 3 },
+      { t: 'statue', x: 26, y: 21, w: 2, h: 3 }, { t: 'statue', x: 35, y: 21, w: 2, h: 3 },
+      /* 大楼梯与服务梯：与二、三层同一坐标带 */
+      { t: 'stairs', x: 27, y: 33, w: 8, h: 5, flat: true },
+      { t: 'stairRail', x: 26, y: 33, w: 1, h: 5 },
+      { t: 'stairRail', x: 35, y: 33, w: 1, h: 5 },
+      { t: 'stairs', x: 39, y: 33, w: 3, h: 5, flat: true },
+      { t: 'stairRail', x: 38, y: 33, w: 1, h: 5 },
+      /* 门厅：接待与等候 */
+      { t: 'counterFront', x: 20, y: 40, w: 8, h: 2 },
+      { t: 'ledgerDesk', x: 34, y: 40, w: 8, h: 2 },
+      { t: 'carpet', x: 28, y: 42, w: 6, h: 3, flat: true },
+      { t: 'sofa', x: 17, y: 44, w: 5, h: 2 }, { t: 'sofa', x: 42, y: 44, w: 5, h: 2 },
+      { t: 'potPlant', x: 13, y: 43, w: 2, h: 2 }, { t: 'potPlant', x: 49, y: 43, w: 2, h: 2 },
+      { t: 'fireplace', x: 55, y: 40, w: 5, h: 3 },
+      { t: 'chandelier', x: 29, y: 38, w: 4, h: 2, flat: true },
+      { t: 'chandelier', x: 22, y: 16, w: 4, h: 2, flat: true },
+      { t: 'chandelier', x: 35, y: 16, w: 4, h: 2, flat: true }
+    ],
+    spots: [
+      /* 管家的事务台从二层搬到一层：规划要求「原管家办理的事务仍可从一层找到」，
+         而蔷薇春宴任务的唯一办理点就是这个 service:'castle' 的服务台。 */
+      { x: 37, y: 40, kind: 'cityService', service: 'castle', label: '门厅事务台',
+        stand: [[37, 42], [35, 42], [39, 42], [37, 39]] },
+      { x: 10, y: 22, kind: 'interiorProp', label: '公开档案阅览席',
+        stand: [[10, 25], [8, 25], [12, 25]],
+        note: '借阅桌按年代排着索引柜：城堡旧址的图纸、白蔷薇城建城以来的地契副本，还有历任管事的值班记录。',
+        note2: '查阅不需要许可，抄录要在这里登记。' },
+      { x: 43, y: 27, kind: 'interiorProp', label: '文书与委托案台',
+        stand: [[43, 25], [41, 25], [45, 25]],
+        note: '案台上摊着当天的委托：通行证补办、城堡供货核对、还有几张写着「待塞琳确认」的条子。',
+        note2: '委托在这里登记，报酬到账后才算完成。' },
+      { x: 43, y: 9, kind: 'interiorProp', label: '卫兵值班',
+        stand: [[43, 11], [43, 12], [43, 13]],
+        note: '值班表记着谁守哪一段：门楼、内庭、东侧货门。卫兵只登记进出，不发放楼层许可。',
+        note2: '寝居与正式公务的进入条件另有门牌写明。' }
+    ],
+    staff: ['steward']
+  },
+  palace_f3: {
+    w: 64, h: 48, floor: 'wood',
+    props: [
+      { t: 'partition', x: 25, y: 2, w: 1, h: 11 },
+      { t: 'partition', x: 38, y: 2, w: 1, h: 11 },
+      { t: 'partition', x: 25, y: 21, w: 1, h: 10 },
+      { t: 'partition', x: 38, y: 21, w: 1, h: 10 },
+      /* 书房（西北）：书桌、书架与壁炉 */
+      { t: 'desk', x: 4, y: 3, w: 7, h: 3 },
+      { t: 'bookshelf', x: 3, y: 8, w: 3, h: 5 },
+      { t: 'bookshelf', x: 12, y: 8, w: 3, h: 5 },
+      { t: 'roundTable', x: 8, y: 8, w: 4, h: 3 },
+      { t: 'fireplace', x: 19, y: 8, w: 4, h: 3 },
+      /* 阅读前厅（中北） */
+      { t: 'sofa', x: 28, y: 3, w: 4, h: 2 }, { t: 'sofa', x: 33, y: 3, w: 4, h: 2 },
+      { t: 'bookshelf', x: 27, y: 8, w: 3, h: 5 }, { t: 'bookshelf', x: 34, y: 8, w: 3, h: 5 },
+      /* 客房甲（东北） */
+      { t: 'bed', x: 40, y: 3, w: 5, h: 4 }, { t: 'desk', x: 47, y: 3, w: 5, h: 3 },
+      { t: 'wardrobe', x: 55, y: 3, w: 4, h: 5 },
+      { t: 'carpet', x: 42, y: 9, w: 8, h: 3, flat: true },
+      /* 私人会客室（西中） */
+      { t: 'sofa', x: 4, y: 22, w: 5, h: 2 }, { t: 'sofa', x: 13, y: 22, w: 5, h: 2 },
+      { t: 'roundTable', x: 9, y: 21, w: 4, h: 3 },
+      { t: 'fireplace', x: 3, y: 27, w: 5, h: 3 }, { t: 'bookshelf', x: 18, y: 27, w: 5, h: 5 },
+      /* 中央起居（中段，与梯厅连成一片） */
+      { t: 'desk', x: 28, y: 22, w: 5, h: 2 }, { t: 'sofa', x: 33, y: 24, w: 4, h: 2 },
+      /* 客房乙（东中） */
+      { t: 'bed', x: 40, y: 22, w: 5, h: 4 }, { t: 'roundTable', x: 47, y: 22, w: 4, h: 3 },
+      { t: 'wardrobe', x: 55, y: 22, w: 4, h: 5 },
+      { t: 'carpet', x: 42, y: 28, w: 8, h: 3, flat: true },
+      /* 大楼梯与服务梯 */
+      { t: 'stairs', x: 27, y: 33, w: 8, h: 5, flat: true },
+      { t: 'stairRail', x: 26, y: 33, w: 1, h: 5 },
+      { t: 'stairRail', x: 35, y: 33, w: 1, h: 5 },
+      { t: 'stairs', x: 39, y: 33, w: 3, h: 5, flat: true },
+      { t: 'stairRail', x: 38, y: 33, w: 1, h: 5 },
+      /* 寝居（西南）：门牌与许可另行检查，不在这里自动过夜 */
+      { t: 'bed', x: 4, y: 40, w: 5, h: 4 }, { t: 'genericShelf', x: 11, y: 40, w: 4, h: 2 },
+      { t: 'wardrobe', x: 18, y: 40, w: 5, h: 5 },
+      /* 阅读廊（东南）：通往露台门 */
+      { t: 'bookshelf', x: 40, y: 40, w: 3, h: 6 }, { t: 'bookshelf', x: 60, y: 40, w: 3, h: 6 },
+      { t: 'readingTable', x: 45, y: 41, w: 8, h: 3 },
+      { t: 'carpet', x: 42, y: 40, w: 16, h: 5, flat: true },
+      { t: 'chandelier', x: 29, y: 28, w: 4, h: 2, flat: true }
+    ],
+    spots: [
+      { x: 7, y: 3, kind: 'interiorProp', label: '主人书桌',
+        stand: [[7, 6], [5, 6], [9, 6]],
+        note: '书桌上摊着今早的公文与一封没拆的信。窗边能看见花园和北面的旧塔。',
+        note2: '起居层比二层安静得多：谈正事不会被打断。' },
+      { x: 11, y: 22, kind: 'interiorProp', label: '私人会客室',
+        stand: [[11, 25], [9, 25], [13, 25]],
+        note: '沙发围着小桌，壁炉烧着。这里说话不用按正式接待厅的规矩。',
+        note2: '不经引荐的人不会自己走进来。' },
+      { x: 42, y: 22, kind: 'interiorProp', label: '客房登记簿',
+        stand: [[42, 27], [40, 27], [44, 27]],
+        note: '登记簿记着今晚留宿的人名与房号。只有登记过的客房能过夜。',
+        note2: '走到陌生的卧室不会自动睡着——门牌上写得很清楚。' },
+      { x: 48, y: 41, kind: 'interiorProp', label: '阅读廊',
+        stand: [[48, 45], [46, 45], [50, 45]],
+        note: '书架从三层一直排到露台门边，末端那几本是各地寄来的园艺与建筑册。',
+        note2: '露台门在东墙尽头，门牌写着开放时段。' }
+    ],
+    staff: []
+  }
+};
+
+/* 二层沿用 CITY_ROOMS.castle（同一份定义），这里不重复登记。 */
+function palaceHallRooms() { return PALACE_ROOMS; }
+
+/* ---------- 大楼梯 ---------- */
+/* 楼梯带 x=27..34 / y=33..37 逐层对齐；上行触发点在西端、下行触发点在东端，
+   两个触发点分处楼梯的两头，findInteractable 的「正前方优先」不会挑错。
+   stand 分列楼梯南北两侧，落点固定在楼梯另一端之外：
+     上行落到 (31,27)，下行落到 (31,42)，
+   与 stand 任何一格的曼哈顿距离都 ≥3，刚上楼不会立刻被拉回去。 */
+var PALACE_STAIR = { upX: 28, downX: 33, y: 35, upY: 27, downY: 42,
+  upStand: [[28, 38], [29, 38], [28, 39], [29, 39]],
+  downStand: [[33, 31], [34, 31], [33, 32], [34, 32]] };
+var PALACE_STAIRS = [];
+function buildPalaceStairs() {
+  PALACE_STAIRS = [];
+  PALACE_FLOORS.forEach(function (fl, i) {
+    var list = INTERACTABLES[fl.sceneId];
+    if (i > 0) {
+      var below = PALACE_FLOORS[i - 1];
+      PALACE_STAIRS.push({ id: fl.id + '_down', kind: 'palaceStair', floorId: fl.id, sceneId: fl.sceneId, dir: 'down',
+        x: PALACE_STAIR.downX, y: PALACE_STAIR.y, stand: PALACE_STAIR.downStand,
+        to: below.sceneId, tx: 31, ty: PALACE_STAIR.downY, face: 'up', label: '下楼 · ' + below.label });
+    }
+    if (i < PALACE_FLOORS.length - 1) {
+      var above = PALACE_FLOORS[i + 1];
+      PALACE_STAIRS.push({ id: fl.id + '_up', kind: 'palaceStair', floorId: fl.id, sceneId: fl.sceneId, dir: 'up',
+        x: PALACE_STAIR.upX, y: PALACE_STAIR.y, stand: PALACE_STAIR.upStand,
+        to: above.sceneId, tx: 31, ty: PALACE_STAIR.upY, face: 'down', label: '上楼 · ' + above.label });
+    }
+    PALACE_STAIRS.forEach(function (s) {
+      if (s.sceneId !== fl.sceneId) return;
+      if (list.some(function (it) { return it.id === s.id; })) return;
+      list.push({ id: s.id, kind: 'palaceStair', x: s.x, y: s.y, stand: s.stand,
+        label: s.label, floorId: fl.id, dir: s.dir, to: s.to, tx: s.tx, ty: s.ty });
+    });
+  });
+}
+function usePalaceStair(it) {
+  var fl = palaceFloorById(it.floorId);
+  if (!fl) { toast('这段楼梯还没接上。'); return; }
+  if (it.stand && !standOn(it.stand)) { toast('请走到大楼梯前再上楼。'); return; }
+  closeWindow();
+  doSwitchScene(it.to, it.tx, it.ty, it.dir === 'up' ? 'down' : 'up');
+}
+function standOn(stand) {
+  return stand.some(function (p) { return p[0] === state.player.x && p[1] === state.player.y; });
+}
+/* 宫内楼层图：列出各层、该层房间和当前层高亮。
+   楼梯本身按 E 直接换层，这里是查阅用的导览（从 HUD 楼层牌打开）。 */
+function openPalaceGuide(title, stairFromId) {
+  var cur = palaceFloorOf(state.sceneId);
+  openWindow({ id: 'palace_guide', kind: 'custom', wide: true,
+    title: title || (cur ? '宫城楼层导览 · ' + cur.label : '宫城楼层导览'),
+    build: function (b) {
+      if (stairFromId) {
+        var row = el('div', 'row'), from = palaceFloorById(stairFromId), idx = PALACE_FLOORS.indexOf(from);
+        if (idx > 0) row.appendChild(mkBtn('返回 ' + PALACE_FLOORS[idx - 1].label + ' 的大楼梯', 'primary', function () {
+          closeWindow(); travelPalaceStair(from.id, 'down');
+        }));
+        if (idx < PALACE_FLOORS.length - 1) row.appendChild(mkBtn('上到 ' + PALACE_FLOORS[idx + 1].label + ' 的大楼梯', 'primary', function () {
+          closeWindow(); travelPalaceStair(from.id, 'up');
+        }));
+        b.appendChild(row);
+        b.appendChild(el('p', 'muted', '台阶与落点分开落位，上下楼不会自动弹回。'));
+        b.appendChild(el('hr'));
+      }
+      PALACE_FLOORS.forEach(function (fl) {
+        var isCur = cur && cur.id === fl.id;
+        b.appendChild(el('p', isCur ? 'strong' : 'req-chip', (isCur ? '▶ ' : '') + fl.label));
+        var rooms = palaceRoomNames(fl.sceneId);
+        b.appendChild(el('p', 'muted', rooms.length ? rooms.join(' · ') : '房间正在布置。'));
+      });
+      b.appendChild(el('p', 'muted', '宫苑、门楼与东西两翼在地面层，走出主门即可回到白蔷薇城。'));
+    }, actions: [{ label: '关闭', close: true }] });
+}
+/* 导览里的「上/下楼」按钮：目的地由楼层号唯一决定，落点取该层那一侧楼梯记录里的落点。 */
+function travelPalaceStair(fromFloorId, dir) {
+  var fl = palaceFloorById(fromFloorId);
+  if (!fl) { toast('这一层还没有接通楼梯。'); return; }
+  var rec = PALACE_STAIRS.filter(function (s) { return s.sceneId === fl.sceneId && s.dir === dir; })[0];
+  if (!rec) { toast('这个方向还没有楼梯。'); return; }
+  closeWindow();
+  doSwitchScene(rec.to, rec.tx, rec.ty);
+}
+function palaceRoomNames(sceneId) {
+  var map = MAPS[sceneId];
+  var names = (INTERACTABLES[sceneId] || []).filter(function (it) {
+    return ['interiorProp', 'cityService'].indexOf(it.kind) >= 0;
+  }).map(function (it) { return it.label; });
+  return names;
+}
+function usePalaceGate(it) {
+  if (it.stand && !standOn(it.stand)) { toast('请走到门旁再进入。'); return; }
+  var e = exploreState();
+  if (it.to === 'city' && !e.city) { toast('先在小镇南口驿路牌按 E 办理城市通行证。'); return; }
+  closeWindow();
+  doSwitchScene(it.to, it.tx, it.ty);
+}
+function openPalaceLocked(it) {
+  openWindow({ id: 'palace_locked', kind: 'custom', title: it.label || '尚未开放的区域',
+    build: function (b) {
+      b.appendChild(el('p', null, it.note || '这一部分还在施工。'));
+      b.appendChild(el('p', 'muted', '已开放的部分照常可走：宫苑、一层门厅、二层王座厅与三层起居。'));
+    }, actions: [{ label: '返回', close: true }] });
+}
+function openPalaceGuideChip() {
+  var fl = palaceFloorOf(state.sceneId);
+  openPalaceGuide(fl ? fl.label : '宫城楼层导览', null);
+}
+
+/* ---------- 装配 ---------- */
+function buildPalace() {
+  buildPalaceGrounds();
+  /* 两处户外必须先于室内建好：installIndoorDoors 会立刻校验门在目标场景的落点，
+     目标地图还不存在就会抛「门外落点不可用」。
+     对向落点都比门内侧站位再远一格，免得「走出去」紧接着又被门拉回来。 */
+  palaceOutdoor('palace_gallery', '白蔷薇宫城 · 二层 回廊', 28, 16, [
+    { x: 0, y: 7, width: 1, to: 'city_castle', tx: 60, ty: 10 }
+  ]);
+  palaceOutdoor('palace_terrace', '白蔷薇宫城 · 翼楼露台', 40, 28, [
+    { x: 3, y: 13, width: 1, to: 'palace_f3', tx: 60, ty: 34 }
+  ]);
+
+  /* 一层：南墙正中主门通宫苑。 */
+  palaceRoom('palace_f1', '白蔷薇宫城 · 一层 门厅', PALACE_ROOMS.palace_f1, [
+    { id: 'main', side: 'south', x: 31, y: 47, width: 2, to: 'palace_grounds', tx: 60, ty: 49, style: 'stone' }
+  ]);
+  /* 三层：东墙露台门通翼楼露台。 */
+  palaceRoom('palace_f3', '白蔷薇宫城 · 三层 起居', PALACE_ROOMS.palace_f3, [
+    { id: 'terrace', side: 'east', x: 63, y: 34, to: 'palace_terrace', tx: 4, ty: 13, style: 'stone' }
+  ]);
+
+  /* 二层沿用 city_castle 这个 ID（规划 §8：保留稳定身份当作二层礼仪主层）。
+     building() 先建过一版 34×24，这里按新定义整体重建并换成回廊门。 */
+  if (SCENE_ORDER.indexOf('city_castle') < 0) SCENE_ORDER.push('city_castle');
+  palaceRoom('city_castle', '白蔷薇宫城 · 二层 王座厅', CITY_ROOMS.castle, [
+    { id: 'gallery', side: 'east', x: 63, y: 10, to: 'palace_gallery', tx: 1, ty: 7, style: 'stone' }
+  ]);
+
+  /* 露台与回廊的铺装：门外两步是落脚处，栏杆在边界上。 */
+  fillRect(MAPS.palace_terrace, 4, 13, 8, 13, T_PATH, false);
+  fillRect(MAPS.palace_gallery, 1, 6, 3, 8, T_PATH, false);
+  fillRect(MAPS.palace_gallery, 1, 7, 1, 7, T_PATH, false);
+  /* 户外的 decor 只认地面装饰类型（tuft/streetTree/flower/bench/sign/fountain…），
+     planter 是房间里的 CITY_PROPS，画在这里不会生效，所以回廊用花丛与长椅。 */
+  MAPS.palace_gallery.decor = [{ t: 'flower', x: 6, y: 3, v: 0 }, { t: 'flower', x: 8, y: 3, v: 1 },
+    { t: 'flower', x: 20, y: 3, v: 1 }, { t: 'flower', x: 22, y: 3, v: 0 },
+    { t: 'bench', x: 12, y: 4 }, { t: 'bench', x: 16, y: 12 }];  MAPS.palace_terrace.decor = [{ t: 'planter', x: 8, y: 5 }, { t: 'planter', x: 8, y: 20 },
+    { t: 'planter', x: 30, y: 5 }, { t: 'planter', x: 30, y: 20 }];
+  MAPS.palace_gallery.buildings = [];
+  MAPS.palace_terrace.buildings = [];
+
+  /* 门内侧的交互物：室内→户外的回程走 exits（走过即切），
+     户外→室内按 E 进。这里补上露台与回廊的门牌。 */
+  INTERACTABLES.palace_gallery.push({ id: 'palace_gallery_in', kind: 'indoorEntrance',
+    to: 'city_castle', doorId: 'gallery', x: 1, y: 7, label: '返回二层 王座厅',
+    stand: [[1, 6], [1, 8], [2, 7], [0, 7]] });
+  INTERACTABLES.palace_terrace.push({ id: 'palace_terrace_in', kind: 'indoorEntrance',
+    to: 'palace_f3', doorId: 'terrace', x: 2, y: 13, label: '返回三层 起居',
+    stand: [[2, 12], [2, 14], [1, 13], [3, 13]] });
+  /* 露台与回廊也要有可读内容，不能只是「能走进去的空地」。
+     露台栏杆是实心碰撞，所以站在栏边只能看，不会掉到虚空。 */
+  INTERACTABLES.palace_terrace.push(
+    { id: 'terrace_view', kind: 'interiorProp', label: '露台观景',
+      x: 18, y: 6, stand: [[18, 7], [17, 6], [19, 6]],
+      note: '从这里能一眼看完荣誉内庭、东翼的屋顶，再往北是花园与旧堡塔楼。',
+      note2: '屋面只开放有安全通路的部分，栏杆外没有落脚处。' },
+    { id: 'terrace_garden', kind: 'interiorProp', label: '露台花箱',
+      x: 22, y: 21, stand: [[22, 20], [21, 21], [23, 21]],
+      note: '花箱里种着从宫苑花园分出来的白蔷薇，园丁按周来修整。',
+      note2: '园艺与石材维护属于可反复事务，做完还能再来。' });
+  INTERACTABLES.palace_gallery.push(
+    { id: 'gallery_walk', kind: 'interiorProp', label: '回廊漫步',
+      x: 12, y: 8, stand: [[12, 9], [11, 8], [13, 8]],
+      note: '回廊沿内庭一侧绕过去，北端接花园。正式宴会前这里是宾客等候的地方。',
+      note2: '东端那扇门通向三层翼楼露台，开放时段写在门牌上。' });
+
+  /* 房间定义里的 spots 转成交互物：管家事务台因此留在「一层」。 */
+  [['palace_f1', PALACE_ROOMS.palace_f1], ['palace_f3', PALACE_ROOMS.palace_f3],
+   ['city_castle', CITY_ROOMS.castle]].forEach(function (pair) {
+    (pair[1].spots || []).forEach(function (s, i) {
+      var list = INTERACTABLES[pair[0]];
+      if (list.some(function (it) { return it.id === pair[0] + '_spot_' + i; })) return;
+      list.push({ id: pair[0] + '_spot_' + i, kind: s.kind, x: s.x, y: s.y, stand: s.stand,
+        label: s.label, service: s.service, note: s.note, note2: s.note2 });
+    });
+  });
+
+  buildPalaceStairs();
+
+  /* 城市街道上的城堡门改为通往宫苑：城市主入口、道路与马车落点全部不动，
+     只是门后从王座厅换成宫苑。 */
+  var gate = (INTERACTABLES.city || []).filter(function (it) { return it.id === 'castle'; })[0];
+  if (gate) {
+    gate.kind = 'palaceGate';
+    gate.to = 'palace_grounds';
+    gate.tx = 60; gate.ty = 90;
+    gate.label = '白蔷薇宫城';
+    gate.stand = [[320, 165], [319, 164], [321, 164]];
+  }
+  /* 管家随事务台搬到一层。 */
+  postResident('steward', 'palace_f1', 36, 43);
+  CITY_STAFF_ROUTINES.steward = [
+    [360, 540, 36, 43], [540, 660, 33, 41], [660, 1020, 36, 43], [1020, 1320, 30, 43]
+  ];
+
+  /* M 地图只留一个宫城入口（规划 §8）：三层与两处露台共用同一个安全落点，
+     传送只把人送到宫苑主道，不会把人直接扔到某一层。 */
+  addExtendedNode('castle.palace', 'white_rose.palace', 'palace_grounds',
+    '白蔷薇宫城', 'city', 'landmark', [[60, 90], [60, 91], [59, 90], [61, 90]],
+    '城堡扩建成的宫城。门楼后是荣誉内庭，主宫三层可逐层参观。', null);
+}
+buildPalace();
+
+/* ---------- 宫城存档 ---------- */
+/* 一层门厅的安全落点：旧档迁移与「新人第一次进宫」都落在这里。
+   (31,44) 在门厅主地毯上，前方两格就是主门，回头能看见主宫中轴。 */
+var PALACE_FOYER = { scene: 'palace_f1', x: 31, y: 44 };
+/* discovered 只登记玩家真正走进过的场景。新档也从空开始——
+   站在农场的玩家还没去过宫城，导览不该替他记上一笔。 */
+function newPalaceState() {
+  return { layoutVersion: PALACE_LAYOUT_VERSION, discovered: {} };
+}
+/* 旧档没有 palace 字段时返回 layoutVersion:0，让 normalizeSave 知道要跑一次迁移。
+   本函数必须幂等：归一化读一次与读两次要得到同一份数据，
+   否则「读一次」和「读两次」的存档对不上。 */
+function normalizePalace(v) {
+  var out = newPalaceState();
+  if (!v || typeof v !== 'object') { out.layoutVersion = 0; return out; }
+  out.layoutVersion = clamp(Math.floor(isInt(v.layoutVersion) ? v.layoutVersion : 0), 0, PALACE_LAYOUT_VERSION);
+  if (v.discovered && typeof v.discovered === 'object') Object.keys(v.discovered).forEach(function (k) {
+    if (v.discovered[k] === true) out.discovered[k] = true;
+  });
+  return out;
+}
+/* 到访登记：玩家真正走进某一层才记进楼层导览，传送节点不会把整层标成已看。 */
+function notePalaceArrival(sceneId) {
+  var s = state && state.palace;
+  if (!s || !isPalaceScene(sceneId)) return;
+  if (s.discovered[sceneId]) return;
+  s.discovered[sceneId] = true;
+  markDirty();
+}
+var palaceSwitchBase = doSwitchScene;
+doSwitchScene = function (to, tx, ty, face) { var r = palaceSwitchBase(to, tx, ty, face); notePalaceArrival(to); return r; };
+
+
+
+
 /* R1：全部起步点在公开小镇；阶段、货物保管和完成事实只存一份。 */
 var ROOKIE_JOBS={
   engineering:{name:'松动的公共水泵',person:'阿栎',reward:25,steps:[
@@ -17999,6 +19510,244 @@ activateInteractable=function(it){
   }rookieBaseInteract(it);
 };
 
+/* R2 · 个人刀剑、模拟时间遭遇与十个入门天赋。军事账本不参与。 */
+var PERSONAL_FOOD_HP = {bread:12};
+ITEMS.bread.desc += ' 食用另恢复12点生命（均衡饮食向下取整）。';
+var PERSONAL_UPGRADES = [null,
+  {name:'铜装',damage:10,need:{copper_ingot:2,wood:2},coins:50,minutes:30},
+  {name:'铁刃',damage:14,need:{iron_ingot:4,coal:2},coins:120,minutes:45},
+  {name:'精钢',damage:19,need:{steel_ingot:4,hardwood:2},coins:240,minutes:60}];
+var personalCombat = {active:false,mode:false,scene:'',cool:0,dodge:0,inv:0,stun:0,flash:0,enemy:null,trial:null,event:null};
+function personalAttrEffect(id,v){
+ if(id==='int')return '矿样研究 '+Math.ceil(30*(1-Math.min(.25,Math.max(0,v-5)*.01+(hasTalent('focus_read')?.10:0))))+'分钟';
+ if(id==='body')return '生命上限 '+personalMaxHp(v);
+ if(id==='nerve')return '硬直 '+(.35*(1-Math.min(.25,Math.max(0,v-5)*.01+(hasTalent('steady')?.1:0)))).toFixed(3)+'秒';
+ if(id==='luck')return '普通采集额外概率 '+Math.round(Math.min(.17,Math.max(0,v-5)*.01+(hasTalent('lucky_find')?.03:0))*100)+'%';
+ return v>=8?'可学辨迹/识矿（仍需天赋点）':'辨迹/识矿需要感知8';
+}
+function personalMaxHp(body){return 60+Math.max(0,(body===undefined?charAttr('body'):body)-5)*4;}
+function normalizePersonal(raw,body,today){
+  raw=raw&&typeof raw==='object'?raw:{};
+  function num(v,d,lo,hi){return Number.isFinite(v)?clamp(Math.floor(v),lo,hi):d;}
+  var p={dodgeKey:raw.dodgeKey==='x'?'x':'Shift',tracked:raw.tracked===true,trained:raw.trained===true,training:{sword:{hit:false,dodge:false},blade:{hit:false,dodge:false}},weapons:{},equipped:null,
+    hp:num(raw.hp,personalMaxHp(body),1,personalMaxHp(body)),resolved:{},examples:{},luckCycles:{},meetingDay:num(raw.meetingDay,-7,-7,today),
+    study:raw.study===true,analysis:raw.analysis===true,dutyDay:num(raw.dutyDay,0,0,today),dutyDone:raw.dutyDone===true,steelStory:raw.steelStory===true};
+  ['sword','blade'].forEach(function(k){
+    var t=(raw.training||{})[k]||{};p.training[k]={hit:t.hit===true,dodge:t.dodge===true};
+    var w=(raw.weapons||{})[k];if(p.trained&&w&&typeof w==='object')p.weapons[k]={tier:num(w.tier,0,0,3),name:typeof w.name==='string'?w.name.slice(0,24):'初次训练',memento:typeof w.memento==='string'?w.memento.slice(0,40):'小镇训练绳结'};
+  });
+  if(p.trained&&!Object.keys(p.weapons).length)p.weapons.sword={tier:0,name:'初次训练',memento:'小镇训练绳结'};
+  p.equipped=p.weapons[raw.equipped]?raw.equipped:(Object.keys(p.weapons)[0]||null);
+  ['hollow','canal'].forEach(function(k){var r=(raw.resolved||{})[k];if(r&&['fight','bypass'].indexOf(r.method)>=0)p.resolved[k]={method:r.method,day:num(r.day,1,1,today)};});
+  CHAR_TALENT_IDS.forEach(function(k){if(typeof (raw.examples||{})[k]==='string')p.examples[k]=raw.examples[k].slice(0,180);});
+  Object.keys(raw.luckCycles||{}).slice(0,500).forEach(function(k){if(/^((forest|mine[123]):\d+,\d+)$/.test(k))p.luckCycles[k]=num(raw.luckCycles[k],0,0,today);});
+  return p;
+}
+function personalState(){if(!state.personal)state.personal=normalizePersonal(null,charAttr('body'),state.totalDay);return state.personal;}
+function personalExample(id,msg){personalState().examples[id]=msg;markDirty();}
+function personalHeal(n){var p=personalState(),got=Math.max(0,Math.min(Math.floor(n),personalMaxHp()-p.hp));p.hp+=got;markDirty();return got;}
+function personalWeapon(){var p=personalState(),k=personalCombat.trial||p.equipped,w=personalCombat.trial?{tier:0}:p.weapons[k];return w?{kind:k,tier:w.tier,damage:[8,10,14,19][w.tier],interval:k==='blade'?0.60:0.70,range:(k==='blade'?1.1:1.3)*TILE,width:(k==='blade'?0.85:0.45)*TILE}:null;}
+function personalWeaponName(k){var w=personalState().weapons[k];return w?['修整旧','铜装','铁刃','精钢'][w.tier]+(k==='blade'?'刀':'剑'):'未装备';}
+function personalSafeAction(){return !personalCombat.active&&!Game.busy&&!sceneSwitch.busy&&!(Game.fishing&&Game.fishing.active);}
+function personalNear(sc,x,y){return state.sceneId===sc&&Math.abs(state.player.x-x)+Math.abs(state.player.y-y)<=1;}
+function personalTownPoint(){return {scene:'town',x:20,y:7,label:'小镇共用工坊'};}
+function personalClaim(k){
+  var p=personalState();if(!personalSafeAction()||p.trained||['sword','blade'].indexOf(k)<0||!personalNear('town',17,13))return false;
+  if(!['sword','blade'].every(function(k){return p.training[k].hit&&p.training[k].dodge;})){toast('先免费试刀、试剑，各命中一次并闪避一次。');return false;}
+  p.trained=true;p.weapons[k]={tier:0,name:'初次训练',memento:'小镇训练绳结'};p.equipped=k;
+  grantCharExpOnce('personal.training',60,'训练');markDirty();saveNow();refreshWindow();toast('领取了'+personalWeaponName(k)+'，在角色 → 武器装备。');return true;
+}
+function personalEquip(k){var p=personalState();if(!personalSafeAction()||!p.weapons[k])return false;p.equipped=k;personalCombat.mode=false;markDirty();saveNow();refreshWindow();return true;}
+function personalUpgrade(k,expected){
+  var p=personalState(),w=p.weapons[k],u=PERSONAL_UPGRADES[expected+1];
+  if(!personalSafeAction()||!w||w.tier!==expected||!u)return false;
+  var point=expected===2?{scene:'city_smith',x:13,y:6,leash:3,label:'霍尔铁砧'}:personalTownPoint();
+  return performAction({point:point,need:u.need,coins:u.coins,minutes:u.minutes,
+    guard:function(){return personalSafeAction()&&p.weapons[k]===w&&w.tier===expected&&(expected<2||p.steelStory);},reason:'精钢需要先完成霍尔的刃材试验。',
+    apply:function(){w.tier++;toast('整修完成：'+personalWeaponName(k)+'；保留名字与绳结。');}});
+}
+function personalSmelt(id){
+  var city=id==='steel_ingot',cfg=id==='copper_ingot'?{copper_ore:3,coal:1}:id==='iron_ingot'?{iron_ore:3,coal:1}:id==='steel_ingot'?{iron_ingot:2,charcoal:1}:null;
+  if(!cfg||!personalSafeAction())return false;
+  return performAction({point:city?{scene:'city_smith',x:13,y:6,leash:3,label:'霍尔铁砧'}:personalTownPoint(),need:cfg,out:id,qty:1,minutes:30,energy:2});
+}
+function personalSteelStory(){var p=personalState();return performAction({point:{scene:'city_smith',x:13,y:6,leash:3,label:'霍尔铁砧'},need:{iron_ore:2,charcoal:1},minutes:30,energy:3,
+ guard:function(){return personalSafeAction()&&p.trained&&!p.steelStory;},apply:function(){p.steelStory=true;grantCharExpOnce('personal.steel-story',60,'工匠');toast('霍尔与你比较了生铁与钢的刃口，认可精钢整修委托。');}});}
+function personalRenderWeapon(b){
+ var p=personalState(),box=charBox(b,'个人刀剑与独立装备槽');
+ charRow(box,'生命',p.hp+' / '+personalMaxHp());charRow(box,'装备',p.equipped?personalWeaponName(p.equipped):'尚未领取');
+ charNote(box,'免费训练：小镇巡护员，训练牌 (17,13)，全天开放。走到旁边按 E；免费试刀试剑，各命中和闪避后任选旧刀或旧剑。无需修桥或城市通行证。');
+ box.appendChild(mkBtn('第一次自卫训练 · 查看 / 追踪','primary',function(){personalState().tracked=true;markDirty();saveNow();openPersonalTraining();}));
+ charNote(box,'整修路线：旧刃伤害8 → 铜装10（铜锭2、木材2、50金）→ 铁刃14（铁锭4、煤2、120金）→ 城市精钢19（钢锭4、硬木2、240金与霍尔刃材试验）。');
+ ['sword','blade'].forEach(function(k){var w=p.weapons[k];if(!w)return;
+  var row=charBox(box,personalWeaponName(k)+' · '+w.name);charNote(row,'纪念：'+w.memento+' · 基础伤害 '+[8,10,14,19][w.tier]);
+  row.appendChild(mkBtn(p.equipped===k?'已装备':'装备','sm',function(){personalEquip(k);}));
+  var input=el('input');input.value=w.name;input.maxLength=24;input.setAttribute('aria-label',(k==='blade'?'刀':'剑')+'的名字');row.appendChild(input);
+  row.appendChild(mkBtn('保存名字','sm',function(){if(!personalSafeAction())return;w.name=input.value.trim().slice(0,24)||'初次训练';markDirty();saveNow();refreshWindow();}));
+  var expected=w.tier,u=PERSONAL_UPGRADES[expected+1];if(u){charNote(row,'下一阶段 '+u.name+'：'+Object.keys(u.need).map(function(id){return itemName(id)+' ×'+u.need[id];}).join('、')+'，'+u.coins+' 金 / '+u.minutes+'分钟。'+(w.tier===2?'城市铁匠铺霍尔铁砧 (13,6)，先完成刃材试验。':'小镇工坊 (20,7)，在旁边委托。'));row.appendChild(mkBtn('委托升级为'+u.name,'sm',function(){personalUpgrade(k,expected);}));}
+ });
+ if(p.trained&&!(p.weapons.sword&&p.weapons.blade)){box.appendChild(mkBtn('免费领取另一种旧刃','sm',function(){if(!personalNear('town',17,13)||!personalSafeAction()){toast('请到小镇训练牌旁领取。');return;}var k=p.weapons.sword?'blade':'sword';if(p.weapons[k])return;p.weapons[k]={tier:0,name:'另一种手感',memento:'小镇训练绳结'};markDirty();saveNow();refreshWindow();}));}
+ charNote(box,'剑：0.70 秒，系数 1.00，前方 1.3 格窄范围。刀：0.60 秒，系数 0.85，前方 1.1 格宽范围。Q 收拔，空格攻击，Shift 闪避；手机使用下方可读按钮。攻击不消耗农事体力，空挥不给经验。');
+ charNote(box,'旧矿山一层南侧 (14,20) 有两段可选支路。每段都可免费绕行，以 20分钟 / 3体力换取相同 35金与10经验。战败退回入口、保留所有物品，恢复半血并推进60分钟。');
+ box.appendChild(mkBtn('武器材料与工坊服务','sm',openPersonalWorkshop));
+ charLater(box,'陨铁：尚无资源与地区，不可购买。');
+ var keySelect=el('select');keySelect.setAttribute('aria-label','闪避按键');['Shift','x'].forEach(function(k){var o=el('option',null,k==='x'?'X 键闪避':'Shift 键闪避');o.value=k;keySelect.appendChild(o);});keySelect.value=p.dodgeKey;keySelect.onchange=function(){p.dodgeKey=keySelect.value;markDirty();saveNow();refreshWindow();};box.appendChild(el('label',null,'闪避按键设置：'));box.appendChild(keySelect);
+ var tools=charBox(b,'现在真正在用的工具');TOOLS.forEach(function(t){charRow(tools,t.name,'快捷栏 '+t.slot);});charNote(tools,'农用工具与军需装备不属于个人刀剑槽。');
+}
+CHAR_BUILD.weapon=personalRenderWeapon;
+function openPersonalTraining(){
+ openWindow({id:'personal_training',kind:'character',title:'第一次自卫训练',build:function(b){var p=personalState();
+ charNote(b,'联系人：小镇巡护员 · 全天 · 小镇训练牌 (17,13)。请在牌旁按 E。安全训练不掉血，不消耗钱或体力。试两种武器，各命中和闪避一次，然后回训练牌领取。训练中可随时撤回。');
+ ['sword','blade'].forEach(function(k){var t=p.training[k];b.appendChild(el('p',null,(k==='blade'?'刀':'剑')+'：命中 '+(t.hit?'✓':'待练')+' / 闪避 '+(t.dodge?'✓':'待练')));b.appendChild(mkBtn('免费试'+(k==='blade'?'刀':'剑'),'primary',function(){personalStart('training',k);}));if(!p.trained)b.appendChild(mkBtn('领取旧'+(k==='blade'?'刀':'剑'),'sm',function(){personalClaim(k);}));});
+ if(p.trained)b.appendChild(el('p','req-chip ok','已取得训练记录；可免费补领另一形制旧刃（角色 → 武器）。'));},actions:[{label:'角色武器页',close:false,onClick:function(){openCharacter('weapon');}},{label:'关闭',close:true}]});
+}
+function openPersonalWorkshop(){
+ openWindow({id:'personal_workshop',kind:'custom',wide:true,title:'刀剑与材料工坊',build:function(b){
+ charNote(b,'铜、铁在小镇工坊 (20,7)；钢在城市铁匠铺霍尔铁砧 (13,6)。每批30分钟 / 2体力，先校验材料和完整背包，失败不扣费。');
+ [['copper_ingot','铜矿3 + 煤1'],['iron_ingot','铁矿3 + 煤1'],['steel_ingot','铁锭2 + 木炭1']].forEach(function(a){b.appendChild(mkBtn('熔炼'+itemName(a[0])+' · '+a[1],'sm',function(){personalSmelt(a[0]);}));});
+ b.appendChild(mkBtn('霍尔的刃材试验 · 铁矿2 / 木炭1 / 30分钟','sm',personalSteelStory));
+ b.appendChild(mkBtn('装备与升级','primary',function(){openCharacter('weapon');}));
+ renderPersonalPump(b);},actions:[{label:'关闭',close:true}]});
+}
+// 矿样研究与入门维修提供实际智力路线；公共责任必须跨日复核。
+function personalResearchMinutes(){return Math.ceil(30*(1-Math.min(.25,Math.max(0,charAttr('int')-5)*.01+(hasTalent('focus_read')?.10:0))));}
+function personalStudy(){var p=personalState(),mins=personalResearchMinutes();return performAction({point:{scene:'mine1',x:14,y:20,label:'矿样台'},minutes:mins,energy:2,guard:function(){return personalSafeAction()&&!p.study;},apply:function(){p.study=true;grantCharExpOnce('personal.mine-study',20,'发现');if(hasTalent('focus_read'))personalExample('focus_read','矿样研究：30 → '+mins+'分钟。');toast('研究完成：北侧 (4,3) 的铜矿有富集亮斑，矿样记录已保存。');}});}
+function personalAnalyze(){var p=personalState(),effective=Math.min(20,charAttr('int')+(hasTalent('craft_grasp')?2:0));return performAction({point:personalTownPoint(),minutes:15,energy:1,guard:function(){return personalSafeAction()&&!p.analysis&&effective>=10&&rookieState().engineering===1;},reason:'先在任务板报名水泵维修；有效智力需10。保底路线仍可逐步借工具维修。',apply:function(){p.analysis=true;rookieState().engineering=3;if(hasTalent('craft_grasp'))personalExample('craft_grasp','水泵分析：智力 '+charAttr('int')+' +2 = '+effective+'，核对出松栓而非断水；省去往返询问。');toast('分析松栓与昨日用水记录，工程入门已推进到紧固试水。');}});}
+function personalDuty(){var p=personalState();if(!hasTalent('stand_forward')&&!p.dutyDay)return false;
+ return performAction({point:personalTownPoint(),minutes:p.dutyDay?20:15,energy:3,guard:function(){return personalSafeAction()&&!p.dutyDone&&(p.dutyDay||rookieState().engineering>=4)&&(!p.dutyDay||state.totalDay>p.dutyDay);},reason:'先完成入门水泵紧固试水，再接下值守；值守须在次日复核，不能同天结案。',apply:function(){
+ if(!p.dutyDay){p.dutyDay=state.totalDay;personalExample('stand_forward','承担水泵安全值守：3体力并预约次日复核；待完成责任。');toast('你接下值守，隔天到工坊复核压力；洗点不撤销责任。');}
+ else{p.dutyDone=true;state.coins+=25;bumpRoute('engineering',1);grantCharExpOnce('personal.pump-duty',60,'公共责任');personalExample('stand_forward','已跨日复核水泵，得到25金与工程责任记录。');toast('压力稳定、警示解除。值守完成。');}}});}
+function renderPersonalPump(b){var p=personalState();charNote(b,'水泵额外分析：有效智力 '+Math.min(20,charAttr('int')+(hasTalent('craft_grasp')?2:0))+' / 10；工艺理解 +2，检定最终最多20。');b.appendChild(mkBtn('分析水泵松栓 · 15分钟 / 1体力','sm',personalAnalyze));if(hasTalent('stand_forward')||p.dutyDay){b.appendChild(mkBtn(p.dutyDone?'水泵值守已完成':p.dutyDay?'次日复核值守 · 20分钟 / 3体力':'挺身而出：承担水泵值守 · 15分钟 / 3体力','sm',personalDuty));}}
+function personalMeeting(){var p=personalState();return performAction({point:{scene:'town',x:12,y:13,label:'集市'},out:'berry',qty:1,minutes:5,guard:function(){return personalSafeAction()&&hasTalent('good_meeting')&&state.totalDay-p.meetingDay>=7;},reason:'好时相逢每七个世界日一次；需要先学习天赋。',apply:function(){p.meetingDay=state.totalDay;personalExample('good_meeting','集市居民赠送普通野莓1份，下次可遇第'+(p.meetingDay+7)+'天。');toast('集市居民与你分享一份野莓和今日农事见闻。');}});}
+function personalLuckyRate(){return Math.min(.17,Math.max(0,charAttr('luck')-5)*.01+(hasTalent('lucky_find')?.03:0));}
+function personalLuckyRoll(key,day){var h=2166136261;var s=key+':'+day;for(var i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619);// 混合高低位，避免相邻世界日的字符串哈希长期聚在同一概率区间。
+ h=Math.imul(h^(h>>>16),0x7feb352d);h=Math.imul(h^(h>>>15),0x846ca68b);h^=h>>>16;return (h>>>0)/4294967296;}
+var personalGatherBase=gatherExplore;
+gatherExplore=function(tool,x,y){
+ var sc=state.sceneId,n=exploreNode(sc,x,y),before=n&&n.saved.hp,cycle=n&&n.saved.day;
+ // 一个节点同日最多完成一个再生周期；用完成日固化奖励，不在重载时重抽。
+ cycle=state.totalDay;
+ var ok=personalGatherBase(tool,x,y);if(!ok||!n||before<=0||n.saved.hp!==0||['wood','stone','copper_ore','iron_ore','mushroom'].indexOf(n.def.item)<0)return ok;
+ var p=personalState(),key=sc+':'+key2(x,y);if(p.luckCycles[key]===cycle)return ok;
+ p.luckCycles[key]=cycle;var rate=personalLuckyRate(),roll=personalLuckyRoll(key,cycle);
+ if(roll<rate&&bagAccepts(n.def.item,1)){invAdd(n.def.item,1);toast('顺手找到普通'+itemName(n.def.item)+' ×1。');}
+ if(hasTalent('lucky_find'))personalExample('lucky_find',MAPS[sc].name+' ('+x+','+y+')：概率 '+Math.round(rate*100)+'%，'+(roll<rate?'额外产物检定成功':'本周期未额外获得')+'；每节点每周期仅检定一次。');
+ markDirty();refreshHud();return ok;
+};
+EXPLORE_NODES.mine1['4,3'].rich=true;EXPLORE_NODES.mine1['4,3'].qty=4;
+EXPLORE_NODES.mine2['9,8'].rich=true;EXPLORE_NODES.mine2['9,8'].qty=4;
+// 两个普通遭遇共用一段短支路，每个唯一事件只有一种已结算解法。
+['r2_training','r2_hollow'].forEach(function(id){var m=mkMap(14,12,T_PATH);for(var x=0;x<14;x++)for(var y=0;y<12;y++)if(x===0||y===0||x===13||y===11){m.t[x][y]=T_BUILDING;m.solid[x][y]=1;}
+ m.name=id==='r2_training'?'小镇安全训练场':'旧矿山 · 自愿危险支路';m.indoor=true;m.buildings=[];m.decor=[{t:'sign',x:7,y:9}];m.exits=[];MAPS[id]=m;INTERACTABLES[id]=[];SCENE_ORDER.push(id);});
+installIndoorDoors('r2_training',[{id:'main',side:'south',x:7,y:11,width:2,to:'town',tx:17,ty:14,label:'返回小镇训练牌'}]);
+installIndoorDoors('r2_hollow',[{id:'main',side:'south',x:7,y:11,width:2,to:'mine1',tx:14,ty:21,label:'撤回矿山安全入口'}]);
+INTERACTABLES.town.push({id:'personal_training',x:17,y:13,stand:[[17,14],[16,13],[18,13]],kind:'personalTraining',label:'自卫训练 · 免费试刀剑'});
+INTERACTABLES.mine1.push({id:'personal_hollow',x:14,y:20,stand:[[14,21],[13,20],[15,20]],kind:'personalHollow',label:'危险支路 · 可绕行 / 矿样研究'});
+if(!MAPS.town.decor)MAPS.town.decor=[];
+MAPS.town.decor.push({t:'sign',x:17,y:13});MAPS.mine1.decor.push({t:'sign',x:14,y:20});
+function personalResetCombat(){document.documentElement.classList.remove('personal-encounter');personalCombat={active:false,mode:false,scene:'',cool:0,dodge:0,inv:0,stun:0,flash:0,enemy:null,trial:null,event:null};clearKeys();}
+function personalSetScene(sc,x,y){state.sceneId=sc;state.player.x=x;state.player.y=y;syncPlayerPixel();onSceneChanged();}
+function personalStart(event,trial){
+ if(!personalSafeAction())return false;
+ var p=personalState(),training=event==='training';if(training){if(!personalNear('town',17,13)||['sword','blade'].indexOf(trial)<0){toast('请到小镇训练牌旁。');return false;}}
+ else if(['hollow','canal'].indexOf(event)<0||!personalNear('mine1',14,20)||!p.trained||!p.equipped||p.resolved[event]){toast('需在矿山一层支路入口旁，完成训练并装备旧刃；已解决的事件不重复领奖。');return false;}
+ closeWindow();personalResetCombat();var scene=training?'r2_training':'r2_hollow',entry=MAPS[scene].enter;personalSetScene(scene,entry.x,entry.y);state.player.face='up';
+ document.documentElement.classList.add('personal-encounter');personalCombat.active=true;personalCombat.mode=true;personalCombat.scene=state.sceneId;personalCombat.event=event;personalCombat.trial=training?trial:null;
+ personalCombat.enemy={x:7*TILE+8,y:6*TILE+12,hp:training?999:48,maxHp:48,phase:'approach',timer:0,tx:0,ty:0,kind:event==='canal'?'rush':'slow'};
+ toast(training?'训练：走近、朝向假人按空格；观察举爪预警并闪避，练习受击不扣生命，然后撤回领取。':'危险：生物会先举爪或伏身预警；移动或闪避避开标记。可随时撤回。');return true;
+}
+function personalResolve(event,method){
+ var p=personalState();if(p.resolved[event])return false;p.resolved[event]={method:method,day:state.totalDay};state.coins+=35;
+ var key='personal.encounter.'+event,c=charState();if(!Object.prototype.hasOwnProperty.call(c.expGrants||{},key)){if(!c.expGrants)c.expGrants={};c.expGrants[key]=state.totalDay;grantCharExpDaily('danger',10);}
+ toast('支路安全记录完成（'+(method==='fight'?'驱离':'绕行标记')+'），获得35金与10经验；两种解法同奖。');markDirty();return true;
+}
+function personalBypass(event){var p=personalState();return performAction({point:{scene:'mine1',x:14,y:20,label:'支路警示牌'},minutes:20,energy:3,guard:function(){return personalSafeAction()&&['hollow','canal'].indexOf(event)>=0&&!p.resolved[event];},apply:function(){personalResolve(event,'bypass');}});}
+function personalLeave(failed){
+ var sc=state&&state.sceneId,c=personalCombat;if(!state||(sc!=='r2_training'&&sc!=='r2_hollow')){if(c.active)personalResetCombat();return;}
+ var training=sc==='r2_training';personalResetCombat();closeWindow();personalSetScene(training?'town':'mine1',training?17:14,training?14:21);
+ if(failed){personalState().hp=Math.ceil(personalMaxHp()*.5);state.timeMinutes=Math.min(CFG.dayEnd,state.timeMinutes+60);toast('已救回安全入口：恢复半血，推进60分钟，物品与金币全部保留。');}
+ markDirty();saveNow();refreshHud();if(failed&&state.timeMinutes>=CFG.dayEnd)autoSleep();
+}
+function personalToggle(){if(timePaused()||!personalWeapon())return false;personalCombat.mode=!personalCombat.mode;toast(personalCombat.mode?'武器模式：空格攻击 / Shift闪避':'工具模式：空格使用农具');return true;}
+function personalAttack(){
+ var c=personalCombat,w=personalWeapon();if(timePaused()||!c.mode||!w||c.cool>0||c.stun>0)return false;
+ c.cool=w.interval;c.flash=.18;var e=c.enemy;if(!c.active||!e)return true;
+ var f=FACE_DIR[state.player.face]||[0,1],dx=e.x-Game.ppos.x,dy=e.y-Game.ppos.y,forward=dx*f[0]+dy*f[1],side=Math.abs(dx*f[1]-dy*f[0]);
+ if(forward<0||forward>w.range||side>w.width)return true;
+ if(c.trial){personalState().training[c.trial].hit=true;toast('训练命中！再练闪避，然后撤回。');markDirty();}
+ else{var dmg=Math.max(1,Math.round(w.damage*(w.kind==='blade'?.85:1)-1));e.hp-=dmg;toast('命中 '+dmg+' · 敌方生命 '+Math.max(0,e.hp)+'/48');if(e.hp<=0){var event=c.event;personalResolve(event,'fight');personalLeave(false);}}
+ Audio2.play('breakrock');return true;
+}
+function personalDodge(){var c=personalCombat;if(timePaused()||!c.mode||!personalWeapon()||c.dodge>0||c.stun>0)return false;
+ var f=FACE_DIR[state.player.face]||[0,1];for(var i=0;i<12;i++){var nx=Game.ppos.x+f[0]*TILE*.1,ny=Game.ppos.y+f[1]*TILE*.1;if(isSolid(state.sceneId,Math.floor(nx/TILE),Math.floor(ny/TILE)))break;Game.ppos.x=nx;Game.ppos.y=ny;}
+ state.player.x=Math.floor(Game.ppos.x/TILE);state.player.y=Math.floor(Game.ppos.y/TILE);c.dodge=1.6;c.inv=.16;
+ if(c.trial){personalState().training[c.trial].dodge=true;toast('闪避完成！命中后可撤回训练牌。');markDirty();}return true;
+}
+function personalStunSeconds(){return .35*(1-Math.min(.25,Math.max(0,charAttr('nerve')-5)*.01+(hasTalent('steady')?.1:0)));}
+function personalCanApproach(x,y){var e=personalCombat.active&&personalCombat.enemy;if(!e)return true;var d=Math.hypot(x-e.x,y-e.y);return d>=TILE*.55||d>Math.hypot(Game.ppos.x-e.x,Game.ppos.y-e.y);}
+function personalTakeHit(){var c=personalCombat;if(c.inv>0)return false;if(c.trial){c.inv=.6;c.stun=personalStunSeconds();toast('练习受击：未扣生命。观察举爪预警，移动或闪避离开标记。');return true;}var p=personalState();p.hp=Math.max(0,p.hp-8);c.inv=.6;c.stun=personalStunSeconds();if(hasTalent('steady'))personalExample('steady','受击硬直 .35 → '+c.stun.toFixed(3)+'秒；暂停时不推进。');markDirty();if(p.hp===0)personalLeave(true);return true;}
+function tickPersonal(dt){
+ var c=personalCombat;if(!state)return;if(timePaused())return;
+ ['cool','dodge','inv','stun','flash'].forEach(function(k){c[k]=Math.max(0,c[k]-dt);});
+ if(c.active&&state.sceneId!==c.scene){personalResetCombat();return;}
+ var e=c.enemy;if(!c.active||!e)return;
+ var dist=Math.hypot(e.x-Game.ppos.x,e.y-Game.ppos.y);
+ e.timer=Math.max(0,e.timer-dt);
+ if(e.phase==='recover'){if(e.timer<=0)e.phase='approach';return;}
+ if(e.phase==='warn'){if(e.timer<=0){e.phase='attack';e.timer=e.kind==='rush'?.3:.12;}return;}
+ if(e.phase==='attack'){
+  if(e.kind==='rush'){var d=Math.hypot(e.tx-e.x,e.ty-e.y);if(d>1){var step=Math.min(d,5*TILE*dt),nx=e.x+(e.tx-e.x)/d*step,ny=e.y+(e.ty-e.y)/d*step;if(!isSolid(c.scene,Math.floor(nx/TILE),Math.floor(ny/TILE))){e.x=nx;e.y=ny;}}}
+  if(Math.hypot(Game.ppos.x-(e.kind==='rush'?e.x:e.tx),Game.ppos.y-(e.kind==='rush'?e.y:e.ty))<TILE*.75)personalTakeHit();
+  if(e.timer<=0){e.phase='recover';e.timer=.9;}return;
+ }
+ if(dist<(e.kind==='rush'?4:1.35)*TILE){e.phase='warn';e.timer=e.kind==='rush'?.9:.75;e.tx=Game.ppos.x;e.ty=Game.ppos.y;return;}
+ if(c.trial)return;
+ var speed=1.3*TILE*dt;if(dist>0){var nx=e.x+(Game.ppos.x-e.x)/dist*speed,ny=e.y+(Game.ppos.y-e.y)/dist*speed;if(!isSolid(c.scene,Math.floor(nx/TILE),Math.floor(ny/TILE))){e.x=nx;e.y=ny;}}
+}
+function drawPersonal(g,ox,oy){
+ var c=personalCombat,e=c.enemy;if(!c.active)return;g.save();g.translate(-ox,-oy);
+ if(e){var x=e.x,y=e.y;px(g,x-7,y-11,14,10,c.trial?'#9A795B':e.kind==='rush'?'#977399':'#699A83');px(g,x-5,y-14,3,5,'#D6D4B7');px(g,x+2,y-14,3,5,'#D6D4B7');px(g,x-3,y-8,1,1,'#283831');px(g,x+3,y-8,1,1,'#283831');
+ if(e.phase==='warn'||e.phase==='attack'){g.strokeStyle='#F9CA69';g.lineWidth=2;g.strokeRect(e.tx-TILE*.75,e.ty-TILE*.75,TILE*1.5,TILE*1.5);g.fillStyle='#F9CA69';g.font='8px monospace';g.fillText(e.kind==='rush'?'! 冲刺':'! 举爪',x-14,y-20);}
+ if(!c.trial){px(g,x-10,y-19,20,2,'#482E37');px(g,x-10,y-19,20*Math.max(0,e.hp)/48,2,'#DC8C70');}}
+ if(c.mode){var f=FACE_DIR[state.player.face]||[0,1],w=personalWeapon(),px2=Game.ppos.x,py2=Game.ppos.y;if(w){g.strokeStyle=c.flash>0?'#FFF0AD':'#8DA9AA';g.lineWidth=c.flash>0?3:1;g.beginPath();g.moveTo(px2+f[0]*7,py2-5+f[1]*7);g.lineTo(px2+f[0]*w.range,py2-5+f[1]*w.range);g.stroke();}}
+ g.restore();
+}
+function openPersonalHollow(){var p=personalState();openWindow({id:'personal_hollow',kind:'custom',wide:true,title:'旧矿山 · 支路警告',build:function(b){
+ charNote(b,'两段短支路都有可预见的危险，普通矿脉不受影响。旧刃可应付，也可按20分钟 / 3体力的保底方案绕行和标记；各方法主奖同为35金与10经验。攻击 / 移动 / 闪避，随时撤回。失败保留所有物品。');
+ [['hollow','缓慢矿穴生物 · 举爪预兆'],['canal','旧河道穴居生物 · 伏身冲刺']].forEach(function(a){b.appendChild(el('p',null,a[1]+(p.resolved[a[0]]?' · 已解决（'+p.resolved[a[0]].method+'）':'')));if(!p.resolved[a[0]]){b.appendChild(mkBtn('进入'+a[1],'primary',function(){personalStart(a[0]);}));b.appendChild(mkBtn('绕行标记'+(a[0]==='hollow'?'矿穴':'河道'),'sm',function(){personalBypass(a[0]);}));}});
+ charNote(b,'矿样研究：基础30分钟，当前'+personalResearchMinutes()+'分钟 / 2体力；只结算一次。');b.appendChild(mkBtn(p.study?'矿样已研究':'研究矿样','sm',personalStudy));
+ if(hasTalent('read_ore')){charNote(b,'识矿：一层 (4,3) 有铜色富集亮斑；二层 (9,8) 铁线密集。到矿脉旁仍须正常使用镐子采集。');personalExample('read_ore','辨认一层(4,3)铜色亮斑、二层(9,8)铁线；没有远程采集。');}
+ },actions:[{label:'关闭',close:true}]});}
+// 入门足迹通过原任务内容呈现，保底见闻仍然完整。
+var personalRookieRender=renderRookieJobs;
+renderRookieJobs=function(b){personalRookieRender(b);if(hasTalent('read_tracks')){charNote(b,'辨迹：林口犬爪印向南通往集市，车辙边缘湿润、是今天的新痕；东北碎叶下的旧痕不通向危险支路。');personalExample('read_tracks','林缘安全调查：新犬爪印向南至集市；碎叶下旧痕无需追踪。');}if(rookieNear('workshop'))renderPersonalPump(b);};
+var personalInteractBase=activateInteractable;
+activateInteractable=function(it){if(it&&it.kind==='personalTraining'){openPersonalTraining();return;}if(it&&it.kind==='personalHollow'){openPersonalHollow();return;}personalInteractBase(it);};
+var personalWorkshopBase=openWorkshop;
+openWorkshop=function(){personalWorkshopBase();if(UI.window){var build=UI.window.build;UI.window.build=function(b){b.appendChild(mkBtn('个人刀剑 / 熔炼 / 水泵分析','primary',openPersonalWorkshop));build(b);};refreshWindow();}};
+var personalMarketBase=openMarket;
+openMarket=function(){personalMarketBase();if(UI.window&&hasTalent('good_meeting')){var build=UI.window.build;UI.window.build=function(b){b.appendChild(mkBtn('好时相逢 · 与集市居民分享见闻','sm',personalMeeting));build(b);};refreshWindow();}};
+var personalCityServiceBase=openCityService;
+openCityService=function(it){personalCityServiceBase(it);if(it&&it.service==='smith'&&UI.window){var build=UI.window.build;UI.window.build=function(b){b.appendChild(mkBtn('个人刀剑 / 精钢整修','primary',openPersonalWorkshop));build(b);};refreshWindow();}};
+var personalHistoryBase=CHAR_BUILD.history;
+CHAR_BUILD.history=function(b){personalHistoryBase(b);var p=personalState(),box=charBox(b,'个人训练与责任');
+ charRow(box,'免费训练',p.trained?'已完成，两形制试用记录已保存':'小镇训练牌 (17,13)');
+ ['hollow','canal'].forEach(function(k){charRow(box,k==='hollow'?'矿穴支路':'河道支路',p.resolved[k]?'第'+p.resolved[k].day+'天 · '+(p.resolved[k].method==='fight'?'驱离':'绕行标记'):'可选，未处理');});
+ charRow(box,'水泵安全值守',p.dutyDone?'已复核结案':p.dutyDay?'第'+p.dutyDay+'天接下，次日到小镇工坊复核':'尚未承担');
+};
+var personalSerializeBase=serialize;
+serialize=function(){var raw=personalSerializeBase();raw.personal=deepClone(personalState());return raw;};
+// 控件留在游戏舞台内部，适配旋转的手机画面，与现有方向键同时使用。
+function personalControls(){var root=$('#viewport');if(!root||$('#personalControls'))return;
+ var box=el('div','personal-controls');box.id='personalControls';var label=el('span');label.id='personalStatus';box.appendChild(label);
+ [['personalMode','收拔武器 Q',personalToggle],['personalAttack','攻击 空格',personalAttack],['personalDodge','闪避 Shift',personalDodge],['personalLeave','撤回安全区',function(){personalLeave(false);}]].forEach(function(a){var b=mkBtn(a[1],'sm',a[2]);b.id=a[0];box.appendChild(b);});root.appendChild(box);}
+var personalHudBase=refreshHud;
+refreshHud=function(){personalHudBase();if(!state)return;personalControls();var box=$('#personalControls');if(!box)return;box.hidden=!(personalState().trained||personalCombat.active);box.classList.toggle('active',personalCombat.active||personalCombat.mode);$('#personalLeave').hidden=!personalCombat.active;
+ $('#personalStatus').textContent=(personalCombat.trial?'安全试用':'生命 '+personalState().hp+'/'+personalMaxHp())+' · '+(personalCombat.mode?'武器模式':'工具模式');
+ $('#personalDodge').textContent='闪避 '+personalState().dodgeKey;
+ $('#personalAttack').disabled=!personalCombat.mode||!!UI.window;$('#personalDodge').disabled=!personalCombat.mode||!!UI.window;
+};
+
 window.__MOSS__ = {
   doorTiles: doorTiles, installIndoorDoors: installIndoorDoors, drawIndoorDoors: drawIndoorDoors,
   questExitTile: questExitTile,
@@ -18019,6 +19768,15 @@ window.__MOSS__ = {
 
   /* 角色成长账本（R1）。用 getter 导出，避免测试拿到的是快照。 */
   Game: Game,
+  personalState:personalState, normalizePersonal:normalizePersonal, personalMaxHp:personalMaxHp,
+  personalUpgrade:personalUpgrade, personalSmelt:personalSmelt, personalClaim:personalClaim, personalEquip:personalEquip,
+  personalSteelStory:personalSteelStory, personalStart:personalStart, personalLeave:personalLeave,
+  personalAttack:personalAttack, personalDodge:personalDodge, personalTakeHit:personalTakeHit, tickPersonal:tickPersonal,
+  personalWeapon:personalWeapon, personalStunSeconds:personalStunSeconds, personalResearchMinutes:personalResearchMinutes,
+  personalBypass:personalBypass, personalStudy:personalStudy, personalAnalyze:personalAnalyze, personalDuty:personalDuty, personalMeeting:personalMeeting,
+  personalLuckyRoll:personalLuckyRoll, personalLuckyRate:personalLuckyRate,
+  openPersonalHollow:openPersonalHollow, openPersonalTraining:openPersonalTraining, openPersonalWorkshop:openPersonalWorkshop,
+  get personalCombat(){return personalCombat;},
   charState: charState,
   charBudget: charBudget,
   charLevelCap: charLevelCap,
@@ -18084,6 +19842,15 @@ window.__MOSS__ = {
   },
   __drawRoomTo: __drawRoomTo,
   __drawFacadeTo: __drawFacadeTo,
+  /* 白蔷薇宫城观测面：楼层表、楼梯记录与落点查询，供自动化测试核对
+     跨层连通性与存档迁移，不注入任何测试数据。 */
+  PALACE_FLOORS: PALACE_FLOORS.map(function (f) { return { id: f.id, label: f.label, sceneId: f.sceneId, order: f.order }; }),
+  PALACE_STAIRS: PALACE_STAIRS,
+  palaceFloorOf: function (sceneId) { var f = palaceFloorOf(sceneId); return f ? { id: f.id, label: f.label, order: f.order } : null; },
+  palaceStairFrom: function (sceneId) {
+    return PALACE_STAIRS.filter(function (s) { return s.sceneId === sceneId; })
+      .map(function (s) { return { id: s.id, x: s.x, y: s.y, stand: s.stand, to: s.to, tx: s.tx, ty: s.ty, label: s.label }; });
+  },
   /* 调试用：直接跳场景（绕过地面寻路，自动化测试与调试用） */
   devSwitchScene: function (to, tx, ty) { state.sceneId = to; state.player.x = tx; state.player.y = ty; state.player.face = 'down'; syncPlayerPixel(); onSceneChanged(); registerArrival(to); },
   /* 第七版快速传送的验收探针：真实走预览→确认事务，不注入状态 */
@@ -18229,6 +19996,9 @@ window.__MOSS__ = {
   gateAllowed: function (key) { return extendedGateAllowed(key); },
   bumpRoute: function (k, n) { return bumpRoute(k, n); },
   bumpCareer: function (k, n) { return bumpCareer(k, n); },
+  mineWorks: function () { return mineWorks(); },
+  professionalWaterPolicy: function () { return professionalWaterPolicy(); },
+  openEngineeringProjectLog: function () { return openEngineeringProjectLog(); },
   /* 测试用：把职业与军事线恢复到「刚起步」状态，保留世界探索进度 */
   resetCareerForTest: function () {
     var p = professionalLifeState();
@@ -18237,7 +20007,9 @@ window.__MOSS__ = {
     p.careers = { horticulture: 0, medicine: 0, trade: 0, engineering: 0 };
     p.trust = 0;
     p.eng = { stage: 0, post: '', incident: '', hearing: '', choice: '', budget: 0, memories: {} };
-    p.waterworks = Object.assign({}, p.waterworks, { certified: false, repair: null, allocation: null });
+    p.projects = {};
+    p.projects[ENG_PROJECT_ID] = newEngProject();
+    deriveWaterworksFromProject(p, p.waterworks);
     state.militaryLife = newMilitaryLife();
     var e = exploreState();
     e.forest = true; e.mine = true;
@@ -18248,46 +20020,93 @@ window.__MOSS__ = {
   openExtendedGate: function (key) { return openExtendedGate(key); },
   normalizeProfessionalLife: function (raw) { return normalizeProfessionalLife(raw); },
   syncWater: function () { var p = professionalLifeState(); p.waterworks.certified = true; return p.waterworks.certified; },
-  /* 测试用：给出一个自洽的「水利已验收」状态（repair/allocation/receivedStone 三者齐备） */
+  /* 测试用：给出一个自洽的「已取得基础工程认证」状态。
+     基础认证 = 三处勘测读数齐备 ＋ 实践路线已登记；认证不再等于工程已交付。 */
   grantWaterworksCertificate: function () {
-    var p = professionalLifeState();
-    p.waterworks.repair = 'irrigation';
-    p.waterworks.allocation = 'irrigation';
-    p.waterworks.receivedStone = true;
-    p.waterworks.millOpinion = true;
-    p.waterworks.meadowOpinion = true;
-    p.waterworks.portOpinion = true;
-    p.waterworks.testDay = 0;
-    p.waterworks.certified = true;
+    var p = professionalLifeState(), pj = engProject();
+    pj.survey = { level: 2, day: state.totalDay, east: 'sound', silt: 'light' };
+    pj.practice = 'mill';
+    pj.phase = 'certify';
+    deriveWaterworksFromProject(p, p.waterworks);
     return true;
+  },
+  engProjectInfo: function () {
+    var pj = engProject();
+    return {
+      id: pj.id, phase: pj.phase, step: engPhaseIndex(pj), scheme: pj.scheme,
+      survey: pj.survey, practice: pj.practice, emergency: pj.emergency, opinions: pj.opinions,
+      stone: pj.stone, kit: pj.kit, build: pj.build, mode: pj.mode, crew: pj.crew,
+      trialDay: pj.trialDay, maintDay: pj.maintDay, maintCount: pj.maintCount,
+      funds: pj.funds, fundsLeft: engFundsLeft(pj), risk: engRisk(pj),
+      steps: engSchemeBuild(pj).map(function (s) { return s; }),
+      scope: professionalLifeState().waterworks.scope,
+      allocation: professionalLifeState().waterworks.allocation,
+      policy: professionalWaterPolicy(), shipping: professionalShippingMinutes(60),
+      practiceRoute: engPracticeRoute()
+    };
   },
   engInfo: function () {
     var e = engCareer();
     return { stage: e.stage, post: e.post, incident: e.incident, choice: e.choice,
-      hearing: e.hearing, budget: e.budget, memories: e.memories, can: engCan(), playerCoins: state.coins };
+      hearing: e.hearing, budget: e.budget, budgetGranted: !!e.budgetGranted, memories: e.memories, can: engCan(), playerCoins: state.coins };
   },
+  /* 测试用：确认关键工序不能在远处完成 —— 走与真实按钮同一个 extendedWork 入口 */
+  engRemoteProbe: function (site) {
+    var fired = false, before = JSON.stringify(engProject());
+    extendedWork(site, '探针', { minutes: 1, guard: function () { return true; } }, function () { fired = true; });
+    return { fired: fired, unchanged: JSON.stringify(engProject()) === before };
+  },
+  /* 测试用：把工程推到「方案已定、石料已到场」的自洽状态。
+     材料物流链由既有 R2 用例覆盖，这里只夹具它已完成；
+     工程内部的每一步仍由验收脚本走真实界面与真实位置。 */
+  engFixtureToScheme: function (scheme) {
+    var p = professionalLifeState(), pj = engProject(), e = engCareer();
+    pj.survey = { level: 2, day: Math.max(1, state.totalDay), east: 'sound', silt: 'light' };
+    pj.practice = 'mill';
+    pj.phase = 'certify';
+    deriveWaterworksFromProject(p, p.waterworks);
+    e.stage = 4; e.post = 'waterworks_engineer'; e.incident = 'channel'; e.choice = 'channel';
+    applyEngChoice();
+    pj.opinions = { mill: true, meadow: true, port: true };
+    engGrantBudget();
+    if (!engConfirmScheme(scheme || 'conservative')) return false;
+    pj.stone = true; pj.stoneDay = state.totalDay;
+    deriveWaterworksFromProject(p, p.waterworks);
+    state.inventory.iron_ingot = (state.inventory.iron_ingot || 0) + 1;
+    state.energy = Math.max(state.energy, 60);
+    state.timeMinutes = Math.max(state.timeMinutes, 480);
+    markDirty();
+    return true;
+  },
+  /* 测试用：把工程推到「已验收交付」。只验收下游后果的脚本（CDE 等）
+     用它跳过工程内部流程 —— 那些步骤由 run-r3-project 逐键验证。 */
+  engFixtureAccepted: function (scheme) {
+    if (!this.engFixtureToScheme(scheme || 'conservative')) return false;
+    var q = engProject();
+    q.kit = 1; engAdvance('materials');
+    q.build = engSchemeBuild(q).length; q.mode = 'self'; engAdvance('build');
+    q.trialDay = Math.max(1, state.totalDay - 1);
+    engAdvance('trial');
+    return engAcceptProject();
+  },
+  /* 夹具：世界日期前进一天。委托施工每天只能开一道工序，
+     用它替代真实睡觉流程，不影响资金与工序的结算逻辑。 */
+  engAdvanceDay: function () { state.totalDay++; markDirty(); if (typeof refreshWindow === 'function') refreshWindow(); return state.totalDay; },
   engStep: function (what, arg) {
     var e = engCareer();
-    if (what === 'sign') { if (e.stage !== 0 || !professionalLifeState().waterworks.certified) return false; e.stage = 1; rememberChoice('noya', '独立署名水利报告'); return true; }
+    if (what === 'sign') { if (e.stage !== 0 || !engHasCertificate()) return false; e.stage = 1; rememberChoice('noya', '独立署名水利报告'); return true; }
     if (what === 'incident') {
       if (e.stage !== 1 || e.incident || ['field','channel'].indexOf(arg)<0) return false;
       e.incident = arg; e.choice = arg; e.stage = 2;
       rememberChoice('noya', arg === 'field' ? '事故中先保农田' : '事故中先保通航');
       rememberChoice('martin', arg === 'field' ? '事故中先保农田' : '事故中先保通航');
-      professionalLifeState().watershedContract = 2;
       applyEngChoice();
       return true;
     }
     if (what === 'post') { if (e.stage < 2 || e.post) return false; e.post = 'waterworks_engineer'; e.stage = 4; rememberChoice('noya', '事故后接下工程岗位'); return true; }
-    if (what === 'budget') { if (e.stage < 3 || e.hearing || e.budgetGranted) return false; e.budgetGranted=true; e.budget += 150; rememberChoice('council', '以岗位身份申请机构预算'); return true; }
-    if (what === 'hearing') {
-      if (e.stage < 4 || e.hearing || e.budget<150 || ['irrigation','navigation'].indexOf(arg)<0) return false;
-      e.hearing = arg; e.budget = Math.max(0, e.budget - 150);
-      professionalLifeState().waterworks.allocation = arg;
-      rememberChoice('noya', arg === 'irrigation' ? '主持说明会时把预算给了灌溉' : '主持说明会时把预算给了通航');
-      rememberChoice(arg === 'irrigation' ? 'martin' : 'council', arg === 'irrigation' ? '主持说明会时把预算给了灌溉' : '主持说明会时把预算给了通航');
-      markDirty(); return true;
-    }
+    if (what === 'budget') { if (e.stage < 3 || e.budgetGranted || engProject().funds.granted > 0) return false; return engGrantBudget(); }
+    if (what === 'scheme') { return engConfirmScheme(arg); }
+    if (what === 'accept') { return engAcceptProject(); }
     return false;
   },
   syncPlayer: function () { syncPlayerPixel(); onSceneChanged(); },

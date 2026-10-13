@@ -27,13 +27,16 @@ const FAST = [
 /* 第二层：真实浏览器流程 */
 const BROWSER = [
   'run-r0-character-entry.mjs', 'run-r1-character-growth.mjs', 'run-r1-accounting.mjs', 'run-r1-rookie-routes.mjs', 'run-r1-mobile.mjs',
+  'run-r2-personal.mjs', 'run-r2-talents.mjs', 'run-r2-mobile.mjs', 'run-r2-accounting.mjs',
   'run-phase-c-mill.mjs', 'run-phase-c-meadow.mjs', 'run-phase-cde.mjs',
   'run-phase-d-review.mjs', 'run-indoor-weather.mjs', 'run-indoor-doors.mjs',
   'run-v7-stageE-rules.mjs', 'run-v7-stageE-cloudpass.mjs', 'run-v7-stageE-extras.mjs',
   'run-v7-stageB.mjs', 'run-v7-stageB-soil.mjs', 'run-v7-audit-regressions.mjs',
   'run-v7-stageC.mjs', 'run-v7-stageC-heath.mjs', 'run-v7-stageC-interiors.mjs',
   'run-world-map.mjs', 'run-fast-travel.mjs', 'run-save-invariants.mjs', 'run-alt-routes.mjs',
-  'run-engineering-career.mjs', 'run-engineering-ui.mjs',
+  'run-engineering-career.mjs', 'run-engineering-ui.mjs', 'run-r3-project.mjs', 'run-r3-mobile.mjs',
+  /* 白蔷薇宫城 P1：布局契约、楼层通行、存档迁移与手机端分层验收 */
+  'run-palace-layout.mjs', 'run-palace-save.mjs', 'run-palace-floors.mjs', 'run-palace-mobile.mjs',
   'run-v3.mjs', 'run-guide.mjs',
   'run-edge.mjs', 'run-main.mjs', 'run-responsive-layout.mjs'
 ].filter((f) => fs.existsSync(path.join(here, f)));

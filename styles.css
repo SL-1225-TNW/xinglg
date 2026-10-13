@@ -260,6 +260,21 @@ button{font-family:inherit}
   pointer-events:none;
 }
 
+/* 白蔷薇宫城楼层牌：宫城场景常驻，可点开楼层导览。
+   位置压在场景名下方，两个标签不会互相盖住；触控目标高度与 #touch* 一致，
+   手机横竖屏都够手指点中。 */
+.floor-tag{
+  position:absolute;right:6px;top:26px;
+  min-height:28px;max-width:min(220px,72%);
+  padding:4px 10px;border-radius:6px;
+  background:rgba(28,40,32,.88);border:1px solid #6b7f5f;
+  color:var(--paper);font-size:12px;line-height:1.2;letter-spacing:.5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  cursor:pointer;
+}
+.floor-tag:hover{border-color:var(--hint)}
+.floor-tag:focus-visible{outline:2px solid var(--hint);outline-offset:2px}
+
 /* ---------------- 底部：快捷栏 + 提示 ---------------- */
 #dock{
   flex:0 0 auto;
@@ -776,6 +791,8 @@ textarea.save-box{
   #stage{padding:6px 6px 2px}
   .quest-strip{font-size:11px;bottom:4px;left:4px;right:4px}
   .scene-tag{display:none}
+  /* 窄屏上场景名让位给楼层牌：楼层可点，场景名是纯装饰。 */
+  .floor-tag{top:6px;right:6px;min-height:32px;font-size:12px;padding:5px 10px}
   .window-layer{padding:8px}
   .win{max-height:calc(100vh - 16px)}
   .win-body{padding:10px}
@@ -991,6 +1008,7 @@ html.rotated-play .hud{order:initial;width:auto;flex-wrap:nowrap}
 html.rotated-play .hud-cell{min-width:0;flex:1 1 auto}
 html.rotated-play .hotbar{width:auto;max-width:calc(100% - 16px)}
 html.rotated-play .scene-tag{display:block}
+html.rotated-play .floor-tag{display:block;top:26px}
 html.rotated-play .quest-strip{bottom:80px}
 html.compact-play #topbar{min-height:36px;padding:2px 8px;gap:6px}
 html.compact-play .hud-label{display:none}
@@ -1092,3 +1110,14 @@ html.compact-play[data-device="tablet"] .tact-sm{width:44px;height:44px}
   .forest-journal-foot{display:none}.forest-journal-page{padding:14px 13px 17px}
   .forest-journal-page h2{font-size:22px}.journal-stat-grid{grid-template-columns:1fr}
 }
+/* R2：可读战斗控件在舞台内，沿用现有手机旋转与方向键。 */
+.personal-controls{position:absolute;top:6px;left:50%;transform:translateX(-50%);z-index:5;display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap;width:max-content;max-width:96%;padding:5px;background:#19382fee;border:1px solid #b7ad7f;border-radius:5px;line-height:1.3;font-size:12px;pointer-events:auto}
+.personal-controls[hidden],.personal-controls button[hidden]{display:none}
+.personal-controls button{min-height:36px;touch-action:none;white-space:nowrap}
+.personal-controls span{flex-basis:100%;text-align:center;color:#f1e5be}
+@media(max-width:600px){.personal-controls{top:3px;padding:3px;gap:3px}.personal-controls button{font-size:11px;padding:4px 7px;min-height:36px}}
+html.personal-encounter #farmAssist{display:none!important}
+.personal-controls{z-index:35}
+.personal-controls:not(.active){left:auto;right:6px;transform:none;width:auto}
+.personal-controls:not(.active) #personalAttack,.personal-controls:not(.active) #personalDodge{display:none}
+html.immersive .personal-controls{top:56px}

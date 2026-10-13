@@ -37,11 +37,11 @@ try {
   const talent = await body();
   ok(/专注研读/.test(talent) && /好时相逢/.test(talent), '天赋页列出首批十个入门节点');
   ok(/后续内容/.test(talent), '后续十五节点标成后续内容');
-  /* R1 起：已接入阶段的节点可学，未接入阶段（R2）仍必须没有购买按钮。
+  /* R2 起：十个已接入的入门节点可学，后续十五节点仍不出售。
      新档没有天赋点，所以「学习」按钮此刻应当是禁用状态。 */
   const learnBtns = p.locator('.win-body button', { hasText: '学习（1 点）' });
   const learnCount = await learnBtns.count();
-  ok(learnCount === 2, '只给 2 个已接真实玩法的 R1 节点学习入口，其余只可查看');
+  ok(learnCount === 10, '十个入门节点都已接入且提供学习入口');
   const disabled = await learnBtns.evaluateAll(bs => bs.every(b => b.disabled));
   ok(disabled, '新档没有天赋点，学习按钮为禁用而不是可点');
   const buyBtns = await p.locator('.win-body button').allTextContents();
@@ -50,7 +50,7 @@ try {
   await p.getByRole('button', { name: '武器', exact: true }).click();
   const weapon = await body();
   ok(/现在真正在用的工具/.test(weapon), '武器页先展示真实工具');
-  ok(/尚未开放/.test(weapon) && /旧刀/.test(weapon), '个人刀剑写明未开放与训练路径');
+  ok(/免费训练/.test(weapon) && /旧刀/.test(weapon), '个人刀剑写明免费训练与装备路径');
   ok(/不算个人刀剑|不是武器|不属于个人/.test(weapon), '军需装备没有被写成个人武器');
 
   await p.getByRole('button', { name: '经历', exact: true }).click();

@@ -39,6 +39,10 @@ jobs:
           node tests/run-r1-accounting.mjs
           node tests/run-r1-rookie-routes.mjs
           node tests/run-r1-mobile.mjs
+          node tests/run-r2-personal.mjs
+          node tests/run-r2-talents.mjs
+          node tests/run-r2-mobile.mjs
+          node tests/run-r2-accounting.mjs
           node tests/run-indoor-doors.mjs
       - name: Verify mill and meadow
         run: |

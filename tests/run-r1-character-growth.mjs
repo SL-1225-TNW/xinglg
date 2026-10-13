@@ -208,10 +208,10 @@ try {
     const m = __MOSS__;
     m.state.char.talentPoints = 8; m.state.char.attr = { int: 9, sense: 9, nerve: 9, body: 9, luck: 9 };
     const before = m.state.char.talentPoints;
-    const err = m.charLearnTalent('steady');
+    const err = m.charLearnTalent('果断反击');
     return { err, unchanged: m.state.char.talentPoints === before };
   });
-  ok(!!r2Locked.err && r2Locked.unchanged, 'R2 节点即使点数够也不能学，且不扣点');
+  ok(!!r2Locked.err && r2Locked.unchanged, '后续十五节点仍不能学，且不扣点');
 
   /* --- 存读档往返：等级/属性/天赋/去重记录都保留 --- */
   await v(() => {

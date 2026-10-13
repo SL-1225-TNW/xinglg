@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict';
+﻿import assert from 'node:assert/strict';
 import {launch, boot, walkTo, faceTowards} from './harness.mjs';
 
 let checks=0;
@@ -85,7 +85,7 @@ try {
 
  // Isolated completed-waterworks fixture measures actual downstream effects, not just flags.
  for(const policy of ['irrigation','navigation']){
-  await reset();await v(policy=>{const m=__MOSS__,w=m.professionalLifeState().waterworks;Object.assign(w,{repair:'pending',receivedStone:true,millOpinion:true,meadowOpinion:true,portOpinion:true,allocation:policy,certified:true});m.state.meadowLife.plots=[{seedDay:m.state.totalDay,waterDays:[]},null,null];m.state.weather.today='sun';},policy);
+  await reset();await v(policy=>{const m=__MOSS__;m.engFixtureAccepted(policy==='irrigation'?'conservative':'balanced');m.state.meadowLife.plots=[{seedDay:m.state.totalDay,waterDays:[]},null,null];m.state.weather.today='sun';},policy);
   await night();eq(policy+' 实际夜结算供水',await v(()=>__MOSS__.state.meadowLife.plots[0].waterDays.length),policy==='irrigation'?1:0);
   await pose('mill_workshop',9,7);await v(()=>__MOSS__.openMillLife('mill'));
   for(let i=0;i<3;i++)await click('磨粉 · 小麦2 → 面粉3');

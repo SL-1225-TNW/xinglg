@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="830" viewBox="0 0 960 830">
+<defs><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#d5d9d5" stroke-width=".5"/></pattern><pattern id="roof" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M0 12L12 0" stroke="#8d989e" stroke-width="1"/></pattern><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="#567b7c"/></marker></defs>
+<rect width="960" height="830" fill="#f7f2e8"/>
+<rect x="24" y="94" width="912" height="664" fill="url(#grid)"/>
+<style>text{font-family:"Microsoft YaHei","Noto Sans CJK SC",sans-serif;fill:#243b50;font-size:21px}.muted{fill:#637584;font-size:16px}.heading{font-weight:700;font-size:30px}.room{stroke:#526c80;stroke-width:2.5}.path{stroke:#8eaaa7;stroke-width:11;fill:none;stroke-linecap:square;stroke-linejoin:round}.axis{stroke:#8f7450;stroke-width:2;stroke-dasharray:6 7;fill:none}</style>
+<text x="38" y="44" class="heading">白蔷薇宫城 · 总平面草案</text>
+<text x="40" y="76" class="muted">三层主宫＋两层翼楼＋地下服务层｜功能草图，非比例施工图</text>
+<rect x="260" y="115" width="460" height="110" fill="#d9e5ca" class="room"/>
+<text x="490.0" y="170.0" text-anchor="middle">蔷薇花园</text>
+<text x="490.0" y="198.0" text-anchor="middle" class="muted">花坛 · 园丁 · 散步路线</text>
+<rect x="230" y="260" width="520" height="105" fill="#f2dfb5" class="room"/>
+<text x="490.0" y="312.5" text-anchor="middle">主宫 · 地上三层</text>
+<text x="490.0" y="340.5" text-anchor="middle" class="muted">1F办事 / 2F礼仪 / 3F起居</text>
+<rect x="155" y="390" width="155" height="195" fill="#d9e9e4" class="room"/>
+<text x="232.5" y="487.5" text-anchor="middle">西翼 · 两层</text>
+<text x="232.5" y="515.5" text-anchor="middle" class="muted">档案 · 音乐 · 礼拜</text>
+<rect x="670" y="390" width="155" height="195" fill="#f2dfb5" class="room"/>
+<text x="747.5" y="487.5" text-anchor="middle">东翼 · 两层</text>
+<text x="747.5" y="515.5" text-anchor="middle" class="muted">接待 · 宴会 · 备餐</text>
+<rect x="335" y="405" width="310" height="160" fill="#d9e5ca" class="room"/>
+<text x="490.0" y="485.0" text-anchor="middle">荣誉内庭</text>
+<text x="490.0" y="513.0" text-anchor="middle" class="muted">环院回廊 · 露天庭院</text>
+<rect x="845" y="390" width="90" height="195" fill="#e5d4c3" class="room"/>
+<text x="890.0" y="487.5" text-anchor="middle">服务院</text>
+<text x="890.0" y="515.5" text-anchor="middle" class="muted">侧门</text>
+<rect x="350" y="630" width="280" height="58" fill="#d9e9e4" class="room"/>
+<text x="490.0" y="666.0" text-anchor="middle">门楼与游客接待</text>
+<rect x="315" y="715" width="350" height="48" fill="#d9e9e4" class="room"/>
+<text x="490.0" y="746.0" text-anchor="middle">城市仪式广场</text>
+<rect x="35" y="390" width="98" height="100" fill="#d9dee3" class="room"/>
+<text x="84.0" y="440.0" text-anchor="middle">礼拜堂</text>
+<text x="84.0" y="468.0" text-anchor="middle" class="muted">下厅＋观礼廊</text>
+<circle cx="130" cy="287" r="58" fill="#d9dee3" stroke="#526c80" stroke-width="2.5"/>
+<text x="130" y="286" text-anchor="middle" style="font-size:20px">旧堡塔楼</text>
+<text x="130" y="313" text-anchor="middle" class="muted">石基 · 观景</text>
+<path d="M130 346V375H180V390" class="path"/>
+<path d="M133 440H155" class="path"/>
+<path d="M310 487H324V382H656V487H670" class="path"/>
+<path d="M310 545H324V610H656V545H670" class="path"/>
+<path d="M490 688V714" class="path"/>
+<path d="M490 610V630" class="path"/>
+<path d="M750 317H860V390" class="path"/>
+<path d="M490 750V357" class="axis"/>
+<path d="M490 260V225" class="axis"/>
+<text x="493" y="600" text-anchor="middle" style="font-size:19px">主门 → 内庭 → 大楼梯</text>
+<circle cx="584" cy="486" r="23" fill="#b7d7db" stroke="#638f98" stroke-width="2"/>
+<text x="584" y="491" text-anchor="middle" style="font-size:19px">泉</text>
+<rect x="447" y="344" width="86" height="44" fill="#f2dfb5" class="room"/>
+<path d="M449 352H531" stroke="#526c80" stroke-width="1"/>
+<path d="M449 360H531" stroke="#526c80" stroke-width="1"/>
+<path d="M449 368H531" stroke="#526c80" stroke-width="1"/>
+<path d="M449 376H531" stroke="#526c80" stroke-width="1"/>
+<rect x="440" y="388" width="100" height="28" fill="#f7f2e8"/>
+<text x="490" y="408" text-anchor="middle" style="font-size:17px">大楼梯</text>
+<text x="824" y="337" text-anchor="middle" style="font-size:18px">独立后勤路线</text>
+<text x="43" y="148" text-anchor="start" style="font-size:20px">北 ↑</text>
+<rect x="40" y="787" width="17" height="17" fill="#d9e9e4" stroke="#526c80"/>
+<text x="65" y="801" text-anchor="start" style="font-size:16px">公众／办事</text>
+<rect x="214" y="787" width="17" height="17" fill="#f2dfb5" stroke="#526c80"/>
+<text x="239" y="801" text-anchor="start" style="font-size:16px">礼仪／接待</text>
+<rect x="388" y="787" width="17" height="17" fill="#e5ddec" stroke="#526c80"/>
+<text x="413" y="801" text-anchor="start" style="font-size:16px">起居／访问</text>
+<rect x="562" y="787" width="17" height="17" fill="#e5d4c3" stroke="#526c80"/>
+<text x="587" y="801" text-anchor="start" style="font-size:16px">后勤</text>
+<rect x="736" y="787" width="17" height="17" fill="#d9e5ca" stroke="#526c80"/>
+<text x="761" y="801" text-anchor="start" style="font-size:16px">花园／露台</text>
+</svg>
