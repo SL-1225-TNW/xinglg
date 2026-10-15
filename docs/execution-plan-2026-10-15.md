@@ -6,7 +6,7 @@
 
 - R0—R2 已有首轮实现与专项验收；R3-A、R3-B 已交付。
 - 重点场景建设第一版的首个交付范围已进入 `main`。`main` 的 `89553dab3b07238dcfe845812109c95991fd2f5e` 上，CI 与 Pages 发布均已通过（[CI run #10](https://github.com/SL-1225-TNW/xinglg/actions/runs/38707356839)、[Pages run #59](https://github.com/SL-1225-TNW/xinglg/actions/runs/38711844555)）；两个工作流都指向该提交。建设复审记录载有分组验证结果。
-- R3-C1、C2、C3 已分别在串接 PR #9、#10、#11 实施。C1 预防与移动端专项通过 run #19；C2 恢复专项及 R3 工程 131 项、C1 17 项和移动端专项通过 run #27；C3 周期养护与累计专项通过 run #30。run #19、#27 的全仓回归及 run #30 的累计全仓回归仍在进行，相关 PR 均未合并。R3-C 整体验收仍缺少一份不调用 `devSwitchScene` 的自然新档全流程；R3-D 尚未开始。
+- R3-C1、C2、C3 已分别在串接 PR #9、#10、#11 实施。C1 预防与移动端专项通过 run #19；C2 恢复专项及 R3 工程 131 项、C1 17 项和移动端专项通过 run #27；C3 周期养护与累计专项通过 run #30。run #19 的全仓回归已通过；run #27 与 run #30 的全仓回归仍在进行，相关 PR 均未合并。R3-C 整体验收仍缺少一份不调用 `devSwitchScene` 的自然新档全流程；R3-D 尚未开始。
 - 细节基线见 [R3 实施计划](r3-implementation-plan.md)、[建设交付与复审](construction-completion.md) 和 [功能状态表](feature-status.md)。
 
 ## 阶段 0：对齐状态与验证基线
