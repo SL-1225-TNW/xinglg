@@ -36,7 +36,13 @@ const BROWSER = [
   'run-world-map.mjs', 'run-fast-travel.mjs', 'run-save-invariants.mjs', 'run-alt-routes.mjs',
   'run-engineering-career.mjs', 'run-engineering-ui.mjs', 'run-r3-project.mjs', 'run-r3-mobile.mjs',
   /* 白蔷薇宫城 P1：布局契约、楼层通行、存档迁移与手机端分层验收 */
-  'run-palace-layout.mjs', 'run-palace-save.mjs', 'run-palace-floors.mjs', 'run-palace-mobile.mjs',
+  'run-palace-layout.mjs', 'run-palace-save.mjs', 'run-palace-floors.mjs', 'run-palace-mobile.mjs', 'run-palace-wayfinding.mjs', 'run-palace-east-wing.mjs', 'run-palace-service.mjs',
+  'run-university.mjs',
+  'run-south-gate.mjs',
+  'run-industry.mjs',
+  'run-clinic-construction.mjs',
+  'run-construction-completion.mjs',
+  'run-construction-saves.mjs',
   'run-v3.mjs', 'run-guide.mjs',
   'run-edge.mjs', 'run-main.mjs', 'run-responsive-layout.mjs'
 ].filter((f) => fs.existsSync(path.join(here, f)));

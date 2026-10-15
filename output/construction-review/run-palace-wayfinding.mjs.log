@@ -1,0 +1,41 @@
+PASS 三层共有18个具名房门
+PASS palace_f1 礼拜堂门可实际步行穿过，保持同层
+PASS 礼拜堂门可返回原走廊
+PASS palace_f1 卫兵值房门可实际步行穿过，保持同层
+PASS 卫兵值房门可返回原走廊
+PASS palace_f1 档案阅览门可实际步行穿过，保持同层
+PASS 档案阅览门可返回原走廊
+PASS palace_f1 文书室门可实际步行穿过，保持同层
+PASS 文书室门可返回原走廊
+PASS palace_f1 等候室门可实际步行穿过，保持同层
+PASS 等候室门可返回原走廊
+PASS palace_f1 接待案台门可实际步行穿过，保持同层
+PASS 接待案台门可返回原走廊
+PASS city_castle 王座厅门可实际步行穿过，保持同层
+PASS 王座厅门可返回原走廊
+PASS city_castle 镜廊门可实际步行穿过，保持同层
+PASS 镜廊门可返回原走廊
+PASS city_castle 正式接待门可实际步行穿过，保持同层
+PASS 正式接待门可返回原走廊
+PASS city_castle 宴会厅门可实际步行穿过，保持同层
+PASS 宴会厅门可返回原走廊
+PASS city_castle 音乐沙龙门可实际步行穿过，保持同层
+PASS 音乐沙龙门可返回原走廊
+PASS city_castle 备餐间门可实际步行穿过，保持同层
+PASS 备餐间门可返回原走廊
+PASS palace_f3 书房门可实际步行穿过，保持同层
+PASS 书房门可返回原走廊
+PASS palace_f3 客房甲门可实际步行穿过，保持同层
+PASS 客房甲门可返回原走廊
+PASS palace_f3 会客室门可实际步行穿过，保持同层
+PASS 会客室门可返回原走廊
+PASS palace_f3 客房乙门可实际步行穿过，保持同层
+PASS 客房乙门可返回原走廊
+PASS palace_f3 寝居区门可实际步行穿过，保持同层
+PASS 寝居区门可返回原走廊
+PASS palace_f3 阅读廊门可实际步行穿过，保持同层
+PASS 阅读廊门可返回原走廊
+PASS 从标记的上楼平台交互换层且不收费
+PASS 从下楼平台原路返回一层
+PASS 房门与台阶渲染无报错
+宫殿楼梯与房门 40 项通过

@@ -1,0 +1,23 @@
+PASS 四处室内门与工作位可达
+PASS 原地区医舍入口保留
+PASS 步行到门 patient
+PASS 进病房可步行到床尾记录台
+PASS 无病历不能直接照护
+PASS 照护只消耗一个真实药包
+PASS 沿用原病历隔夜日期
+PASS 当天不可提前复诊
+PASS 病房读档留在室内
+PASS 病历读档保留
+PASS 次日病房复诊写回原病历
+PASS 原互信仅奖励一次
+PASS 重复打开不会重复结算
+PASS 步行到门 main
+PASS 步行到门 main
+PASS 步行到门 cloister
+PASS 回廊可达药草说明牌
+PASS 药草展示说明与实际一致
+PASS 步行到门 main
+PASS 新增房间无页面异常
+PASS 手机可从诊疗室进病房
+PASS 手机无页面异常
+医舍建设 22 项通过

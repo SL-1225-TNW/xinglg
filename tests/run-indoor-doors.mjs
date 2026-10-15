@@ -16,7 +16,16 @@ try {
     const M = __MOSS__, failures = [], rooms = Object.keys(M.MAPS).filter(id => M.MAPS[id].indoor);
     for (const id of rooms) {
       const map = M.MAPS[id], exits = new Set(map.exits.map(e => `${e.x},${e.y}`));
-      if (!map.doors?.length) failures.push(id + ': missing doors');
+      if (!map.doors?.length) {
+        // 地下层使用内部楼梯，验收真实返回连接，不能为旧规则补假外门。
+        const stairs=(M.INTERACTABLES[id]||[]).filter(it=>['palaceServiceStair','universityStair','innStair'].includes(it.kind));
+        if(!stairs.length) failures.push(id + ': missing doors or stairs');
+        for(const it of stairs){
+          if(!M.MAPS[it.to]||M.isSolid(it.to,it.tx,it.ty))failures.push(id+': unsafe stair destination');
+          if(!it.stand?.length||!it.stand.every(s=>!M.isSolid(id,...s)&&M.findPath(id,map.enter.x,map.enter.y,...s)))failures.push(id+': inaccessible stair');
+          if(!(M.INTERACTABLES[it.to]||[]).some(back=>back.kind===it.kind&&back.to===id))failures.push(id+': missing return stair');
+        }
+      }
       for (const d of map.doors || []) {
         if (M.isSolid(id, d.enter.x, d.enter.y) || exits.has(`${d.enter.x},${d.enter.y}`)) failures.push(id + ': unsafe entry');
         if (M.isSolid(d.to, d.tx, d.ty)) failures.push(id + ': blocked return');

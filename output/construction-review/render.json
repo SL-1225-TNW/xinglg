@@ -1,0 +1,37 @@
+{
+  "note": "Headless Chromium animation-frame observations on this host, not physical-device FPS or a standalone rendering benchmark.",
+  "results": [
+    {
+      "viewport": {
+        "width": 1280,
+        "height": 860
+      },
+      "touch": false,
+      "frames": 120,
+      "medianMs": 16.7,
+      "p95Ms": 16.7,
+      "cache": {
+        "width": 608,
+        "height": 416,
+        "rgbaBytes": 1011712
+      },
+      "errors": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "touch": true,
+      "frames": 120,
+      "medianMs": 16.7,
+      "p95Ms": 16.8,
+      "cache": {
+        "width": 608,
+        "height": 416,
+        "rgbaBytes": 1011712
+      },
+      "errors": []
+    }
+  ]
+}

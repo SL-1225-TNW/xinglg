@@ -1,0 +1,84 @@
+PASS 酒窖不能当日封存
+PASS 酒窖真实消耗葡萄并产酒，保留已加工来源计数
+PASS 不能用已加工的本批来源重复压汁
+PASS 不能提前刷新采收
+PASS 医舍访问权限在轮换后保留
+PASS 酿酒后正常跨日可转做医舍供货
+PASS 追索分支增加封签复核耗时
+PASS 重复装运不覆盖运单或多扣货物
+PASS 医舍不能当日复诊
+PASS 酒窖先行路线仍可实际完成医舍合同
+PASS 雨天同时提供抢收和延期选择
+PASS 延期不能同日立即兑现
+PASS 延期跨夜后晴日收获完整批次
+PASS 雨天直接抢收取得较低产量
+PASS 体力不足不扣料钱时间或改变批次
+PASS 日终不足完整耗时不扣资源
+PASS 满包夹具真实20格
+PASS 扣料后仍满包不会损失原料或周期
+PASS 扣完原料腾出一格可以加工
+PASS 补运金币不足时不改变资源和合同
+PASS 离开设施范围不能远程办理合同
+PASS 先装运再处理货差不会把未签收运单错误结清
+PASS 石灰层每天一批且防重复
+PASS 八份来源可加工两批
+PASS 采场第二天能继续生产
+PASS irrigation 实际夜结算供水
+PASS irrigation 实际磨坊日额度
+PASS irrigation 实际装运耗时
+PASS irrigation 读档保留水利选择与未签收运单
+PASS navigation 实际夜结算供水
+PASS navigation 实际磨坊日额度
+PASS navigation 实际装运耗时
+PASS navigation 读档保留水利选择与未签收运单
+PASS vineyard_press 步行到门前
+PASS vineyard_press 实际进入
+PASS vineyard_cellar 步行到门前
+PASS vineyard_cellar 实际进入
+PASS clinic_ward 步行到门前
+PASS clinic_ward 实际进入
+PASS clinic_archive 步行到门前
+PASS clinic_archive 实际进入
+PASS port_office 步行到门前
+PASS port_office 实际进入
+PASS port_lockhouse 步行到门前
+PASS port_lockhouse 实际进入
+PASS quarry_shed 步行到门前
+PASS quarry_shed 实际进入
+PASS waterworks_control 步行到门前
+PASS waterworks_control 实际进入
+PASS D 复审无控制台错误
+阶段 D 复审 50/50 PASS
+PASS 844 vineyard 触屏实际打开服务
+PASS 844 vineyard 窗口不横向溢出
+PASS 844 vine_lucy 对话可进入对应职业服务
+PASS 844 clinic_ward 触屏实际打开服务
+PASS 844 clinic_ward 窗口不横向溢出
+PASS 844 clinic_celine 对话可进入对应职业服务
+PASS 844 port_office 触屏实际打开服务
+PASS 844 port_office 窗口不横向溢出
+PASS 844 port_mia 对话可进入对应职业服务
+PASS 844 quarry 触屏实际打开服务
+PASS 844 quarry 窗口不横向溢出
+PASS 844 quarry_marl 对话可进入对应职业服务
+PASS 844 waterworks_control 触屏实际打开服务
+PASS 844 waterworks_control 窗口不横向溢出
+PASS 844 water_engineer 对话可进入对应职业服务
+PASS 844 手机无控制台错误
+PASS 390 vineyard 触屏实际打开服务
+PASS 390 vineyard 窗口不横向溢出
+PASS 390 vine_lucy 对话可进入对应职业服务
+PASS 390 clinic_ward 触屏实际打开服务
+PASS 390 clinic_ward 窗口不横向溢出
+PASS 390 clinic_celine 对话可进入对应职业服务
+PASS 390 port_office 触屏实际打开服务
+PASS 390 port_office 窗口不横向溢出
+PASS 390 port_mia 对话可进入对应职业服务
+PASS 390 quarry 触屏实际打开服务
+PASS 390 quarry 窗口不横向溢出
+PASS 390 quarry_marl 对话可进入对应职业服务
+PASS 390 waterworks_control 触屏实际打开服务
+PASS 390 waterworks_control 窗口不横向溢出
+PASS 390 water_engineer 对话可进入对应职业服务
+PASS 390 手机无控制台错误
+阶段 D 完整复审 82/82 PASS

@@ -1,0 +1,37 @@
+[
+  {
+    "file": "run-palace-layout.mjs",
+    "exit": 0,
+    "seconds": 4
+  },
+  {
+    "file": "run-palace-save.mjs",
+    "exit": 0,
+    "seconds": 3
+  },
+  {
+    "file": "run-palace-floors.mjs",
+    "exit": 0,
+    "seconds": 37
+  },
+  {
+    "file": "run-palace-mobile.mjs",
+    "exit": 0,
+    "seconds": 10
+  },
+  {
+    "file": "run-palace-wayfinding.mjs",
+    "exit": 0,
+    "seconds": 13
+  },
+  {
+    "file": "run-palace-east-wing.mjs",
+    "exit": 0,
+    "seconds": 49
+  },
+  {
+    "file": "run-palace-service.mjs",
+    "exit": 0,
+    "seconds": 46
+  }
+]

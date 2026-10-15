@@ -1,0 +1,30 @@
+PASS 旧档确实不带 palace 字段
+PASS 旧档玩家停在 city_castle
+PASS 旧档读入后 state.palace 存在
+PASS 旧档迁移后 palace.layoutVersion === 1
+PASS 旧档迁移后玩家落到一层门厅 palace_f1
+PASS 迁移落点不卡在墙里
+PASS 迁移保留了任务进度
+PASS 迁移保留了 NPC 好感
+PASS 迁移保留了供货箱
+PASS 迁移保留了已取得的城市通行证
+PASS 迁移保留了金币与天数
+PASS 旧档迁移流程无控制台错误
+PASS 迁移后的存档会写回 palace.layoutVersion
+PASS 迁移只执行一次（重开不再挪一次玩家）
+PASS 二次读档后落点依然可走
+PASS 二次读档流程无控制台错误
+PASS 往返后 palace 字段完全一致
+PASS 往返后场景一致
+PASS 往返后玩家坐标一致
+PASS 往返后 palace 仍带 layoutVersion
+PASS 往返流程无控制台错误
+PASS 新档也有 palace.layoutVersion === 1
+PASS 新档玩家没有被迁移挪动
+PASS 新档起始位置可走
+PASS 新开局流程无控制台错误
+
+================ 宫城存档不变式 ================
+通过 25 项，失败 0 项
+==============================================
+

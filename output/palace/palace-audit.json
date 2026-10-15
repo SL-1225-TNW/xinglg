@@ -1,0 +1,2670 @@
+{
+ "floors": [
+  {
+   "id": "palace_f1",
+   "label": "一层 · 门厅",
+   "sceneId": "palace_f1",
+   "order": 1
+  },
+  {
+   "id": "city_castle",
+   "label": "二层 · 王座厅",
+   "sceneId": "city_castle",
+   "order": 2
+  },
+  {
+   "id": "palace_f3",
+   "label": "三层 · 起居",
+   "sceneId": "palace_f3",
+   "order": 3
+  }
+ ],
+ "stairs": [
+  {
+   "id": "palace_f1_up",
+   "kind": "palaceStair",
+   "floorId": "palace_f1",
+   "sceneId": "palace_f1",
+   "dir": "up",
+   "x": 28,
+   "y": 35,
+   "stand": [
+    [
+     28,
+     38
+    ],
+    [
+     29,
+     38
+    ],
+    [
+     28,
+     39
+    ],
+    [
+     29,
+     39
+    ]
+   ],
+   "to": "city_castle",
+   "tx": 31,
+   "ty": 27,
+   "face": "down",
+   "label": "上楼 · 二层 · 王座厅"
+  },
+  {
+   "id": "city_castle_down",
+   "kind": "palaceStair",
+   "floorId": "city_castle",
+   "sceneId": "city_castle",
+   "dir": "down",
+   "x": 33,
+   "y": 35,
+   "stand": [
+    [
+     33,
+     31
+    ],
+    [
+     34,
+     31
+    ],
+    [
+     33,
+     32
+    ],
+    [
+     34,
+     32
+    ]
+   ],
+   "to": "palace_f1",
+   "tx": 31,
+   "ty": 42,
+   "face": "up",
+   "label": "下楼 · 一层 · 门厅"
+  },
+  {
+   "id": "city_castle_up",
+   "kind": "palaceStair",
+   "floorId": "city_castle",
+   "sceneId": "city_castle",
+   "dir": "up",
+   "x": 28,
+   "y": 35,
+   "stand": [
+    [
+     28,
+     38
+    ],
+    [
+     29,
+     38
+    ],
+    [
+     28,
+     39
+    ],
+    [
+     29,
+     39
+    ]
+   ],
+   "to": "palace_f3",
+   "tx": 31,
+   "ty": 27,
+   "face": "down",
+   "label": "上楼 · 三层 · 起居"
+  },
+  {
+   "id": "palace_f3_down",
+   "kind": "palaceStair",
+   "floorId": "palace_f3",
+   "sceneId": "palace_f3",
+   "dir": "down",
+   "x": 33,
+   "y": 35,
+   "stand": [
+    [
+     33,
+     31
+    ],
+    [
+     34,
+     31
+    ],
+    [
+     33,
+     32
+    ],
+    [
+     34,
+     32
+    ]
+   ],
+   "to": "city_castle",
+   "tx": 31,
+   "ty": 42,
+   "face": "up",
+   "label": "下楼 · 二层 · 王座厅"
+  }
+ ],
+ "rooms": {
+  "palace_f1": {
+   "w": 64,
+   "h": 48,
+   "floor": "tile",
+   "doors": [
+    {
+     "id": "palace_f1_room_door_0",
+     "x": 25,
+     "y": 13,
+     "h": 3,
+     "side": "west",
+     "label": "礼拜堂"
+    },
+    {
+     "id": "palace_f1_room_door_1",
+     "x": 38,
+     "y": 17,
+     "h": 3,
+     "side": "east",
+     "label": "卫兵值房"
+    },
+    {
+     "id": "palace_f1_room_door_2",
+     "x": 25,
+     "y": 26,
+     "h": 2,
+     "side": "west",
+     "label": "档案阅览"
+    },
+    {
+     "id": "palace_f1_room_door_3",
+     "x": 38,
+     "y": 26,
+     "h": 2,
+     "side": "east",
+     "label": "文书室"
+    },
+    {
+     "id": "palace_f1_room_door_4",
+     "x": 25,
+     "y": 42,
+     "h": 2,
+     "side": "west",
+     "label": "等候室"
+    },
+    {
+     "id": "palace_f1_room_door_5",
+     "x": 38,
+     "y": 42,
+     "h": 2,
+     "side": "east",
+     "label": "接待案台"
+    }
+   ],
+   "props": [
+    {
+     "t": "archiveShelf",
+     "x": 3,
+     "y": 3,
+     "w": 3,
+     "h": 6,
+     "flat": false
+    },
+    {
+     "t": "bookshelf",
+     "x": 3,
+     "y": 10,
+     "w": 3,
+     "h": 7,
+     "flat": false
+    },
+    {
+     "t": "archiveShelf",
+     "x": 7,
+     "y": 3,
+     "w": 9,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "readingTable",
+     "x": 7,
+     "y": 8,
+     "w": 8,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "desk",
+     "x": 7,
+     "y": 13,
+     "w": 7,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "banner",
+     "x": 19,
+     "y": 3,
+     "w": 2,
+     "h": 6,
+     "flat": false
+    },
+    {
+     "t": "longTable",
+     "x": 40,
+     "y": 3,
+     "w": 10,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "genericShelf",
+     "x": 40,
+     "y": 8,
+     "w": 3,
+     "h": 7,
+     "flat": false
+    },
+    {
+     "t": "desk",
+     "x": 44,
+     "y": 9,
+     "w": 6,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "banner",
+     "x": 53,
+     "y": 3,
+     "w": 2,
+     "h": 6,
+     "flat": false
+    },
+    {
+     "t": "potPlant",
+     "x": 60,
+     "y": 11,
+     "w": 2,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "archiveShelf",
+     "x": 3,
+     "y": 22,
+     "w": 3,
+     "h": 9,
+     "flat": false
+    },
+    {
+     "t": "archiveShelf",
+     "x": 7,
+     "y": 22,
+     "w": 9,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "desk",
+     "x": 7,
+     "y": 27,
+     "w": 7,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "longTable",
+     "x": 16,
+     "y": 22,
+     "w": 8,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "banner",
+     "x": 19,
+     "y": 27,
+     "w": 2,
+     "h": 6,
+     "flat": false
+    },
+    {
+     "t": "ledgerDesk",
+     "x": 40,
+     "y": 22,
+     "w": 7,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "archiveShelf",
+     "x": 53,
+     "y": 22,
+     "w": 3,
+     "h": 9,
+     "flat": false
+    },
+    {
+     "t": "desk",
+     "x": 40,
+     "y": 27,
+     "w": 7,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "mapCabinet",
+     "x": 40,
+     "y": 29,
+     "w": 11,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "fountain",
+     "x": 29,
+     "y": 24,
+     "w": 3,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "statue",
+     "x": 26,
+     "y": 21,
+     "w": 2,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "statue",
+     "x": 35,
+     "y": 21,
+     "w": 2,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "palaceSteps",
+     "x": 27,
+     "y": 33,
+     "w": 8,
+     "h": 5,
+     "flat": true
+    },
+    {
+     "t": "stairRail",
+     "x": 26,
+     "y": 33,
+     "w": 1,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "stairRail",
+     "x": 35,
+     "y": 33,
+     "w": 1,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "palaceServiceSteps",
+     "x": 39,
+     "y": 33,
+     "w": 3,
+     "h": 5,
+     "flat": true
+    },
+    {
+     "t": "stairRail",
+     "x": 38,
+     "y": 33,
+     "w": 1,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "counterFront",
+     "x": 20,
+     "y": 40,
+     "w": 8,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "ledgerDesk",
+     "x": 34,
+     "y": 40,
+     "w": 8,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "carpet",
+     "x": 28,
+     "y": 42,
+     "w": 6,
+     "h": 3,
+     "flat": true
+    },
+    {
+     "t": "sofa",
+     "x": 17,
+     "y": 44,
+     "w": 5,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "sofa",
+     "x": 42,
+     "y": 44,
+     "w": 5,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "potPlant",
+     "x": 13,
+     "y": 43,
+     "w": 2,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "potPlant",
+     "x": 49,
+     "y": 43,
+     "w": 2,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "fireplace",
+     "x": 55,
+     "y": 40,
+     "w": 5,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "chandelier",
+     "x": 29,
+     "y": 38,
+     "w": 4,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "chandelier",
+     "x": 22,
+     "y": 16,
+     "w": 4,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "chandelier",
+     "x": 35,
+     "y": 16,
+     "w": 4,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "palaceRoomDoor",
+     "x": 25,
+     "y": 13,
+     "w": 1,
+     "h": 3,
+     "flat": true
+    },
+    {
+     "t": "palaceRoomDoor",
+     "x": 38,
+     "y": 17,
+     "w": 1,
+     "h": 3,
+     "flat": true
+    },
+    {
+     "t": "palaceRoomDoor",
+     "x": 25,
+     "y": 26,
+     "w": 1,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "palaceRoomDoor",
+     "x": 38,
+     "y": 26,
+     "w": 1,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "palaceRoomDoor",
+     "x": 25,
+     "y": 42,
+     "w": 1,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "palaceRoomDoor",
+     "x": 38,
+     "y": 42,
+     "w": 1,
+     "h": 2,
+     "flat": true
+    }
+   ],
+   "partitions": [
+    {
+     "x": 25,
+     "y": 2,
+     "w": 1,
+     "h": 11
+    },
+    {
+     "x": 25,
+     "y": 16,
+     "w": 1,
+     "h": 1
+    },
+    {
+     "x": 25,
+     "y": 32,
+     "w": 1,
+     "h": 10
+    },
+    {
+     "x": 25,
+     "y": 44,
+     "w": 1,
+     "h": 3
+    },
+    {
+     "x": 38,
+     "y": 2,
+     "w": 1,
+     "h": 15
+    },
+    {
+     "x": 38,
+     "y": 20,
+     "w": 1,
+     "h": 1
+    },
+    {
+     "x": 38,
+     "y": 32,
+     "w": 1,
+     "h": 10
+    },
+    {
+     "x": 38,
+     "y": 44,
+     "w": 1,
+     "h": 3
+    },
+    {
+     "x": 25,
+     "y": 21,
+     "w": 1,
+     "h": 5
+    },
+    {
+     "x": 25,
+     "y": 28,
+     "w": 1,
+     "h": 4
+    },
+    {
+     "x": 38,
+     "y": 21,
+     "w": 1,
+     "h": 5
+    },
+    {
+     "x": 38,
+     "y": 28,
+     "w": 1,
+     "h": 4
+    }
+   ],
+   "stairs": [
+    {
+     "t": "palaceSteps",
+     "x": 27,
+     "y": 33,
+     "w": 8,
+     "h": 5
+    },
+    {
+     "t": "palaceServiceSteps",
+     "x": 39,
+     "y": 33,
+     "w": 3,
+     "h": 5
+    }
+   ],
+   "interactables": [
+    {
+     "id": "exit_main",
+     "kind": "indoorExit",
+     "x": 31,
+     "y": 47,
+     "label": "返回白蔷薇宫苑",
+     "stand": [
+      [
+       31,
+       46
+      ],
+      [
+       32,
+       46
+      ]
+     ],
+     "note": ""
+    },
+    {
+     "id": "palace_f1_spot_0",
+     "kind": "cityService",
+     "x": 37,
+     "y": 40,
+     "label": "门厅事务台",
+     "service": "castle",
+     "stand": [
+      [
+       37,
+       42
+      ],
+      [
+       35,
+       42
+      ],
+      [
+       39,
+       42
+      ],
+      [
+       37,
+       39
+      ]
+     ],
+     "note": ""
+    },
+    {
+     "id": "palace_f1_spot_1",
+     "kind": "interiorProp",
+     "x": 10,
+     "y": 22,
+     "label": "公开档案阅览席",
+     "stand": [
+      [
+       10,
+       25
+      ],
+      [
+       8,
+       25
+      ],
+      [
+       12,
+       25
+      ]
+     ],
+     "note": "借阅桌按年代排着索引柜：城堡旧址的图纸、白蔷薇城建城以来的地契副本，还有历任管事"
+    },
+    {
+     "id": "palace_f1_spot_2",
+     "kind": "interiorProp",
+     "x": 43,
+     "y": 27,
+     "label": "文书与委托案台",
+     "stand": [
+      [
+       43,
+       25
+      ],
+      [
+       41,
+       25
+      ],
+      [
+       45,
+       25
+      ]
+     ],
+     "note": "案台上摊着当天的委托：通行证补办、城堡供货核对、还有几张写着「待塞琳确认」的条子"
+    },
+    {
+     "id": "palace_f1_spot_3",
+     "kind": "interiorProp",
+     "x": 43,
+     "y": 9,
+     "label": "卫兵值班",
+     "stand": [
+      [
+       43,
+       11
+      ],
+      [
+       43,
+       12
+      ],
+      [
+       43,
+       13
+      ]
+     ],
+     "note": "值班表记着谁守哪一段：门楼、内庭、东侧货门。卫兵只登记进出，不发放楼层许可。"
+    },
+    {
+     "id": "palace_f1_up",
+     "kind": "palaceStair",
+     "x": 28,
+     "y": 35,
+     "label": "上楼 · 二层 · 王座厅",
+     "to": "city_castle",
+     "tx": 31,
+     "ty": 27,
+     "stand": [
+      [
+       28,
+       38
+      ],
+      [
+       29,
+       38
+      ],
+      [
+       28,
+       39
+      ],
+      [
+       29,
+       39
+      ]
+     ],
+     "note": ""
+    }
+   ]
+  },
+  "city_castle": {
+   "w": 64,
+   "h": 48,
+   "floor": "marble",
+   "doors": [
+    {
+     "id": "city_castle_room_door_0",
+     "x": 25,
+     "y": 13,
+     "h": 3,
+     "side": "west",
+     "label": "王座厅"
+    },
+    {
+     "id": "city_castle_room_door_1",
+     "x": 38,
+     "y": 17,
+     "h": 3,
+     "side": "east",
+     "label": "镜廊"
+    },
+    {
+     "id": "city_castle_room_door_2",
+     "x": 25,
+     "y": 26,
+     "h": 2,
+     "side": "west",
+     "label": "正式接待"
+    },
+    {
+     "id": "city_castle_room_door_3",
+     "x": 38,
+     "y": 26,
+     "h": 2,
+     "side": "east",
+     "label": "宴会厅"
+    },
+    {
+     "id": "city_castle_room_door_4",
+     "x": 25,
+     "y": 42,
+     "h": 2,
+     "side": "west",
+     "label": "音乐沙龙"
+    },
+    {
+     "id": "city_castle_room_door_5",
+     "x": 38,
+     "y": 42,
+     "h": 2,
+     "side": "east",
+     "label": "备餐间"
+    }
+   ],
+   "props": [
+    {
+     "t": "carpet",
+     "x": 12,
+     "y": 8,
+     "w": 10,
+     "h": 12,
+     "flat": true
+    },
+    {
+     "t": "chandelier",
+     "x": 13,
+     "y": 2,
+     "w": 4,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "chandelier",
+     "x": 18,
+     "y": 2,
+     "w": 4,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "throne",
+     "x": 14,
+     "y": 3,
+     "w": 6,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "banner",
+     "x": 4,
+     "y": 2,
+     "w": 2,
+     "h": 6,
+     "flat": false
+    },
+    {
+     "t": "banner",
+     "x": 28,
+     "y": 2,
+     "w": 2,
+     "h": 6,
+     "flat": false
+    },
+    {
+     "t": "banner",
+     "x": 4,
+     "y": 12,
+     "w": 2,
+     "h": 6,
+     "flat": false
+    },
+    {
+     "t": "banner",
+     "x": 28,
+     "y": 12,
+     "w": 2,
+     "h": 6,
+     "flat": false
+    },
+    {
+     "t": "statue",
+     "x": 6,
+     "y": 9,
+     "w": 3,
+     "h": 4,
+     "flat": false
+    },
+    {
+     "t": "statue",
+     "x": 25,
+     "y": 9,
+     "w": 3,
+     "h": 4,
+     "flat": false
+    },
+    {
+     "t": "longTable",
+     "x": 8,
+     "y": 21,
+     "w": 8,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "longTable",
+     "x": 18,
+     "y": 21,
+     "w": 8,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "sofa",
+     "x": 9,
+     "y": 16,
+     "w": 4,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "sofa",
+     "x": 21,
+     "y": 16,
+     "w": 4,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "sofa",
+     "x": 28,
+     "y": 3,
+     "w": 4,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "sofa",
+     "x": 33,
+     "y": 3,
+     "w": 4,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "roundTable",
+     "x": 30,
+     "y": 2,
+     "w": 4,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "carpet",
+     "x": 28,
+     "y": 8,
+     "w": 7,
+     "h": 3,
+     "flat": true
+    },
+    {
+     "t": "mirror",
+     "x": 40,
+     "y": 3,
+     "w": 3,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "mirror",
+     "x": 45,
+     "y": 3,
+     "w": 3,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "mirror",
+     "x": 50,
+     "y": 3,
+     "w": 3,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "mirror",
+     "x": 55,
+     "y": 3,
+     "w": 3,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "carpet",
+     "x": 42,
+     "y": 5,
+     "w": 14,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "banner",
+     "x": 39,
+     "y": 11,
+     "w": 2,
+     "h": 6,
+     "flat": false
+    },
+    {
+     "t": "banner",
+     "x": 58,
+     "y": 11,
+     "w": 2,
+     "h": 6,
+     "flat": false
+    },
+    {
+     "t": "sofa",
+     "x": 43,
+     "y": 10,
+     "w": 5,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "receptionDesk",
+     "x": 12,
+     "y": 24,
+     "w": 9,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "sofa",
+     "x": 7,
+     "y": 28,
+     "w": 5,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "sofa",
+     "x": 19,
+     "y": 28,
+     "w": 5,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "roundTable",
+     "x": 13,
+     "y": 27,
+     "w": 4,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "banner",
+     "x": 3,
+     "y": 24,
+     "w": 2,
+     "h": 6,
+     "flat": false
+    },
+    {
+     "t": "banner",
+     "x": 22,
+     "y": 24,
+     "w": 2,
+     "h": 6,
+     "flat": false
+    },
+    {
+     "t": "carpet",
+     "x": 6,
+     "y": 26,
+     "w": 17,
+     "h": 3,
+     "flat": true
+    },
+    {
+     "t": "longTable",
+     "x": 39,
+     "y": 23,
+     "w": 10,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "longTable",
+     "x": 51,
+     "y": 23,
+     "w": 10,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "longTable",
+     "x": 39,
+     "y": 28,
+     "w": 10,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "longTable",
+     "x": 51,
+     "y": 28,
+     "w": 10,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "longTable",
+     "x": 39,
+     "y": 38,
+     "w": 10,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "longTable",
+     "x": 51,
+     "y": 38,
+     "w": 10,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "chandelier",
+     "x": 43,
+     "y": 26,
+     "w": 4,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "chandelier",
+     "x": 55,
+     "y": 26,
+     "w": 4,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "chandelier",
+     "x": 43,
+     "y": 41,
+     "w": 4,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "carpet",
+     "x": 40,
+     "y": 26,
+     "w": 20,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "sofa",
+     "x": 4,
+     "y": 36,
+     "w": 5,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "sofa",
+     "x": 15,
+     "y": 36,
+     "w": 5,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "roundTable",
+     "x": 9,
+     "y": 35,
+     "w": 4,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "desk",
+     "x": 4,
+     "y": 42,
+     "w": 6,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "bookshelf",
+     "x": 18,
+     "y": 41,
+     "w": 5,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "carpet",
+     "x": 5,
+     "y": 35,
+     "w": 17,
+     "h": 3,
+     "flat": true
+    },
+    {
+     "t": "palaceSteps",
+     "x": 27,
+     "y": 33,
+     "w": 8,
+     "h": 5,
+     "flat": true
+    },
+    {
+     "t": "stairRail",
+     "x": 26,
+     "y": 33,
+     "w": 1,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "stairRail",
+     "x": 35,
+     "y": 33,
+     "w": 1,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "palaceServiceSteps",
+     "x": 39,
+     "y": 33,
+     "w": 3,
+     "h": 5,
+     "flat": true
+    },
+    {
+     "t": "stairRail",
+     "x": 38,
+     "y": 33,
+     "w": 1,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "kitchen",
+     "x": 40,
+     "y": 42,
+     "w": 7,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "genericShelf",
+     "x": 48,
+     "y": 42,
+     "w": 3,
+     "h": 4,
+     "flat": false
+    },
+    {
+     "t": "readingTable",
+     "x": 53,
+     "y": 42,
+     "w": 6,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "bookshelf",
+     "x": 59,
+     "y": 42,
+     "w": 3,
+     "h": 4,
+     "flat": false
+    },
+    {
+     "t": "carpet",
+     "x": 28,
+     "y": 27,
+     "w": 5,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "palaceRoomDoor",
+     "x": 25,
+     "y": 13,
+     "w": 1,
+     "h": 3,
+     "flat": true
+    },
+    {
+     "t": "palaceRoomDoor",
+     "x": 38,
+     "y": 17,
+     "w": 1,
+     "h": 3,
+     "flat": true
+    },
+    {
+     "t": "palaceRoomDoor",
+     "x": 25,
+     "y": 26,
+     "w": 1,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "palaceRoomDoor",
+     "x": 38,
+     "y": 26,
+     "w": 1,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "palaceRoomDoor",
+     "x": 25,
+     "y": 42,
+     "w": 1,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "palaceRoomDoor",
+     "x": 38,
+     "y": 42,
+     "w": 1,
+     "h": 2,
+     "flat": true
+    }
+   ],
+   "partitions": [
+    {
+     "x": 25,
+     "y": 2,
+     "w": 1,
+     "h": 11
+    },
+    {
+     "x": 25,
+     "y": 16,
+     "w": 1,
+     "h": 1
+    },
+    {
+     "x": 25,
+     "y": 32,
+     "w": 1,
+     "h": 10
+    },
+    {
+     "x": 25,
+     "y": 44,
+     "w": 1,
+     "h": 3
+    },
+    {
+     "x": 38,
+     "y": 2,
+     "w": 1,
+     "h": 15
+    },
+    {
+     "x": 38,
+     "y": 20,
+     "w": 1,
+     "h": 1
+    },
+    {
+     "x": 38,
+     "y": 32,
+     "w": 1,
+     "h": 10
+    },
+    {
+     "x": 38,
+     "y": 44,
+     "w": 1,
+     "h": 3
+    },
+    {
+     "x": 25,
+     "y": 21,
+     "w": 1,
+     "h": 5
+    },
+    {
+     "x": 25,
+     "y": 28,
+     "w": 1,
+     "h": 4
+    },
+    {
+     "x": 38,
+     "y": 21,
+     "w": 1,
+     "h": 5
+    },
+    {
+     "x": 38,
+     "y": 28,
+     "w": 1,
+     "h": 4
+    }
+   ],
+   "stairs": [
+    {
+     "t": "palaceSteps",
+     "x": 27,
+     "y": 33,
+     "w": 8,
+     "h": 5
+    },
+    {
+     "t": "palaceServiceSteps",
+     "x": 39,
+     "y": 33,
+     "w": 3,
+     "h": 5
+    }
+   ],
+   "interactables": [
+    {
+     "id": "exit_gallery",
+     "kind": "indoorExit",
+     "x": 63,
+     "y": 10,
+     "label": "返回白蔷薇宫城 · 二层 回廊",
+     "stand": [
+      [
+       62,
+       10
+      ]
+     ],
+     "note": ""
+    },
+    {
+     "id": "city_castle_spot_0",
+     "kind": "interiorProp",
+     "x": 16,
+     "y": 24,
+     "label": "正式接待厅",
+     "stand": [
+      [
+       16,
+       26
+      ],
+      [
+       14,
+       26
+      ],
+      [
+       18,
+       26
+      ]
+     ],
+     "note": "接待台后是等候前厅，正式接见从这里进王座厅。长廊与宴会厅对普通访客开放。"
+    },
+    {
+     "id": "city_castle_spot_1",
+     "kind": "interiorProp",
+     "x": 11,
+     "y": 36,
+     "label": "音乐沙龙",
+     "stand": [
+      [
+       11,
+       39
+      ],
+      [
+       9,
+       39
+      ],
+      [
+       13,
+       39
+      ]
+     ],
+     "note": "小乐团的位置留了一半空：正式宴会时这里不排演，春宴当天由塞琳安排人手。"
+    },
+    {
+     "id": "city_castle_spot_2",
+     "kind": "interiorProp",
+     "x": 43,
+     "y": 28,
+     "label": "宴会厅",
+     "stand": [
+      [
+       43,
+       31
+      ],
+      [
+       41,
+       31
+      ],
+      [
+       45,
+       31
+      ]
+     ],
+     "note": "六张长桌按上菜次序排开，西侧留出乐队与致辞的位置。"
+    },
+    {
+     "id": "city_castle_spot_3",
+     "kind": "interiorProp",
+     "x": 43,
+     "y": 42,
+     "label": "备餐间",
+     "stand": [
+      [
+       43,
+       45
+      ],
+      [
+       41,
+       45
+      ],
+      [
+       45,
+       45
+      ]
+     ],
+     "note": "菜谱与送货票据钉在墙上，当日的食材按上菜顺序从服务梯那边送进来。"
+    },
+    {
+     "id": "city_castle_down",
+     "kind": "palaceStair",
+     "x": 33,
+     "y": 35,
+     "label": "下楼 · 一层 · 门厅",
+     "to": "palace_f1",
+     "tx": 31,
+     "ty": 42,
+     "stand": [
+      [
+       33,
+       31
+      ],
+      [
+       34,
+       31
+      ],
+      [
+       33,
+       32
+      ],
+      [
+       34,
+       32
+      ]
+     ],
+     "note": ""
+    },
+    {
+     "id": "city_castle_up",
+     "kind": "palaceStair",
+     "x": 28,
+     "y": 35,
+     "label": "上楼 · 三层 · 起居",
+     "to": "palace_f3",
+     "tx": 31,
+     "ty": 27,
+     "stand": [
+      [
+       28,
+       38
+      ],
+      [
+       29,
+       38
+      ],
+      [
+       28,
+       39
+      ],
+      [
+       29,
+       39
+      ]
+     ],
+     "note": ""
+    }
+   ]
+  },
+  "palace_f3": {
+   "w": 64,
+   "h": 48,
+   "floor": "wood",
+   "doors": [
+    {
+     "id": "palace_f3_room_door_0",
+     "x": 25,
+     "y": 13,
+     "h": 3,
+     "side": "west",
+     "label": "书房"
+    },
+    {
+     "id": "palace_f3_room_door_1",
+     "x": 38,
+     "y": 17,
+     "h": 3,
+     "side": "east",
+     "label": "客房甲"
+    },
+    {
+     "id": "palace_f3_room_door_2",
+     "x": 25,
+     "y": 26,
+     "h": 2,
+     "side": "west",
+     "label": "会客室"
+    },
+    {
+     "id": "palace_f3_room_door_3",
+     "x": 38,
+     "y": 26,
+     "h": 2,
+     "side": "east",
+     "label": "客房乙"
+    },
+    {
+     "id": "palace_f3_room_door_4",
+     "x": 25,
+     "y": 42,
+     "h": 2,
+     "side": "west",
+     "label": "寝居区"
+    },
+    {
+     "id": "palace_f3_room_door_5",
+     "x": 38,
+     "y": 42,
+     "h": 2,
+     "side": "east",
+     "label": "阅读廊"
+    }
+   ],
+   "props": [
+    {
+     "t": "desk",
+     "x": 4,
+     "y": 3,
+     "w": 7,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "bookshelf",
+     "x": 3,
+     "y": 8,
+     "w": 3,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "bookshelf",
+     "x": 12,
+     "y": 8,
+     "w": 3,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "roundTable",
+     "x": 8,
+     "y": 8,
+     "w": 4,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "fireplace",
+     "x": 19,
+     "y": 8,
+     "w": 4,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "sofa",
+     "x": 28,
+     "y": 3,
+     "w": 4,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "sofa",
+     "x": 33,
+     "y": 3,
+     "w": 4,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "bookshelf",
+     "x": 27,
+     "y": 8,
+     "w": 3,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "bookshelf",
+     "x": 34,
+     "y": 8,
+     "w": 3,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "bed",
+     "x": 40,
+     "y": 3,
+     "w": 5,
+     "h": 4,
+     "flat": false
+    },
+    {
+     "t": "desk",
+     "x": 47,
+     "y": 3,
+     "w": 5,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "wardrobe",
+     "x": 55,
+     "y": 3,
+     "w": 4,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "carpet",
+     "x": 42,
+     "y": 9,
+     "w": 8,
+     "h": 3,
+     "flat": true
+    },
+    {
+     "t": "sofa",
+     "x": 4,
+     "y": 22,
+     "w": 5,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "sofa",
+     "x": 13,
+     "y": 22,
+     "w": 5,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "roundTable",
+     "x": 9,
+     "y": 21,
+     "w": 4,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "fireplace",
+     "x": 3,
+     "y": 27,
+     "w": 5,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "bookshelf",
+     "x": 18,
+     "y": 27,
+     "w": 5,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "desk",
+     "x": 28,
+     "y": 22,
+     "w": 5,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "sofa",
+     "x": 33,
+     "y": 24,
+     "w": 4,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "bed",
+     "x": 40,
+     "y": 22,
+     "w": 5,
+     "h": 4,
+     "flat": false
+    },
+    {
+     "t": "roundTable",
+     "x": 47,
+     "y": 22,
+     "w": 4,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "wardrobe",
+     "x": 55,
+     "y": 22,
+     "w": 4,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "carpet",
+     "x": 42,
+     "y": 28,
+     "w": 8,
+     "h": 3,
+     "flat": true
+    },
+    {
+     "t": "palaceSteps",
+     "x": 27,
+     "y": 33,
+     "w": 8,
+     "h": 5,
+     "flat": true
+    },
+    {
+     "t": "stairRail",
+     "x": 26,
+     "y": 33,
+     "w": 1,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "stairRail",
+     "x": 35,
+     "y": 33,
+     "w": 1,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "palaceServiceSteps",
+     "x": 39,
+     "y": 33,
+     "w": 3,
+     "h": 5,
+     "flat": true
+    },
+    {
+     "t": "stairRail",
+     "x": 38,
+     "y": 33,
+     "w": 1,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "bed",
+     "x": 4,
+     "y": 40,
+     "w": 5,
+     "h": 4,
+     "flat": false
+    },
+    {
+     "t": "genericShelf",
+     "x": 11,
+     "y": 40,
+     "w": 4,
+     "h": 2,
+     "flat": false
+    },
+    {
+     "t": "wardrobe",
+     "x": 18,
+     "y": 40,
+     "w": 5,
+     "h": 5,
+     "flat": false
+    },
+    {
+     "t": "bookshelf",
+     "x": 40,
+     "y": 40,
+     "w": 3,
+     "h": 6,
+     "flat": false
+    },
+    {
+     "t": "bookshelf",
+     "x": 60,
+     "y": 40,
+     "w": 3,
+     "h": 6,
+     "flat": false
+    },
+    {
+     "t": "readingTable",
+     "x": 45,
+     "y": 41,
+     "w": 8,
+     "h": 3,
+     "flat": false
+    },
+    {
+     "t": "carpet",
+     "x": 42,
+     "y": 40,
+     "w": 16,
+     "h": 5,
+     "flat": true
+    },
+    {
+     "t": "chandelier",
+     "x": 29,
+     "y": 28,
+     "w": 4,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "palaceRoomDoor",
+     "x": 25,
+     "y": 13,
+     "w": 1,
+     "h": 3,
+     "flat": true
+    },
+    {
+     "t": "palaceRoomDoor",
+     "x": 38,
+     "y": 17,
+     "w": 1,
+     "h": 3,
+     "flat": true
+    },
+    {
+     "t": "palaceRoomDoor",
+     "x": 25,
+     "y": 26,
+     "w": 1,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "palaceRoomDoor",
+     "x": 38,
+     "y": 26,
+     "w": 1,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "palaceRoomDoor",
+     "x": 25,
+     "y": 42,
+     "w": 1,
+     "h": 2,
+     "flat": true
+    },
+    {
+     "t": "palaceRoomDoor",
+     "x": 38,
+     "y": 42,
+     "w": 1,
+     "h": 2,
+     "flat": true
+    }
+   ],
+   "partitions": [
+    {
+     "x": 25,
+     "y": 2,
+     "w": 1,
+     "h": 11
+    },
+    {
+     "x": 25,
+     "y": 16,
+     "w": 1,
+     "h": 1
+    },
+    {
+     "x": 25,
+     "y": 32,
+     "w": 1,
+     "h": 10
+    },
+    {
+     "x": 25,
+     "y": 44,
+     "w": 1,
+     "h": 3
+    },
+    {
+     "x": 38,
+     "y": 2,
+     "w": 1,
+     "h": 15
+    },
+    {
+     "x": 38,
+     "y": 20,
+     "w": 1,
+     "h": 1
+    },
+    {
+     "x": 38,
+     "y": 32,
+     "w": 1,
+     "h": 10
+    },
+    {
+     "x": 38,
+     "y": 44,
+     "w": 1,
+     "h": 3
+    },
+    {
+     "x": 25,
+     "y": 21,
+     "w": 1,
+     "h": 5
+    },
+    {
+     "x": 25,
+     "y": 28,
+     "w": 1,
+     "h": 3
+    },
+    {
+     "x": 38,
+     "y": 21,
+     "w": 1,
+     "h": 5
+    },
+    {
+     "x": 38,
+     "y": 28,
+     "w": 1,
+     "h": 3
+    }
+   ],
+   "stairs": [
+    {
+     "t": "palaceSteps",
+     "x": 27,
+     "y": 33,
+     "w": 8,
+     "h": 5
+    },
+    {
+     "t": "palaceServiceSteps",
+     "x": 39,
+     "y": 33,
+     "w": 3,
+     "h": 5
+    }
+   ],
+   "interactables": [
+    {
+     "id": "exit_terrace",
+     "kind": "indoorExit",
+     "x": 63,
+     "y": 34,
+     "label": "返回白蔷薇宫城 · 翼楼露台",
+     "stand": [
+      [
+       62,
+       34
+      ]
+     ],
+     "note": ""
+    },
+    {
+     "id": "palace_f3_spot_0",
+     "kind": "interiorProp",
+     "x": 7,
+     "y": 3,
+     "label": "主人书桌",
+     "stand": [
+      [
+       7,
+       6
+      ],
+      [
+       5,
+       6
+      ],
+      [
+       9,
+       6
+      ]
+     ],
+     "note": "书桌上摊着今早的公文与一封没拆的信。窗边能看见花园和北面的旧塔。"
+    },
+    {
+     "id": "palace_f3_spot_1",
+     "kind": "interiorProp",
+     "x": 11,
+     "y": 22,
+     "label": "私人会客室",
+     "stand": [
+      [
+       11,
+       25
+      ],
+      [
+       9,
+       25
+      ],
+      [
+       13,
+       25
+      ]
+     ],
+     "note": "沙发围着小桌，壁炉烧着。这里说话不用按正式接待厅的规矩。"
+    },
+    {
+     "id": "palace_f3_spot_2",
+     "kind": "interiorProp",
+     "x": 42,
+     "y": 22,
+     "label": "客房登记簿",
+     "stand": [
+      [
+       42,
+       27
+      ],
+      [
+       40,
+       27
+      ],
+      [
+       44,
+       27
+      ]
+     ],
+     "note": "登记簿记着今晚留宿的人名与房号。只有登记过的客房能过夜。"
+    },
+    {
+     "id": "palace_f3_spot_3",
+     "kind": "interiorProp",
+     "x": 48,
+     "y": 41,
+     "label": "阅读廊",
+     "stand": [
+      [
+       48,
+       45
+      ],
+      [
+       46,
+       45
+      ],
+      [
+       50,
+       45
+      ]
+     ],
+     "note": "书架从三层一直排到露台门边，末端那几本是各地寄来的园艺与建筑册。"
+    },
+    {
+     "id": "palace_f3_down",
+     "kind": "palaceStair",
+     "x": 33,
+     "y": 35,
+     "label": "下楼 · 二层 · 王座厅",
+     "to": "city_castle",
+     "tx": 31,
+     "ty": 42,
+     "stand": [
+      [
+       33,
+       31
+      ],
+      [
+       34,
+       31
+      ],
+      [
+       33,
+       32
+      ],
+      [
+       34,
+       32
+      ]
+     ],
+     "note": ""
+    }
+   ]
+  }
+ },
+ "scenes": [
+  {
+   "id": "palace_grounds",
+   "name": "白蔷薇宫苑",
+   "w": 120,
+   "h": 96,
+   "indoor": false,
+   "exits": [
+    {
+     "x": 60,
+     "y": 93,
+     "to": "city",
+     "tx": 320,
+     "ty": 165
+    }
+   ],
+   "buildings": [
+    {
+     "id": "palace_main",
+     "label": "白蔷薇宫城 · 主宫",
+     "x": 40,
+     "y": 30,
+     "w": 41,
+     "h": 17,
+     "kind": "castle"
+    },
+    {
+     "id": "palace_east",
+     "label": "东翼",
+     "x": 86,
+     "y": 34,
+     "w": 23,
+     "h": 17,
+     "kind": "palace"
+    },
+    {
+     "id": "palace_keep",
+     "label": "旧堡塔楼",
+     "x": 10,
+     "y": 34,
+     "w": 21,
+     "h": 21,
+     "kind": "keep"
+    },
+    {
+     "id": "palace_chapel",
+     "label": "宫苑礼拜堂",
+     "x": 12,
+     "y": 58,
+     "w": 17,
+     "h": 13,
+     "kind": "palace"
+    },
+    {
+     "id": "palace_gate",
+     "label": "白蔷薇门楼",
+     "x": 50,
+     "y": 78,
+     "w": 21,
+     "h": 11,
+     "kind": "palace"
+    }
+   ],
+   "decor": 26,
+   "interactables": [
+    {
+     "id": "palace_main_door",
+     "kind": "indoorEntrance",
+     "x": 60,
+     "y": 46,
+     "label": "进入白蔷薇宫城一层门厅",
+     "to": "palace_f1",
+     "stand": [
+      [
+       60,
+       47
+      ],
+      [
+       59,
+       47
+      ],
+      [
+       61,
+       47
+      ],
+      [
+       60,
+       48
+      ]
+     ],
+     "note": ""
+    },
+    {
+     "id": "palace_back_city",
+     "kind": "palaceGate",
+     "x": 60,
+     "y": 93,
+     "label": "返回白蔷薇城 · 城堡前庭",
+     "to": "city",
+     "tx": 320,
+     "ty": 165,
+     "stand": [
+      [
+       60,
+       92
+      ],
+      [
+       59,
+       92
+      ],
+      [
+       61,
+       92
+      ],
+      [
+       60,
+       94
+      ]
+     ],
+     "note": ""
+    },
+    {
+     "id": "palace_east_wing",
+     "kind": "palaceLocked",
+     "x": 97,
+     "y": 50,
+     "label": "东翼",
+     "stand": [
+      [
+       97,
+       51
+      ],
+      [
+       96,
+       51
+      ],
+      [
+       98,
+       51
+      ]
+     ],
+     "note": "东翼正在修缮：宴会厅、音乐沙龙与固定服务梯会在下一批开通。"
+    },
+    {
+     "id": "palace_keep_site",
+     "kind": "palaceLocked",
+     "x": 20,
+     "y": 54,
+     "label": "旧堡塔楼",
+     "stand": [
+      [
+       20,
+       55
+      ],
+      [
+       19,
+       55
+      ],
+      [
+       21,
+       55
+      ]
+     ],
+     "note": "旧堡塔楼与宫苑礼拜堂组成历史区，石基与历代纹章正在整理。"
+    },
+    {
+     "id": "palace_chapel_site",
+     "kind": "palaceLocked",
+     "x": 20,
+     "y": 70,
+     "label": "宫苑礼拜堂",
+     "stand": [
+      [
+       20,
+       71
+      ],
+      [
+       19,
+       71
+      ],
+      [
+       21,
+       71
+      ]
+     ],
+     "note": "礼拜堂下层归一层使用，上层观礼廊接二层的礼仪路线。"
+    },
+    {
+     "id": "palace_service_yard",
+     "kind": "palaceLocked",
+     "x": 98,
+     "y": 62,
+     "label": "东侧后勤院",
+     "stand": [
+      [
+       98,
+       61
+      ],
+      [
+       97,
+       61
+      ],
+      [
+       99,
+       61
+      ]
+     ],
+     "note": "后勤院有独立的货物入口：货门 → 地下厨房 → 服务梯 → 备餐间，不必穿过王座厅。"
+    }
+   ]
+  },
+  {
+   "id": "palace_gallery",
+   "name": "白蔷薇宫城 · 二层 回廊",
+   "w": 28,
+   "h": 16,
+   "indoor": false,
+   "exits": [
+    {
+     "x": 0,
+     "y": 7,
+     "to": "city_castle",
+     "tx": 60,
+     "ty": 10
+    }
+   ],
+   "buildings": [],
+   "decor": 6,
+   "interactables": [
+    {
+     "id": "palace_gallery_in",
+     "kind": "indoorEntrance",
+     "x": 1,
+     "y": 7,
+     "label": "返回二层 王座厅",
+     "to": "city_castle",
+     "stand": [
+      [
+       1,
+       6
+      ],
+      [
+       1,
+       8
+      ],
+      [
+       2,
+       7
+      ],
+      [
+       0,
+       7
+      ]
+     ],
+     "note": ""
+    },
+    {
+     "id": "gallery_walk",
+     "kind": "interiorProp",
+     "x": 12,
+     "y": 8,
+     "label": "回廊漫步",
+     "stand": [
+      [
+       12,
+       9
+      ],
+      [
+       11,
+       8
+      ],
+      [
+       13,
+       8
+      ]
+     ],
+     "note": "回廊沿内庭一侧绕过去，北端接花园。正式宴会前这里是宾客等候的地方。"
+    }
+   ]
+  },
+  {
+   "id": "palace_terrace",
+   "name": "白蔷薇宫城 · 翼楼露台",
+   "w": 40,
+   "h": 28,
+   "indoor": false,
+   "exits": [
+    {
+     "x": 3,
+     "y": 13,
+     "to": "palace_f3",
+     "tx": 60,
+     "ty": 34
+    }
+   ],
+   "buildings": [],
+   "decor": 4,
+   "interactables": [
+    {
+     "id": "palace_terrace_in",
+     "kind": "indoorEntrance",
+     "x": 2,
+     "y": 13,
+     "label": "返回三层 起居",
+     "to": "palace_f3",
+     "stand": [
+      [
+       2,
+       12
+      ],
+      [
+       2,
+       14
+      ],
+      [
+       1,
+       13
+      ],
+      [
+       3,
+       13
+      ]
+     ],
+     "note": ""
+    },
+    {
+     "id": "terrace_view",
+     "kind": "interiorProp",
+     "x": 18,
+     "y": 6,
+     "label": "露台观景",
+     "stand": [
+      [
+       18,
+       7
+      ],
+      [
+       17,
+       6
+      ],
+      [
+       19,
+       6
+      ]
+     ],
+     "note": "从这里能一眼看完荣誉内庭、东翼的屋顶，再往北是花园与旧堡塔楼。"
+    },
+    {
+     "id": "terrace_garden",
+     "kind": "interiorProp",
+     "x": 22,
+     "y": 21,
+     "label": "露台花箱",
+     "stand": [
+      [
+       22,
+       20
+      ],
+      [
+       21,
+       21
+      ],
+      [
+       23,
+       21
+      ]
+     ],
+     "note": "花箱里种着从宫苑花园分出来的白蔷薇，园丁按周来修整。"
+    }
+   ]
+  }
+ ],
+ "reach": {
+  "palace_f1": {
+   "entry": {
+    "x": 31,
+    "y": 46
+   },
+   "walkable": 2297,
+   "reachable": 2297,
+   "unreachableCount": 0,
+   "unreachableSample": []
+  },
+  "city_castle": {
+   "entry": {
+    "x": 62,
+    "y": 10
+   },
+   "walkable": 2205,
+   "reachable": 2205,
+   "unreachableCount": 0,
+   "unreachableSample": []
+  },
+  "palace_f3": {
+   "entry": {
+    "x": 62,
+    "y": 34
+   },
+   "walkable": 2342,
+   "reachable": 2342,
+   "unreachableCount": 0,
+   "unreachableSample": []
+  },
+  "palace_grounds": {
+   "fromCityGate": 9460,
+   "at_97_57": true,
+   "at_98_57": true,
+   "at_97_62": true,
+   "at_60_46": true,
+   "at_60_49": true,
+   "at_60_93": true,
+   "at_60_94": true
+  }
+ }
+}

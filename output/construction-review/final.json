@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-15",
+  "status": "local construction complete; not committed or published",
+  "constructionRoutes": {
+    "source": 74,
+    "singleFile": 74
+  },
+  "constructionSaveBoundaries": {
+    "source": 32,
+    "singleFile": 32
+  },
+  "legacyGroups": 21,
+  "legacyGroupsPassed": 21,
+  "mainChecks": 123,
+  "mainCompletedDay": 14,
+  "worldMapChecks": 20,
+  "travelChecks": 56,
+  "exactInlineGameMatch": true,
+  "physicalMobileTested": false
+}

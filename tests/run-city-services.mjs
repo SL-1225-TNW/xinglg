@@ -101,6 +101,8 @@ try {
     s.inventory = {}; s.energy = 100; s.timeMinutes = 480;
   });
   await openSvc('foundry');
+  // 开窗前关闭上一窗口的间隙会正常流逝时间；从本次窗口打开后测无消耗。
+  await page.evaluate(() => { window.__MOSS__.state.timeMinutes = 480; });
   T('铸造车间窗口', await winOpen(page));
   const fbtns = (await page.locator('.win-body button').allTextContents()).filter(b => b.trim());
   const si = fbtns.findIndex(b => /熔铁/.test(b));
@@ -114,7 +116,7 @@ try {
     }));
     T('材料不足不扣体力', st.e === 100, 'energy=' + st.e);
     T('材料不足不推进时间', st.t === 480, 'time=' + st.t);
-    T('提示材料不够', /材料不够/.test(st.msg), '「' + st.msg + '」');
+    T('提示材料不够', /材料不(够|足)/.test(st.msg), '「' + st.msg + '」');
   }
 
   /* ---------- 6. 满背包不吞材料 ---------- */
@@ -122,17 +124,12 @@ try {
   const slots = await page.evaluate(() => {
     const M = window.__MOSS__, s = M.state;
     // 只留熔铁要用的料，且确保 iron_ingot 不在包里（否则同种叠加不占槽，测不出满包）
-    s.inventory = { iron_ore: 4, coal: 2 };
-    const fill = ['wood', 'copper_ore', 'gem', 'mushroom', 'berry', 'fish_bass',
-      'fish_silver', 'flour', 'plank', 'charcoal', 'paper', 'cloth', 'salt',
-      'vinegar', 'cheese', 'honey'];
-    for (let g = 0; g < 200; g++) {
-      if (M.countSlots() >= M.CFG.bagSlots) break;
-      s.inventory[fill[g % fill.length]] = 1;
-    }
+    // 两种原料在扣料后仍有余量，不会释放槽；其余槽用合法木材堆填满。
+    s.inventory = { iron_ore: 4, charcoal: 2, wood: M.CFG.stack * (M.CFG.bagSlots - 2) };
     return { slots: M.countSlots(), cap: M.CFG.bagSlots, hasIngot: !!s.inventory.iron_ingot };
   });
   console.log(`  · 背包塞满 ${slots.slots}/${slots.cap} 槽，包内无铁锭=${!slots.hasIngot}`);
+  T('满包夹具确实占满槽位', slots.slots === slots.cap);
   await openSvc('foundry');
   const f2 = (await page.locator('.win-body button').allTextContents()).filter(b => b.trim());
   const si2 = f2.findIndex(b => /熔铁/.test(b));
@@ -207,7 +204,7 @@ try {
     const s = window.__MOSS__.state;
     s.coins = 5000; s.energy = 5; s.inventory = {}; s.timeMinutes = 480;
   });
-  await openSvc('uni_lab');
+  await openSvc('uni_main');
   const ubtn = (await page.locator('.win-body button').allTextContents()).filter(b => b.trim());
   const ci = ubtn.findIndex(b => /进阶课|讲义/.test(b));
   T('有课程按钮', ci >= 0, ubtn[ci] || ubtn.join('|'));

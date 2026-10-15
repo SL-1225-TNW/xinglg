@@ -1,0 +1,123 @@
+PASS 宫殿探针齐全（PALACE_FLOORS / PALACE_STAIRS / palaceFloorOf / palaceStairFrom）
+PASS 楼层表覆盖三层室内场景
+PASS palaceFloorOf 对三层室内场景都能认领楼层
+PASS 楼层表字段形状完整（id/label/sceneId/order）
+PASS 场景存在且 solid 结构为 [x][y]：palace_f1
+PASS 尺寸符合契约 §3：palace_f1
+PASS palace_f1 能确定入口落点
+PASS palace_f1 全部入口落点可走
+PASS palace_f1 至少有一扇门
+PASS palace_f1 · 门 main 内侧站位从入口可达
+PASS palace_f1 · 门 wing 内侧站位从入口可达
+PASS palace_f1 · 门 west 内侧站位从入口可达
+PASS palace_f1 每个交互物都声明了站位 stand
+PASS palace_f1 · 交互物 palace_f1_spot_0(cityService) 站位从入口可达
+PASS palace_f1 · 交互物 palace_f1_spot_1(interiorProp) 站位从入口可达
+PASS palace_f1 · 交互物 palace_f1_spot_2(interiorProp) 站位从入口可达
+PASS palace_f1 · 交互物 palace_f1_spot_3(interiorProp) 站位从入口可达
+PASS palace_f1 · 交互物 palace_f1_up(palaceStair) 站位从入口可达
+PASS palace_f1 · 交互物 exit_main(indoorExit) 站位从入口可达
+PASS palace_f1 · 交互物 exit_wing(indoorExit) 站位从入口可达
+PASS palace_f1 · 交互物 exit_west(indoorExit) 站位从入口可达
+PASS palace_f1 · 楼梯 palace_f1_up 触发格从入口可达
+PASS palace_f1 · 落点 31,42 不是死区（可走到本层楼梯）
+PASS palace_f1 · 落点 31,46 不是死区（可走到本层楼梯）
+PASS palace_f1 · 落点 62,19 不是死区（可走到本层楼梯）
+PASS palace_f1 · 落点 1,19 不是死区（可走到本层楼梯）
+PASS palace_f1 没有走不到的孤立可走格
+PASS palace_f1 围出了房间（家具圈出的封闭格 > 0）
+PASS palace_f1 房间格占可走格比例 > 5%（整层不能空荡）
+PASS 场景存在且 solid 结构为 [x][y]：city_castle
+PASS 尺寸符合契约 §3：city_castle
+PASS city_castle 能确定入口落点
+PASS city_castle 全部入口落点可走
+PASS city_castle 至少有一扇门
+PASS city_castle · 门 gallery 内侧站位从入口可达
+PASS city_castle · 门 service 内侧站位从入口可达
+PASS city_castle · 门 chapel 内侧站位从入口可达
+PASS city_castle 每个交互物都声明了站位 stand
+PASS city_castle · 交互物 city_castle_spot_0(interiorProp) 站位从入口可达
+PASS city_castle · 交互物 city_castle_spot_1(interiorProp) 站位从入口可达
+PASS city_castle · 交互物 city_castle_spot_2(interiorProp) 站位从入口可达
+PASS city_castle · 交互物 city_castle_spot_3(interiorProp) 站位从入口可达
+PASS city_castle · 交互物 city_castle_down(palaceStair) 站位从入口可达
+PASS city_castle · 交互物 city_castle_up(palaceStair) 站位从入口可达
+PASS city_castle · 交互物 exit_gallery(indoorExit) 站位从入口可达
+PASS city_castle · 交互物 exit_service(indoorExit) 站位从入口可达
+PASS city_castle · 交互物 exit_chapel(indoorExit) 站位从入口可达
+PASS city_castle · 楼梯 city_castle_down 触发格从入口可达
+PASS city_castle · 楼梯 city_castle_up 触发格从入口可达
+PASS city_castle · 落点 31,27 不是死区（可走到本层楼梯）
+PASS city_castle · 落点 31,42 不是死区（可走到本层楼梯）
+PASS city_castle · 落点 62,10 不是死区（可走到本层楼梯）
+PASS city_castle · 落点 62,19 不是死区（可走到本层楼梯）
+PASS city_castle · 落点 1,19 不是死区（可走到本层楼梯）
+PASS city_castle 没有走不到的孤立可走格
+PASS city_castle 围出了房间（家具圈出的封闭格 > 0）
+PASS city_castle 房间格占可走格比例 > 5%（整层不能空荡）
+PASS 场景存在且 solid 结构为 [x][y]：palace_f3
+PASS 尺寸符合契约 §3：palace_f3
+PASS palace_f3 能确定入口落点
+PASS palace_f3 全部入口落点可走
+PASS palace_f3 至少有一扇门
+PASS palace_f3 · 门 terrace 内侧站位从入口可达
+PASS palace_f3 每个交互物都声明了站位 stand
+PASS palace_f3 · 交互物 exit_terrace(indoorExit) 站位从入口可达
+PASS palace_f3 · 交互物 palace_f3_spot_0(interiorProp) 站位从入口可达
+PASS palace_f3 · 交互物 palace_f3_spot_1(interiorProp) 站位从入口可达
+PASS palace_f3 · 交互物 palace_f3_spot_2(interiorProp) 站位从入口可达
+PASS palace_f3 · 交互物 palace_f3_spot_3(interiorProp) 站位从入口可达
+PASS palace_f3 · 交互物 palace_f3_down(palaceStair) 站位从入口可达
+PASS palace_f3 · 楼梯 palace_f3_down 触发格从入口可达
+PASS palace_f3 · 落点 31,27 不是死区（可走到本层楼梯）
+PASS palace_f3 · 落点 62,34 不是死区（可走到本层楼梯）
+PASS palace_f3 没有走不到的孤立可走格
+PASS palace_f3 围出了房间（家具圈出的封闭格 > 0）
+PASS palace_f3 房间格占可走格比例 > 5%（整层不能空荡）
+PASS PALACE_STAIRS 非空
+PASS 楼梯 palace_f1_up（palace_f1 → city_castle） 在来源场景登记为 palaceStair 交互物
+PASS 楼梯 palace_f1_up（palace_f1 → city_castle） stand 非空
+PASS 楼梯 palace_f1_up（palace_f1 → city_castle） 目标场景存在于 MAPS
+PASS 楼梯 palace_f1_up（palace_f1 → city_castle） 落点 (31,27) 在目标场景可走
+PASS 楼梯 palace_f1_up（palace_f1 → city_castle） 落点与每个触发格相距 ≥ 3 格
+PASS 楼梯 palace_f1_up（palace_f1 → city_castle） 目标场景有反向楼梯能回来
+PASS 楼梯 palace_f1_up（palace_f1 → city_castle） 落点能走到反向楼梯的触发格
+PASS 楼梯 city_castle_down（city_castle → palace_f1） 在来源场景登记为 palaceStair 交互物
+PASS 楼梯 city_castle_down（city_castle → palace_f1） stand 非空
+PASS 楼梯 city_castle_down（city_castle → palace_f1） 目标场景存在于 MAPS
+PASS 楼梯 city_castle_down（city_castle → palace_f1） 落点 (31,42) 在目标场景可走
+PASS 楼梯 city_castle_down（city_castle → palace_f1） 落点与每个触发格相距 ≥ 3 格
+PASS 楼梯 city_castle_down（city_castle → palace_f1） 目标场景有反向楼梯能回来
+PASS 楼梯 city_castle_down（city_castle → palace_f1） 落点能走到反向楼梯的触发格
+PASS 楼梯 city_castle_up（city_castle → palace_f3） 在来源场景登记为 palaceStair 交互物
+PASS 楼梯 city_castle_up（city_castle → palace_f3） stand 非空
+PASS 楼梯 city_castle_up（city_castle → palace_f3） 目标场景存在于 MAPS
+PASS 楼梯 city_castle_up（city_castle → palace_f3） 落点 (31,27) 在目标场景可走
+PASS 楼梯 city_castle_up（city_castle → palace_f3） 落点与每个触发格相距 ≥ 3 格
+PASS 楼梯 city_castle_up（city_castle → palace_f3） 目标场景有反向楼梯能回来
+PASS 楼梯 city_castle_up（city_castle → palace_f3） 落点能走到反向楼梯的触发格
+PASS 楼梯 palace_f3_down（palace_f3 → city_castle） 在来源场景登记为 palaceStair 交互物
+PASS 楼梯 palace_f3_down（palace_f3 → city_castle） stand 非空
+PASS 楼梯 palace_f3_down（palace_f3 → city_castle） 目标场景存在于 MAPS
+PASS 楼梯 palace_f3_down（palace_f3 → city_castle） 落点 (31,42) 在目标场景可走
+PASS 楼梯 palace_f3_down（palace_f3 → city_castle） 落点与每个触发格相距 ≥ 3 格
+PASS 楼梯 palace_f3_down（palace_f3 → city_castle） 目标场景有反向楼梯能回来
+PASS 楼梯 palace_f3_down（palace_f3 → city_castle） 落点能走到反向楼梯的触发格
+PASS palace_f1 声明了 palaceStair
+PASS city_castle 声明了 palaceStair
+PASS palace_f3 声明了 palaceStair
+PASS 所有层的楼梯触发点落在同一条楼梯带上（y 相同，x 跨度 ≤8 格）
+PASS city_castle 同层不同方向的触发点分处楼梯两头（不会挑错方向）
+PASS 场景存在且 solid 结构为 [x][y]：palace_terrace
+PASS 尺寸符合契约 §3：palace_terrace
+PASS palace_terrace 临空边是实心碰撞（只留合法出口）
+PASS palace_terrace 合法出口数量有限（没有假门）
+PASS palace_terrace 每个出口都通向真实可走的场景（没有假门）
+PASS palace_terrace 没有按 doors 安装的洞（户外栏杆不画假门）
+PASS palace_terrace 从门口能走到全部交互物站位
+PASS 无控制台错误
+
+================ 宫城布局契约 ================
+通过 118 项，失败 0 项
+==============================================
+

@@ -1,0 +1,112 @@
+白蔷薇宫城 · 楼层通行验收（契约 docs/palace-p1-contract.md）
+
+── 源码入口 §0 探针与场景登记
+  ✓ 源码入口 对外探针 PALACE_FLOORS / PALACE_STAIRS 存在  [true,true]
+  ✓ 源码入口 对外探针 palaceFloorOf / palaceStairFrom 是函数  [true,true]
+  ✓ 源码入口 五个宫城场景都已登记（§2）  palace_grounds palace_f1 city_castle palace_f3 palace_terrace
+  ✓ 源码入口 palaceFloorOf 能认出一/二/三层  palace_f1=1 city_castle=2 palace_f3=3
+  ✓ 源码入口 palaceFloorOf 对户外宫苑/露台返回 null（不占楼层号）  palace_grounds=null palace_terrace=null
+
+── 源码入口 §1 完整游览链（真按键）
+  ✓ 源码入口 城市城堡门已改成通往 palace_grounds（§7.1）  castle / palaceGate → palace_grounds
+  ✓ 源码 城堡门 kind 是契约约定的 palaceGate  实际 kind=palaceGate
+  ✓ 源码 city → palace_grounds  castle（palaceGate）站位 (320,165) 按 E · 落点 (60,90) 面朝 down
+  ✓ 源码 palace_grounds → palace_f1  palace_main_door（indoorEntrance）站位 (60,47) 按 E · 落点 (31,46) 面朝 down
+  ✓ 源码 palace_f1 → city_castle  palace_f1_up（palaceStair）站位 (28,38) 按 E · 落点 (31,27) 面朝 down
+  ✓ 源码 city_castle → palace_f3  city_castle_up（palaceStair）站位 (28,38) 按 E · 落点 (31,27) 面朝 down
+  ✓ 源码 palace_f3 → palace_terrace  exit_terrace（indoorExit）站位 (62,34) 按 E · 落点 (4,13) 面朝 down
+  ✓ 源码 露台回来 palace_terrace → palace_f3  按 E 走 palace_terrace_in（indoorEntrance）· 落点 (62,34)
+
+── 源码入口 §2 原路返回（真按键）
+  ✓ 源码 palace_f3 → city_castle  palace_f3_down（palaceStair）站位 (33,31) 按 E · 落点 (31,42) 面朝 up
+  ✓ 源码 city_castle → palace_f1  city_castle_down（palaceStair）站位 (33,31) 按 E · 落点 (31,42) 面朝 up
+  ✓ 源码 主门 palace_f1 → palace_grounds  按 E 走 exit_main（indoorExit）· 落点 (60,49)
+  ✓ 源码 palace_grounds → city  palace_back_city（palaceGate）站位 (60,92) 按 E · 落点 (320,165) 面朝 down
+
+── 源码入口 §3 落点不弹回 / 朝向对应（§6.1 落点距触发格 ≥3）
+  ✓ 源码 palace_f1 → city_castle  palace_f1_up（palaceStair）站位 (28,38) 按 E · 落点 (31,27) 面朝 down
+  ✓ 源码 palace_f1 → city_castle 落点距本层楼梯站位 ≥3 格  落点 (31,27) 到最近站位 6 格
+  ✓ 源码 palace_f1 → city_castle 落点连按两次 E 不弹回  连按后 → city_castle (31,27)
+  ✓ 源码 palace_f1 → city_castle 落点面朝走下来的那一侧  face=down · 台阶在 (28,35)
+  ✓ 源码 city_castle → palace_f3  city_castle_up（palaceStair）站位 (28,38) 按 E · 落点 (31,27) 面朝 down
+  ✓ 源码 city_castle → palace_f3 落点距本层楼梯站位 ≥3 格  落点 (31,27) 到最近站位 6 格
+  ✓ 源码 city_castle → palace_f3 落点连按两次 E 不弹回  连按后 → palace_f3 (31,27)
+  ✓ 源码 city_castle → palace_f3 落点面朝走下来的那一侧  face=down · 台阶在 (28,35)
+  ✓ 源码 palace_f3 → city_castle  palace_f3_down（palaceStair）站位 (33,31) 按 E · 落点 (31,42) 面朝 up
+  ✓ 源码 palace_f3 → city_castle 落点距本层楼梯站位 ≥3 格  落点 (31,42) 到最近站位 5 格
+  ✓ 源码 palace_f3 → city_castle 落点连按两次 E 不弹回  连按后 → city_castle (31,42)
+  ✓ 源码 palace_f3 → city_castle 落点面朝走下来的那一侧  face=up · 台阶在 (33,35)
+  ✓ 源码 city_castle → palace_f1  city_castle_down（palaceStair）站位 (33,31) 按 E · 落点 (31,42) 面朝 up
+  ✓ 源码 city_castle → palace_f1 落点距本层楼梯站位 ≥3 格  落点 (31,42) 到最近站位 5 格
+  ✓ 源码 city_castle → palace_f1 落点连按两次 E 不弹回  连按后 → palace_f1 (31,42)
+  ✓ 源码 city_castle → palace_f1 落点面朝走下来的那一侧  face=up · 台阶在 (33,35)
+
+── 源码入口 §4 每层有可交互内容
+  ✓ 源码入口 palace_grounds 至少 2 个非门类交互物  palaceGate interiorProp interiorProp constructionWork constructionWork constructionGuide
+  ✓ 源码入口 palace_f1 至少 2 个非门类交互物  cityService interiorProp interiorProp interiorProp
+  ✓ 源码入口 city_castle 至少 2 个非门类交互物  interiorProp interiorProp interiorProp interiorProp
+  ✓ 源码入口 palace_f3 至少 2 个非门类交互物  interiorProp interiorProp interiorProp interiorProp
+  ✓ 源码入口 palace_terrace 至少 2 个非门类交互物  interiorProp interiorProp
+
+── 源码入口 §5 一层能找管家塞琳的服务台
+  ✓ 源码入口 palace_f1 有 cityService/castle 服务点  palace_f1_spot_0 · 门厅事务台
+  ✓ 源码入口 一层管家服务台按 E 弹出窗口  {"win":true,"layerOpen":true,"hasWin":true}
+  ✓ 源码入口 全程浏览器无报错
+
+── 打包版 §0 探针与场景登记
+  ✓ 打包版 对外探针 PALACE_FLOORS / PALACE_STAIRS 存在  [true,true]
+  ✓ 打包版 对外探针 palaceFloorOf / palaceStairFrom 是函数  [true,true]
+  ✓ 打包版 五个宫城场景都已登记（§2）  palace_grounds palace_f1 city_castle palace_f3 palace_terrace
+  ✓ 打包版 palaceFloorOf 能认出一/二/三层  palace_f1=1 city_castle=2 palace_f3=3
+  ✓ 打包版 palaceFloorOf 对户外宫苑/露台返回 null（不占楼层号）  palace_grounds=null palace_terrace=null
+
+── 打包版 §1 完整游览链（真按键）
+  ✓ 打包版 城市城堡门已改成通往 palace_grounds（§7.1）  castle / palaceGate → palace_grounds
+  ✓ 打包 城堡门 kind 是契约约定的 palaceGate  实际 kind=palaceGate
+  ✓ 打包 city → palace_grounds  castle（palaceGate）站位 (320,165) 按 E · 落点 (60,90) 面朝 down
+  ✓ 打包 palace_grounds → palace_f1  palace_main_door（indoorEntrance）站位 (60,47) 按 E · 落点 (31,46) 面朝 down
+  ✓ 打包 palace_f1 → city_castle  palace_f1_up（palaceStair）站位 (28,38) 按 E · 落点 (31,27) 面朝 down
+  ✓ 打包 city_castle → palace_f3  city_castle_up（palaceStair）站位 (28,38) 按 E · 落点 (31,27) 面朝 down
+  ✓ 打包 palace_f3 → palace_terrace  exit_terrace（indoorExit）站位 (62,34) 按 E · 落点 (4,13) 面朝 down
+  ✓ 打包 露台回来 palace_terrace → palace_f3  按 E 走 palace_terrace_in（indoorEntrance）· 落点 (62,34)
+
+── 打包版 §2 原路返回（真按键）
+  ✓ 打包 palace_f3 → city_castle  palace_f3_down（palaceStair）站位 (33,31) 按 E · 落点 (31,42) 面朝 up
+  ✓ 打包 city_castle → palace_f1  city_castle_down（palaceStair）站位 (33,31) 按 E · 落点 (31,42) 面朝 up
+  ✓ 打包 主门 palace_f1 → palace_grounds  按 E 走 exit_main（indoorExit）· 落点 (60,49)
+  ✓ 打包 palace_grounds → city  palace_back_city（palaceGate）站位 (60,92) 按 E · 落点 (320,165) 面朝 down
+
+── 打包版 §3 落点不弹回 / 朝向对应（§6.1 落点距触发格 ≥3）
+  ✓ 打包 palace_f1 → city_castle  palace_f1_up（palaceStair）站位 (28,38) 按 E · 落点 (31,27) 面朝 down
+  ✓ 打包 palace_f1 → city_castle 落点距本层楼梯站位 ≥3 格  落点 (31,27) 到最近站位 6 格
+  ✓ 打包 palace_f1 → city_castle 落点连按两次 E 不弹回  连按后 → city_castle (31,27)
+  ✓ 打包 palace_f1 → city_castle 落点面朝走下来的那一侧  face=down · 台阶在 (28,35)
+  ✓ 打包 city_castle → palace_f3  city_castle_up（palaceStair）站位 (28,38) 按 E · 落点 (31,27) 面朝 down
+  ✓ 打包 city_castle → palace_f3 落点距本层楼梯站位 ≥3 格  落点 (31,27) 到最近站位 6 格
+  ✓ 打包 city_castle → palace_f3 落点连按两次 E 不弹回  连按后 → palace_f3 (31,27)
+  ✓ 打包 city_castle → palace_f3 落点面朝走下来的那一侧  face=down · 台阶在 (28,35)
+  ✓ 打包 palace_f3 → city_castle  palace_f3_down（palaceStair）站位 (33,31) 按 E · 落点 (31,42) 面朝 up
+  ✓ 打包 palace_f3 → city_castle 落点距本层楼梯站位 ≥3 格  落点 (31,42) 到最近站位 5 格
+  ✓ 打包 palace_f3 → city_castle 落点连按两次 E 不弹回  连按后 → city_castle (31,42)
+  ✓ 打包 palace_f3 → city_castle 落点面朝走下来的那一侧  face=up · 台阶在 (33,35)
+  ✓ 打包 city_castle → palace_f1  city_castle_down（palaceStair）站位 (33,31) 按 E · 落点 (31,42) 面朝 up
+  ✓ 打包 city_castle → palace_f1 落点距本层楼梯站位 ≥3 格  落点 (31,42) 到最近站位 5 格
+  ✓ 打包 city_castle → palace_f1 落点连按两次 E 不弹回  连按后 → palace_f1 (31,42)
+  ✓ 打包 city_castle → palace_f1 落点面朝走下来的那一侧  face=up · 台阶在 (33,35)
+
+── 打包版 §4 每层有可交互内容
+  ✓ 打包版 palace_grounds 至少 2 个非门类交互物  palaceGate interiorProp interiorProp constructionWork constructionWork constructionGuide
+  ✓ 打包版 palace_f1 至少 2 个非门类交互物  cityService interiorProp interiorProp interiorProp
+  ✓ 打包版 city_castle 至少 2 个非门类交互物  interiorProp interiorProp interiorProp interiorProp
+  ✓ 打包版 palace_f3 至少 2 个非门类交互物  interiorProp interiorProp interiorProp interiorProp
+  ✓ 打包版 palace_terrace 至少 2 个非门类交互物  interiorProp interiorProp
+
+── 打包版 §5 一层能找管家塞琳的服务台
+  ✓ 打包版 palace_f1 有 cityService/castle 服务点  palace_f1_spot_0 · 门厅事务台
+  ✓ 打包版 一层管家服务台按 E 弹出窗口  {"win":true,"layerOpen":true,"hasWin":true}
+  ✓ 打包版 全程浏览器无报错
+
+======== 宫城楼层通行报告 ========
+断言 82 项，失败 0 项，警告 0 条
+=======================================
+

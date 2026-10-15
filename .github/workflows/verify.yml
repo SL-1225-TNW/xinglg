@@ -63,6 +63,38 @@ jobs:
         run: |
           node tests/run-v7-stageB.mjs
           node tests/run-v7-audit-regressions.mjs
+      - name: Verify palace floors, doors, saves and mobile navigation
+        run: |
+          node tests/run-palace-layout.mjs
+          node tests/run-palace-save.mjs
+          node tests/run-palace-floors.mjs
+          node tests/run-palace-mobile.mjs
+          node tests/run-palace-wayfinding.mjs
+          node tests/run-palace-east-wing.mjs
+          node tests/run-palace-service.mjs
+          node tests/run-palace-service.mjs --single-file
+      - name: Verify university routes and research
+        run: |
+          node tests/run-university.mjs
+          node tests/run-university.mjs --single-file
+      - name: Verify south gate lodging and post routes
+        run: |
+          node tests/run-south-gate.mjs
+          node tests/run-south-gate.mjs --single-file
+      - name: Verify industrial batches and freight
+        run: |
+          node tests/run-industry.mjs
+          node tests/run-industry.mjs --single-file
+      - name: Verify clinic rooms and shared patient records
+        run: |
+          node tests/run-clinic-construction.mjs
+          node tests/run-clinic-construction.mjs --single-file
+      - name: Verify completed construction routes and records
+        run: |
+          node tests/run-construction-completion.mjs
+          node tests/run-construction-completion.mjs --single-file
+          node tests/run-construction-saves.mjs
+          node tests/run-construction-saves.mjs --single-file
       - name: Verify main gameplay and responsive layout
         run: |
           node tests/run-main.mjs

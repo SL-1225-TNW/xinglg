@@ -903,7 +903,11 @@ function newGameState() {
     overloaded: false,
     char: newCharState(),
     /* 白蔷薇宫城：新建档案直接是当前布局版本，只有旧档才需要迁移。 */
-    palace: { layoutVersion: PALACE_LAYOUT_VERSION, discovered: { palace_grounds: true, palace_f1: true, city_castle: true, palace_f3: true } }
+    palace: { layoutVersion: PALACE_LAYOUT_VERSION, discovered: { palace_grounds: true, palace_f1: true, city_castle: true, palace_f3: true }, provision: {stage:0,completedDay:-1} },
+    university: newUniversityState(),
+    southGate: newSouthGateState(),
+    industry: newIndustryState(),
+    construction: newConstructionState()
   };
   s.inventory.seed_radish = 8;
   s.inventory.seed_potato = 2;
@@ -992,6 +996,10 @@ function serialize() {
     char: state.char || newCharState(),
     /* 白蔷薇宫城布局版本。刻意不升 SCHEMA_VERSION：版本号一变旧档会被判损坏。 */
     palace: state.palace || newPalaceState(),
+    university: state.university || newUniversityState(),
+    southGate: state.southGate || newSouthGateState(),
+    industry: state.industry || newIndustryState(),
+    construction: state.construction || newConstructionState(),
     savedAt: Date.now()
   };
 }
@@ -1103,6 +1111,10 @@ function normalizeSave(raw) {
      任务、好感、供货与已取得许可一律不动，只挪坐标。
      normalizeSave 本身只钳制边界，不会把卡进墙里的人救出来，所以这一步是必需的。 */
   s.palace = normalizePalace(raw.palace);
+  s.university = normalizeUniversity(raw.university);
+  s.southGate = normalizeSouthGate(raw.southGate, s.totalDay);
+  s.industry = normalizeIndustry(raw.industry, s.totalDay);
+  s.construction = normalizeConstruction(raw.construction, s.totalDay);
   if (!s.palace.layoutVersion && s.sceneId === 'city_castle') {
     var foyer = PALACE_FOYER;
     s.sceneId = foyer.scene;
@@ -1111,7 +1123,7 @@ function normalizeSave(raw) {
   if (!s.palace.layoutVersion && s.sceneId.indexOf('palace_') === 0) s.palace.layoutVersion = PALACE_LAYOUT_VERSION;
   /* 兜底：宫城任何落点若落在墙或家具上，拉到该场景最近的可走格。
      不改动别的场景，避免把这次迁移的影响扩散到全游戏。 */
-  if (isPalaceScene(s.sceneId)) {
+  if (isPalaceScene(s.sceneId) || UNIVERSITY_LABELS[s.sceneId] || SOUTH_GATE_LABELS[s.sceneId] || INDUSTRY_LABELS[s.sceneId] || CONSTRUCTION_SCENES.indexOf(s.sceneId)>=0) {
     if (MAPS[s.sceneId].solid[s.player.x][s.player.y]) {
       var safe = nearestWalkable(s.sceneId, s.player.x, s.player.y);
       s.player.x = safe.x; s.player.y = safe.y;
@@ -2272,9 +2284,13 @@ function refreshFloorTag() {
   var n = document.getElementById('floorTag');
   if (!n) return;
   var sid = state && state.sceneId, fl = palaceFloorOf(sid);
-  if (!fl && !(sid && PALACE_OUTDOOR.indexOf(sid) >= 0)) { n.hidden = true; return; }
+  if(INDUSTRY_LABELS[sid]){n.hidden=false;n.textContent=INDUSTRY_LABELS[sid];return;}
+  if (SOUTH_GATE_LABELS[sid]) { n.hidden=false;n.textContent=SOUTH_GATE_LABELS[sid];refreshInnRoomLabels();return; }
+  if (UNIVERSITY_LABELS[sid]) { n.hidden=false;n.textContent=UNIVERSITY_LABELS[sid];return; }
+  var serviceIndex = PALACE_SERVICE_LEVELS.indexOf(sid);
+  if (!fl && serviceIndex < 0 && !(sid && PALACE_OUTDOOR.indexOf(sid) >= 0)) { n.hidden = true; return; }
   n.hidden = false;
-  n.textContent = fl ? ('楼层 ' + fl.order + '／3 · ' + fl.label.replace(/^[一二三]层 · /, '')) : '宫城 · 地面层';
+  n.textContent = fl ? ('楼层 ' + fl.order + '／3 · ' + fl.label.replace(/^[一二三]层 · /, '')) : serviceIndex >= 0 ? PALACE_SERVICE_LABELS[serviceIndex] : '宫城 · 地面层';
 }
 
 function syncPlayerPixel() {
@@ -2541,10 +2557,11 @@ var CITY_ROOMS = {
       { t: 'sofa', x: 9, y: 16, w: 4, h: 2 },
       { t: 'sofa', x: 21, y: 16, w: 4, h: 2 },
       /* ---- 隔断：与一、三层同一格网，宽门洞 ---- */
-      { t: 'partition', x: 25, y: 2, w: 1, h: 9 }, { t: 'partition', x: 25, y: 17, w: 1, h: 6 },
-      { t: 'partition', x: 38, y: 2, w: 1, h: 13 },
-      { t: 'partition', x: 25, y: 21, w: 1, h: 11 },
-      { t: 'partition', x: 38, y: 21, w: 1, h: 11 },
+      /* 隔断贯通南北，18 处房门才开在墙上而不是空地上（总纲 §2.2.2）；
+         门位缺口由 installPalaceWayfinding 按 installPalaceWayfinding 的 slots 切开。 */
+      { t: 'partition', x: 25, y: 2, w: 1, h: 15 }, { t: 'partition', x: 25, y: 32, w: 1, h: 15 },
+      { t: 'partition', x: 38, y: 2, w: 1, h: 19 }, { t: 'partition', x: 38, y: 32, w: 1, h: 15 },
+      { t: 'partition', x: 25, y: 21, w: 1, h: 11 }, { t: 'partition', x: 38, y: 21, w: 1, h: 11 },
       /* ---- 等候前厅（梯厅北段） ---- */
       { t: 'sofa', x: 28, y: 3, w: 4, h: 2 }, { t: 'sofa', x: 33, y: 3, w: 4, h: 2 },
       { t: 'roundTable', x: 30, y: 2, w: 4, h: 3 },
@@ -2601,7 +2618,7 @@ var CITY_ROOMS = {
       { x: 43, y: 42, kind: 'interiorProp', label: '备餐间',
         stand: [[43, 45], [41, 45], [45, 45]],
         note: '菜谱与送货票据钉在墙上，当日的食材按上菜顺序从服务梯那边送进来。',
-        note2: '地下厨房的路线在下一批开通。' }
+        note2: '后勤路线已接通：二层东侧门进东翼备餐层，再沿服务梯下到地下厨房。' }
     ],
     staff: []
   },
@@ -3859,22 +3876,23 @@ var CITY_INFO = {
   library: { name: '蔷薇图书馆', who: '图书管理员艾琳在查阅台', desc: '书架顶到屋顶，梯子靠在架边，地图柜里卷着整个山谷的旧图。' },
   smith: { name: '白蔷薇铁匠铺', who: '铁匠霍尔守着铁砧', desc: '熔炉的火烧得通红，工具墙挂满钳锤，冷却槽里还冒着白气。' },
   tailor: { name: '丝带裁缝铺', who: '裁缝莉丝在裁剪台前', desc: '布卷靠墙立着，裁剪台上摊着剪到一半的衣料，衣架上挂着改好的长裙。' },
-  inn: { name: '南门旅馆', who: '老板贝尔守着接待处', desc: '接待处后面是餐厅和厨房，楼梯通向几间风格各异的客房。' },
+  inn: { name: '南门旅馆', who: '老板贝尔守着接待处', desc: '一层前台、餐厅与厨房，右上楼梯通二层客房A、B。先登记当晚房间，再到床旁过夜。' },
   post: { name: '驿站邮局', who: '邮递员小翎在分信柜前', desc: '整面墙的分信柜塞满信件，邮袋堆在柜台边，公告板上贴着今日告示。' },
   carriage: { name: '南门马车站', who: '马车夫守着售票处', desc: '装卸台上堆着待发的货，售票处可以直达各街区。' },
+  stable: { name:'南门马厩',who:'马具保管处',desc:'饮水槽、草料与备用马具分开存放，通道保持畅通。目前开放参观与说明，未开放买马或寄养。' },
   park: { name: '公园亭舍', who: '园丁在这里照看花坛', desc: '亭子四面敞开，能看见池塘和散步道；长凳上坐着歇脚的人。' },
   castle: { name: '白蔷薇宫城 · 一层 门厅事务台', who: '管家塞琳在核对清单', desc: '门厅铺着方砖，正对主门的长毯通向大楼梯；左手是公开档案的借阅桌，右手的案台登记文书与委托。' },
   home: { name: '住处', who: '这里住着一位城市居民', desc: '一张床、一个衣柜和一张餐桌——城里大多数人的家就是这样。' },
-  quay_store: { name: '河岸长条货仓', who: '货栈管事格林在核对着货单', desc: '通长开间里货架一路排到河门，每一格都写着入库的批次号，吊臂正把最后一批麻袋从驳船吊上来。' },
-  sawmill: { name: '东岸锯木厂', who: '老木工海恩守着锯台', desc: '原木垛从北侧滑道滚进来，锯台把整木剖成板材，锯末铺了满地，成品板料靠南门码好等着装车。' },
-  foundry: { name: '白蔷薇铸造车间', who: '铸工加尔在浇铸台边', desc: '两座熔炉同时开着，火光把半间屋子烤得发红，砂型排在铁砧之间，冷却槽里的水还冒着白气。' },
+  quay_store: { name: '河岸长条货仓', who: '货栈管事岸正在核对货单', desc: '原料货架、成品装卸台与登记桌分区，东侧货门接厂区货运道。普通代销与工业板材批次各有明确入口。' },
+  sawmill: { name: '东岸锯木厂', who: '锯木工老槐守着锯台', desc: '进料架、带锯与成品堆分区，西侧装卸门通货仓方向。原加工保留，批次锯切在锯台右侧办理。' },
+  foundry: { name: '白蔷薇铸造车间', who: '铸铁匠铁青在浇铸台旁', desc: '熔炉、模具与冷却区各有通道，原熔炼和铸件服务保留。' },
   watermill: { name: '河湾水力磨坊', who: '磨坊主莉安守着石磨', desc: '水轮从侧渠引水推动磨盘，磨碎的麦粉落进筛网，面袋在墙角堆到房梁，房外就是那条全年不冻的引水渠。' },
   boiler: { name: '厂区锅炉房', who: '司炉工多恩守着汽机阀台', desc: '锅炉日夜烧着，汽管沿墙爬向全厂，压力表指针抖得厉害，煤堆和出渣口就在炉前。' },
-  shipyard: { name: '船具修理棚', who: '船匠佩里在船架边', desc: '两条船架并排立着，龙骨下面堆着新刨的船板，工具墙上挂满船钉和绳索，棚顶飘着桐油味。' },
-  uni_main: { name: '白蔷薇大学 · 正殿', who: '院长薇拉在注册台后', desc: '穹顶下的长桌成列排开，讲台正对全场，四壁书架顶到屋顶，中央立着奠基人的石像。' },
-  uni_wing: { name: '白蔷薇大学 · 教学楼', who: '讲师莫兰在推开教室门', desc: '两张长桌供研讨，资料室的书架和梯子沿墙排开，抄本的墨味混着窗缝进来的风。' },
-  uni_lab: { name: '自然史实验楼', who: '研究员艾德在记录台边', desc: '标本柜从地面排到齐眉，解剖台和器械台亮着铜件，墙上是整幅的山谷地质图，玻璃瓶里泡着各种标本。' },
-  uni_dorm: { name: '白蔷薇大学 · 宿舍院', who: '舍监布兰奇在院中值夜', desc: '四间卧室围着起居的壁炉，书桌和书架挤在窗边，墙上的告示钉着社团招新和讲堂时刻表。' },
+  shipyard: { name: '船具修理棚', who: '船匠舵生在船架边', desc: '船架、工具与收货位分开；原船具加工保留，工业板材在西侧收货台签收。' },
+  uni_main: { name: '白蔷薇大学 · 主楼一层', who: '教授砚秋在注册台旁', desc: '讲堂保留课程与抄录服务，接待公告提供育苗研究报名；西侧楼梯通往二层研讨与教师研究空间。' },
+  uni_wing: { name: '白蔷薇大学 · 教学楼', who: '讲师允之在研讨桌旁', desc: '两张长桌供研讨，资料室的书架和梯子沿墙排开，抄本的墨味混着窗缝进来的风。' },
+  uni_lab: { name: '自然史实验楼', who: '研究员墨笙在记录台边', desc: '标本柜沿墙排列，原实验服务保留；植物样本核验台接续图书馆查阅与温室观察。' },
+  uni_dorm: { name: '白蔷薇大学 · 宿舍院', who: '学员砚白在自习室旁', desc: '四间卧室围着起居的壁炉，书桌和书架挤在窗边，墙上的告示钉着社团招新和讲堂时刻表。' },
   bank: { name: '白蔷薇国立银行 · 营业厅', who: '柜员霍兰守着柜台', desc: '大理石柜台隔开内外两侧，后房是账台与票据柜，两只铁箱就锁在门边，账本上的数字一天比一天厚。' },
   exchange: { name: '谷物交易所 · 报价大厅', who: '经纪人费尔在成交台后', desc: '报价板挂满了当日的麦价、燕价和运费，成交台前挤着议价的人，角落里的样品袋按产地分堆码着。' },
   gold: { name: '金库与票据所', who: '库管薇妮守着票据所柜台', desc: '外间清点票据，内间才是金库——两只银箱一左一右，账柜锁着上一季的全部存契。' },
@@ -3882,6 +3900,7 @@ var CITY_INFO = {
   civic: { name: '市政厅', who: '书记官南德在服务台后', desc: '议事长桌居中，两侧公示板贴着本月的税册和工程告示，墙上的市徽下压着历任市长的名录。' }
 };
 function openCityService(it) {
+  if (it.service === 'inn') { openInnDesk(); return; }
   var s = it.service, info = CITY_INFO[s] || CITY_INFO.home;
 
   /* ============ 城市产业链工具 ============
@@ -3942,6 +3961,7 @@ function openCityService(it) {
   if (s === 'sawmill') {
     workWindow('sawmill', info.name, info.desc, info.who, function (b) {
       b.appendChild(el('p', 'strong', '锯台作业'));
+      b.appendChild(mkBtn('工业批次与厂区路线','sm',openIndustryGuide));
       b.appendChild(el('p', 'muted', '整木推上锯台，按尺寸剖成板材。剖得越厚越费体力，但成品更值钱。'));
       var row = el('div', 'row');
       row.appendChild(mkBtn('细剖 ×6 板材 · 木材 2 · 体力 10', '', function () {
@@ -4028,6 +4048,7 @@ function openCityService(it) {
   if (s === 'quay_store') {
     workWindow('quay_store', info.name, info.desc, info.who, function (b) {
       b.appendChild(el('p', 'strong', '堆栈代管'));
+      b.appendChild(mkBtn('工业批次与厂区路线','sm',openIndustryGuide));
       b.appendChild(el('p', 'muted', '管事按整批结算，不零卖。工业品、板材、铸件在这里出手价比城里高一成，因为下游都从这里进货。'));
       b.appendChild(el('p', 'muted', '（仓储本身不加工：把成品送来换钱即可。）'));
     }, ['plank', 'cast_gear', 'steel_ingot', 'ironclad', 'flour', 'coal', 'charcoal', 'bread_batch', 'salt_fish'], '工业品代存代销，溢价 15%。');
@@ -4038,7 +4059,8 @@ function openCityService(it) {
   if (s === 'uni_main') {
     workWindow('uni_main', info.name, info.desc, info.who, function (b) {
       b.appendChild(el('p', 'strong', '注册与修业'));
-      b.appendChild(el('p', 'muted', '入学先交束脩，抄讲义按页计酬。讲席不同，出手的东西也不同。'));
+      b.appendChild(el('p', 'muted', '讲堂可听讲与抄录，进阶课另收费。接待公告提供免费首轮研究报名；二层从西侧楼梯进入。'));
+      b.appendChild(mkBtn('校园导览与研究下一步','sm',openUniversityGuide));
       var r1 = el('div', 'row');
       r1.appendChild(mkBtn('听讲并抄录 → 手抄本 ×1 · 体力 14', '', function () {
         cityWork({ out: 'manuscript', qty: 1, energy: 14, minutes: 120, done: '抄完一册讲义' });
@@ -4500,7 +4522,7 @@ function openCityService(it) {
   var extra = {
     library: '翻开地方志：山谷北面是雾杉森林，旧矿山藏在东北；白蔷薇城建在更早的城堡旧址上。',
     inn: '贝尔打听到的消息：今天' + (isRaining() ? '下雨，街上的人都带着伞。' : '天晴，适合往河岸那边走。') + '明天' + ((state.weather && state.weather.tomorrow === 'rain') ? '有雨。' : '放晴。'),
-    castle: '城堡的事务在一层门厅办理：通行证、城堡委托与声望都在这里登记。事务台旁边就是大楼梯，上二层看王座与镜廊，再上一层是起居与客房。地下后勤与东翼尚未开放。'
+    castle: '城堡的事务在一层门厅办理：通行证、城堡委托与声望都在这里登记。大楼梯通主楼二三层。东墙门通东翼收货台；东翼服务梯连接地下厨房与二层备餐，二层西门接主楼礼仪层。'
   };
   openWindow({ id: 'city_service', kind: 'custom', title: info.name, build: function (b) {
     b.appendChild(el('p', null, info.desc));
@@ -6734,13 +6756,15 @@ function autoSleep() {
   performSettlement(true);
 }
 
-function requestSleep() {
+function requestSleep(innRoom) {
+  innRoom = innRoom === 'a' || innRoom === 'b' ? innRoom : null;
   // 复用 farmOverview，避免这里另算一份与浮层/提示不一致（§32.2）
   var ov = farmOverview();
   openWindow({
     id: 'sleepconfirm', kind: 'custom', narrow: true, title: '结束今天？',
     build: function (body) {
       body.appendChild(el('p', null, '现在睡觉会推进到' + fmtTime(CFG.dayStart) + '的第二天。'));
+      if(innRoom)body.appendChild(el('p','strong','明早在南门旅馆客房 '+innRoom.toUpperCase()+' 醒来。本夜房费已在前台支付，确认时不再扣费。'));
       if (ov.needWater > 0) {
         body.appendChild(el('p', 'muted', '还有 ' + ov.needWater + ' 株作物今天没有浇水，它们今天不会生长（不会枯死）。'));
       } else {
@@ -6759,12 +6783,13 @@ function requestSleep() {
     },
     actions: [
       { label: '再玩一会儿', kind: 'ghost', close: true },
-      { label: '确认睡觉', kind: 'primary', onClick: function () { closeWindow(); setTimeout(function () { performSettlement(false); }, 30); } }
+      { label: '确认睡觉', kind: 'primary', onClick: function () { closeWindow(); setTimeout(function () { performSettlement(false, innRoom); }, 30); } }
     ]
   });
 }
 
-function performSettlement(auto) {
+function performSettlement(auto, innRoom) {
+  if(innRoom && !innCanSleep(innRoom)){toast('请先登记当晚客房，并到自己的床旁休息。');return false;}
   personalLeave(false);
   personalState().hp=personalMaxHp();
   if (Game.busy === 'settle') return;
@@ -6891,10 +6916,15 @@ function performSettlement(auto) {
     state.timeMinutes = CFG.dayStart;
     if (state.sceneId === 'house') {
       state.player.x = HOUSE_BED_WAKE.x; state.player.y = HOUSE_BED_WAKE.y; state.player.face = 'right';
+    } else if (innRoom) {
+      state.sceneId='city_inn_upper';
+      var bed=INN_BEDS[innRoom];state.player={x:bed.stand[0][0],y:bed.stand[0][1],face:'down'};
+      southGateState().lastStay={room:innRoom,day:summary.day};southGateState().booking=null;
     } else {
       state.sceneId = 'farm';
       state.player.x = 9; state.player.y = 10; state.player.face = 'down';
     }
+    if(southGateState().booking&&southGateState().booking.day<state.totalDay)southGateState().booking=null;
     syncPlayerPixel();
 
     /* 7. 重置水分，再应用雨天与洒水器 */
@@ -8088,6 +8118,9 @@ function questExitTile() {
     map.doors.forEach(function (d) {
       var path = findPath(s, p.x, p.y, d.x, d.y);
       if (path && path.length < distance) { best = [d.x, d.y]; distance = path.length; }
+    });
+    if (!best) (INTERACTABLES[s] || []).filter(function(it){return ['palaceServiceStair','universityStair','innStair'].indexOf(it.kind)>=0;}).forEach(function(it){
+      it.stand.forEach(function(a){var path=findPath(s,p.x,p.y,a[0],a[1]);if(path&&path.length<distance){best=a;distance=path.length;}});
     });
     return best;
   }
@@ -11239,6 +11272,9 @@ CHAR_BUILD.talent = function (b) {
 };
 
 CHAR_BUILD.history = function (b) {
+  var campus = charBox(b, '大学研究');
+  charNote(campus, universityNext());
+  campus.appendChild(mkBtn('查看校园路线与研究记录','sm',openUniversityGuide));
   var p = professionalLifeState(), m = militaryLifeState(), e = exploreState();
   var eng = engCareer();
 
@@ -12904,6 +12940,7 @@ function travelNodeUnlocked(n) {
   if (n.id === 'riverside.bank') return !!state.bridgeRepaired;
   if (n.id === 'forest.gate') return !!exploreState().forest;
   if (n.id === 'city.gate') return !!exploreState().city;
+  if (n.id === 'castle.palace') return !!exploreState().city;
   if (n.id === 'mine.entrance') return !!exploreState().mine;
   if (n.id === 'mill.square') return true;   // 麦田村沿小镇主路开放，先到访再登记
   if (n.id === 'heath.ranch') return true;   // 草甸沿小镇南路过坡即到
@@ -12945,6 +12982,7 @@ var SCENE_TO_NODE = {
 /* 当前所在场景对应的传送节点；房间内部按所属地点归并。 */
 function currentTravelNodeId() {
   var sid = state.sceneId;
+  if (isPalaceScene(sid)) return 'castle.palace';
   if (sid.indexOf('city_') === 0) return 'city.gate';   // 城市内部房间归到城市公共站
   return SCENE_TO_NODE[sid] || '';
 }
@@ -12952,6 +12990,8 @@ function currentTravelNodeId() {
 /* 站内耗时。同一城市公共街区与矿内安全层为 0；其余走成对初值。
    未制作的路线不收费、不推进时间后再宣布目的地不存在。 */
 function travelMinutesBetween(fromId, toId) {
+  if(fromId==='castle.palace')fromId='city.gate';
+  if(toId==='castle.palace')toId='city.gate';
   if (!fromId || !toId) return 0;
   if (fromId === toId) return 0;
   var na = travelNodeById(fromId), nb = travelNodeById(toId);
@@ -13162,6 +13202,10 @@ function drawWorldAtlas(c) {
 function openWorldMap() {
   clearKeys();
   var current=state.sceneId.indexOf('meadow')===0?'meadow':state.sceneId.indexOf('mill_')===0?'mill':state.sceneId==='house'?'farm':state.sceneId.indexOf('mine')===0?'pass':state.sceneId.indexOf('city_')===0?'city':state.sceneId;
+  if(isPalaceScene(state.sceneId))current='city';
+  if(state.sceneId==='farm_attic')current='farm';
+  var actualRegion=EXTENDED_REGION_BY_SCENE[state.sceneId];
+  if(actualRegion)current={mill_village:'mill',meadow:'heath',cloud_pass:'cloud',old_road:'oldroad',neighbor:'border'}[actualRegion]||actualRegion;
   var selected=current;
   var cityView=current==='city';
   /* 城市内街区落点：同城内公共街区 0 分钟，直接传送到已发现公共落点，
@@ -13226,6 +13270,8 @@ function openWorldMap() {
         grid.appendChild(btn);
       });
       b.appendChild(grid);
+      var palaceNode=travelNodeById('castle.palace');
+      if(palaceNode){var palacePreview=travelPreview(palaceNode.id),palaceBtn=mkBtn('白蔷薇宫城 · 宫苑公共入口','',function(){if(commitTravel('castle.palace'))closeWindow();});palaceBtn.disabled=!palacePreview.ok;palaceBtn.title=palacePreview.ok?'前往宫苑，不直达内室':palacePreview.reason;b.appendChild(palaceBtn);}
     }
     b.appendChild(el('p','muted','虚线边框地点：未解锁或待开放，点击查看详情。实线路：现有农场与小镇连接；虚线路：探索路线示意。森林由小镇北口进入，矿山由森林东北进入。快速传送免费、无冷却，不需要先走到驿站；矿内只有已修复且到访过的安全层可直达。'));
   },actions:[{label:'返回游戏',kind:'primary',close:true}]});
@@ -13536,6 +13582,23 @@ function openStructure(st) {
   });
 }
 function activateInteractable(it) {
+  if(it.kind==='constructionWork'){openConstructionWork(it);return;}
+  if(it.kind==='constructionGuide'){openConstructionGuide(it);return;}
+  if(it.kind==='industryWork'){openIndustryWork(it);return;}
+  if(it.kind==='industryGuide'){openIndustryGuide();return;}
+  if(it.kind==='clinicCare'){openClinicCare();return;}
+  if(it.kind==='clinicGuide'){openClinicGuide();return;}
+  if(it.kind==='innStair'){if(standOn(it.stand)){closeWindow();doSwitchScene(it.to,it.tx,it.ty,it.dir==='up'?'down':'up');}else toast('请到旅馆楼梯箭头旁。');return;}
+  if(it.kind==='innBed'){if(innCanSleep(it.room))requestSleep(it.room);else toast('请到前台登记当晚的这间客房。');return;}
+  if(it.kind==='southGateGuide'){openSouthGateGuide();return;}
+  if(it.kind==='stationEntrance'){enterIndoorDoor(it);return;}
+  if(it.kind==='stationMail'){openStationMail(it);return;}
+  if (it.kind === 'universityGuide') { openUniversityGuide(); return; }
+  if (it.kind === 'universityStudy') { openUniversityStudy(it); return; }
+  if (it.kind === 'universityStair') { useUniversityStair(it); return; }
+  if (it.kind === 'palaceServiceStair') { usePalaceServiceStair(it); return; }
+  if (it.kind === 'palaceProvision') { openPalaceProvision(it); return; }
+  if (it.kind === 'palaceSupply') { openPalaceSupply(); return; }
   if (it.kind === 'indoorExit') { useIndoorExit(it); return; }
   if (it.kind === 'indoorEntrance') { enterIndoorDoor(it); return; }
   if (it.kind === 'meadowLife') { openMeadowLife(it.work); return; }
@@ -14944,6 +15007,7 @@ function drawEnterHint(g, ox, oy) {
   var text = '';
   if (hit.kind === 'enterHouse') text = 'E 进入农舍';
   else if (hit.kind === 'indoorExit') text = '走到门口 / ' + (touchDevice() ? '交互' : 'E') + ' ' + hit.label;
+  else if (hit.kind === 'palaceStair') text = (touchDevice() ? '交互' : 'E') + ' ' + hit.label;
   else if (hit.kind === 'bed') text = 'E 睡觉';
   else if (hit.kind === 'houseChest') text = 'E 打开储物箱';
   else if (hit.kind === 'calendar') text = 'E 看日历';
@@ -15424,16 +15488,24 @@ function drawScene(g, dt) {
       ents.push({z:it.y*TILE+TILE,f:function(g,x,y,work){px(g,x*TILE+4,y*TILE+3,8,12,work==='pump'?'#717D70':'#B6AA7D');px(g,x*TILE+6,y*TILE+5,4,6,work==='pump'?'#5C9BA4':'#466B7B');px(g,x*TILE+2,y*TILE+14,12,2,'#4E5049');},a:[it.x,it.y,it.work]});
     } else if(it.kind==='treasure'){ents.push({z:it.y*TILE+TILE,f:function(g,x,y){px(g,x*TILE+2,y*TILE+5,12,9,'#895F38');px(g,x*TILE+2,y*TILE+5,12,3,'#BD9257');px(g,x*TILE+7,y*TILE+7,2,4,'#E5C775');},a:[it.x,it.y]});
     } else if(it.kind==='mineStairs'||it.kind==='mineGate'||it.kind==='forestGate'){ents.push({z:it.y*TILE+TILE,f:function(g,x,y){px(g,x*TILE,y*TILE,16,16,'#544A3D');px(g,x*TILE+3,y*TILE+2,10,14,'#272C32');for(var i=0;i<4;i++)px(g,x*TILE+4,y*TILE+5+i*3,8,1,'#A8A18C');},a:[it.x,it.y]});
+    } else if(it.kind==='clinicGuide'||it.kind==='clinicCare'||it.kind==='constructionWork'||it.kind==='constructionGuide'){
+      ents.push({z:it.y*TILE+TILE,f:function(g,x,y,label,art,work){if(art)CITY_PROPS.palaceWorkingSteps(g,art);if(work==='bench'){var r={x:x-1,y:y,w:3,h:1};CITY_PROPS.bench(g,r);if(constructionState().civicStage===4)px(g,x*TILE,y*TILE+2,6,3,'#91AD68');}palacePlaque(g,(x+.5)*TILE,y*TILE-36,label,touchDevice()?'旁边点交互':'旁边按 E');},a:[it.x,it.y,it.label,it.art,it.work]});
+    } else if(it.kind==='industryGuide'||it.kind==='industryWork'){
+      ents.push({z:it.y*TILE+TILE,f:function(g,x,y,label){palacePlaque(g,(x+.5)*TILE,y*TILE-43,label);},a:[it.x,it.y,it.label]});
+    } else if(it.kind==='innStair'){
+      ents.push({z:it.y*TILE+TILE+1,f:drawInnStairSign,a:[it]});
+    } else if(it.kind==='southGateGuide'||it.kind==='stationMail'||it.kind==='stationEntrance'){
+      ents.push({z:(it.y+(it.kind==='stationEntrance'?3:1))*TILE,f:function(g,x,y,label,door){if(door){px(g,x*TILE,y*TILE,16,20,'#584332');px(g,x*TILE+3,y*TILE+3,10,15,'#BA9562');}palacePlaque(g,(x+.5)*TILE,y*TILE-43,label);},a:[it.x,it.y,it.label,it.kind==='stationEntrance']});
+    } else if(it.kind==='universityStudy'){
+      ents.push({z:it.y*TILE+TILE,f:function(g,x,y,label){palacePlaque(g,(x+.5)*TILE,y*TILE-43,label);},a:[it.x,it.y,it.label]});
+    } else if(it.kind==='universityGuide'){
+      ents.push({z:it.y*TILE+TILE,f:function(g,x,y){palacePlaque(g,(x+.5)*TILE,y*TILE-45,'白蔷薇大学','校园导览');},a:[it.x,it.y]});
+    } else if(it.kind==='universityStair'){
+      ents.push({z:it.y*TILE+TILE+1,f:drawUniversityStairSign,a:[it]});
+    } else if(it.kind==='palaceServiceStair'){
+      ents.push({z:it.y*TILE+TILE+1,f:drawPalaceServiceSign,a:[it]});
     } else if(it.kind==='palaceStair'){
-      /* 楼梯面已由 CITY_PROPS.stairs 烘进房间画布；这里补台阶口的木牌与上下箭头，
-         让「上楼／下楼」在画面上可读，而不只是一条提示文字。 */
-      ents.push({z:it.y*TILE+TILE+1,f:function(g,x,y,dir){
-        px(g,x*TILE-10,y*TILE-22,36,15,'#3E4A3C');px(g,x*TILE-8,y*TILE-20,32,11,'#5C6B52');
-        g.font='bold 9px sans-serif';g.textAlign='center';g.fillStyle='#F0D990';
-        var txt=dir==='up'?'↑ 上楼':dir==='down'?'↓ 下楼':'◇ 楼层';
-        g.fillText(txt,x*TILE+8,y*TILE-11);g.textAlign='left';
-        px(g,x*TILE+4,y*TILE-26,16,3,'#C0A15E');
-      },a:[it.x,it.y,it.dir]});
+      ents.push({z:it.y*TILE+TILE+1,f:drawPalaceStairSign,a:[it]});
     } else if(it.kind==='palaceLocked'){
       ents.push({z:it.y*TILE+TILE,f:function(g,x,y){px(g,x*TILE+3,y*TILE+4,10,12,'#6E5A41');px(g,x*TILE+2,y*TILE+3,12,3,'#8B7355');px(g,x*TILE+7,y*TILE+8,2,3,'#C2AE7A');},a:[it.x,it.y]});
     } else if(it.kind==='cityGate'){ents.push({z:it.y*TILE+TILE,f:drawCityGateSite,a:[it.x,it.y]});
@@ -16063,7 +16135,7 @@ function bindInput() {
   $('#touchChar').onclick = function () { if (UI.window && UI.window.id === 'character') closeWindow(); else openCharacter(); };
   $('#btnRecords').onclick = function () { UI.window&&UI.window.id==='workrecords'?closeWindow():openWorkRecords(); };
   /* 宫城楼层牌：宫城场景常驻，点击打开楼层导览。 */
-  $('#floorTag').onclick = function () { openPalaceGuideChip(); };
+  $('#floorTag').onclick = function () { if(INDUSTRY_LABELS[state.sceneId])openIndustryGuide();else if(SOUTH_GATE_LABELS[state.sceneId])openSouthGateGuide();else if(UNIVERSITY_LABELS[state.sceneId])openUniversityGuide();else openPalaceGuideChip(); };
   refreshFloorTag();
   $('#touchUse').addEventListener('pointerdown', function (e) {
     e.preventDefault(); Audio2.unlock();
@@ -17682,7 +17754,12 @@ function palaceRoom(id, label, def, doorDefs) {
     roomTheme: 'castle', roomDef: def, exits: [], buildings: [], decor: [] };
   SCENE_ORDER.push(id);
   INTERACTABLES[id] = [];
-  installIndoorDoors(id, doorDefs);
+  if (doorDefs.length) installIndoorDoors(id, doorDefs);
+  else {
+    /* 地下层只经内部楼梯进出；保留完整外墙，不制造直通地面的假门。 */
+    MAPS[id].doors = [];
+    MAPS[id].enter = { x: 17, y: 14 };
+  }
   return MAPS[id];
 }
 /* 户外宫苑/露台：先铺一圈实心边界，再把门洞那一格开成通路。
@@ -17712,7 +17789,7 @@ var PALACE_GROUNDS = {
   /* 主宫地基：南墙正中留门洞。 */
   blocks: [
     { x0: 40, y0: 30, x1: 80, y1: 46, door: { x: 60, y: 46 } },   // 主宫
-    { x0: 86, y0: 34, x1: 108, y1: 50 },                            // 东翼（P2 开放）
+    { x0: 84, y0: 32, x1: 112, y1: 52, door: { x: 97, y: 52 } },                            // 东翼（建设一期已开放）
     { x0: 10, y0: 34, x1: 30, y1: 54 },                            // 旧堡塔楼（P3 开放）
     { x0: 12, y0: 58, x1: 28, y1: 70 },                            // 礼拜堂（P3 开放）
     { x0: 50, y0: 78, x1: 70, y1: 88, gap: { x0: 59, x1: 61 } }     // 门楼，中间留通道
@@ -17760,7 +17837,7 @@ function buildPalaceGrounds() {
     buildings: [
       /* visualHeight 供视锥裁剪用，必须覆盖墙体+屋顶+山花，否则宫苑里会把屋顶裁掉。 */
       { id: 'palace_main', label: '白蔷薇宫城 · 主宫', x: 40, y: 30, w: 41, h: 17, kind: 'castle', visualHeight: 320, door: { x: 60, y: 46 } },
-      { id: 'palace_east', label: '东翼', x: 86, y: 34, w: 23, h: 17, kind: 'palace', visualHeight: 150, door: { x: 97, y: 50 } },
+      { id: 'palace_east', label: '白蔷薇宫城 · 东翼', x: 84, y: 32, w: 29, h: 21, kind: 'palace', visualHeight: 150, door: { x: 97, y: 52 } },
       { id: 'palace_keep', label: '旧堡塔楼', x: 10, y: 34, w: 21, h: 21, kind: 'keep', visualHeight: 150, door: { x: 20, y: 54 } },
       { id: 'palace_chapel', label: '宫苑礼拜堂', x: 12, y: 58, w: 17, h: 13, kind: 'palace', chapel: true, visualHeight: 180, door: { x: 20, y: 70 } },
       { id: 'palace_gate', label: '白蔷薇门楼', x: 50, y: 78, w: 21, h: 11, kind: 'palace', visualHeight: 120, door: { x: 60, y: 88 } }
@@ -17778,8 +17855,15 @@ function buildPalaceGrounds() {
       /* 花园步道两侧的行道树。 */
       [48, 56, 66, 72].forEach(function (x) { d.push({ t: 'streetTree', x: x, y: 10 }); d.push({ t: 'streetTree', x: x, y: 22 }); });
       d.push({ t: 'bench', x: 50, y: 16 }, { t: 'bench', x: 70, y: 16 });
-      /* 门楼两侧的花箱用花丛，落在草地上。 */
+      /* 门楼两侧的花丛落在草地上。 */
       d.push({ t: 'flower', x: 52, y: 92, v: 1 }, { t: 'flower', x: 68, y: 92, v: 1 });
+      /* 后勤院：卸货区的货堆、马车停靠位与收货窗口标记。
+         地面装饰类型里没有 crate/car 这类室外道具，用货堆的等价物——花箱与路牌，
+         真正的卸货台在东翼室内，院里只留待车与指示。 */
+      d.push({ t: 'sign', x: 97, y: 55 }, { t: 'sign', x: 106, y: 58 });
+      d.push({ t: 'bench', x: 91, y: 62 }, { t: 'bench', x: 105, y: 72 });
+      [88, 90, 92].forEach(function (x) { d.push({ t: 'flower', x: x, y: 74, v: 1 }); });
+      [104, 106, 108].forEach(function (x) { d.push({ t: 'flower', x: x, y: 62, v: 0 }); });
       return d;
     })() };
   SCENE_ORDER.push('palace_grounds');
@@ -17792,18 +17876,22 @@ function buildPalaceGrounds() {
     { id: 'palace_back_city', kind: 'palaceGate', to: 'city', tx: 320, ty: 165,
       x: 60, y: 93, label: '返回白蔷薇城 · 城堡前庭', stand: [[60, 92], [59, 92], [61, 92], [60, 94]] },
     /* 尚未开放的区域写清用途与开放批次，不画一扇假门。 */
-    { id: 'palace_east_wing', kind: 'palaceLocked', x: 97, y: 50, label: '东翼',
-      note: '东翼正在修缮：宴会厅、音乐沙龙与固定服务梯会在下一批开通。',
-      stand: [[97, 51], [96, 51], [98, 51]] },
+    { id: 'palace_east_wing', kind: 'indoorEntrance', x: 97, y: 52, label: '进入东翼 · 收货与厨房',
+      to: 'palace_east_wing', doorId: 'to_yard', stand: [[97, 53], [96, 53], [98, 53], [97, 54]] },
     { id: 'palace_keep_site', kind: 'palaceLocked', x: 20, y: 54, label: '旧堡塔楼',
       note: '旧堡塔楼与宫苑礼拜堂组成历史区，石基与历代纹章正在整理。',
       stand: [[20, 55], [19, 55], [21, 55]] },
     { id: 'palace_chapel_site', kind: 'palaceLocked', x: 20, y: 70, label: '宫苑礼拜堂',
       note: '礼拜堂下层归一层使用，上层观礼廊接二层的礼仪路线。',
       stand: [[20, 71], [19, 71], [21, 71]] },
-    { id: 'palace_service_yard', kind: 'palaceLocked', x: 98, y: 62, label: '东侧后勤院',
-      note: '后勤院有独立的货物入口：货门 → 地下厨房 → 服务梯 → 备餐间，不必穿过王座厅。',
-      stand: [[98, 61], [97, 61], [99, 61]] }
+    /* 后勤院说明入口；正式交付在东翼收货台，服务梯通地下和二层。 */
+    { id: 'palace_service_yard', kind: 'interiorProp', x: 98, y: 62, label: '东侧后勤院 · 收货窗口',
+      stand: [[98, 61], [97, 61], [99, 61], [98, 63]],
+      note: '货门在北面。沿院门向北可进东翼南门；春宴物资在东翼收货台交付。',
+      note2: '路线是：后勤院 → 东翼收货台 → 一层东门 → 门厅事务台。不经过王座厅与宴会厅。' },
+    { id: 'palace_service_locked', kind: 'interiorProp', x: 104, y: 68, label: '后勤楼层指路牌',
+      note: '地下后勤与东翼二层已开放。从东翼中央服务梯上下楼；二层西门接主楼礼仪层。',
+      stand: [[104, 67], [103, 68], [105, 68]] }
   ];
 }
 
@@ -17821,10 +17909,11 @@ var PALACE_ROOMS = {
     w: 64, h: 48, floor: 'tile',
     props: [
       /* 隔断：上段与中段各留一处宽门洞 */
-      { t: 'partition', x: 25, y: 2, w: 1, h: 9 }, { t: 'partition', x: 25, y: 17, w: 1, h: 6 },
-      { t: 'partition', x: 38, y: 2, w: 1, h: 13 },
-      { t: 'partition', x: 25, y: 21, w: 1, h: 11 },
-      { t: 'partition', x: 38, y: 21, w: 1, h: 11 },
+      /* 隔断贯通南北，18 处房门才开在墙上而不是空地上（总纲 §2.2.2）；
+         门位缺口由 installPalaceWayfinding 按 installPalaceWayfinding 的 slots 切开。 */
+      { t: 'partition', x: 25, y: 2, w: 1, h: 15 }, { t: 'partition', x: 25, y: 32, w: 1, h: 15 },
+      { t: 'partition', x: 38, y: 2, w: 1, h: 19 }, { t: 'partition', x: 38, y: 32, w: 1, h: 15 },
+      { t: 'partition', x: 25, y: 21, w: 1, h: 11 }, { t: 'partition', x: 38, y: 21, w: 1, h: 11 },
       /* 北翼西：礼拜堂下厅 */
       { t: 'archiveShelf', x: 3, y: 3, w: 3, h: 6 },
       { t: 'bookshelf', x: 3, y: 10, w: 3, h: 7 },
@@ -17871,7 +17960,7 @@ var PALACE_ROOMS = {
     ],
     spots: [
       /* 管家的事务台从二层搬到一层：规划要求「原管家办理的事务仍可从一层找到」，
-         而蔷薇春宴任务的唯一办理点就是这个 service:'castle' 的服务台。 */
+         春宴在此或东翼收货台办理，共用唯一委托进度。 */
       { x: 37, y: 40, kind: 'cityService', service: 'castle', label: '门厅事务台',
         stand: [[37, 42], [35, 42], [39, 42], [37, 39]] },
       { x: 10, y: 22, kind: 'interiorProp', label: '公开档案阅览席',
@@ -17892,10 +17981,9 @@ var PALACE_ROOMS = {
   palace_f3: {
     w: 64, h: 48, floor: 'wood',
     props: [
-      { t: 'partition', x: 25, y: 2, w: 1, h: 11 },
-      { t: 'partition', x: 38, y: 2, w: 1, h: 11 },
-      { t: 'partition', x: 25, y: 21, w: 1, h: 10 },
-      { t: 'partition', x: 38, y: 21, w: 1, h: 10 },
+      { t: 'partition', x: 25, y: 2, w: 1, h: 15 }, { t: 'partition', x: 25, y: 32, w: 1, h: 15 },
+      { t: 'partition', x: 38, y: 2, w: 1, h: 19 }, { t: 'partition', x: 38, y: 32, w: 1, h: 15 },
+      { t: 'partition', x: 25, y: 21, w: 1, h: 10 }, { t: 'partition', x: 38, y: 21, w: 1, h: 10 },
       /* 书房（西北）：书桌、书架与壁炉 */
       { t: 'desk', x: 4, y: 3, w: 7, h: 3 },
       { t: 'bookshelf', x: 3, y: 8, w: 3, h: 5 },
@@ -17942,15 +18030,15 @@ var PALACE_ROOMS = {
       { x: 11, y: 22, kind: 'interiorProp', label: '私人会客室',
         stand: [[11, 25], [9, 25], [13, 25]],
         note: '沙发围着小桌，壁炉烧着。这里说话不用按正式接待厅的规矩。',
-        note2: '不经引荐的人不会自己走进来。' },
+        note2: '当前开放陈设参观；私人会见需管家另行引荐，尚无可办理的会见安排。' },
       { x: 42, y: 22, kind: 'interiorProp', label: '客房登记簿',
         stand: [[42, 27], [40, 27], [44, 27]],
-        note: '登记簿记着今晚留宿的人名与房号。只有登记过的客房能过夜。',
-        note2: '走到陌生的卧室不会自动睡着——门牌上写得很清楚。' },
+        note: '这里展示宫廷客房陈设，尚不受理宫殿住宿登记。',
+        note2: '需要过夜请到南门旅馆前台登记客房。宫内床与私人物件不提供使用。' },
       { x: 48, y: 41, kind: 'interiorProp', label: '阅读廊',
         stand: [[48, 45], [46, 45], [50, 45]],
         note: '书架从三层一直排到露台门边，末端那几本是各地寄来的园艺与建筑册。',
-        note2: '露台门在东墙尽头，门牌写着开放时段。' }
+        note2: '露台门在东墙尽头，现可经门牌处往返参观。' }
     ],
     staff: []
   }
@@ -17958,6 +18046,80 @@ var PALACE_ROOMS = {
 
 /* 二层沿用 CITY_ROOMS.castle（同一份定义），这里不重复登记。 */
 function palaceHallRooms() { return PALACE_ROOMS; }
+
+/* 宫殿可读通路：台阶覆盖真实梯段，门框与门槛对应实际可走开口。 */
+CITY_PROPS.palaceSteps=function(g,r){
+  var x=r.x*TILE,y=r.y*TILE,W=r.w*TILE,H=r.h*TILE;
+  var fl=palaceFloorOf(r.sceneId);
+  px(g,x,y,W,H,'#4B504E');
+  px(g,x+3,y+3,W-6,H-6,'#C4BAA4');
+  [[0,Math.floor(W*.48),fl&&fl.order<3,false],[Math.floor(W*.62),Math.floor(W*.38),fl&&fl.order>1,true]].forEach(function(l){
+    var lx=x+l[0]+3,lw=l[1]-6;
+    if(!l[2]){px(g,lx,y+4,lw,H-8,'#C4BAA4');px(g,lx+4,y+9,lw-8,H-18,'#A99E89');return;}
+    for(var i=0;i<10;i++){
+      var sy=y+4+i*7,shade=l[3]?['#9B9486','#B0A795'][i%2]:['#C8BEA9','#B8AE99'][i%2];
+      px(g,lx,sy,lw,7,shade);px(g,lx,sy,lw,2,'#F0E4C6');px(g,lx,sy+6,lw,1,'#756F63');
+    }
+    px(g,lx,y+2,2,H-4,'#D6B871');px(g,lx+lw-2,y+2,2,H-4,'#D6B871');
+  });
+  px(g,x+Math.floor(W*.5),y+3,Math.max(3,Math.floor(W*.1)),H-6,'#E7DDC7');
+};
+CITY_PROPS.palaceServiceSteps=function(g,r){
+  var x=r.x*TILE,y=r.y*TILE,W=r.w*TILE,H=r.h*TILE;
+  px(g,x,y,W,H,'#5E635D');for(var i=0;i<10;i++){px(g,x+2,y+3+i*7,W-4,6,'#ABA696');px(g,x+2,y+3+i*7,W-4,1,'#DAD2BA');}
+  px(g,x,y+H-13,W,8,'#816447');px(g,x,y+H-11,W,2,'#D8B975');
+  palacePlaque(g,x+W/2,y+H+4,'旧梯段封闭','服务梯在东翼');
+};
+function palacePlaque(g,cx,y,label,detail){
+  g.save();g.font='bold 10px sans-serif';var W=Math.max(58,Math.ceil(g.measureText(label).width)+14);
+  px(g,Math.round(cx-W/2),y,W,detail?29:19,'#253D35');px(g,Math.round(cx-W/2),y,W,2,'#D9BE77');
+  g.textAlign='center';g.fillStyle='#FFF0BA';g.fillText(label,cx,y+13);
+  if(detail){g.font='9px sans-serif';g.fillStyle='#EEE4CC';g.fillText(detail,cx,y+25);}g.restore();
+}
+function drawPalaceStairSign(g,it){
+  var up=it.dir==='up',to=palaceFloorOf(it.to),name=to?['','一层','二层','三层'][to.order]:'';
+  // 上行从南侧进入，下行从北侧进入，指示牌直接放在各自的平台上。
+  var x=(up?28.5:33.5)*TILE,y=(up?38:31)*TILE;
+  px(g,x-9,y-6,18,13,'#E5D2A0');g.save();g.font='bold 12px sans-serif';g.textAlign='center';g.fillStyle='#405C57';g.fillText(up?'↑':'↓',x,y+5);g.restore();
+  palacePlaque(g,x,up?y+21:y-40,(up?'上楼 → ':'下楼 → ')+name,touchDevice()?'在箭头旁点交互':'在箭头旁按 E');
+}
+CITY_PROPS.palaceRoomDoor=function(g,r){
+  var x=r.x*TILE,y=r.y*TILE,H=r.h*TILE,left=r.side==='west';
+  // 木门扇沿房间内侧敞开，门槛上的地面箭头指出通往哪个房间。
+  px(g,x+2,y+3,TILE-4,H-6,'#BBA578');px(g,x+5,y+4,TILE-10,H-8,'#E2CAA0');
+  px(g,x-2,y,TILE+4,4,'#5E4935');px(g,x-2,y+H-4,TILE+4,4,'#5E4935');
+  px(g,x-1,y+1,TILE+2,2,'#E7C88D');px(g,x-1,y+H-3,TILE+2,2,'#E7C88D');
+  var leafX=left?x-9:x+TILE+3;
+  px(g,leafX,y+4,6,Math.floor(H/2)-4,'#805937');px(g,leafX,y+Math.ceil(H/2),6,Math.floor(H/2)-4,'#805937');
+  px(g,leafX+1,y+7,2,3,'#E6C56E');px(g,leafX+1,y+H-11,2,3,'#E6C56E');
+  g.save();g.font='bold 12px sans-serif';g.textAlign='center';g.fillStyle='#405C57';g.fillText(left?'←':'→',x+8,y+H/2+4);g.restore();
+  palacePlaque(g,x+(left?-31:47),y+(r.labelOffset===undefined?-19:r.labelOffset),r.label);
+};
+var PALACE_ROOM_DOORS=[];
+function installPalaceWayfinding(){
+  var labels={palace_f1:['礼拜堂','卫兵值房','档案阅览','文书室','等候室','接待案台'],
+    city_castle:['王座厅','镜廊','正式接待','宴会厅','音乐沙龙','备餐间'],
+    palace_f3:['书房','客房甲','会客室','客房乙','寝居区','阅读廊']};
+  PALACE_FLOORS.forEach(function(fl){
+    var def=fl.sceneId==='city_castle'?CITY_ROOMS.castle:PALACE_ROOMS[fl.sceneId];
+    var slots=[[25,13,3,'west'],[38,17,3,'east'],[25,26,2,'west'],[38,26,2,'east'],[25,42,2,'west'],[38,42,2,'east']];
+    var doors=slots.map(function(a,i){return {t:'palaceRoomDoor',id:fl.id+'_room_door_'+i,sceneId:fl.sceneId,x:a[0],y:a[1],w:1,h:a[2],side:a[3],label:labels[fl.sceneId][i],flat:true};});
+    // 把隔断在门口切开，保留其余实体墙；房门不传送，直接步行穿过。
+    var props=[];
+    def.props.forEach(function(p){
+      if(p.t==='stairs'){props.push(Object.assign({},p,{t:p.w===8?'palaceSteps':'palaceServiceSteps',sceneId:fl.sceneId}));return;}
+      if(p.t!=='partition'){props.push(p);return;}
+      var start=null;
+      for(var y=p.y;y<=p.y+p.h;y++){
+        var gap=y===p.y+p.h||doors.some(function(d){return p.x===d.x&&y>=d.y&&y<d.y+d.h;});
+        if(!gap&&start===null)start=y;
+        if(gap&&start!==null){props.push(Object.assign({},p,{y:start,h:y-start}));start=null;}
+      }
+    });
+    def.props=props.concat(doors);PALACE_ROOM_DOORS=PALACE_ROOM_DOORS.concat(doors);
+  });
+}
+installPalaceWayfinding();
 
 /* ---------- 大楼梯 ---------- */
 /* 楼梯带 x=27..34 / y=33..37 逐层对齐；上行触发点在西端、下行触发点在东端，
@@ -18028,7 +18190,12 @@ function openPalaceGuide(title, stairFromId) {
         var rooms = palaceRoomNames(fl.sceneId);
         b.appendChild(el('p', 'muted', rooms.length ? rooms.join(' · ') : '房间正在布置。'));
       });
-      b.appendChild(el('p', 'muted', '宫苑、门楼与东西两翼在地面层，走出主门即可回到白蔷薇城。'));
+      b.appendChild(el('p', 'muted', '东翼服务梯连接地下后勤、地面收货与二层备餐。主楼一层西门通西翼餐厅音乐室；二层西门通礼拜堂观礼廊，内梯可下至宫苑。宫苑西侧旧堡已开放石基展厅和观景层，北花园可办理维护。返回城市沿中轴走到南门楼外。'));
+      b.appendChild(el('p', 'strong', palaceProvisionNext()));
+      PALACE_SERVICE_LEVELS.forEach(function(id,i){
+        b.appendChild(el('p',state.sceneId===id?'strong':'muted',PALACE_SERVICE_LABELS[i]+'：'+
+          (INTERACTABLES[id]||[]).filter(function(it){return ['palaceProvision','interiorProp','kitchen','palaceSupply'].indexOf(it.kind)>=0;}).map(function(it){return it.label;}).join(' · ')));
+      });
     }, actions: [{ label: '关闭', close: true }] });
 }
 /* 导览里的「上/下楼」按钮：目的地由楼层号唯一决定，落点取该层那一侧楼梯记录里的落点。 */
@@ -18058,12 +18225,200 @@ function openPalaceLocked(it) {
   openWindow({ id: 'palace_locked', kind: 'custom', title: it.label || '尚未开放的区域',
     build: function (b) {
       b.appendChild(el('p', null, it.note || '这一部分还在施工。'));
-      b.appendChild(el('p', 'muted', '已开放的部分照常可走：宫苑、一层门厅、二层王座厅与三层起居。'));
+      b.appendChild(el('p', 'muted', '已开放：宫苑、三层主楼、回廊、露台、东翼地面及二层、地下后勤。东翼服务梯连接后勤各层；旧堡与礼拜堂历史区仍未开放。'));
     }, actions: [{ label: '返回', close: true }] });
 }
 function openPalaceGuideChip() {
   var fl = palaceFloorOf(state.sceneId);
   openPalaceGuide(fl ? fl.label : '宫城楼层导览', null);
+}
+
+/* ---------- 东翼（建设一期 · 第一处侧翼） ----------
+   总纲 §3.2 给侧翼定的用途是「厨房、餐厅、职员办公、侍从及储藏等配套」，
+   通行安排是「先完成一翼；服务路线连接后勤院，避免穿过礼仪大厅」。
+   平面 36×24：中间 x=16..19 是南北向走廊，两端分别做职员办公与侍从休息；
+   y=9..14 是横向通道，连通东西两侧，货物从南门进来不必绕回礼仪大厅。
+   两道外门：西墙通主楼一层东侧，南墙通宫苑后勤院。 */
+var PALACE_EAST_WING = {
+  w: 36, h: 24, floor: 'stone',
+  props: [
+    /* 两道纵向隔墙，各留三个门洞：储藏 / 横向通道 / 收货台（西），厨房 / 横向通道 / 餐厅（东） */
+    { t: 'partition', x: 15, y: 1, w: 1, h: 4 }, { t: 'partition', x: 15, y: 7, w: 1, h: 4 },
+    { t: 'partition', x: 15, y: 13, w: 1, h: 5 }, { t: 'partition', x: 15, y: 20, w: 1, h: 3 },
+    { t: 'partition', x: 20, y: 1, w: 1, h: 4 }, { t: 'partition', x: 20, y: 7, w: 1, h: 4 },
+    { t: 'partition', x: 20, y: 13, w: 1, h: 5 }, { t: 'partition', x: 20, y: 20, w: 1, h: 3 },
+    /* 储藏：原料与工具，不上礼仪厅 */
+    { t: 'genericShelf', x: 2, y: 2, w: 3, h: 5 },
+    { t: 'crates', x: 6, y: 2, w: 5, h: 2 }, { t: 'bookshelf', x: 6, y: 5, w: 5, h: 2 },
+    { t: 'barrel', x: 12, y: 2, w: 2, h: 2 }, { t: 'barrel', x: 12, y: 5, w: 2, h: 2 },
+    /* 职员办公：排班表与当日的领料单 */
+    { t: 'desk', x: 16, y: 2, w: 3, h: 2 }, { t: 'chair', x: 17, y: 5, w: 2, h: 2 },
+    /* 厨房：炉灶、烤炉与备料台 */
+    { t: 'kitchen', x: 22, y: 2, w: 6, h: 3 }, { t: 'oven', x: 29, y: 2, w: 4, h: 3 },
+    { t: 'cuttingTable', x: 22, y: 6, w: 5, h: 2 }, { t: 'genericShelf', x: 29, y: 6, w: 4, h: 2 },
+    /* 横向通道保持通畅，只在两端放长凳 */
+    { t: 'bench', x: 8, y: 11, w: 3, h: 2 }, { t: 'bench', x: 24, y: 11, w: 3, h: 2 },
+    /* 收货台：南门进来的第一站 */
+    { t: 'counterFront', x: 2, y: 17, w: 7, h: 2 }, { t: 'crates', x: 2, y: 20, w: 4, h: 2 },
+    { t: 'barrel', x: 7, y: 20, w: 2, h: 2 }, { t: 'noticeBoard', x: 11, y: 17, w: 4, h: 3 },
+    /* 侍从休息：换班的人在这里等 */
+    { t: 'sofa', x: 16, y: 17, w: 4, h: 2 }, { t: 'chair', x: 16, y: 20, w: 1, h: 2 },
+    { t: 'potPlant', x: 19, y: 20, w: 1, h: 2 },
+    /* 餐厅与备餐：上菜次序按桌牌走，不进主楼宴会厅 */
+    { t: 'longTable', x: 23, y: 17, w: 10, h: 2 }, { t: 'chair', x: 22, y: 17, w: 2, h: 2 },
+    { t: 'kitchen', x: 30, y: 20, w: 4, h: 2 }, { t: 'genericShelf', x: 22, y: 20, w: 5, h: 2 }
+  ],
+  spots: [
+    { x: 5, y: 17, kind: 'palaceSupply', label: '春宴收货台',
+      stand: [[5, 19], [3, 19], [7, 19]],
+      note: '南门进来的第一站：货先在这里点数、登记来源和批次，再按领料单分发到厨房与备餐。',
+      note2: '搬货从后勤院直接进这里，不必穿过一层门厅与礼仪大厅。' },
+    { x: 25, y: 4, kind: 'kitchen', label: '厨房炉灶 · 烹饪',
+      stand: [[25, 5], [24, 5], [26, 5]],
+      note: '两口炉子一口烤炉，旺季这天到晚不停。当日的菜单钉在备餐台边上。',
+      note2: '食材按上菜次序从走廊那头送进来。' },
+    { x: 8, y: 2, kind: 'interiorProp', label: '储藏',
+      stand: [[8, 4], [7, 4], [9, 4]],
+      note: '木料、陶罐与备用灶具按类别码放，领用要在排班表上划一笔。',
+      note2: '修缮用的石材另有存放处，不走这条通道。' },
+    { x: 28, y: 18, kind: 'interiorProp', label: '餐厅与备餐',
+      stand: [[28, 19], [27, 19], [29, 19]],
+      note: '主楼宴会的宾客席在二层，这里只做上菜前的最后一道。',
+      note2: '餐盘与桌牌按宴会厅的人数提前一刻钟备好。' },
+    { x: 18, y: 3, kind: 'interiorProp', label: '职员办公室',
+      stand: [[18, 4], [17, 4], [19, 4]],
+      note: '墙上钉着当天的排班和领料单。谁去收货、谁守门楼、谁跟车，在这里签。',
+      note2: '塞琳的事务台在一层门厅，公务不必带到侧翼来。' },
+    { x: 18, y: 18, kind: 'interiorProp', label: '侍从休息',
+      stand: [[18, 19], [17, 19], [19, 19]],
+      note: '换班的人在这里等叫班，茶还热着。旧沙发是上一任管事留下的。',
+      note2: '不在班次的时候可以坐一会儿，不会有人赶。' }
+  ],
+  staff: []
+};
+
+/* 收货台共用塞琳春宴委托的进度与结算，门厅保留原入口。 */
+function openPalaceSupply() {
+  openWindow({ id: 'palace_supply', kind: 'custom', title: '东翼 · 春宴收货台',
+    build: function (b) {
+      b.appendChild(el('p', null, '这里办理塞琳的春宴物资交付。与门厅事务台共用同一份清单，奖励只结算一次。'));
+      b.appendChild(el('p', 'muted', '厨房沿中央走廊向北，在右侧门内；西门返回主楼一层，南门返回后勤院。厨房沿用已解锁的料理配方。'));
+      appendCityStoryCard(b, 'rose');
+      b.appendChild(el('p', 'muted', palaceProvisionNext()));
+      b.appendChild(mkBtn('查看后勤备餐', '', function () {
+        openPalaceProvision({ work: 'receive', sceneId: 'palace_east_wing', stand: [[5,19],[3,19],[7,19]], label: '后勤收货' });
+      }));
+    }, actions: [{ label: '关闭', close: true }] });
+}
+
+/* 东翼独立垂直后勤线路：B1—地面—二层，不改变主楼三层编号。 */
+var PALACE_SERVICE_LEVELS = ['palace_basement', 'palace_east_wing', 'palace_east_upper'];
+var PALACE_SERVICE_LABELS = ['地下后勤 · B1', '东翼 · 地面层', '东翼 · 二层'];
+var PALACE_SERVICE_STAIRS = [];
+CITY_PROPS.palaceWorkingSteps = function (g, r) {
+  var x=r.x*TILE,y=r.y*TILE,W=r.w*TILE,H=r.h*TILE;
+  px(g,x,y,W,H,'#625F57');
+  for(var i=0;i<10;i++){
+    px(g,x+2,y+2+i*7,W-4,6,'#B8AC95');px(g,x+2,y+2+i*7,W-4,1,'#EBD9B2');
+  }
+  px(g,x+W/2-1,y,2,H,'#D0B078');
+};
+function drawPalaceServiceSign(g,it) {
+  var s=it.stand[0],x=(s[0]+.5)*TILE,y=s[1]*TILE;
+  palacePlaque(g,x,it.dir==='up'?y+18:y-34,it.label,touchDevice()?'箭头旁点交互':'箭头旁按 E');
+  g.save();g.font='bold 12px sans-serif';g.textAlign='center';g.fillStyle='#FFF0BA';
+  g.fillText(it.dir==='up'?'↑':'↓',x,y+12);g.restore();
+}
+function usePalaceServiceStair(it) {
+  if(!standOn(it.stand)){toast('请走到服务梯箭头旁。');return;}
+  closeWindow();doSwitchScene(it.to,it.tx,it.ty,it.dir==='up'?'down':'up');
+}
+function palaceServiceRoom(upper) {
+  var doors=[
+    {t:'palaceRoomDoor',x:15,y:5,w:1,h:2,side:'west',label:upper?'布草间':'食材库',flat:true},
+    {t:'palaceRoomDoor',x:20,y:5,w:1,h:2,side:'east',label:upper?'职员阅读':'备料厨房',flat:true},
+    {t:'palaceRoomDoor',x:15,y:18,w:1,h:2,side:'west',label:upper?'值班室':'维修间',flat:true},
+    {t:'palaceRoomDoor',x:20,y:18,w:1,h:2,side:'east',label:upper?'宴会备餐':'酒窖',flat:true}
+  ];
+  var props=[
+    {t:'partition',x:15,y:1,w:1,h:4},{t:'partition',x:15,y:7,w:1,h:4},
+    {t:'partition',x:15,y:13,w:1,h:5},{t:'partition',x:15,y:20,w:1,h:3},
+    {t:'partition',x:20,y:1,w:1,h:4},{t:'partition',x:20,y:7,w:1,h:4},
+    {t:'partition',x:20,y:13,w:1,h:5},{t:'partition',x:20,y:20,w:1,h:3},
+    {t:'genericShelf',x:2,y:2,w:4,h:5},{t:'crates',x:8,y:2,w:5,h:2},
+    {t:upper?'readingTable':'kitchen',x:23,y:2,w:7,h:3},
+    {t:upper?'bookshelf':'oven',x:31,y:2,w:3,h:3},
+    {t:'cuttingTable',x:23,y:6,w:5,h:2},
+    {t:'desk',x:2,y:17,w:7,h:2},{t:'genericShelf',x:10,y:20,w:4,h:2},
+    {t:upper?'longTable':'barrel',x:23,y:17,w:upper?9:3,h:2},
+    {t:upper?'genericShelf':'barrel',x:28,y:20,w:5,h:2}
+  ].concat(doors);
+  return {w:36,h:24,floor:upper?'wood':'stone',props:props,spots:[
+    {x:9,y:2,kind:upper?'interiorProp':'palaceProvision',work:'store',label:upper?'布草与餐具':'食材入库',stand:[[9,4]],
+      note:'干净布草与餐具分架存放，搬运不经过客席。'},
+    {x:25,y:4,kind:upper?'interiorProp':'palaceProvision',work:'prepare',label:upper?'职员阅读桌':'后勤备料灶',stand:[[25,5]],
+      note:'值班人员在这里查阅当日准备单。'},
+    {x:5,y:17,kind:'interiorProp',label:upper?'值班室':'维修工具台',stand:[[5,19]],
+      note:upper?'交接班在这里登记，主楼二层从西门进入。':'灯具和备用灶具放在这里；独立维修委托尚未开放。'},
+    {x:27,y:17,kind:upper?'palaceProvision':'interiorProp',work:'serve',label:upper?'宴会备餐台':'酒窖与储藏',stand:[[27,19]],
+      note:'这里只开放储藏说明，酒类加工和贸易尚未开放。'}
+  ]};
+}
+function buildPalaceServiceLevels() {
+  var basement=palaceServiceRoom(false),upper=palaceServiceRoom(true);
+  palaceRoom('palace_basement','白蔷薇宫城 · 地下后勤 B1',basement,[]);
+  palaceRoom('palace_east_upper','白蔷薇宫城 · 东翼二层',upper,[
+    {id:'to_hall',side:'west',x:0,y:19,to:'city_castle',tx:60,ty:19,style:'stone'}
+  ]);
+  installIndoorDoors('city_castle',[
+    {id:'gallery',side:'east',x:63,y:10,to:'palace_gallery',tx:1,ty:7,style:'stone'},
+    {id:'service',side:'east',x:63,y:19,to:'palace_east_upper',tx:4,ty:19,style:'stone',label:'进入东翼二层 · 备餐'}
+  ]);
+  PALACE_SERVICE_LEVELS.forEach(function(id,i){
+    var map=MAPS[id],list=INTERACTABLES[id];
+    map.roomDef.props.push({t:'palaceWorkingSteps',x:16,y:9,w:4,h:5,flat:true});
+    (i===0?basement.spots:i===2?upper.spots:[]).forEach(function(s,j){
+      list.push(Object.assign({id:id+'_service_'+j,sceneId:id},s));
+    });
+    if(i>0) PALACE_SERVICE_STAIRS.push({id:id+'_service_down',sceneId:id,kind:'palaceServiceStair',dir:'down',
+      x:16,y:8,stand:[[16,8]],to:PALACE_SERVICE_LEVELS[i-1],tx:17,ty:14,label:'↓ '+PALACE_SERVICE_LABELS[i-1]});
+    if(i<2) PALACE_SERVICE_STAIRS.push({id:id+'_service_up',sceneId:id,kind:'palaceServiceStair',dir:'up',
+      x:19,y:15,stand:[[19,15]],to:PALACE_SERVICE_LEVELS[i+1],tx:19,ty:6,label:'↑ '+PALACE_SERVICE_LABELS[i+1]});
+    delete map._roomCanvas;
+  });
+  PALACE_SERVICE_STAIRS.forEach(function(s){INTERACTABLES[s.sceneId].push(s);});
+  INTERACTABLES.palace_basement.push({id:'basement_kitchen',kind:'kitchen',x:25,y:4,stand:[[24,5]],label:'厨房 · 自用料理'});
+}
+function palaceProvisionState(){return state.palace.provision||(state.palace.provision={stage:0,completedDay:-1});}
+function palaceProvisionNext() {
+  var p=palaceProvisionState();
+  if(p.stage===4&&p.completedDay<state.totalDay)return '新的一天：可回东翼收货台领取下一份备餐单。';
+  return ['后勤备餐：东翼收货台领单，交土豆 ×2。','下一步：下服务梯，在地下食材库登记。',
+    '下一步：地下右侧后勤备料灶做饭。','下一步：上服务梯到东翼二层，在右下备餐台交餐。',
+    '今日备餐已完成；下一游戏日可在收货台再领单。'][p.stage];
+}
+function openPalaceProvision(it) {
+  var p=palaceProvisionState(),work=it.work,expected={receive:0,store:1,prepare:2,serve:3}[work];
+  var labels={receive:'领取备餐单 · 土豆2 · 5分钟',store:'登记食材入库 · 5分钟',prepare:'完成备餐 · 20分钟／2体力',serve:'交付备餐 · 5分钟 · 45金'};
+  openWindow({id:'palace_provision',kind:'custom',title:it.label||'宫殿后勤备餐',build:function(b){
+    b.appendChild(el('p',null,'春宴供货完成后，塞琳按日安排一份后勤备餐。土豆在收货时交出并记入这张单，后续不用重复带材料。'));
+    b.appendChild(el('p','strong',palaceProvisionNext()));
+    b.appendChild(el('p','muted','原料与饭菜保存在后勤单中，不能出售。跨日和读档保留未完进度；每日最多结算一次。自用料理在地下炉灶旁的另一个操作位置。'));
+    if(exploreState().cityStories.rose!=='done')b.appendChild(el('p','muted','先完成塞琳的“为蔷薇园备下春宴”。'));
+    var recipe=RECIPES.filter(function(r){return r.id==='plain_rice';})[0];
+    if(!recipeUnlocked(recipe))b.appendChild(el('p','muted','还需解锁土豆料理：芽芽好感达到25，或已有对应配方。'));
+    b.appendChild(mkBtn(labels[work],'primary',function(){
+      var recipe=RECIPES.filter(function(r){return r.id==='plain_rice';})[0];
+      if(!recipeUnlocked(recipe)){toast('先与芽芽熟悉起来，解锁土豆料理配方。');return;}
+      var ok=performAction({need:work==='receive'?{potato:2}:{},minutes:work==='prepare'?20:5,energy:work==='prepare'?2:0,
+        guard:function(){return state.sceneId===it.sceneId&&standOn(it.stand)&&exploreState().cityStories.rose==='done'&&
+          (p.stage===expected||(work==='receive'&&p.stage===4&&p.completedDay<state.totalDay));},
+        reason:'请在对应柜台按顺序办理；今日已交付的备餐不能重复领取。',
+        apply:function(){p.stage=expected+1;if(work==='serve'){state.coins+=45;p.completedDay=state.totalDay;}}
+      });
+      if(ok){toast(palaceProvisionNext());refreshWindow();}
+    }));
+  },actions:[{label:'关闭',close:true}]});
 }
 
 /* ---------- 装配 ---------- */
@@ -18082,6 +18437,29 @@ function buildPalace() {
   /* 一层：南墙正中主门通宫苑。 */
   palaceRoom('palace_f1', '白蔷薇宫城 · 一层 门厅', PALACE_ROOMS.palace_f1, [
     { id: 'main', side: 'south', x: 31, y: 47, width: 2, to: 'palace_grounds', tx: 60, ty: 49, style: 'stone' }
+  ]);
+
+  /* 东翼（建设一期）：西墙通一层东侧，南墙通宫苑后勤院；
+     南门落点 (97,53) 在翼楼与后勤院之间的草地上。 */
+  palaceRoom('palace_east_wing', '白蔷薇宫城 · 东翼', PALACE_EAST_WING, [
+    { id: 'to_palace', side: 'west', x: 0, y: 19, to: 'palace_f1', tx: 60, ty: 19, style: 'stone' },
+    { id: 'to_yard', side: 'south', x: 8, y: 23, to: 'palace_grounds', tx: 97, ty: 53, style: 'stone' }
+  ]);
+  /* 翼楼的房间门与隔断一起放进 roomDef.props，绘制时才烘进画布。 */
+  PALACE_EAST_WING.props = PALACE_EAST_WING.props.concat([
+    { t: 'palaceRoomDoor', id: 'wing_door_store', sceneId: 'palace_east_wing', x: 15, y: 5, w: 1, h: 2, side: 'west', label: '储藏', flat: true },
+    { t: 'palaceRoomDoor', id: 'wing_door_kitchen', sceneId: 'palace_east_wing', x: 20, y: 5, w: 1, h: 2, side: 'east', label: '厨房', flat: true },
+    { t: 'palaceRoomDoor', id: 'wing_door_pass_w', sceneId: 'palace_east_wing', x: 15, y: 11, w: 1, h: 2, side: 'west', label: '横向通道', flat: true },
+    { t: 'palaceRoomDoor', id: 'wing_door_pass_e', sceneId: 'palace_east_wing', x: 20, y: 11, w: 1, h: 2, side: 'east', label: '餐厅通道', flat: true },
+    { t: 'palaceRoomDoor', id: 'wing_door_goods', sceneId: 'palace_east_wing', x: 15, y: 18, w: 1, h: 2, side: 'west', label: '收货台', flat: true },
+    { t: 'palaceRoomDoor', id: 'wing_door_dining', sceneId: 'palace_east_wing', x: 20, y: 18, w: 1, h: 2, side: 'east', label: '餐厅备餐', flat: true }
+  ]);
+
+  /* 一层补开东墙门通东翼。两边互相指向，必须等两个场景都存在才能装门，
+     所以这里回头重装一次——installIndoorDoors 会重新走全套校验。 */
+  installIndoorDoors('palace_f1', [
+    { id: 'main', side: 'south', x: 31, y: 47, width: 2, to: 'palace_grounds', tx: 60, ty: 49, style: 'stone' },
+    { id: 'wing', side: 'east', x: 63, y: 19, to: 'palace_east_wing', tx: 4, ty: 19, style: 'stone' }
   ]);
   /* 三层：东墙露台门通翼楼露台。 */
   palaceRoom('palace_f3', '白蔷薇宫城 · 三层 起居', PALACE_ROOMS.palace_f3, [
@@ -18126,16 +18504,16 @@ function buildPalace() {
     { id: 'terrace_garden', kind: 'interiorProp', label: '露台花箱',
       x: 22, y: 21, stand: [[22, 20], [21, 21], [23, 21]],
       note: '花箱里种着从宫苑花园分出来的白蔷薇，园丁按周来修整。',
-      note2: '园艺与石材维护属于可反复事务，做完还能再来。' });
+      note2: '这里目前开放观景与花箱说明；园艺和石材维护委托尚未开放。' });
   INTERACTABLES.palace_gallery.push(
     { id: 'gallery_walk', kind: 'interiorProp', label: '回廊漫步',
       x: 12, y: 8, stand: [[12, 9], [11, 8], [13, 8]],
       note: '回廊沿内庭一侧绕过去，北端接花园。正式宴会前这里是宾客等候的地方。',
-      note2: '东端那扇门通向三层翼楼露台，开放时段写在门牌上。' });
+      note2: '这条回廊返回二层王座厅。去三层露台请先回主楼，经大楼梯上三层，再走东侧露台门。' });
 
   /* 房间定义里的 spots 转成交互物：管家事务台因此留在「一层」。 */
   [['palace_f1', PALACE_ROOMS.palace_f1], ['palace_f3', PALACE_ROOMS.palace_f3],
-   ['city_castle', CITY_ROOMS.castle]].forEach(function (pair) {
+   ['city_castle', CITY_ROOMS.castle], ['palace_east_wing', PALACE_EAST_WING]].forEach(function (pair) {
     (pair[1].spots || []).forEach(function (s, i) {
       var list = INTERACTABLES[pair[0]];
       if (list.some(function (it) { return it.id === pair[0] + '_spot_' + i; })) return;
@@ -18145,6 +18523,7 @@ function buildPalace() {
   });
 
   buildPalaceStairs();
+  buildPalaceServiceLevels();
 
   /* 城市街道上的城堡门改为通往宫苑：城市主入口、道路与马车落点全部不动，
      只是门后从王座厅换成宫苑。 */
@@ -18170,6 +18549,344 @@ function buildPalace() {
 }
 buildPalace();
 
+/* 大学建设二期：沿用城市校园与全部旧服务，仅增必要楼层和首轮研究。 */
+var UNIVERSITY_LABELS = {
+  city_uni_main:'大学主楼 · 一层',city_university_main_upper:'大学主楼 · 二层',
+  city_library:'图书馆 · 一层',city_library_upper:'图书馆 · 二层',
+  city_academy:'河岸学部',city_uni_wing:'教学研讨楼',city_uni_lab:'自然史实验楼',
+  city_greenhouse:'植物温室',city_uni_dorm:'大学宿舍院'
+};
+var UNIVERSITY_STAIRS=[];
+function newUniversityState(){return {studyStage:0};}
+function normalizeUniversity(v){return {studyStage:v&&isInt(v.studyStage)&&v.studyStage>=0&&v.studyStage<=5?v.studyStage:0};}
+function universityState(){return state.university||(state.university=newUniversityState());}
+function universityNext(){return [
+  '首轮研究：在主楼一层接待公告报名“萝卜育苗观察”。',
+  '下一步：图书馆上二层，到东侧专题资料桌查阅育苗记录。',
+  '下一步：去植物温室，观察左侧育苗床。',
+  '下一步：带萝卜 ×1 去自然史实验楼，对照观察核验样本。',
+  '下一步：去主楼二层左侧研讨桌，提交研究报告。',
+  '研究已完成：温室观察与携带样本已核验。课程、译介和标本整理仍可在原柜台办理。'
+][universityState().studyStage];}
+function universityResearchMinutes(){return Math.ceil(30*(1-Math.min(.15,Math.max(0,charAttr('int')-5)*.01)));}
+function openUniversityGuide(){
+  openWindow({id:'university_guide',kind:'custom',wide:true,title:'白蔷薇大学 · 校园导览',build:function(b){
+    b.appendChild(el('p','strong',universityNext()));
+    b.appendChild(el('p',null,'院落北侧是大学主楼与自然史实验楼，西侧为图书馆，东侧为河岸学部，南侧有教学研讨楼和温室。宿舍在东南侧。'));
+    b.appendChild(el('p','muted','主楼一层讲授与接待，二层研讨和教师研究；图书馆一层保留查阅台与旧志委托，二层为专题资料与安静阅览。各自从标明目的地的楼梯上下楼。'));
+    b.appendChild(el('p','muted','校园导览只提供方向，不代替步行或地图交通。现有课程、译稿、标本交易、育苗及宿舍休息照常办理。'));
+    Object.keys(UNIVERSITY_LABELS).forEach(function(id){b.appendChild(el('p',state.sceneId===id?'strong':'muted',
+      (state.sceneId===id?'▶ ':'')+UNIVERSITY_LABELS[id]));});
+    if(universityState().studyStage===5)b.appendChild(el('p',null,'报告结论：温室观察说明育苗条件；实验楼确认携带的萝卜样本种类。记录不宣称样本由玩家种植，也不据此证明整个山谷的生长规律。'));
+  },actions:[{label:'关闭',close:true}]});
+}
+function openUniversityStudy(it){
+  var expected={enrol:0,read:1,observe:2,verify:3,report:4}[it.work];
+  var minutes=it.work==='verify'?universityResearchMinutes():it.work==='read'?20:it.work==='observe'?10:5;
+  var energy=it.work==='verify'?2:0;
+  var labels={enrol:'报名育苗观察',read:'查阅并记录资料',observe:'记录育苗观察',verify:'核验萝卜样本',report:'提交研究报告'};
+  openWindow({id:'university_study',kind:'custom',title:it.label,build:function(b){
+    b.appendChild(el('p','strong',universityNext()));
+    b.appendChild(el('p',null,'接待报名 → 图书馆二层查阅 → 温室观察 → 实验楼核验 → 主楼二层报告。没有学费和其他职业前置；核验收取萝卜 ×1。'));
+    b.appendChild(el('p','muted','本处操作：'+minutes+' 分钟'+(energy?'、'+energy+' 体力':'')+'。研究进度跨日和读档保留，完成后获得考察笔记 ×1 与角色经验 60，只结算一次。'));
+    if(it.work==='verify')b.appendChild(el('p','muted','智力可缩短本次核验，最多减少15%；这项植物研究不套用限定矿样／水样的“专注研读”。'));
+    if(universityState().studyStage===5){b.appendChild(el('p','muted','报告已存入校园记录，可从所在区域牌查看结论。'));return;}
+    b.appendChild(mkBtn(labels[it.work],'primary',function(){
+      var ok=performAction({need:it.work==='verify'?{radish:1}:{},out:it.work==='report'?'field_note':null,qty:1,minutes:minutes,energy:energy,
+        guard:function(){return state.sceneId===it.sceneId&&standOn(it.stand)&&exploreState().city&&universityState().studyStage===expected;},
+        reason:'请先完成上一项研究，并到对应的桌台旁办理。',apply:function(){
+          universityState().studyStage=expected+1;
+          if(it.work==='report')grantCharExpOnce('university.seedling-report',60,'学习');
+        }});
+      if(ok){toast(universityNext());refreshWindow();}
+    }));
+  },actions:[{label:'校园导览',close:false,onClick:openUniversityGuide},{label:'关闭',close:true}]});
+}
+function useUniversityStair(it){
+  if(!standOn(it.stand)){toast('请到楼梯箭头旁操作。');return;}
+  closeWindow();doSwitchScene(it.to,it.tx,it.ty,it.dir==='up'?'down':'up');
+}
+function drawUniversityStairSign(g,it){
+  var s=it.stand[0];palacePlaque(g,(s[0]+.5)*TILE,s[1]*TILE+(it.dir==='up'?17:-34),it.label,touchDevice()?'箭头旁点交互':'箭头旁按 E');
+  g.save();g.fillStyle='#EAD4A1';g.font='bold 12px sans-serif';g.textAlign='center';g.fillText(it.dir==='up'?'↑':'↓',(s[0]+.5)*TILE,s[1]*TILE+12);g.restore();
+}
+function buildUniversityUpper(id,label,def,entry){
+  var r=mkMap(def.w,def.h,T_PATH);
+  fillRect(r,0,0,r.w-1,0,T_BUILDING,true);fillRect(r,0,r.h-1,r.w-1,r.h-1,T_BUILDING,true);
+  fillCol(r,0,0,r.h-1,T_BUILDING,true);fillCol(r,r.w-1,0,r.h-1,T_BUILDING,true);
+  def.props.forEach(function(p){if(!p.flat)fillRect(r,p.x,p.y,p.x+p.w-1,p.y+p.h-1,T_BUILDING,true);});
+  MAPS[id]={w:r.w,h:r.h,t:r.t,solid:r.solid,name:label,indoor:true,roomTheme:'library',roomDef:def,
+    exits:[],doors:[],enter:entry,buildings:[],decor:[]};
+  INTERACTABLES[id]=[];SCENE_ORDER.push(id);
+}
+function buildUniversity(){
+  var library={w:30,h:20,floor:'wood',props:[
+    {t:'bookshelf',x:2,y:2,w:4,h:7},{t:'desk',x:8,y:2,w:4,h:2},
+    {t:'partition',x:19,y:1,w:1,h:3},{t:'partition',x:19,y:7,w:1,h:12},
+    {t:'palaceRoomDoor',x:19,y:4,w:1,h:3,side:'east',label:'专题资料',flat:true},
+    {t:'desk',x:23,y:3,w:5,h:2},{t:'mapCabinet',x:21,y:10,w:6,h:3},
+    {t:'archiveShelf',x:22,y:15,w:5,h:3},{t:'readingTable',x:3,y:12,w:8,h:3},
+    {t:'palaceWorkingSteps',x:14,y:5,w:4,h:5,flat:true}
+  ]};
+  var main={w:36,h:24,floor:'plank',props:[
+    {t:'partition',x:19,y:1,w:1,h:4},{t:'partition',x:19,y:7,w:1,h:10},{t:'partition',x:19,y:19,w:1,h:4},
+    {t:'palaceRoomDoor',x:19,y:5,w:1,h:2,side:'east',label:'教师研究',flat:true},
+    {t:'palaceRoomDoor',x:19,y:17,w:1,h:2,side:'east',label:'阅读与会谈',flat:true},
+    {t:'desk',x:4,y:3,w:9,h:2},{t:'longTable',x:4,y:7,w:10,h:3},
+    {t:'bookshelf',x:2,y:8,w:3,h:4},{t:'bookshelf',x:3,y:19,w:4,h:3},
+    {t:'readingTable',x:22,y:3,w:10,h:3},{t:'bookshelf',x:30,y:9,w:3,h:8},
+    {t:'sofa',x:22,y:13,w:5,h:2},{t:'desk',x:22,y:18,w:6,h:2},
+    {t:'palaceWorkingSteps',x:8,y:14,w:4,h:5,flat:true}
+  ]};
+  buildUniversityUpper('city_library_upper','蔷薇图书馆 · 二层资料室',library,{x:16,y:12});
+  buildUniversityUpper('city_university_main_upper','白蔷薇大学 · 二层研讨',main,{x:12,y:20});
+  [
+    {sceneId:'city_library',to:'city_library_upper',dir:'up',x:17,y:11,stand:[[17,11]],tx:16,ty:12,label:'↑ 图书馆二层'},
+    {sceneId:'city_library_upper',to:'city_library',dir:'down',x:14,y:4,stand:[[14,4]],tx:16,ty:3,label:'↓ 图书馆一层'},
+    {sceneId:'city_uni_main',to:'city_university_main_upper',dir:'up',x:11,y:20,stand:[[11,20]],tx:12,ty:20,label:'↑ 主楼二层'},
+    {sceneId:'city_university_main_upper',to:'city_uni_main',dir:'down',x:8,y:13,stand:[[8,13]],tx:12,ty:12,label:'↓ 主楼一层'}
+  ].forEach(function(s,i){s.id='university_stair_'+i;s.kind='universityStair';UNIVERSITY_STAIRS.push(s);INTERACTABLES[s.sceneId].push(s);});
+  MAPS.city_library.roomDef.props.push({t:'palaceWorkingSteps',x:14,y:5,w:4,h:5,flat:true});
+  MAPS.city_uni_main.roomDef.props.push({t:'palaceWorkingSteps',x:8,y:14,w:4,h:5,flat:true});
+  var tasks=[
+    {sceneId:'city_uni_main',work:'enrol',x:12,y:5,stand:[[12,6]],label:'研究接待公告'},
+    {sceneId:'city_library_upper',work:'read',x:25,y:4,stand:[[25,5]],label:'育苗专题资料桌'},
+    {sceneId:'city_greenhouse',work:'observe',x:5,y:10,stand:[[5,9]],label:'育苗观察床'},
+    {sceneId:'city_uni_lab',work:'verify',x:14,y:9,stand:[[14,11]],label:'植物样本核验台'},
+    {sceneId:'city_university_main_upper',work:'report',x:7,y:4,stand:[[7,5]],label:'研讨报告桌'}
+  ];
+  tasks.forEach(function(it,i){it.id='university_study_'+i;it.kind='universityStudy';INTERACTABLES[it.sceneId].push(it);});
+  INTERACTABLES.city_university_main_upper.push({id:'university_reading',kind:'interiorProp',x:24,y:4,stand:[[24,6]],label:'教师研究与阅读',note:'这里提供安静阅读与会谈环境，长期导师课程尚未开放。'});
+  INTERACTABLES.city_library_upper.push({id:'university_archive',kind:'interiorProp',x:24,y:16,stand:[[24,14]],label:'专题档案柜',note:'资料与索引留在图书馆，研究结果记录在校园导览中。'});
+  /* 原有建筑和地基不动：只在空地铺院落及连接路，不清除树、家具或建筑碰撞。 */
+  function campusPath(x0,y0,x1,y1){for(var x=x0;x<=x1;x++)for(var y=y0;y<=y1;y++)if(!MAPS.city.solid[x][y])MAPS.city.t[x][y]=T_PATH;}
+  campusPath(482,66,526,88);campusPath(467,60,469,89);campusPath(453,89,502,91);
+  campusPath(469,80,579,82);campusPath(553,56,555,82);campusPath(502,88,504,91);
+  campusPath(456,91,458,146);
+  INTERACTABLES.city.push({id:'university_court_guide',kind:'universityGuide',x:503,y:82,stand:[[503,83],[502,82],[504,82]],label:'大学校园导览'});
+  MAPS.city.decor.push({t:'bench',x:486,y:85},{t:'bench',x:517,y:85},{t:'flower',x:487,y:69,v:0},{t:'flower',x:519,y:69,v:1});
+  ['city_library','city_uni_main'].forEach(function(id){delete MAPS[id]._roomCanvas;});
+}
+buildUniversity();
+
+/* 建设三期：南门旅馆客房及邮局—车马院，沿用原日结算和交通规则。 */
+var SOUTH_GATE_LABELS={city_inn:'旅馆 · 一层前台',city_inn_upper:'旅馆 · 二层客房',city_post:'南门邮局',city_carriage:'南门马车站',city_stable:'南门马厩'};
+var INN_BEDS={a:{x:6,y:12,stand:[[7,12]],room:'a'},b:{x:21,y:12,stand:[[20,12]],room:'b'}};
+function newSouthGateState(){return {booking:null,lastStay:null,mailStage:0,mailCompletedDay:-1};}
+function normalizeSouthGate(v,day){
+  var n=newSouthGateState();if(!v||typeof v!=='object')return n;
+  function room(x){return x==='a'||x==='b';}
+  if(v.booking&&room(v.booking.room)&&v.booking.day===day)n.booking={room:v.booking.room,day:day};
+  if(v.lastStay&&room(v.lastStay.room)&&isInt(v.lastStay.day)&&v.lastStay.day>=1&&v.lastStay.day<day)n.lastStay={room:v.lastStay.room,day:v.lastStay.day};
+  n.mailStage=isInt(v.mailStage)&&v.mailStage>=0&&v.mailStage<=3?v.mailStage:0;
+  n.mailCompletedDay=isInt(v.mailCompletedDay)?clamp(v.mailCompletedDay,-1,day):-1;
+  if(n.mailStage===3&&n.mailCompletedDay<1)n.mailStage=0;
+  return n;
+}
+function southGateState(){return state.southGate||(state.southGate=newSouthGateState());}
+function innBooking(){var b=southGateState().booking;return b&&b.day===state.totalDay?b:null;}
+function innCanSleep(room){return !!(INN_BEDS[room]&&innBooking()&&innBooking().room===room&&state.sceneId==='city_inn_upper'&&standOn(INN_BEDS[room].stand));}
+function refreshInnRoomLabels(){
+  var map=MAPS.city_inn_upper;if(!map)return;var b=innBooking(),changed=false;
+  map.roomDef.props.forEach(function(p){if(!p.room)return;var label='客房 '+p.room.toUpperCase()+(b&&b.room===p.room?' · 已登记':' · 可登记');if(p.label!==label){p.label=label;changed=true;}});
+  if(changed)delete map._roomCanvas;
+}
+function innAtDesk(){return state.sceneId==='city_inn'&&standOn([[11,3],[19,3],[15,5]]);}
+function openInnDesk(){
+  openWindow({id:'city_inn',kind:'custom',title:'南门旅馆 · 贝尔的前台',build:function(b){
+    var booking=innBooking();
+    b.appendChild(el('p',null,'一层为前台、餐厅和厨房。右上方楼梯通二层客房 A、B；过夜前请在这里登记。'));
+    b.appendChild(el('p','muted','每夜 40 金，仅登记当晚一间客房。到已登记房间床旁确认睡觉，明早在房内醒来，农场、出货与地区事务照常结算；不会代为浇水。'));
+    if(booking){
+      b.appendChild(el('p','strong','当晚已登记客房 '+booking.room.toUpperCase()+'，房费已付。'));
+      b.appendChild(mkBtn('取消当晚登记 · 退回40金','sm',function(){if(!innAtDesk()||!innBooking()){toast('请在前台办理有效登记。');return;}southGateState().booking=null;state.coins+=40;markDirty();saveNow();refreshHud();refreshInnRoomLabels();refreshWindow();}));
+    }else ['a','b'].forEach(function(room){b.appendChild(mkBtn('登记客房 '+room.toUpperCase()+' · 40金','primary',function(){
+      if(performAction({coins:40,minutes:0,guard:function(){return innAtDesk()&&exploreState().city&&!innBooking();},reason:'请在前台登记，已有当晚客房无需再付费。',apply:function(){southGateState().booking={room:room,day:state.totalDay};}})){
+        refreshInnRoomLabels();refreshWindow();toast('客房 '+room.toUpperCase()+' 已登记；从右上方楼梯上楼，沿客房走廊找到房门。');
+      }
+    }));});
+    b.appendChild(mkBtn('买乡村面包 · 30金','sm',function(){performAction({coins:30,out:'bread',qty:1,minutes:0,guard:innAtDesk,reason:'请到旅馆前台购买。'});}));
+    b.appendChild(mkBtn('南门旅馆与驿站导览','sm',openSouthGateGuide));
+  },actions:[{label:'离开前台',close:true}]});
+}
+function stationMailNext(){var m=southGateState();if(m.mailStage===3&&m.mailCompletedDay<state.totalDay)return '新一天：邮局分拣台可接下一袋站内邮件。';return [
+  '邮局分拣台可领取一袋站内邮件，送到马车站装卸台。',
+  '下一步：到南门马车站装卸台，交邮件并领取回执。',
+  '下一步：回邮局分拣台提交回执，领取20金。',
+  '今日邮件已交接；下一游戏日可再到邮局分拣台办理。'
+][m.mailStage];}
+function openSouthGateGuide(){
+  var b=innBooking(),last=southGateState().lastStay;
+  openWindow({id:'south_gate_guide',kind:'custom',wide:true,title:'南门旅馆与驿站导览',build:function(body){
+    body.appendChild(el('p',null,'南门旅馆在街区东侧，邮局在西侧，马车站在邮局西北，马厩在西南。邮局东侧有通往车马院的侧门。'));
+    body.appendChild(el('p','strong',b?'当晚登记：客房 '+b.room.toUpperCase()+'。从前台右上方楼梯上二层。':'住宿先在旅馆前台登记；楼上未登记客房可参观，床不可过夜。'));
+    if(last)body.appendChild(el('p','muted','上次住宿：第'+last.day+'天，客房 '+last.room.toUpperCase()+'。'));
+    body.appendChild(el('p','strong',stationMailNext()));
+    body.appendChild(el('p','muted','站内邮件与回执保存在事务中，跨日和读档保留，不占背包且不能出售。每天最多结算一次。'));
+    body.appendChild(el('p','muted','原邮局寄信与付费马车仍在柜台办理，M地图快速传送沿用原规则。马厩目前开放参观与马具说明，未开放买马或寄养。'));
+  },actions:[{label:'关闭',close:true}]});
+}
+function openStationMail(it){
+  var expected=it.work==='coach'?1:null;
+  openWindow({id:'station_mail',kind:'custom',title:it.label,build:function(b){
+    var m=southGateState();b.appendChild(el('p','strong',stationMailNext()));
+    b.appendChild(el('p','muted','分拣领袋10分钟／1体力，马车站交接5分钟，回邮局交回执5分钟；报酬20金，不收玩家材料。'));
+    var label=it.work==='coach'?'交邮件并领取回执':m.mailStage===2?'提交回执 · 20金':'分拣并领取邮袋';
+    b.appendChild(mkBtn(label,'primary',function(){
+      var current=southGateState(),stage=current.mailStage,claim=it.work!=='coach'&&stage===2;
+      performAction({minutes:it.work==='coach'||claim?5:10,energy:it.work==='coach'||claim?0:1,
+        guard:function(){return state.sceneId===it.sceneId&&standOn(it.stand)&&exploreState().city&&
+          (it.work==='coach'?stage===expected:claim||stage===0||(stage===3&&current.mailCompletedDay<state.totalDay));},
+        reason:'请按顺序交接邮件；当天结算后不能重复领袋。',apply:function(){
+          if(it.work==='coach')current.mailStage=2;else if(claim){current.mailStage=3;current.mailCompletedDay=state.totalDay;state.coins+=20;}else current.mailStage=1;
+        }});
+    }));
+  },actions:[{label:'驿站导览',close:false,onClick:openSouthGateGuide},{label:'关闭',close:true}]});
+}
+CITY_PROPS.stationSteps=function(g,r){
+  var x=r.x*TILE,y=r.y*TILE,W=r.w*TILE,H=r.h*TILE,step=Math.floor((H-4)/8);
+  px(g,x,y,W,H,'#635447');for(var i=0;i<8;i++){px(g,x+2,y+2+i*step,W-4,step,'#B39D7A');px(g,x+2,y+2+i*step,W-4,1,'#EFDBAC');}px(g,x,y,2,H,'#7B603D');px(g,x+W-2,y,2,H,'#7B603D');
+};
+function drawInnStairSign(g,it){var s=it.stand[0];palacePlaque(g,(s[0]+.5)*TILE,s[1]*TILE+(it.dir==='up'?18:-34),it.label,touchDevice()?'箭头旁点交互':'箭头旁按 E');}
+function buildSouthGate(){
+  var facade=CITY_BUILDINGS.filter(function(b){return b.id==='inn';})[0];
+  if(facade&&facade.arch){facade.arch.storeys=2;facade.visualHeight=Math.max(facade.visualHeight||0,facade.arch.roofForm==='terrace'?70:66);}
+  var lobby=MAPS.city_inn,old=lobby.roomDef.props;
+  old.filter(function(p){return p.t==='stairs'||p.t==='bed';}).forEach(function(p){fillRect(lobby,p.x,p.y,p.x+p.w-1,p.y+p.h-1,T_PATH,false);});
+  lobby.roomDef.props=old.filter(function(p){return p.t!=='stairs'&&p.t!=='bed';});
+  [{t:'stationSteps',x:22,y:2,w:5,h:4,flat:true},{t:'bench',x:2,y:14,w:4,h:2},{t:'crates',x:9,y:14,w:4,h:2}].forEach(function(p){lobby.roomDef.props.push(p);if(!p.flat)fillRect(lobby,p.x,p.y,p.x+p.w-1,p.y+p.h-1,T_BUILDING,true);});
+  var upper={w:30,h:24,floor:'plank',props:[
+    {t:'partition',x:1,y:8,w:12,h:1},{t:'partition',x:17,y:8,w:12,h:1},
+    {t:'partition',x:12,y:9,w:1,h:5},{t:'partition',x:12,y:17,w:1,h:6},
+    {t:'partition',x:17,y:9,w:1,h:5},{t:'partition',x:17,y:17,w:1,h:6},
+    {t:'palaceRoomDoor',x:12,y:14,w:1,h:3,side:'west',room:'a',label:'客房 A',labelOffset:39,flat:true},
+    {t:'palaceRoomDoor',x:17,y:14,w:1,h:3,side:'east',room:'b',label:'客房 B',labelOffset:39,flat:true},
+    {t:'bed',x:3,y:10,w:4,h:4},{t:'wardrobe',x:3,y:18,w:3,h:3},{t:'desk',x:8,y:18,w:3,h:2},
+    {t:'bed',x:21,y:10,w:4,h:4},{t:'wardrobe',x:24,y:18,w:3,h:3},{t:'desk',x:20,y:18,w:3,h:2},
+    {t:'genericShelf',x:3,y:2,w:4,h:3},{t:'noticeBoard',x:9,y:2,w:5,h:3},
+    {t:'stationSteps',x:22,y:2,w:5,h:4,flat:true}
+  ]};
+  buildUniversityUpper('city_inn_upper','南门旅馆 · 二层客房',upper,{x:20,y:7});MAPS.city_inn_upper.roomTheme='home';
+  INTERACTABLES.city_inn.push({id:'inn_up',kind:'innStair',dir:'up',x:24,y:6,stand:[[24,6]],to:'city_inn_upper',tx:20,ty:7,label:'↑ 二层客房'});
+  INTERACTABLES.city_inn_upper.push({id:'inn_down',kind:'innStair',dir:'down',x:21,y:3,stand:[[21,3]],to:'city_inn',tx:20,ty:7,label:'↓ 一层前台'});
+  ['a','b'].forEach(function(room){INTERACTABLES.city_inn_upper.push(Object.assign({id:'inn_bed_'+room,kind:'innBed',label:'客房 '+room.toUpperCase()+' · 床'},INN_BEDS[room]));});
+  INTERACTABLES.city_inn_upper.push({id:'inn_cleaning',kind:'interiorProp',x:6,y:3,stand:[[7,3]],label:'清洁储物架',note:'干净床单与工具存放在前厅，不占客房通道。客房A、B分别在楼下方左右两侧。'});
+  INTERACTABLES.city_inn.push({id:'inn_kitchen',kind:'kitchen',x:25,y:11,stand:[[25,12]],label:'旅馆厨房 · 自用料理'});
+  INTERACTABLES.city_post.push({id:'station_sort',kind:'stationMail',work:'post',sceneId:'city_post',x:6,y:4,stand:[[6,7]],label:'邮局分拣台'});
+  INTERACTABLES.city_carriage.push({id:'station_dispatch',kind:'stationMail',work:'coach',sceneId:'city_carriage',x:6,y:3,stand:[[6,5]],label:'马车站邮件交接台'});
+  var postMain=MAPS.city_post.doors[0];
+  installIndoorDoors('city_post',[postMain,{id:'yard',side:'east',x:25,y:14,to:'city',tx:287,ty:438,style:'wood',label:'前往车马院侧道'}]);
+  INTERACTABLES.city.push({id:'post_yard_entrance',kind:'stationEntrance',x:286,y:438,stand:[[287,438],[287,439]],to:'city_post',doorId:'yard',label:'邮局侧门 · 车马院'});
+  INTERACTABLES.city.push({id:'south_gate_guide',kind:'southGateGuide',x:292,y:446,stand:[[292,447],[291,446],[293,446]],label:'南门旅馆与驿站导览'});
+  function yardPath(x0,y0,x1,y1){for(var x=x0;x<=x1;x++)for(var y=y0;y<=y1;y++)if(!MAPS.city.solid[x][y])MAPS.city.t[x][y]=T_PATH;}
+  yardPath(287,433,292,448);yardPath(252,444,356,446);yardPath(253,408,257,460);
+  MAPS.city.decor.push({t:'bench',x:290,y:443});delete lobby._roomCanvas;
+}
+buildSouthGate();
+
+/* 建设四期：城市生产与地区河港共用唯一工业批次，不借用旧核验运单。 */
+var INDUSTRY_LABELS={city_quay_store:'厂区 · 货仓',city_sawmill:'厂区 · 锯木厂',city_foundry:'厂区 · 铸造',city_watermill:'厂区 · 水磨坊',city_boiler:'厂区 · 锅炉',city_shipyard:'厂区 · 船具棚',port_office:'下游河港 · 船务屋',port_lockhouse:'下游河港 · 船闸'};
+function newIndustryState(){return {stage:0,serial:0,route:null,completedDay:-1,lastReceipt:null};}
+function normalizeIndustry(v,day){
+  var n=newIndustryState();if(!v||typeof v!=='object')return n;
+  n.stage=isInt(v.stage)&&v.stage>=0&&v.stage<=6?v.stage:0;
+  n.serial=isInt(v.serial)?clamp(v.serial,0,1000000):0;
+  n.route=['local','river','reclaim'].indexOf(v.route)>=0?v.route:null;
+  n.completedDay=isInt(v.completedDay)?clamp(v.completedDay,-1,day):-1;
+  if(n.stage===4&&n.route!=='river'||n.stage===5&&['local','river'].indexOf(n.route)<0){n.stage=3;n.route=null;}
+  if(n.stage===6&&n.completedDay<1){n.stage=0;n.route=null;}
+  if(n.stage>0&&n.serial<1)n.serial=1;
+  var r=v.lastReceipt;if(r&&isInt(r.serial)&&r.serial>0&&r.serial<=n.serial&&isInt(r.day)&&r.day>=1&&r.day<=day&&['local','river','reclaim'].indexOf(r.route)>=0)n.lastReceipt={serial:r.serial,day:r.day,route:r.route,qty:6};
+  return n;
+}
+function industryState(){return state.industry||(state.industry=newIndustryState());}
+function industryCargo(){var i=industryState();return {wood:i.stage===1?2:0,plank:i.stage>=2&&i.stage<=5?6:0};}
+function industryPrice(){return Math.round(ITEMS.plank.sell*1.15)*6;}
+function industrialRiverReady(){var p=professionalLifeState();return extendedGateAllowed('port')&&p.port.manifestChecked&&(!p.port.shipment||p.port.settled);}
+function industryNext(){var i=industryState();if(i.stage===6&&i.completedDay<state.totalDay)return '新一天：货仓登记桌可收下一批木材。';return [
+  '货仓右侧登记桌收木材 ×2，建立板材批次。',
+  '下一步：去锯木厂，在带锯右侧加工本批木材。',
+  '下一步：回货仓东侧装卸台核验板材 ×6 并入库。',
+  '成品已入库：可取回板材，或选择本地交接／下游水运。',
+  '货物在下游河港待发：到船务屋工业货位办理装船；也可在城市货仓调回。',
+  '运输已办理：去城市船具修理棚的收货位签收本批板材。',
+  '本批已结清；下一游戏日可再办理，普通加工与代销照常开放。'
+][i.stage];}
+function openIndustryGuide(){
+  var i=industryState(),c=industryCargo(),r=i.lastReceipt;
+  openWindow({id:'industry_guide',kind:'custom',wide:true,title:'河港与工业区 · 生产和货运导览',build:function(b){
+    b.appendChild(el('p','strong',industryNext()));
+    b.appendChild(el('p',null,'城市货仓在厂区西侧，锯木厂在东北，铸造、水磨坊和锅炉位于东南，船具棚在东侧。货仓东门与锯木厂西门接装卸通道，普通服务仍在原柜台。'));
+    b.appendChild(el('p','muted','当前批次 '+(i.serial?'#'+i.serial:'未建立')+'：任务保管木材 '+c.wood+'，板材 '+c.plank+'。背包原料、旧地区核验运单与这份批次分别结算，不会把货物同时记到两处。'));
+    b.appendChild(el('p','muted','城市工业码头与下游河港是两处地点。选择水运前须获得原河港到访条件、核验封签，并结清地区原有运输。人的地图传送不推进工业批次。'));
+    b.appendChild(el('p','muted','下游河港从河湾路牌（7,10）进入；实际到访后可用M地图往返。城市本地板材运输也会记录商旅经历，两次本地运输可满足河港的商旅到访条件。'));
+    if(r)b.appendChild(el('p',null,'最近记录：批次 #'+r.serial+'，第'+r.day+'天，板材 '+r.qty+'；'+({local:'本地船棚签收',river:'下游河港转运后船棚签收',reclaim:'玩家领回成品'}[r.route])+'。'));
+    b.appendChild(el('p','muted','厂区休息处与设备说明开放；本期不新增事故或维修职业等级。现有工程师、用水与地区任务保持原规则。'));
+  },actions:[{label:'关闭',close:true}]});
+}
+function finishIndustry(route){var i=industryState();i.stage=6;i.route=route;i.completedDay=state.totalDay;i.lastReceipt={serial:i.serial,day:state.totalDay,route:route,qty:6};}
+function openIndustryWork(it){
+  openWindow({id:'industry_work',kind:'custom',title:it.label,build:function(b){
+    var i=industryState(),c=industryCargo();b.appendChild(el('p','strong',industryNext()));
+    b.appendChild(el('p','muted','批次 #'+i.serial+' · 保管木材 '+c.wood+' / 板材 '+c.plank+'。跨日与读档保留，只在首次收料扣木材。每天最多结清一批。'));
+    function button(label,opts,guard,apply){b.appendChild(mkBtn(label,'primary',function(){
+      var o=Object.assign({},opts,{guard:function(){return state.sceneId===it.sceneId&&standOn(it.stand)&&exploreState().city&&guard(industryState());},reason:'请按批次顺序在对应工位办理；地区运输条件不足时可选本地交接。',apply:apply});
+      if(performAction(o)){toast(industryNext());refreshWindow();}
+    }));}
+    if(it.work==='receive')button('登记木材2 · 5分钟',{need:{wood:2},minutes:5},function(i){return i.stage===0||i.stage===6&&i.completedDay<state.totalDay;},function(){var i=industryState();i.stage=1;i.serial++;i.route=null;});
+    if(it.work==='saw')button('批次细剖 · 木材2 → 板材6 · 60分钟／10体力',{minutes:60,energy:10},function(i){return i.stage===1;},function(){industryState().stage=2;});
+    if(it.work==='stock'){
+      if(i.stage===2)button('核验板材6并入库 · 5分钟',{minutes:5},function(i){return i.stage===2;},function(){industryState().stage=3;});
+      if(i.stage===3){
+        button('取回成品 · 板材6 · 5分钟',{out:'plank',qty:6,minutes:5},function(i){return i.stage===3;},function(){finishIndustry('reclaim');});
+        button('本地装运至船棚 · 25分钟／1体力',{minutes:25,energy:1},function(i){return i.stage===3;},function(){industryState().stage=5;industryState().route='local';});
+        button('送至下游河港待发 · 35分钟／1体力',{minutes:35,energy:1},function(i){return i.stage===3&&industrialRiverReady();},function(){industryState().stage=4;industryState().route='river';});
+        if(!industrialRiverReady())b.appendChild(el('p','muted','水运条件尚未满足：先获得河港到访资格并核验封签；已有地区运输须先结清。本地交接与取回成品均可使用。'));
+      }
+      if(i.stage===4)button('调回港口待发货物 · 35分钟／1体力',{minutes:35,energy:1},function(i){return i.stage===4;},function(){industryState().stage=3;industryState().route=null;});
+    }
+    if(it.work==='river'){
+      b.appendChild(el('p','muted','这份工业批次仍由城市货仓登记。医舍、石料、互市的旧核验运单请在米娅的原事务台办理。'));
+      button('工业板材装船 · '+professionalShippingMinutes(40)+'分钟／2体力',{minutes:professionalShippingMinutes(40),energy:2},function(i){return i.stage===4&&i.route==='river'&&industrialRiverReady();},function(){industryState().stage=5;});
+    }
+    if(it.work==='receipt')button('签收板材6 · '+industryPrice()+'金 · 5分钟',{minutes:5},function(i){return i.stage===5&&['local','river'].indexOf(i.route)>=0;},function(){var i=industryState();state.coins+=industryPrice();finishIndustry(i.route);bumpRoute('trade');});
+    b.appendChild(el('p','muted','签收按既有货栈代销价结算：6 × '+Math.round(ITEMS.plank.sell*1.15)+' = '+industryPrice()+'金。取回成品不另发货款，运输费用以时间和体力计。'));
+    b.appendChild(el('p','muted','实际运输签收记录一次商旅路线；取回自用成品不增加运输经历。'));
+  },actions:[{label:'厂区导览与批次记录',close:false,onClick:openIndustryGuide},{label:'关闭',close:true}]});
+}
+CITY_PROPS.sawBench=function(g,r){
+  var x=r.x*TILE,y=r.y*TILE,W=r.w*TILE,H=r.h*TILE;
+  px(g,x,y+Math.floor(H*.45),W,Math.floor(H*.4),'#8A6443');px(g,x+3,y+H-9,5,9,'#5C4734');px(g,x+W-8,y+H-9,5,9,'#5C4734');
+  px(g,x+Math.floor(W*.45),y+2,4,H-10,'#425354');px(g,x+Math.floor(W*.45)+4,y+4,2,H-14,'#D2D2B8');
+  px(g,x+7,y+Math.floor(H*.5),W-14,6,'#CCA56A');px(g,x+9,y+Math.floor(H*.5)+1,W-18,1,'#E8C38A');
+};
+CITY_PROPS.logFeed=function(g,r){
+  var x=r.x*TILE,y=r.y*TILE,W=r.w*TILE,H=r.h*TILE;px(g,x,y+H-8,W,8,'#76614A');
+  for(var i=0;i<3;i++){var yy=y+5+i*14;px(g,x+4,yy,W-8,10,'#956741');px(g,x+5,yy+1,W-10,2,'#C19C61');px(g,x+W-13,yy+1,8,8,'#D4B37B');px(g,x+W-11,yy+3,4,4,'#A47B4D');}
+};
+function buildIndustry(){
+  var warehouse=MAPS.city_quay_store,saw=MAPS.city_sawmill;
+  saw.roomDef.props.forEach(function(p){if(p.t==='anvil')p.t='sawBench';if(p.t==='dock')p.t='logFeed';});
+  installIndoorDoors('city_quay_store',[warehouse.doors[0],{id:'loading',side:'east',x:35,y:17,width:2,to:'city',tx:476,ty:338,style:'wood',label:'货仓装卸通道'}]);
+  installIndoorDoors('city_sawmill',[saw.doors[0],{id:'loading',side:'west',x:0,y:14,width:2,to:'city',tx:493,ty:330,style:'wood',label:'前往货仓装卸道'}]);
+  INTERACTABLES.city.push({id:'warehouse_loading',kind:'stationEntrance',x:475,y:338,stand:[[476,338],[476,339]],to:'city_quay_store',doorId:'loading',label:'货仓装卸门'});
+  INTERACTABLES.city.push({id:'sawmill_loading',kind:'stationEntrance',x:494,y:330,stand:[[493,330],[493,331]],to:'city_sawmill',doorId:'loading',label:'锯木厂进料门'});
+  [
+    {sceneId:'city_quay_store',work:'receive',x:31,y:9,stand:[[31,10]],label:'木料批次登记桌'},
+    {sceneId:'city_quay_store',work:'stock',x:32,y:15,stand:[[33,15]],label:'成品核验与装卸台'},
+    {sceneId:'city_sawmill',work:'saw',x:17,y:9,stand:[[18,9]],label:'批次带锯工位'},
+    {sceneId:'city_shipyard',work:'receipt',x:7,y:13,stand:[[7,14]],label:'船棚板材收货位'},
+    {sceneId:'port_office',work:'river',x:8,y:6,stand:[[8,7]],label:'工业板材货位'}
+  ].forEach(function(it,j){it.id='industrial_work_'+j;it.kind='industryWork';INTERACTABLES[it.sceneId].push(it);});
+  MAPS.city_shipyard.roomDef.props.push({t:'counterFront',x:6,y:13,w:4,h:1});
+  fillRect(MAPS.city_shipyard,6,13,9,13,T_BUILDING,true);delete MAPS.city_shipyard._roomCanvas;
+  INTERACTABLES.city.push({id:'industry_yard_guide',kind:'industryGuide',x:485,y:342,stand:[[485,343],[484,342],[486,342]],label:'工业区生产与货运导览'});
+  function freightPath(x0,y0,x1,y1){for(var x=x0;x<=x1;x++)for(var y=y0;y<=y1;y++)if(!MAPS.city.solid[x][y])MAPS.city.t[x][y]=T_PATH;}
+  freightPath(476,338,493,343);freightPath(490,330,493,343);freightPath(476,341,593,343);
+  MAPS.city.decor.push({t:'bench',x:482,y:345});delete saw._roomCanvas;delete warehouse._roomCanvas;
+}
+buildIndustry();
+
 /* ---------- 宫城存档 ---------- */
 /* 一层门厅的安全落点：旧档迁移与「新人第一次进宫」都落在这里。
    (31,44) 在门厅主地毯上，前方两格就是主门，回头能看见主宫中轴。 */
@@ -18177,7 +18894,7 @@ var PALACE_FOYER = { scene: 'palace_f1', x: 31, y: 44 };
 /* discovered 只登记玩家真正走进过的场景。新档也从空开始——
    站在农场的玩家还没去过宫城，导览不该替他记上一笔。 */
 function newPalaceState() {
-  return { layoutVersion: PALACE_LAYOUT_VERSION, discovered: {} };
+  return { layoutVersion: PALACE_LAYOUT_VERSION, discovered: {}, provision: {stage:0,completedDay:-1} };
 }
 /* 旧档没有 palace 字段时返回 layoutVersion:0，让 normalizeSave 知道要跑一次迁移。
    本函数必须幂等：归一化读一次与读两次要得到同一份数据，
@@ -18186,6 +18903,12 @@ function normalizePalace(v) {
   var out = newPalaceState();
   if (!v || typeof v !== 'object') { out.layoutVersion = 0; return out; }
   out.layoutVersion = clamp(Math.floor(isInt(v.layoutVersion) ? v.layoutVersion : 0), 0, PALACE_LAYOUT_VERSION);
+  var p=v.provision;
+  if(p&&typeof p==='object'){
+    out.provision.stage=isInt(p.stage)&&p.stage>=0&&p.stage<=4?p.stage:0;
+    out.provision.completedDay=isInt(p.completedDay)?clamp(p.completedDay,-1,1000000):-1;
+    if(out.provision.stage===4&&out.provision.completedDay<0)out.provision.stage=0;
+  }
   if (v.discovered && typeof v.discovered === 'object') Object.keys(v.discovered).forEach(function (k) {
     if (v.discovered[k] === true) out.discovered[k] = true;
   });
@@ -18608,6 +19331,7 @@ window.__MOSS__ = {
      跨层连通性与存档迁移，不注入任何测试数据。 */
   PALACE_FLOORS: PALACE_FLOORS.map(function (f) { return { id: f.id, label: f.label, sceneId: f.sceneId, order: f.order }; }),
   PALACE_STAIRS: PALACE_STAIRS,
+  palaceRoomDoors: PALACE_ROOM_DOORS,
   palaceFloorOf: function (sceneId) { var f = palaceFloorOf(sceneId); return f ? { id: f.id, label: f.label, order: f.order } : null; },
   palaceStairFrom: function (sceneId) {
     return PALACE_STAIRS.filter(function (s) { return s.sceneId === sceneId; })
@@ -19100,6 +19824,278 @@ toast = function (m) {
   if (m !== last) { arr.push({ t: nowMs(), m: m }); if (arr.length > 60) arr.shift(); }
   _toast(m);
 };
+
+/* 医舍内侧病房与修道院回廊：沿用原病历，不另建患者进度。 */
+function openClinicGuide(){
+  var c=professionalLifeState().clinic;
+  openWindow({id:'clinicguide',kind:'custom',title:'白鸢医舍与修道院 · 导览',build:function(b){
+    b.appendChild(el('p',null,'从小镇西南入口进入医舍地区。西侧诊疗室找梅菈：接待、建病历、签收及配药；诊疗室东门通安静病房。东侧档案室找奥伦核对湿地样本，西门通修道院回廊与药草庭院。'));
+    b.appendChild(el('p',null,'病房北侧为药品储藏，床尾记录台办理照护与隔夜复诊。原诊疗台也可办理同一病历。庭院仅作药草展示与休息，尚不产出可采材料。'));
+    b.appendChild(el('p','req-chip',c.recovered?'病历：已完成复诊。':c.patientDay?'病历：第 '+c.patientDay+' 天起可复诊。':c.diagnosed?'病历已建立；配药后到病房照护。':'先到档案室核验样本，再到诊疗室建立病历。'));
+  },actions:[{label:'返回游戏',close:true}]});
+}
+function openClinicCare(){
+  var c=professionalLifeState().clinic;
+  openWindow({id:'cliniccare',kind:'custom',title:'白鸢医舍 · 病房记录台',build:function(b){
+    b.appendChild(el('p',null,'病房与梅菈诊疗台共用同一病历。药包在诊疗室配制，照护后需过一夜再复诊。'));
+    if(c.medicine>0&&!c.patientDay)extendedWorkButton(b,'clinic_bedside','照护病人并记录复诊 · 草药包 ×1',{need:{medicine:1},minutes:20,energy:2,guard:function(){return c.diagnosed&&c.medicine>0&&!c.patientDay;},reason:'先在诊疗室建立病历并配药。'},function(){c.medicine--;c.patientDay=state.totalDay+1;});
+    if(c.patientDay&&!c.recovered)extendedWorkButton(b,'clinic_bedside','复诊并更新病历 · 10分钟',{minutes:10,guard:function(){return c.patientDay&&state.totalDay>=c.patientDay&&!c.recovered;},reason:'病人需要过一夜后复诊。'},function(){var p=professionalLifeState();c.recovered=true;p.careers.medicine=2;p.trust=Math.min(100,p.trust+1);});
+    b.appendChild(el('p','req-chip',c.recovered?'病历已完成复诊，不再重复发放经历。':c.patientDay?'复诊日：第 '+c.patientDay+' 天。':'等待诊疗室开立病历与草药包。'));
+  },actions:[{label:'查看建筑导览',onClick:openClinicGuide},{label:'返回游戏',close:true}]});
+}
+(function buildClinicRooms(){
+  buildUniversityUpper('clinic_patient','白鸢医舍 · 安静病房', {w:22,h:18,floor:'wood',props:[
+    {t:'bed',x:4,y:5,w:3,h:4},{t:'bed',x:14,y:5,w:3,h:4},
+    {t:'bookshelf',x:3,y:2,w:5,h:2},{t:'mapCabinet',x:13,y:2,w:5,h:2},
+    {t:'desk',x:9,y:12,w:4,h:2},{t:'bench',x:3,y:13,w:4,h:1}
+  ]},{x:1,y:10});
+  MAPS.clinic_patient.roomTheme='home';
+  buildUniversityUpper('clinic_cloister','白鸢修道院 · 回廊药草庭院',{w:24,h:18,floor:'stone',props:[
+    {t:'planter',x:6,y:5,w:4,h:3},{t:'planter',x:14,y:5,w:4,h:3},
+    {t:'bench',x:6,y:11,w:4,h:1},{t:'bench',x:14,y:11,w:4,h:1},
+    {t:'bookshelf',x:3,y:2,w:5,h:2}
+  ]},{x:22,y:10});
+  MAPS.clinic_cloister.roomTheme='stone';
+  ['clinic_patient','clinic_cloister'].forEach(function(id){EXTENDED_REGION_BY_SCENE[id]='clinic';});
+  var ward=MAPS.clinic_ward,archive=MAPS.clinic_archive;
+  installIndoorDoors('clinic_ward',[ward.doors[0],{id:'patient',side:'east',x:17,y:10,to:'clinic_patient',tx:1,ty:10,label:'进入安静病房'}]);
+  installIndoorDoors('clinic_patient',[{id:'main',side:'west',x:0,y:10,to:'clinic_ward',tx:16,ty:10,label:'返回梅菈诊疗室'}]);
+  installIndoorDoors('clinic_archive',[archive.doors[0],{id:'cloister',side:'west',x:0,y:10,to:'clinic_cloister',tx:22,ty:10,label:'进入回廊药草庭院'}]);
+  installIndoorDoors('clinic_cloister',[{id:'main',side:'east',x:23,y:10,to:'clinic_archive',tx:1,ty:10,label:'返回奥伦档案室'}]);
+  PROFESSION_SITES.clinic_bedside={scene:'clinic_patient',x:10,y:14,label:'病房照护与复诊'};
+  INTERACTABLES.clinic_patient.push({kind:'clinicCare',x:10,y:13,stand:[[10,14],[11,14]],label:'病房照护与复诊'});
+  [['clinic',20,17],['clinic_ward',15,10],['clinic_archive',2,10],['clinic_patient',3,10],['clinic_cloister',20,10]].forEach(function(p){
+    INTERACTABLES[p[0]].push({kind:'clinicGuide',x:p[1],y:p[2],stand:[[p[1],p[2]+1]],label:p[0]==='clinic_patient'?'北侧药储 · 床尾复诊':p[0]==='clinic_cloister'?'回廊 · 药草展示':'医舍与修道院导览'});
+  });
+})();
+
+/* 建设总规划收尾：公共机构、住宅样板、宫城历史区共用存档事务。 */
+function newConstructionState(){return {civicStage:0,civicChoice:null,marketStage:0,marketItem:null,marketDay:-1,gardenDay:-1,stoneDay:-1,historyRead:false};}
+function normalizeConstruction(v,day){
+  var n=newConstructionState();if(!v||typeof v!=='object')return n;
+  ['civicStage','marketStage'].forEach(function(k){var max=k==='civicStage'?4:3;n[k]=isInt(v[k])&&v[k]>=0&&v[k]<=max?v[k]:0;});
+  n.civicChoice=['shade','access'].indexOf(v.civicChoice)>=0?v.civicChoice:null;
+  if(n.civicStage>=2&&!n.civicChoice)n.civicStage=1;
+  n.marketItem=['radish','potato'].indexOf(v.marketItem)>=0?v.marketItem:null;
+  if(n.marketStage>0&&!n.marketItem)n.marketStage=0;
+  ['marketDay','gardenDay','stoneDay'].forEach(function(k){n[k]=isInt(v[k])&&v[k]>=1&&v[k]<=day?v[k]:-1;});
+  if(n.marketStage===3&&n.marketDay<1)n.marketStage=0;
+  n.historyRead=v.historyRead===true;return n;
+}
+function constructionState(){return state.construction||(state.construction=newConstructionState());}
+var CONSTRUCTION_ROUTES={
+ civic:'居民议事厅：一层公告登记 → 西南楼梯上二层讨论 → 城市铁匠铺核对工法 → 回一层交木材2、石料2验收。二层档案可查结果。原市政厅税务与金融柜台仍在原址。',
+ market:'城市商会：一层东侧接采购单 → 东货门到交接院交作物 → 从内部楼梯上二层领取回执货款。原路易柜台采购与春日订单保留。',
+ house:'农舍原床、厨房、储物箱位置保留。西墙侧门通整理阁楼，工作桌可打开原储物箱与手册；睡觉仍在原床，次日正常结算。',
+ tailor:'丝带裁缝铺：前店裁剪与订单保留；中后部楼梯通楼上住所，后门通晾晒后院。莉丝白天在原裁剪台，住所为访客参观，不提供住宿。',
+ home:'蔷薇街1号：一层会客、厨房与餐桌，二层卧室书房，西门通花园。访客可参观，私人床和衣柜不提供使用或搜取。',
+ palace:'宫城：主楼一层西门通西翼餐厅与音乐室，翼内楼梯上二层公开资料与职员办公，可回主宫二层；宫苑西侧礼拜堂上下两层，观礼廊东门也接主宫二层。旧堡上层可观景；北面花园可办理每日维护。',
+ industry:'厂区：货仓登记与装卸、锯木厂带锯、铸造炉与冷却区、水磨动力、锅炉燃料、船棚收货各有原柜台。主流程沿货仓—锯木厂—货仓—船棚或下游河港推进。'
+};
+var CONSTRUCTION_SCENES=['city_hall','city_hall_upper','city_market','city_market_upper','city_market_yard','house','farm_attic','city_tailor','city_tailor_upper','city_tailor_yard','city_home1','city_home1_upper','city_home1_garden'];
+CITY_PROPS.piano=function(g,r){var W=r.w*TILE,H=r.h*TILE;pb(g,r,0,0,W,H-5,'#473D37');pb(g,r,2,2,W-4,3,'#A48256');pb(g,r,2,H-16,W-4,11,'#EDE3CA');for(var i=4;i<W-6;i+=7){pb(g,r,i,H-16,1,11,'#685E50');if(i%3)pb(g,r,i+1,H-16,3,6,'#342E2A');}pb(g,r,3,H-5,4,5,'#645039');pb(g,r,W-7,H-5,4,5,'#645039');};
+CITY_PROPS.palaceVoid=function(g,r){pb(g,r,0,0,r.w*TILE,r.h*TILE,'#3C423F');pb(g,r,4,4,r.w*TILE-8,r.h*TILE-8,'#59615C');};
+CITY_FLOORS.courtyard=function(g,m){
+  for(var x=0;x<m.w;x++)for(var y=0;y<m.h;y++){
+    var paved=y>=8&&y<=10||x>=Math.floor(m.w/2)-1&&x<=Math.floor(m.w/2)+1;
+    px(g,x*TILE,y*TILE,TILE,TILE,paved?'#B0A38A':(x+y)%2?'#718653':'#798D59');
+    if(paved)px(g,x*TILE,y*TILE,TILE-1,1,'#C7B99C');else if((x*3+y)%5===0)px(g,x*TILE+4,y*TILE+7,3,2,'#92A76A');
+  }
+};
+function openConstructionGuide(it){
+  var c=constructionState(),topic=it.topic||'palace';
+  openWindow({id:'constructionguide',kind:'custom',wide:true,title:it.label||'建筑导览',build:function(b){
+    b.appendChild(el('p',null,CONSTRUCTION_ROUTES[topic]||CONSTRUCTION_ROUTES.palace));
+    if(topic==='civic')b.appendChild(el('p','req-chip','公共修缮：'+['待登记','待二层讨论','待工坊核对','待一层交材料','已验收，二层留档'][c.civicStage]+(c.civicChoice?'；方案：'+(c.civicChoice==='shade'?'树荫休息':'便于通行'):'')));
+    if(topic==='market')b.appendChild(el('p','req-chip','采购：'+['可接单','待院内交货','已交货，待二层回执','本日已结清'][c.marketStage]+(c.marketItem?'；'+itemName(c.marketItem)+' ×2':'')));
+    if(topic==='palace')b.appendChild(el('p','req-chip','旧堡档案：'+(c.historyRead?'已查阅':'可查阅')+'；花草整理：'+(c.gardenDay===state.totalDay?'今日完成':'今日可办')+'；石材维护：'+(c.stoneDay===state.totalDay?'今日完成':'今日可办')));
+    b.appendChild(el('p','muted','导览只解释已开放空间，不代替步行、不授予职位或额外经营权限。'));
+  },actions:[{label:'返回游戏',close:true}]});
+}
+function constructionButton(b,it,label,opts,apply){
+  b.appendChild(mkBtn(label,'primary',function(){
+    var guard=opts.guard;
+    performAction(Object.assign({},opts,{guard:function(){return state.sceneId===it.sceneId&&standOn(it.stand)&&(!/^(city_|palace_)/.test(it.sceneId)||exploreState().city)&&(!guard||guard());},reason:opts.reason||'请按顺序到对应地点办理，已完成的事务不能重复结算。',apply:apply}));
+  }));
+}
+function openConstructionWork(it){
+  openWindow({id:'constructionwork',kind:'custom',wide:true,title:it.label,build:function(b){
+    var c=constructionState(),work=it.work;
+    if(work==='civic_register'||work==='civic_meeting'||work==='civic_inspect'||work==='civic_archive'||work==='bench'){
+      b.appendChild(el('p',null,CONSTRUCTION_ROUTES.civic));
+      b.appendChild(el('p','req-chip','项目记录：'+['未登记','待讨论','待工法核对','待交材料','公共长椅已验收'][c.civicStage]));
+      if(work==='civic_register'&&c.civicStage===0)constructionButton(b,it,'登记公共长椅修缮 · 5分钟',{minutes:5,guard:function(){return c.civicStage===0;}},function(){c.civicStage=1;});
+      if(work==='civic_register'&&c.civicStage===3)constructionButton(b,it,'交木材2、石料2并验收 · 15分钟',{need:{wood:2,stone:2},minutes:15,energy:2,guard:function(){return c.civicStage===3;}},function(){c.civicStage=4;});
+      if(work==='civic_meeting'&&c.civicStage===1)[['shade','树荫休息'],['access','便于通行']].forEach(function(o){constructionButton(b,it,'讨论并登记：'+o[1]+' · 15分钟',{minutes:15,guard:function(){return c.civicStage===1;}},function(){c.civicChoice=o[0];c.civicStage=2;});});
+      if(work==='civic_inspect'&&c.civicStage===2)constructionButton(b,it,'核对长椅接榫与石座 · 10分钟',{minutes:10,guard:function(){return c.civicStage===2;}},function(){c.civicStage=3;});
+      if(c.civicChoice)b.appendChild(el('p',null,'方案记录：'+(c.civicChoice==='shade'?'树荫休息，保留座面遮阳。':'便于通行，座面不伸入公共通路。')+' 材料用于本项目，不另发货款或政治职位。'));
+    }else if(work==='market_order'||work==='market_delivery'||work==='market_receipt'){
+      b.appendChild(el('p',null,CONSTRUCTION_ROUTES.market));
+      b.appendChild(el('p','req-chip','账目：'+['可接单','待交货','待回执货款','已结清'][c.marketStage]));
+      if(work==='market_order'&&(c.marketStage===0||(c.marketStage===3&&c.marketDay<state.totalDay)))['radish','potato'].forEach(function(id){constructionButton(b,it,'接采购单：'+itemName(id)+' ×2 · 5分钟',{minutes:5,guard:function(){return c.marketStage===0||(c.marketStage===3&&c.marketDay<state.totalDay);}},function(){c.marketStage=1;c.marketItem=id;});});
+      if(c.marketItem)b.appendChild(el('p',null,'货品：'+itemName(c.marketItem)+' ×2；沿用原商会单价，总货款 '+(Math.round(ITEMS[c.marketItem].sell*1.3)*2)+' 金。未交货不扣物品；跨日仍保留当前采购单。'));
+      if(work==='market_delivery'&&c.marketStage===1){var need={};need[c.marketItem]=2;constructionButton(b,it,'交付采购作物 ×2 · 10分钟',{need:need,minutes:10,energy:1,guard:function(){return c.marketStage===1;}},function(){c.marketStage=2;});}
+      if(work==='market_receipt'&&c.marketStage===2)constructionButton(b,it,'核对回执并领取货款 · 5分钟',{minutes:5,guard:function(){return c.marketStage===2;}},function(){state.coins+=Math.round(ITEMS[c.marketItem].sell*1.3)*2;c.marketStage=3;c.marketDay=state.totalDay;});
+    }else if(work==='palace_history'){
+      b.appendChild(el('p',null,'旧堡石基早于主宫。下层保存旧纹章、石砌拱券与修缮索引，上层沿安全栏边观景。白蔷薇主宫后来形成礼仪中轴，东翼承担供货，西翼承担接待与音乐。'));
+      if(!c.historyRead)constructionButton(b,it,'查阅并登记历史索引 · 10分钟',{minutes:10,guard:function(){return !c.historyRead;}},function(){c.historyRead=true;});
+      else b.appendChild(el('p','req-chip','旧堡历史索引已记入回访记录。'));
+    }else if(work==='garden'||work==='stone'){
+      var field=work==='garden'?'gardenDay':'stoneDay';
+      b.appendChild(el('p',null,work==='garden'?'整理花坛与修剪枯枝：20分钟、3体力，不收材料；完成后花园记录今日维护。':'维护花园石座与步道：石料1、15分钟、2体力。保留主要通路，完成后登记当日检查。'));
+      if(c[field]!==state.totalDay)constructionButton(b,it,work==='garden'?'整理花草并登记':'交石料1并维护石座',{need:work==='stone'?{stone:1}:{},minutes:work==='garden'?20:15,energy:work==='garden'?3:2,guard:function(){return c[field]!==state.totalDay;}},function(){c[field]=state.totalDay;});
+      else b.appendChild(el('p','req-chip','今日已经维护，明日可再次回来。'));
+    }else if(work==='attic'){
+      b.appendChild(el('p',null,'阁楼是农舍整理出的工作储藏空间。地面层的床、厨房与储物箱仍在原位；这里的收纳入口使用同一个箱子，不复制库存。'));
+      b.appendChild(mkBtn('打开农舍储物箱','primary',openHouseChest));b.appendChild(mkBtn('查看农场手册','',openHandbook));
+    }else if(work==='music'){
+      b.appendChild(el('p',null,'西翼音乐室供宾客与职员休憩，宴会前的小型排演在这里进行。演奏不扣费用，不发放重复春宴奖励。'));
+      constructionButton(b,it,'聆听排演 · 10分钟',{minutes:10},function(){toast('轻快的弦乐沿西翼长廊传来。');});
+    }
+  },actions:[{label:'查看去向',onClick:function(){openConstructionGuide({topic:it.topic,label:'建筑导览'});}},{label:'返回游戏',close:true}]});
+}
+function constructionPoint(scene,x,y,label,work,topic,stand){
+  INTERACTABLES[scene].push({id:'construction_'+work,kind:'constructionWork',sceneId:scene,x:x,y:y,stand:stand||[[x,y+1]],label:label,work:work,topic:topic});
+}
+function constructionSign(scene,x,y,label,topic,stand){INTERACTABLES[scene].push({kind:'constructionGuide',x:x,y:y,label:label,topic:topic,stand:stand||[[x,y+1]]});}
+function constructionStairs(lower,upper,x,y,w,h){
+  var a=MAPS[lower],b=MAPS[upper];
+  var art={t:'palaceWorkingSteps',x:x,y:y,w:w,h:h,flat:true};
+  if(a.roomDef)a.roomDef.props.push(Object.assign({},art));
+  else INTERACTABLES[lower].push({kind:'interiorProp',x:x,y:y,label:'阁楼楼梯',stand:[[x,y+h]],note:'整理阁楼由侧门进入。'});
+  b.roomDef.props.push(Object.assign({},art));
+  [{sceneId:lower,to:upper,dir:'up',x:x+1,y:y+h,stand:[[x+1,y+h]],tx:x+1,ty:y+h+1,label:'↑ '+b.name},
+   {sceneId:upper,to:lower,dir:'down',x:x+1,y:y-1,stand:[[x+1,y-1]],tx:x+1,ty:y-1,label:'↓ '+a.name}].forEach(function(it){it.kind='universityStair';INTERACTABLES[it.sceneId].push(it);});
+  delete a._roomCanvas;delete b._roomCanvas;
+}
+function constructionRoom(id,name,w,h,props,theme){buildUniversityUpper(id,name,{w:w,h:h,floor:theme==='castle'?'tile':'wood',props:props},{x:1,y:1});MAPS[id].roomTheme=theme||'home';}
+function constructionSideDoor(scene,id,side,pos,target,tx,ty,label){
+  var m=MAPS[scene],x=side==='west'?0:side==='east'?m.w-1:pos,y=side==='north'?0:side==='south'?m.h-1:pos;
+  installIndoorDoors(scene,(m.doors||[]).concat([{id:id,side:side,x:x,y:y,to:target,tx:tx,ty:ty,label:label}]));
+}
+(function buildCivicAndHomes(){
+  constructionRoom('city_hall_upper','居民议事厅 · 会议与档案',22,18,[
+    {t:'longTable',x:7,y:5,w:9,h:3},{t:'chair',x:8,y:9,w:2,h:2},{t:'chair',x:13,y:9,w:2,h:2},
+    {t:'archiveShelf',x:16,y:2,w:4,h:2},{t:'desk',x:15,y:13,w:4,h:2}
+  ]);
+  constructionStairs('city_hall','city_hall_upper',1,10,3,3);
+  constructionPoint('city_hall',17,6,'公共修缮登记','civic_register','civic',[[17,7]]);
+  MAPS.city_hall.roomDef.props.push({t:'bench',x:17,y:13,w:3,h:1});fillRect(MAPS.city_hall,17,13,19,13,T_BUILDING,true);
+  constructionPoint('city_hall',18,13,'公共长椅 · 修缮结果','bench','civic',[[18,14]]);
+  INTERACTABLES.city_hall.forEach(function(it){if(it.kind==='cityService'&&it.service==='hall')it.stand=[[7,10],[16,8],[16,6]];});
+  constructionPoint('city_hall_upper',11,7,'公共项目讨论桌','civic_meeting','civic',[[11,8]]);
+  constructionPoint('city_hall_upper',17,14,'项目档案与验收记录','civic_archive','civic',[[17,15]]);
+  constructionPoint('city_smith',18,14,'长椅修缮工法核对','civic_inspect','civic',[[18,15]]);
+  constructionSign('city_hall',4,12,'议事厅 · 登记与上楼','civic',[[4,13]]);
+  constructionRoom('city_market_upper','城市商会 · 商议与回执',30,20,[
+    {t:'archiveShelf',x:3,y:2,w:4,h:5},{t:'longTable',x:17,y:4,w:9,h:3},
+    {t:'desk',x:18,y:12,w:7,h:2},{t:'sofa',x:3,y:13,w:5,h:2}
+  ]);
+  constructionStairs('city_market','city_market_upper',10,5,3,5);
+  constructionRoom('city_market_yard','城市商会 · 货物交接院',22,18,[{t:'crates',x:3,y:3,w:5,h:3},{t:'counterFront',x:11,y:8,w:6,h:1},{t:'bench',x:3,y:12,w:5,h:1}]);
+  constructionSideDoor('city_market','yard','east',14,'city_market_yard',1,10,'前往货物交接院');
+  installIndoorDoors('city_market_yard',[{id:'main',side:'west',x:0,y:10,to:'city_market',tx:28,ty:14,label:'返回商会接待层'}]);
+  constructionPoint('city_market',20,6,'小额农产采购单','market_order','market',[[20,7]]);
+  constructionPoint('city_market_yard',14,8,'采购货物交接台','market_delivery','market',[[14,9]]);
+  constructionPoint('city_market_upper',21,13,'商会回执与货款','market_receipt','market',[[21,14]]);
+  constructionSign('city_market',19,14,'商会 · 上楼与交接院','market',[[19,15]]);
+  constructionRoom('farm_attic','农舍 · 整理阁楼',20,16,[{t:'desk',x:8,y:5,w:5,h:2},{t:'genericShelf',x:3,y:2,w:3,h:5},{t:'chest',x:15,y:4,w:3,h:2},{t:'bench',x:5,y:11,w:5,h:1}]);
+  constructionSideDoor('house','attic','west',7,'farm_attic',1,10,'进入整理阁楼');
+  installIndoorDoors('farm_attic',[{id:'main',side:'west',x:0,y:10,to:'house',tx:1,ty:7,label:'下楼返回农舍生活层'}]);
+  constructionPoint('farm_attic',10,6,'农舍工作与收纳桌','attic','house',[[10,7]]);
+  constructionSign('house',3,7,'农舍 · 阁楼与生活设施','house',[[3,8]]);
+  INTERACTABLES.house[INTERACTABLES.house.length-1].art={x:1,y:6,w:2,h:2};
+  constructionRoom('city_tailor_upper','丝带裁缝铺 · 楼上住所',24,18,[{t:'bed',x:3,y:3,w:4,h:4},{t:'kitchen',x:16,y:3,w:5,h:3},{t:'table',x:15,y:11,w:5,h:2},{t:'wardrobe',x:3,y:10,w:3,h:3}]);
+  constructionStairs('city_tailor','city_tailor_upper',10,9,3,5);
+  constructionRoom('city_tailor_yard','丝带裁缝铺 · 晾晒后院',20,16,[{t:'fabricRolls',x:3,y:3,w:5,h:3},{t:'bench',x:4,y:10,w:5,h:1},{t:'planter',x:13,y:3,w:4,h:3}]);
+  constructionSideDoor('city_tailor','yard','east',15,'city_tailor_yard',1,8,'前往裁缝铺后院');
+  installIndoorDoors('city_tailor_yard',[{id:'main',side:'west',x:0,y:8,to:'city_tailor',tx:22,ty:15,label:'返回裁缝铺前店'}]);
+  constructionSign('city_tailor',15,14,'裁缝铺 · 前店后院与住所','tailor',[[15,15]]);
+  constructionSign('city_tailor_upper',15,12,'莉丝的起居与厨房','tailor',[[15,13]]);
+  constructionRoom('city_home1_upper','蔷薇街1号 · 卧室书房',16,15,[{t:'bed',x:2,y:2,w:4,h:4},{t:'desk',x:10,y:9,w:4,h:2},{t:'bookshelf',x:11,y:2,w:3,h:4}]);
+  constructionStairs('city_home1','city_home1_upper',7,2,3,4);
+  constructionRoom('city_home1_garden','蔷薇街1号 · 花园厨房',22,18,[{t:'kitchen',x:3,y:2,w:5,h:3},{t:'table',x:3,y:10,w:5,h:2},{t:'planter',x:12,y:3,w:5,h:4},{t:'bench',x:13,y:12,w:5,h:1}]);
+  constructionSideDoor('city_home1','garden','west',6,'city_home1_garden',20,8,'前往花园厨房');
+  installIndoorDoors('city_home1_garden',[{id:'main',side:'east',x:21,y:8,to:'city_home1',tx:1,ty:6,label:'返回住宅会客层'}]);
+  constructionSign('city_home1',11,9,'住宅 · 会客与花园','home',[[11,10]]);
+  constructionSign('city_home1_upper',8,11,'卧室书房 · 访客参观','home',[[8,12]]);
+  constructionSign('city_home1_garden',10,13,'家庭厨房与花园休憩','home',[[10,14]]);
+  MAPS.city_home1_garden.roomDef.floor='courtyard';MAPS.city_tailor_yard.roomDef.floor='courtyard';MAPS.city_market_yard.roomDef.floor='stone';
+  extendedAddResident('construction_hall_clerk','榆安','居民事务记录员','city_hall',18,8,'scholar',['#687A71','#D9CFB2','#99735F'],['一层登记公共修缮，二层讨论并查档。工法到原铁匠铺核对，材料回这里交。','长椅验收是公共维护，不会因此授予职位。']);
+  extendedAddResident('construction_home_resident','艾榛','蔷薇街1号住户','city_home1',12,6,'gardener',['#8A7255','#78956B','#D6C6A5'],['前厅可以坐坐，西门是花园厨房。楼上书房可参观，床与衣柜请留给住户使用。','我在前厅接待来客，家人使用后院厨房与楼上房间；进出不要堵住门。']);
+  MAPS.city.buildings.forEach(function(b){if(['hall','market','tailor','home1'].indexOf(b.id)>=0)b.storeys=2;});
+  SCENE_TO_NODE.farm_attic='farm.home';
+})();
+
+(function buildPalaceHistory(){
+  constructionRoom('palace_west_wing','白蔷薇宫城 · 西翼餐厅与音乐室',38,26,[
+    {t:'longTable',x:4,y:4,w:10,h:3},{t:'kitchen',x:3,y:17,w:7,h:3},
+    {t:'sofa',x:22,y:5,w:7,h:2},{t:'piano',x:25,y:11,w:6,h:3},{t:'desk',x:23,y:19,w:6,h:2},
+    {t:'partition',x:18,y:1,w:1,h:8},{t:'partition',x:18,y:12,w:1,h:6},{t:'partition',x:18,y:21,w:1,h:4},
+    {t:'palaceRoomDoor',x:18,y:9,w:1,h:3,side:'east',label:'音乐与接待',flat:true},
+    {t:'palaceRoomDoor',x:18,y:18,w:1,h:3,side:'west',label:'职员餐厅',flat:true}
+  ],'castle');
+  constructionSideDoor('palace_f1','west','west',19,'palace_west_wing',36,19,'进入西翼餐厅与音乐室');
+  installIndoorDoors('palace_west_wing',[
+    {id:'main',side:'east',x:37,y:19,to:'palace_f1',tx:1,ty:19,label:'返回主楼一层'},
+    {id:'yard',side:'south',x:17,y:25,to:'palace_grounds',tx:20,ty:28,label:'前往宫苑西翼门前'}
+  ]);
+  constructionRoom('palace_west_upper','白蔷薇宫城 · 西翼二层资料与办公',38,26,[
+    {t:'archiveShelf',x:11,y:2,w:6,h:4},{t:'readingTable',x:10,y:9,w:8,h:3},
+    {t:'sofa',x:24,y:4,w:7,h:2},{t:'desk',x:24,y:18,w:7,h:2},
+    {t:'bookshelf',x:31,y:8,w:4,h:5},{t:'bench',x:11,y:19,w:6,h:1}
+  ],'castle');
+  constructionStairs('palace_west_wing','palace_west_upper',4,9,4,5);
+  constructionSideDoor('city_castle','west_upper','west',29,'palace_west_upper',36,19,'进入西翼二层资料与办公');
+  installIndoorDoors('palace_west_upper',[{id:'main',side:'east',x:37,y:19,to:'city_castle',tx:1,ty:29,label:'返回主宫二层礼仪层'}]);
+  INTERACTABLES.palace_west_upper.push({kind:'interiorProp',x:14,y:11,stand:[[14,12]],label:'西翼公开资料与值班索引',note:'接待索引记录东翼供餐、西翼排演、礼拜堂观礼与旧堡公开展陈的分工。东翼承接春宴物资，西翼职员只登记公开访问与排演。',note2:'原春宴奖励在管家事务中结算；这里查阅资料不发放第二份奖励。'});
+  constructionSign('palace_west_upper',20,20,'西翼二层 · 内梯与主宫','palace',[[20,21]]);
+  constructionRoom('palace_chapel','白蔷薇宫城 · 礼拜堂下厅',32,24,[
+    {t:'statue',x:13,y:2,w:5,h:4},{t:'bench',x:5,y:9,w:5,h:1},{t:'bench',x:15,y:9,w:5,h:1},
+    {t:'bench',x:5,y:14,w:5,h:1},{t:'bench',x:15,y:14,w:5,h:1},{t:'archiveShelf',x:3,y:2,w:4,h:3}
+  ],'castle');
+  constructionRoom('palace_chapel_upper','白蔷薇宫城 · 礼拜堂观礼廊',32,24,[
+    {t:'partition',x:8,y:6,w:1,h:10},{t:'partition',x:9,y:6,w:12,h:1},{t:'partition',x:20,y:7,w:1,h:9},
+    {t:'bench',x:3,y:18,w:6,h:1},{t:'bookshelf',x:3,y:2,w:4,h:3}
+  ],'castle');
+  // 中部临空区封闭；参观者沿栏外回廊行走，不会穿越上层中庭。
+  fillRect(MAPS.palace_chapel_upper,9,7,19,15,T_BUILDING,true);
+  MAPS.palace_chapel_upper.roomDef.props.push({t:'palaceVoid',x:9,y:7,w:11,h:8,flat:true},{t:'partition',x:9,y:15,w:11,h:1});
+  constructionStairs('palace_chapel','palace_chapel_upper',24,12,4,6);
+  installIndoorDoors('palace_chapel',[{id:'main',side:'south',x:15,y:23,width:2,to:'palace_grounds',tx:20,ty:71,label:'返回礼拜堂门前'}]);
+  constructionSideDoor('city_castle','chapel','west',19,'palace_chapel_upper',30,19,'进入礼拜堂观礼廊');
+  installIndoorDoors('palace_chapel_upper',[{id:'main',side:'east',x:31,y:19,to:'city_castle',tx:1,ty:19,label:'返回主宫二层礼仪层'}]);
+  constructionRoom('palace_keep','白蔷薇旧堡 · 石基与纹章展厅',28,22,[
+    {t:'statue',x:3,y:3,w:4,h:4},{t:'mapCabinet',x:10,y:3,w:6,h:3},
+    {t:'archiveShelf',x:3,y:11,w:5,h:4},{t:'desk',x:10,y:12,w:6,h:2}
+  ],'castle');
+  constructionRoom('palace_keep_upper','白蔷薇旧堡 · 安全观景层',28,22,[
+    {t:'partition',x:2,y:2,w:24,h:1},{t:'bench',x:4,y:7,w:6,h:1},{t:'mapCabinet',x:4,y:13,w:6,h:3}
+  ],'castle');
+  constructionStairs('palace_keep','palace_keep_upper',20,11,4,6);
+  installIndoorDoors('palace_keep',[{id:'main',side:'south',x:13,y:21,width:2,to:'palace_grounds',tx:20,ty:55,label:'返回旧堡门前'}]);
+  var grounds=MAPS.palace_grounds;
+  grounds.buildings.push({id:'palace_west',label:'白蔷薇宫城 · 西翼',x:4,y:8,w:30,h:19,kind:'palace',storeys:2,visualHeight:150,door:{x:20,y:26}});
+  fillRect(grounds,4,8,33,26,T_GRASS,true);fillRect(grounds,20,26,20,28,T_PATH,false);
+  fillRect(grounds,20,28,35,30,T_PATH,false);fillRect(grounds,33,28,35,52,T_PATH,false);
+  ['palace_keep_site','palace_chapel_site'].forEach(function(id){var it=INTERACTABLES.palace_grounds.find(function(i){return i.id===id;});it.kind='indoorEntrance';it.to=id==='palace_keep_site'?'palace_keep':'palace_chapel';it.doorId='main';it.label=id==='palace_keep_site'?'进入旧堡石基展厅':'进入礼拜堂下厅';delete it.note;fillRect(grounds,it.x,it.y,it.x,it.y+1,T_PATH,false);});
+  INTERACTABLES.palace_grounds.push({id:'palace_west_door',kind:'indoorEntrance',to:'palace_west_wing',doorId:'yard',x:20,y:26,stand:[[20,27],[20,28]],label:'进入西翼餐厅与音乐室'});
+  constructionPoint('palace_west_wing',27,13,'西翼音乐室 · 小型排演','music','palace',[[27,14]]);
+  INTERACTABLES.palace_west_wing.push({kind:'kitchen',x:6,y:19,stand:[[6,20]],label:'职员餐厅厨房'});
+  constructionPoint('palace_keep',13,13,'旧堡历史与修缮索引','palace_history','palace',[[13,14]]);
+  constructionSign('palace_keep_upper',8,14,'旧堡观景 · 内庭与城市','palace',[[8,16]]);
+  constructionSign('palace_chapel',18,17,'礼拜堂 · 下厅与观礼廊','palace',[[18,18]]);
+  constructionSign('palace_chapel_upper',5,17,'观礼廊 · 内梯与主宫二层','palace',[[5,19]]);
+  constructionSign('palace_west_wing',20,22,'西翼 · 餐厅音乐与主楼','palace',[[20,23]]);
+  constructionPoint('palace_grounds',52,18,'花园花草维护记录','garden','palace',[[52,19]]);
+  constructionPoint('palace_grounds',68,18,'花园石座与步道维护','stone','palace',[[68,19]]);
+  constructionSign('palace_grounds',34,56,'西翼 · 旧堡 · 礼拜堂','palace',[[34,57]]);
+  extendedAddResident('construction_west_musician','伊弦','宫城排演乐师','palace_west_wing',24,15,'scholar',['#735D72','#CBB49A','#536B75'],['排演在西翼，不占用礼仪大厅。餐厅在隔墙另一侧，东翼厨房仍负责正式供货。','从东门回主楼一层，也可以走南门到宫苑。']);
+  extendedAddResident('construction_palace_gardener','苔林','宫苑园丁','palace_grounds',54,20,'gardener',['#70845D','#C6B68D','#725742'],['花草整理与石座检查分别登记，每天只记一次。维护牌就在北花园两侧。','旧堡与礼拜堂已经开放，西翼门前的支路通向北花园。']);
+  var terrace=INTERACTABLES.palace_terrace.find(function(it){return it.id==='terrace_view';});
+  if(terrace)terrace.note2='北花园已开放花草与石座维护。从主宫门外沿西侧支路绕到北花园，在两侧维护牌办理。';
+  ['palace_grounds','palace_f1','palace_f3','palace_gallery','palace_terrace','palace_east_wing','palace_east_upper','palace_basement','palace_west_wing','palace_west_upper','palace_chapel','palace_chapel_upper','palace_keep','palace_keep_upper'].forEach(function(id){SCENE_TO_NODE[id]='castle.palace';});
+})();
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
 else boot();

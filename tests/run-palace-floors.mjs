@@ -61,7 +61,7 @@ function findIt(p, scene, spec) {
     const list = window.__MOSS__.INTERACTABLES[scene] || [];
     const hit = list.filter(o => (!spec.kind || o.kind === spec.kind) &&
       (!spec.kindIn || spec.kindIn.indexOf(o.kind) >= 0) &&
-      (!spec.to || o.to === spec.to) && (!spec.service || o.service === spec.service))[0];
+      (!spec.to || o.to === spec.to) && (!spec.doorId || o.doorId === spec.doorId) && (!spec.service || o.service === spec.service))[0];
     if (!hit) return null;
     return {
       id: hit.id, kind: hit.kind, to: hit.to || null, doorId: hit.doorId || null,
@@ -272,7 +272,7 @@ async function runSuite(url, tag, tagShort) {
 
     await runLeg(p, {
       from: 'palace_f3', to: 'palace_terrace',
-      find: { kind: 'indoorEntrance', to: 'palace_terrace' }, tolerant: true, expectKind: 'indoorEntrance'
+      find: { kind: 'indoorExit', doorId: 'terrace' }, tolerant: false, expectKind: 'indoorExit'
     }, tagShort);
     await shot(p, 'palace_terrace', 'terrace');
     await leaveRoom(p, 'palace_terrace', 'palace_f3', tagShort + ' 露台回来');

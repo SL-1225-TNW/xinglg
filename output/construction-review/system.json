@@ -1,0 +1,42 @@
+[
+  {
+    "file": "run-indoor-doors.mjs",
+    "exit": 0,
+    "seconds": 13
+  },
+  {
+    "file": "run-save-invariants.mjs",
+    "exit": 0,
+    "seconds": 1
+  },
+  {
+    "file": "run-world-map.mjs",
+    "exit": 0,
+    "seconds": 2
+  },
+  {
+    "file": "run-fast-travel.mjs",
+    "exit": 0,
+    "seconds": 3
+  },
+  {
+    "file": "run-responsive-layout.mjs",
+    "exit": 0,
+    "seconds": 17
+  },
+  {
+    "file": "run-r2-personal.mjs",
+    "exit": 0,
+    "seconds": 27
+  },
+  {
+    "file": "run-r2-mobile.mjs",
+    "exit": 0,
+    "seconds": 8
+  },
+  {
+    "file": "run-single-file-smoke.mjs",
+    "exit": 0,
+    "seconds": 1
+  }
+]

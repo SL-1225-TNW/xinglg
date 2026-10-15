@@ -1,0 +1,32 @@
+[
+  {
+    "file": "run-university.mjs",
+    "exit": 0,
+    "seconds": 195
+  },
+  {
+    "file": "run-south-gate.mjs",
+    "exit": 0,
+    "seconds": 130
+  },
+  {
+    "file": "run-industry.mjs",
+    "exit": 0,
+    "seconds": 83
+  },
+  {
+    "file": "run-clinic-construction.mjs",
+    "exit": 0,
+    "seconds": 21
+  },
+  {
+    "file": "run-city-services.mjs",
+    "exit": 0,
+    "seconds": 13
+  },
+  {
+    "file": "run-phase-d-review.mjs",
+    "exit": 0,
+    "seconds": 56
+  }
+]
