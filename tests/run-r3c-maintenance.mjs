@@ -36,6 +36,8 @@ try {
 
   await interactWith(p, 8, 6);
   check('验收日不要求马上做养护', await btnCount(p, '闸门养护检查'), 0);
+  await closeWin(p);
+  await v(() => __MOSS__.openEngineeringProjectLog());
   check('验收日 N 记录显示下次周期', (await p.locator('.win').innerText()).includes('下次从第 ' + (accepted.day + 3) + ' 天起到期'), true);
   await closeWin(p);
 
