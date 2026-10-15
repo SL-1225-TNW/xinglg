@@ -16,9 +16,41 @@ try {
   await boot(p);
   const v = fn => p.evaluate(fn);
 
-  /* 夹具只把玩家带到已有方案；风险读数和预防选择仍走正式状态与界面。 */
+  /* 稳定晴天的新勘测可走预防评审路线，不必先选择事故应急。 */
   await v(() => {
     const M = __MOSS__;
+    M.grantWaterworksCertificate();
+    M.state.professionalLife.eng.stage = 1;
+    M.state.professionalLife.eng.incident = '';
+    M.state.professionalLife.eng.choice = '';
+    M.state.weather.today = 'sun';
+    M.devSwitchScene('waterworks_control', 8, 6);
+  });
+  await interactWith(p, 8, 6);
+  check('低风险时出现主动预防晋升选项', await btnCount(p, '提交预防方案并晋升'), 1);
+  await clickWin(p, '提交预防方案并晋升');
+  let prevention = await v(() => ({
+    stage: __MOSS__.state.professionalLife.eng.stage,
+    incident: __MOSS__.state.professionalLife.eng.incident,
+    emergency: __MOSS__.engProjectInfo().emergency,
+    day: __MOSS__.engProjectInfo().preventionDay,
+    trust: __MOSS__.state.professionalLife.trust
+  }));
+  check('预防路线晋升且没有事故应急结算', [
+    prevention.stage, prevention.incident, prevention.emergency,
+    prevention.day, prevention.trust
+  ], [2, 'prevention', '', 1, 1]);
+  const savedCareer = await v(() => {
+    const p = __MOSS__.normalizeProfessionalLife(__MOSS__.state.professionalLife);
+    return [p.eng.stage, p.eng.incident, p.eng.choice, p.projects.riverbay_gate.preventionDay];
+  });
+  check('读档规范化保留预防晋升', savedCareer, [2, 'prevention', 'prevention', 1]);
+  await closeWin(p);
+
+  /* 接下来夹具只把玩家带到已有方案；风险读数和预防选择仍走正式状态与界面。 */
+  await v(() => {
+    const M = __MOSS__;
+    M.resetCareerForTest();
     M.engFixtureToScheme('balanced');
     M.state.weather.today = 'sun';
   });

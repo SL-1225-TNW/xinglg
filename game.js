@@ -10037,13 +10037,13 @@ function openEngineeringChapter(b, ww) {
     });
   }
   if (e.stage === 1 && !e.incident) {
-    box.appendChild(el('p', 'req-chip', '旧闸门在一次夜雨中崩了销，下游同时淹了麦田和断航 —— 这就是这项改造的由来。接下来要处理事故。'));
+    box.appendChild(el('p', 'req-chip', '依据已保存的勘测选择路线：低风险且无降雨时可提交预防评审；否则先处理应急事项。'));
   }
   if (e.stage >= 2 && !e.post) {
     extendedWorkButton(b, 'water', '接受正式工程岗位 · 60分钟', { minutes: 60, energy: 3, guard: function () { return e.stage >= 2 && !e.post; } }, function () {
       e.post = 'waterworks_engineer';
       e.stage = 4;
-      rememberChoice('noya', '事故后接下工程岗位');
+      rememberChoice('noya', e.choice === 'prevention' ? '以预防路线接下工程岗位' : '事故后接下工程岗位');
     });
   }
   /* 机构预算：一次拨付，进项目账，不进个人钱包，也不因为读档再发一次 */
@@ -10245,6 +10245,7 @@ function engRiskControlPanel(b, pj) {
     }, function () {
       var q = engProject();
       q.reinforced = true; q.reviewDay = state.totalDay;
+      engRecordPrevention(q);
     });
   }
   b.appendChild(box);
@@ -10367,18 +10368,34 @@ function p_trustUp(n) {
 /* 事故处置：两个选项各自改变真实的系统状态，不是换个说法。
    处置写入项目记录的 emergency 字段 —— 那是验收前的应急口径，
    工程验收后会被正式方案取代，所以两边不会互相覆盖。 */
+/* R3-C1：保留应急处置，同时允许低风险、晴天路线用预防评审晋升。 */
 function openIncidentChoice(b) {
-  var e = engCareer();
+  var e = engCareer(), pj = engProject();
   var box = el('div', 'panel-box');
-  box.appendChild(el('div', 'section-title', '事故 · 夜雨冲垮闸门销'));
-  box.appendChild(el('p', null, '水从缺口直冲下游，麦田刚返青，船闸也断了航。村民要你先保一样。'));
-  box.appendChild(el('p', 'muted', '你的处理会被三方记住：诺娅看工程，马丁看磨坊额度，柯里看村里怎么评这次取舍。这只是应急口径，河湾工程验收后由正式方案接替。'));
-  extendedWorkButton(b, 'water', '先堵缺口保麦田 · 记牺牲通航', { minutes: 120, energy: 4, guard: function () { return e.stage === 1 && !e.incident; } }, function () {
+  box.appendChild(el('div', 'section-title', '河湾风险处置'));
+  box.appendChild(el('p', null, '根据已保存的勘测读数选择应对方式。低风险且无降雨时，可以提交预防评审并接手工程；也可以选择先保障农田或航道的应急路线。'));
+  if (engCanPreventRoute(pj)) {
+    box.appendChild(el('p', 'req-chip ok', '风险预警线以下，勘测记录未过期；可在事故应急路线之外提交预防方案。'));
+    extendedWorkButton(box, 'water', '提交预防方案并晋升 · 30分钟', {
+      minutes: 30, energy: 1,
+      guard: function () { return e.stage === 1 && !e.incident && engCanPreventRoute(engProject()); },
+      reason: '需要近期勘测、低风险读数和无降雨条件。'
+    }, function () {
+      e.incident = 'prevention'; e.choice = 'prevention'; e.stage = 2;
+      pj.reviewDay = state.totalDay;
+      engRecordPrevention(pj);
+      rememberChoice('martin', '工程师按预防评审接手河湾项目');
+    });
+  } else {
+    box.appendChild(el('p', 'muted', '当前条件不满足低风险预防晋升；先按应急路线处置，后续仍可在正式工程中复核或加固。'));
+  }
+  box.appendChild(el('p', 'muted', '应急选择会改变临时供水或货运口径；工程验收后再由正式方案接替。'));
+  extendedWorkButton(box, 'water', '先堵缺口保麦田 · 记牺牲通航', { minutes: 120, energy: 4, guard: function () { return e.stage === 1 && !e.incident; } }, function () {
     e.incident = 'field'; e.choice = 'field'; e.stage = 2;
     rememberChoice('noya', '事故中先保农田'); rememberChoice('martin', '事故中先保农田');
     applyEngChoice();
   });
-  extendedWorkButton(b, 'water', '先泄水保船闸 · 记麦田延灌', { minutes: 120, energy: 4, guard: function () { return e.stage === 1 && !e.incident; } }, function () {
+  extendedWorkButton(box, 'water', '先泄水保船闸 · 记麦田延灌', { minutes: 120, energy: 4, guard: function () { return e.stage === 1 && !e.incident; } }, function () {
     e.incident = 'channel'; e.choice = 'channel'; e.stage = 2;
     rememberChoice('noya', '事故中先保通航'); rememberChoice('martin', '事故中先保通航');
     applyEngChoice();
@@ -10441,7 +10458,7 @@ function newEngProject() {
     build: 0, buildDay: 0, mode: '',
     crew: { day: 0, paid: 0 },
     trialDay: 0, maintDay: 0, maintCount: 0,
-    reviewDay: 0, holdDay: 0, reinforced: false,
+    reviewDay: 0, holdDay: 0, reinforced: false, preventionDay: 0,
     funds: { granted: 0, spent: 0, donated: 0, tx: {} }
   };
 }
@@ -10508,7 +10525,7 @@ function normalizeEngProject(raw, legacy) {
   d.trialDay = num(r.trialDay, 100000);
   d.maintDay = num(r.maintDay, 100000); d.maintCount = num(r.maintCount, 100);
   d.reviewDay = num(r.reviewDay, 100000); d.holdDay = num(r.holdDay, 100000);
-  d.reinforced = !!r.reinforced;
+  d.reinforced = !!r.reinforced; d.preventionDay = num(r.preventionDay, 100000);
   var f = r.funds || {}, tx = {};
   if (f.tx && typeof f.tx === 'object') Object.keys(f.tx).forEach(function (k) {
     var t = f.tx[k];
@@ -10582,6 +10599,7 @@ function openEngineeringProjectLog() {
       var warning = engWarning(pj);
       if (warning) b.appendChild(el('p', 'req-chip', '风险预警 ' + warning.level + '/5 · ' + warning.reasons.join('、') + '。可到闸基现场复核、暂停施工或加固坡体。'));
       else if (pj.reinforced) b.appendChild(el('p', 'req-chip ok', '坡体已加固；当前工程风险低于预警线。'));
+      if (pj.preventionDay) b.appendChild(el('p', 'req-chip ok', '预防评审已通过：第 ' + pj.preventionDay + ' 天记入工程评价与信任。'));
       if (engWorkOnHold(pj)) b.appendChild(el('p', 'req-chip', '施工已暂停到明天，已完成工序保留。'));
       b.appendChild(el('p', 'muted', '联系人：诺娅（水利站）· 马丁（风铃磨坊）· 柯里（议事屋）。材料来源：石灰采场采掘 → 测量石料棚切割 → 下游河港装运 → 水利站凭核验运单签收。'));
       var cert = el('div', 'panel-box');
@@ -10694,10 +10712,26 @@ function engWarning(pj) {
   return score >= 3 ? { level: score, reasons: reasons } : null;
 }
 function engWorkOnHold(pj) { return pj.holdDay === state.totalDay; }
+function engCanPreventRoute(pj) {
+  var observedDay = Math.max(pj.survey.day || 0, pj.reviewDay || 0);
+  return engSurveyDone(pj) && engRisk(pj) <= 2 &&
+    !(state.weather && state.weather.today === 'rain') &&
+    observedDay > 0 && state.totalDay - observedDay < 3;
+}
+function engRecordPrevention(pj) {
+  if (pj.preventionDay || engWarning(pj)) return false;
+  pj.preventionDay = state.totalDay;
+  var p = professionalLifeState();
+  p.trust = Math.min(100, (p.trust || 0) + 1);
+  bumpCareer('engineering');
+  rememberChoice('noya', '以勘测与预防措施控制河湾工程风险');
+  return true;
+}
 function engReviewRisk() {
   var pj = engProject();
   if (!engWarning(pj) || pj.reviewDay === state.totalDay) return false;
   pj.reviewDay = state.totalDay;
+  engRecordPrevention(pj);
   return true;
 }
 function engSurveyDone(pj) { return pj.survey.level > 0 && !!pj.survey.east && !!pj.survey.silt; }
@@ -10727,7 +10761,7 @@ function engNextStepText() {
     return engPracticeRoute() ? '水利控制室领取基础工程认证' : '先去验收' + (mineWorks().inspected ? '矿山排水' : '风铃磨坊水轮') + '，或换另一条实践路线';
   }
   if (e.stage === 0) return '水利控制室签署第一份独立工程报告';
-  if (!e.incident) return '处理夜雨冲垮旧闸门销的事故';
+  if (!e.incident) return '复核勘测风险，提交预防评审或选择应急处置';
   if (!e.post) return '水利控制室接受正式工程岗位';
   if (!e.budgetGranted) return '申请本项目一次性机构拨付 ' + ENG_GRANT_MAX + ' 金';
   if (!pj.scheme) {
@@ -16657,8 +16691,8 @@ function normalizeProfessionalLife(raw){var d=newProfessionalLife(),r=raw&&typeo
   if(d.routes.engineering>=4||d.routes.trade>=4||d.routes.patrol>=4)d.passes.commission=true;
   /* 工程师章节：阶段、事故、岗位与人物记忆都随存档保存 */
   var eg=legacyEng, pj=d.projects[ENG_PROJECT_ID];
-  d.eng={stage:(Number.isFinite(eg.stage)?Math.max(0,Math.min(4,Math.floor(eg.stage))):0),post:String(eg.post||''),incident:['field','channel'].indexOf(eg.incident)>=0?eg.incident:'',
-    hearing:pj.scheme?ENG_SCHEMES[pj.scheme].alloc:'',choice:['field','channel'].indexOf(eg.choice)>=0?eg.choice:'',
+  d.eng={stage:(Number.isFinite(eg.stage)?Math.max(0,Math.min(4,Math.floor(eg.stage))):0),post:String(eg.post||''),incident:['field','channel','prevention'].indexOf(eg.incident)>=0?eg.incident:'',
+    hearing:pj.scheme?ENG_SCHEMES[pj.scheme].alloc:'',choice:['field','channel','prevention'].indexOf(eg.choice)>=0?eg.choice:'',
     budget:pj.funds.granted,budgetGranted:!!eg.budgetGranted||pj.funds.granted>0,
     memories:(eg.memories&&typeof eg.memories==='object')?JSON.parse(JSON.stringify(eg.memories)):{}};
   /* 自洽：没基础工程认证就不可能越过见习；没处置事故不可能有岗位；没岗位不可能主持说明会 */
@@ -19612,7 +19646,7 @@ window.__MOSS__ = {
       stone: pj.stone, kit: pj.kit, build: pj.build, mode: pj.mode, crew: pj.crew,
       trialDay: pj.trialDay, maintDay: pj.maintDay, maintCount: pj.maintCount,
       reviewDay: pj.reviewDay, holdDay: pj.holdDay, reinforced: pj.reinforced,
-      warning: engWarning(pj), heldToday: engWorkOnHold(pj),
+      preventionDay: pj.preventionDay, warning: engWarning(pj), heldToday: engWorkOnHold(pj),
       funds: pj.funds, fundsLeft: engFundsLeft(pj), risk: engRisk(pj),
       steps: engSchemeBuild(pj).map(function (s) { return s; }),
       scope: professionalLifeState().waterworks.scope,
