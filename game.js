@@ -7919,7 +7919,13 @@ function todayPlanItems() {
      不必靠翻旧对话去找自己还欠着什么。 */
   var pj = engProject(), pji = engPhaseIndex(pj), ecur = engCareer();
   if (pji >= 1 || ecur.stage > 0 || (rookieState().engineering > 0 && rookieState().engineering < ROOKIE_JOBS.engineering.steps.length)) {
-    out.push({ tier: 'soon', tag: '工程', text: '河湾闸门 · ' + ENG_PHASE_NAMES[pji] + ' · ' + engNextStepText(), open: openEngineeringProjectLog });
+    var riskWarning = engWarning(pj);
+    out.push({
+      tier: 'soon', tag: riskWarning ? '预警' : '工程',
+      text: riskWarning ? '河湾闸门风险 ' + riskWarning.level + '/5 · ' + riskWarning.reasons.join('、') + ' · 到闸基复核或加固'
+        : '河湾闸门 · ' + ENG_PHASE_NAMES[pji] + ' · ' + engNextStepText(),
+      open: openEngineeringProjectLog
+    });
   }
   return out;
 }
@@ -10203,10 +10209,55 @@ function engMaterialsPanel(b, pj, site) {
   b.appendChild(box);
 }
 /* 闸基工作面：亲自施工与委托班组推进的是同一份 pj.build */
+function engRiskControlPanel(b, pj) {
+  var phase = engPhaseIndex(pj), warning = engWarning(pj);
+  if (!pj.scheme || phase < 2 || phase >= 5) return;
+  var box = el('div', 'panel-box');
+  box.appendChild(el('div', 'section-title', '风险预警与预防'));
+  if (warning) {
+    box.appendChild(el('p', 'req-chip', '当前风险 ' + warning.level + '/5：' + warning.reasons.join('、') + '。'));
+    box.appendChild(el('p', 'muted', '现场复核会刷新读数日期，不会消除已记录的裂缝或淤积；加固坡体需石头 ×2。'));
+  } else {
+    box.appendChild(el('p', 'req-chip ok', pj.reinforced ? '坡体已加固，当前风险低于预警线。' : '当前风险低于预警线；后续天气或过期读数可能再次触发预警。'));
+  }
+  if (engWorkOnHold(pj)) {
+    box.appendChild(el('p', 'req-chip', '施工已暂停到明天，已完成工序保留。'));
+  }
+  if (warning && pj.reviewDay !== state.totalDay) {
+    extendedWorkButton(b, 'riverbay_pit', '现场复核并登记 · 30分钟', {
+      minutes: 30, energy: 1,
+      guard: function () { var q = engProject(); return !!engWarning(q) && q.reviewDay !== state.totalDay; },
+      reason: '今天已复核，或当前风险已低于预警线。'
+    }, function () { engReviewRisk(); });
+  }
+  if (warning && pj.phase === 'build' && !engWorkOnHold(pj)) {
+    extendedWorkButton(b, 'riverbay_pit', '暂停施工到明天', {
+      minutes: 0, energy: 0,
+      guard: function () { var q = engProject(); return q.phase === 'build' && !!engWarning(q) && !engWorkOnHold(q); },
+      reason: '没有待处理的工程风险，或今天已经暂停施工。'
+    }, function () { engProject().holdDay = state.totalDay; });
+  }
+  if (warning && !pj.reinforced) {
+    extendedWorkButton(b, 'riverbay_pit', '加固坡体 · 石头 ×2 · 45分钟', {
+      need: { stone: 2 }, minutes: 45, energy: 3,
+      guard: function () { var q = engProject(); return !!engWarning(q) && !q.reinforced; },
+      reason: '当前风险已解除，或坡体已经加固。'
+    }, function () {
+      var q = engProject();
+      q.reinforced = true; q.reviewDay = state.totalDay;
+    });
+  }
+  b.appendChild(box);
+}
 function engPitPanel(b, pj) {
   var i = engPhaseIndex(pj);
+  engRiskControlPanel(b, pj);
   if (i < 3) {
     if (i >= 0) b.appendChild(el('p', 'muted', '材料没进场之前，闸基工作面不能开工。'));
+    return;
+  }
+  if (engWorkOnHold(pj)) {
+    b.appendChild(el('p', 'req-chip', '今天已暂停施工；明天可以从当前工序继续。'));
     return;
   }
   var steps = engSchemeBuild(pj), sc = ENG_SCHEMES[pj.scheme];
@@ -10390,6 +10441,7 @@ function newEngProject() {
     build: 0, buildDay: 0, mode: '',
     crew: { day: 0, paid: 0 },
     trialDay: 0, maintDay: 0, maintCount: 0,
+    reviewDay: 0, holdDay: 0, reinforced: false,
     funds: { granted: 0, spent: 0, donated: 0, tx: {} }
   };
 }
@@ -10455,6 +10507,8 @@ function normalizeEngProject(raw, legacy) {
   d.crew = { day: num(cw.day, 100000), paid: num(cw.paid, ENG_GRANT_MAX * 4) };
   d.trialDay = num(r.trialDay, 100000);
   d.maintDay = num(r.maintDay, 100000); d.maintCount = num(r.maintCount, 100);
+  d.reviewDay = num(r.reviewDay, 100000); d.holdDay = num(r.holdDay, 100000);
+  d.reinforced = !!r.reinforced;
   var f = r.funds || {}, tx = {};
   if (f.tx && typeof f.tx === 'object') Object.keys(f.tx).forEach(function (k) {
     var t = f.tx[k];
@@ -10525,6 +10579,10 @@ function openEngineeringProjectLog() {
       engPhaseBar(b);
       b.appendChild(el('p', 'work-summary', ENG_PHASE_NAMES[engPhaseIndex(pj)] + ' / ' + ENG_PHASES.length + ' · ' + (ENG_PHASE_TEXT[pj.phase] || '')));
       b.appendChild(el('p', null, '下一步：' + engNextStepText()));
+      var warning = engWarning(pj);
+      if (warning) b.appendChild(el('p', 'req-chip', '风险预警 ' + warning.level + '/5 · ' + warning.reasons.join('、') + '。可到闸基现场复核、暂停施工或加固坡体。'));
+      else if (pj.reinforced) b.appendChild(el('p', 'req-chip ok', '坡体已加固；当前工程风险低于预警线。'));
+      if (engWorkOnHold(pj)) b.appendChild(el('p', 'req-chip', '施工已暂停到明天，已完成工序保留。'));
       b.appendChild(el('p', 'muted', '联系人：诺娅（水利站）· 马丁（风铃磨坊）· 柯里（议事屋）。材料来源：石灰采场采掘 → 测量石料棚切割 → 下游河港装运 → 水利站凭核验运单签收。'));
       var cert = el('div', 'panel-box');
       cert.appendChild(el('div', 'section-title', '认证与资历'));
@@ -10611,6 +10669,36 @@ function engRisk(pj) {
   if (pj.survey.silt === 'heavy') r++;
   var sc = ENG_SCHEMES[pj.scheme];
   return Math.min(5, r + (sc ? sc.risk - 1 : 0));
+}
+/* C1：把已保存勘测、当前天气、读数时效和已做加固组合成只读预警。
+   查看报告只计算风险，不写项目记录，也不生成事故。 */
+function engWarning(pj) {
+  var phase = engPhaseIndex(pj);
+  if (!pj.scheme || phase < 2 || phase >= 5) return null;
+  var score = engRisk(pj), reasons = [], sc = ENG_SCHEMES[pj.scheme];
+  if (pj.survey.level >= 3) reasons.push('勘测水位偏高');
+  if (pj.survey.east === 'cracked') reasons.push('东岸坡脚有裂缝');
+  if (pj.survey.silt === 'heavy') reasons.push('下游淤积偏厚');
+  if (sc && sc.risk > 1) reasons.push('方案施工风险较高');
+  if (state.weather && state.weather.today === 'rain') {
+    score++; reasons.push('今天有降雨');
+  }
+  var observedDay = Math.max(pj.survey.day || 0, pj.reviewDay || 0);
+  if (observedDay > 0 && state.totalDay - observedDay >= 3) {
+    score++; reasons.push('现场读数已超过两天');
+  }
+  if (pj.reinforced) {
+    score -= 2; reasons.push('坡体已加固（风险降低 2 级）');
+  }
+  score = Math.max(1, Math.min(5, score));
+  return score >= 3 ? { level: score, reasons: reasons } : null;
+}
+function engWorkOnHold(pj) { return pj.holdDay === state.totalDay; }
+function engReviewRisk() {
+  var pj = engProject();
+  if (!engWarning(pj) || pj.reviewDay === state.totalDay) return false;
+  pj.reviewDay = state.totalDay;
+  return true;
 }
 function engSurveyDone(pj) { return pj.survey.level > 0 && !!pj.survey.east && !!pj.survey.silt; }
 /* 基础工程认证：勘测读完只是够资格，实践验收通过并领证后才真的有证书 */
@@ -19523,6 +19611,8 @@ window.__MOSS__ = {
       survey: pj.survey, practice: pj.practice, emergency: pj.emergency, opinions: pj.opinions,
       stone: pj.stone, kit: pj.kit, build: pj.build, mode: pj.mode, crew: pj.crew,
       trialDay: pj.trialDay, maintDay: pj.maintDay, maintCount: pj.maintCount,
+      reviewDay: pj.reviewDay, holdDay: pj.holdDay, reinforced: pj.reinforced,
+      warning: engWarning(pj), heldToday: engWorkOnHold(pj),
       funds: pj.funds, fundsLeft: engFundsLeft(pj), risk: engRisk(pj),
       steps: engSchemeBuild(pj).map(function (s) { return s; }),
       scope: professionalLifeState().waterworks.scope,
