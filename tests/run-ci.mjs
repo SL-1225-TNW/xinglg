@@ -34,7 +34,7 @@ const BROWSER = [
   'run-v7-stageB.mjs', 'run-v7-stageB-soil.mjs', 'run-v7-audit-regressions.mjs',
   'run-v7-stageC.mjs', 'run-v7-stageC-heath.mjs', 'run-v7-stageC-interiors.mjs',
   'run-world-map.mjs', 'run-fast-travel.mjs', 'run-save-invariants.mjs', 'run-alt-routes.mjs',
-  'run-engineering-career.mjs', 'run-engineering-ui.mjs', 'run-r3-project.mjs', 'run-r3c-prevention.mjs', 'run-r3c-recovery.mjs', 'run-r3-mobile.mjs',
+  'run-engineering-career.mjs', 'run-engineering-ui.mjs', 'run-r3-project.mjs', 'run-r3c-prevention.mjs', 'run-r3c-recovery.mjs', 'run-r3c-maintenance.mjs', 'run-r3-mobile.mjs',
   /* 白蔷薇宫城 P1：布局契约、楼层通行、存档迁移与手机端分层验收 */
   'run-palace-layout.mjs', 'run-palace-save.mjs', 'run-palace-floors.mjs', 'run-palace-mobile.mjs', 'run-palace-wayfinding.mjs', 'run-palace-east-wing.mjs', 'run-palace-service.mjs',
   'run-university.mjs',
