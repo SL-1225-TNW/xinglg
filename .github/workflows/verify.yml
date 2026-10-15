@@ -32,6 +32,11 @@ jobs:
           for file in tests/*.mjs; do node --check "$file"; done
       - name: Build the offline single-file game
         run: node tests/prepare-site.mjs
+      - name: Verify Riverbay engineering and R3-C1 prevention
+        run: |
+          node tests/run-r3-project.mjs
+          node tests/run-r3c-prevention.mjs
+          node tests/run-r3-mobile.mjs
       - name: Verify character growth and independent rookie routes
         run: |
           node tests/run-r0-character-entry.mjs
