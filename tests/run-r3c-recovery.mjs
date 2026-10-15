@@ -55,6 +55,7 @@ try {
   });
   check('存档归一化保留未结事故与原工序', savedActive, [true, true, true, 1]);
 
+  await closeWin(p);
   await v(() => __MOSS__.openEngineeringProjectLog());
   check('项目记录写明受影响服务与未完成工序',
     (await p.locator('.win').innerText()).includes('事故待恢复：河港货运暂时中断；第 1 道工序尚未完成'), true);
