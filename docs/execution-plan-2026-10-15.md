@@ -5,14 +5,14 @@
 ## 当前状态
 
 - R0—R2 已有首轮实现与专项验收；R3-A、R3-B 已交付。
-- 重点场景建设第一版的首个交付范围已进入 `main`。建设复审记录载有分组验证结果；最新 `main` 提交对应的 CI 与线上发布状态仍需单独核实。
-- R3-C、R3-D 尚未开始。下一项产品里程碑为 R3-C，而不是继续增加建筑空间。
+- 重点场景建设第一版的首个交付范围已进入 `main`。`main` 的 `89553dab3b07238dcfe845812109c95991fd2f5e` 上，CI 与 Pages 发布均已通过（[CI run #10](https://github.com/SL-1225-TNW/xinglg/actions/runs/38707356839)、[Pages run #59](https://github.com/SL-1225-TNW/xinglg/actions/runs/38711844555)）；两个工作流都指向该提交。建设复审记录载有分组验证结果。
+- R3-C1 风险预警与预防正在独立 PR #9 中实施，尚未验收；R3-C2/C3 与 R3-D 尚未开始。接下来按 C1 → C2 → C3 闭合河湾工程。
 - 细节基线见 [R3 实施计划](r3-implementation-plan.md)、[建设交付与复审](construction-completion.md) 和 [功能状态表](feature-status.md)。
 
 ## 阶段 0：对齐状态与验证基线
 
 1. 保持总体规划、README、功能状态表与实现记录描述一致。
-2. 在准确的 `main` 提交上确认完整验证工作流；验证发布时，再核实 Pages 产物对应相同提交。
+2. 已在准确的 `main` 提交上核验完整 CI 与 Pages 发布：两者均指向 `89553dab3b07238dcfe845812109c95991fd2f5e`（[CI run #10](https://github.com/SL-1225-TNW/xinglg/actions/runs/38707356839)、[Pages run #59](https://github.com/SL-1225-TNW/xinglg/actions/runs/38711844555)）。
 3. 将自动化测试、自然新档流程和人工设备试玩分开记录；夹具使用情况逐项注明。
 
 **退出条件：**每个已完成项有对应的代码和测试证据；最新测试及发布状态指向具体提交；旧记录不会被误读成当前线上状态。
