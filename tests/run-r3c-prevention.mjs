@@ -121,5 +121,5 @@ try {
 
   console.log('R3-C1 风险预防检查通过：' + checks + ' 项。');
 } finally {
-  await run.close();
+  await run.browser.close();
 }
