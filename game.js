@@ -7919,11 +7919,13 @@ function todayPlanItems() {
      不必靠翻旧对话去找自己还欠着什么。 */
   var pj = engProject(), pji = engPhaseIndex(pj), ecur = engCareer();
   if (pji >= 1 || ecur.stage > 0 || (rookieState().engineering > 0 && rookieState().engineering < ROOKIE_JOBS.engineering.steps.length)) {
-    var riskWarning = engWarning(pj);
+    var riskWarning = engWarning(pj), recoveryPending = pj.recovery && pj.recovery.active;
     out.push({
-      tier: 'soon', tag: riskWarning ? '预警' : '工程',
-      text: riskWarning ? '河湾闸门风险 ' + riskWarning.level + '/5 · ' + riskWarning.reasons.join('、') + ' · 到闸基复核或加固'
-        : '河湾闸门 · ' + ENG_PHASE_NAMES[pji] + ' · ' + engNextStepText(),
+      tier: 'soon', tag: recoveryPending ? '恢复' : riskWarning ? '预警' : '工程',
+      text: recoveryPending
+        ? '河湾事故恢复 · 补修' + engRecoveryService(pj.recovery.affected) + '并复查结案'
+        : riskWarning ? '河湾闸门风险 ' + riskWarning.level + '/5 · ' + riskWarning.reasons.join('、') + ' · 到闸基复核或加固'
+          : '河湾闸门 · ' + ENG_PHASE_NAMES[pji] + ' · ' + engNextStepText(),
       open: openEngineeringProjectLog
     });
   }
@@ -10219,7 +10221,7 @@ function engRiskControlPanel(b, pj) {
     box.appendChild(el('p', 'req-chip', '当前风险 ' + warning.level + '/5：' + warning.reasons.join('、') + '。'));
     box.appendChild(el('p', 'muted', '现场复核会刷新读数日期，不会消除已记录的裂缝或淤积；加固坡体需石头 ×2。'));
     if (warning.level >= 4 && pj.reviewDay !== state.totalDay && !pj.reinforced) {
-      var interrupted = engRecoveryService(professionalWaterPolicy() === 'navigation' ? 'navigation' : 'irrigation');
+      var interrupted = engRecoveryService(professionalWaterPolicy() === 'irrigation' ? 'irrigation' : 'navigation');
       box.appendChild(el('p', 'req-chip', '若未复核或加固便继续施工，' + interrupted + '将暂时中断；需补修并复查后才能恢复。'));
     }
   } else {
@@ -10266,7 +10268,7 @@ function engTryConstructionFailure(pj, stepName) {
   pj.recovery = {
     active: true,
     cause: '风险 ' + warning.level + '/5 时未复核便继续施工：' + warning.reasons.join('、'),
-    affected: allocation === 'navigation' ? 'navigation' : 'irrigation',
+    affected: allocation === 'irrigation' ? 'irrigation' : 'navigation',
     step: pj.build, day: state.totalDay, stepName: String(stepName || '').slice(0, 100),
     repaired: false, repairDay: 0, closedDay: 0
   };

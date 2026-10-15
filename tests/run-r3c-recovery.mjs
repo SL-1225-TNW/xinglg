@@ -47,6 +47,7 @@ try {
     info.phase, info.build, info.recovery.active, info.recovery.affected,
     info.recovery.step, info.shipping, info.policy
   ], ['build', 1, true, 'navigation', 1, 80, 'navigation']);
+  await p.waitForTimeout(250);
   check('今日安排指向事故恢复', (await p.locator('#todayPlan').innerText()).includes('补修'), true);
   const savedActive = await v(() => {
     const pj = __MOSS__.normalizeProfessionalLife(__MOSS__.state.professionalLife).projects.riverbay_gate;
