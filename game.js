@@ -10224,21 +10224,21 @@ function engRiskControlPanel(b, pj) {
     box.appendChild(el('p', 'req-chip', '施工已暂停到明天，已完成工序保留。'));
   }
   if (warning && pj.reviewDay !== state.totalDay) {
-    extendedWorkButton(b, 'riverbay_pit', '现场复核并登记 · 30分钟', {
+    extendedWorkButton(box, 'riverbay_pit', '现场复核并登记 · 30分钟', {
       minutes: 30, energy: 1,
       guard: function () { var q = engProject(); return !!engWarning(q) && q.reviewDay !== state.totalDay; },
       reason: '今天已复核，或当前风险已低于预警线。'
     }, function () { engReviewRisk(); });
   }
   if (warning && pj.phase === 'build' && !engWorkOnHold(pj)) {
-    extendedWorkButton(b, 'riverbay_pit', '暂停施工到明天', {
+    extendedWorkButton(box, 'riverbay_pit', '暂停施工到明天', {
       minutes: 0, energy: 0,
       guard: function () { var q = engProject(); return q.phase === 'build' && !!engWarning(q) && !engWorkOnHold(q); },
       reason: '没有待处理的工程风险，或今天已经暂停施工。'
     }, function () { engProject().holdDay = state.totalDay; });
   }
   if (warning && !pj.reinforced) {
-    extendedWorkButton(b, 'riverbay_pit', '加固坡体 · 石头 ×2 · 45分钟', {
+    extendedWorkButton(box, 'riverbay_pit', '加固坡体 · 石头 ×2 · 45分钟', {
       need: { stone: 2 }, minutes: 45, energy: 3,
       guard: function () { var q = engProject(); return !!engWarning(q) && !q.reinforced; },
       reason: '当前风险已解除，或坡体已经加固。'
