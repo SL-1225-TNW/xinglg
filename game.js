@@ -10218,6 +10218,10 @@ function engRiskControlPanel(b, pj) {
   if (warning) {
     box.appendChild(el('p', 'req-chip', '当前风险 ' + warning.level + '/5：' + warning.reasons.join('、') + '。'));
     box.appendChild(el('p', 'muted', '现场复核会刷新读数日期，不会消除已记录的裂缝或淤积；加固坡体需石头 ×2。'));
+    if (warning.level >= 4 && pj.reviewDay !== state.totalDay && !pj.reinforced) {
+      var interrupted = engRecoveryService(professionalWaterPolicy() === 'navigation' ? 'navigation' : 'irrigation');
+      box.appendChild(el('p', 'req-chip', '若未复核或加固便继续施工，' + interrupted + '将暂时中断；需补修并复查后才能恢复。'));
+    }
   } else {
     box.appendChild(el('p', 'req-chip ok', pj.reinforced ? '坡体已加固，当前风险低于预警线。' : '当前风险低于预警线；后续天气或过期读数可能再次触发预警。'));
   }

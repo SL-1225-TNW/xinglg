@@ -24,7 +24,7 @@ try {
     pj.kit = 1;
     pj.phase = 'build';
     pj.mode = 'self';
-    pj.build = 0;
+    pj.build = 1;
     pj.survey = { level: 3, day: M.state.totalDay, east: 'cracked', silt: 'heavy' };
     M.state.weather.today = 'rain';
     M.state.energy = 60;
@@ -39,19 +39,20 @@ try {
 
   await interactWith(p, 22, 14);
   check('闸基现场允许推进当前工序', await btnCount(p, '亲自完成：'), 1);
+  check('施工前明确说明忽略风险的服务后果', (await p.locator('.win').innerText()).includes('继续施工，河港货运将暂时中断'), true);
   await clickWin(p, '亲自完成：');
 
   let info = await v(() => __MOSS__.engProjectInfo());
   check('漏检后留下服务中断但不吞掉失败工序', [
     info.phase, info.build, info.recovery.active, info.recovery.affected,
     info.recovery.step, info.shipping, info.policy
-  ], ['build', 0, true, 'navigation', 0, 80, 'navigation']);
+  ], ['build', 1, true, 'navigation', 1, 80, 'navigation']);
   check('今日安排指向事故恢复', (await p.locator('#todayPlan').innerText()).includes('补修'), true);
   const savedActive = await v(() => {
     const pj = __MOSS__.normalizeProfessionalLife(__MOSS__.state.professionalLife).projects.riverbay_gate;
     return [pj.recovery.active, pj.recovery.cause.length > 0, pj.recovery.stepName.length > 0, pj.build];
   });
-  check('存档归一化保留未结事故与原工序', savedActive, [true, true, true, 0]);
+  check('存档归一化保留未结事故与原工序', savedActive, [true, true, true, 1]);
 
   await v(() => __MOSS__.openEngineeringProjectLog());
   check('项目记录写明受影响服务与未完成工序',
@@ -79,14 +80,14 @@ try {
 
   await clickWin(p, '亲自完成：');
   info = await v(() => __MOSS__.engProjectInfo());
-  check('结案后可继续原有工序', [info.build, info.recovery.active], [1, false]);
+  check('结案后可继续原有工序', [info.build, info.recovery.active], [2, false]);
   const savedClosed = await v(() => {
     const pj = __MOSS__.normalizeProfessionalLife(__MOSS__.state.professionalLife).projects.riverbay_gate;
     return [pj.recovery.active, pj.recovery.repaired, pj.recovery.closedDay,
       pj.recovery.stepName.length > 0, pj.build, pj.reviewDay];
   });
   check('结案与恢复后的进度可写回存档', savedClosed, [
-    false, true, info.recovery.closedDay, true, 1, info.reviewDay
+    false, true, info.recovery.closedDay, true, 2, info.reviewDay
   ]);
 
   console.log('R3-C2 恢复闭环检查通过：' + checks + ' 项。');
