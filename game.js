@@ -9991,6 +9991,7 @@ function engEmergencyAlloc(pj) {
 }
 function engPolicyText() {
   var pj = engProject(), sc = ENG_SCHEMES[pj.scheme];
+  if (pj.recovery && pj.recovery.active) return '事故恢复中：' + engRecoveryService(pj.recovery.affected) + '暂时中断';
   if (pj.phase === 'accepted' && sc) return sc.alloc === 'navigation' ? '已验收：通航优先' : '已验收：灌溉优先';
   var em = engEmergencyAlloc(pj);
   if (em) return (em === 'navigation' ? '应急处置：通航优先' : '应急处置：灌溉优先') + '（工程验收后将被方案取代）';
@@ -10250,9 +10251,57 @@ function engRiskControlPanel(b, pj) {
   }
   b.appendChild(box);
 }
+function engRecoveryService(kind) { return kind === 'navigation' ? '河港货运' : '灌溉供水'; }
+/* C2：严重预警下未经当日复核仍继续施工，会留下可恢复的局部故障。
+   失败工序不计入进度；此前完成的工序、经费账和班组工资都保留。 */
+function engTryConstructionFailure(pj, stepName) {
+  var warning = engWarning(pj);
+  if (!warning || warning.level < 4 || pj.reviewDay === state.totalDay || pj.reinforced ||
+      (pj.recovery && pj.recovery.active)) return false;
+  var allocation = professionalWaterPolicy();
+  pj.recovery = {
+    active: true,
+    cause: '风险 ' + warning.level + '/5 时未复核便继续施工：' + warning.reasons.join('、'),
+    affected: allocation === 'navigation' ? 'navigation' : 'irrigation',
+    step: pj.build, day: state.totalDay, stepName: String(stepName || '').slice(0, 100),
+    repaired: false, repairDay: 0, closedDay: 0
+  };
+  markDirty();
+  return true;
+}
+function engRecoveryPanel(b, pj) {
+  var f = pj.recovery, box = el('div', 'panel-box');
+  box.appendChild(el('div', 'section-title', '事故恢复 · ' + engRecoveryService(f.affected) + '中断'));
+  box.appendChild(el('p', 'req-chip', f.cause + '。'));
+  box.appendChild(el('p', null, '受影响工序：第 ' + (f.step + 1) + ' 道 · ' + f.stepName + '。已完成的 ' + pj.build + ' 道工序和既有项目支出保留。'));
+  box.appendChild(el('p', 'muted', '恢复顺序：补修 → 复查 → 结案。补修需 90 分钟／3 点体力；复查另需 30 分钟／1 点体力，不消耗材料或个人/机构资金。'));
+  if (!f.repaired) {
+    extendedWorkButton(box, 'riverbay_pit', '补修受损闸基 · 90分钟', {
+      minutes: 90, energy: 3,
+      guard: function () { var q = engProject(); return !!q.recovery && q.recovery.active && !q.recovery.repaired; },
+      reason: '先完成当前事故的补修。'
+    }, function () {
+      var q = engProject(); q.recovery.repaired = true; q.recovery.repairDay = state.totalDay;
+    });
+  } else {
+    box.appendChild(el('p', 'req-chip ok', '补修已完成（第 ' + f.repairDay + ' 天）；地区服务将在复查结案后恢复。'));
+    extendedWorkButton(box, 'riverbay_pit', '复查并结案 · 30分钟', {
+      minutes: 30, energy: 1,
+      guard: function () { var q = engProject(); return !!q.recovery && q.recovery.active && q.recovery.repaired; },
+      reason: '先补修受损闸基，再进行复查。'
+    }, function () {
+      var q = engProject(), rec = q.recovery;
+      rec.active = false; rec.closedDay = state.totalDay;
+      q.reviewDay = state.totalDay;
+      rememberChoice('noya', '完成河湾闸基补修、复查与事故结案');
+    });
+  }
+  b.appendChild(box);
+}
 function engPitPanel(b, pj) {
   var i = engPhaseIndex(pj);
   engRiskControlPanel(b, pj);
+  if (pj.recovery && pj.recovery.active) { engRecoveryPanel(b, pj); return; }
   if (i < 3) {
     if (i >= 0) b.appendChild(el('p', 'muted', '材料没进场之前，闸基工作面不能开工。'));
     return;
@@ -10290,7 +10339,9 @@ function engPitPanel(b, pj) {
       if (engCareer().stage >= 4) extendedWorkButton(b, 'riverbay_pit', '委托河湾施工队（' + sc.wage + ' 金／工日）', { minutes: 30, energy: 1, guard: function () { var q = engProject(); return q.build === 0 && !q.mode && engPhaseIndex(q) === 3; }, reason: '已经开过工就不能再换施工方式。' }, function () { engProject().mode = 'commission'; engAdvance('build'); });
     } else if (pj.mode === 'self') {
       extendedWorkButton(b, 'riverbay_pit', '亲自完成：' + steps[pj.build] + ' · 90分钟', { minutes: 90, energy: 4, guard: function () { var q = engProject(); return q.mode === 'self' && q.build < steps.length && engCanBuild(q); }, reason: '第一道工序落下后不能换方式；工序全部完成后要封闸试运行。' }, function () {
-        var q = engProject(); q.build++; q.buildDay = state.totalDay; bumpCareer('engineering');
+        var q = engProject();
+        if (engTryConstructionFailure(q, steps[q.build])) return;
+        q.build++; q.buildDay = state.totalDay; bumpCareer('engineering');
       });
     } else {
       box.appendChild(el('p', null, '河湾施工队 4 人 · 已开工 ' + q0(pj.crew.day) + ' 天 · 已付工钱 ' + pj.crew.paid + ' 金 · 机构余额 ' + engFundsLeft(pj) + ' 金。'));
@@ -10303,6 +10354,7 @@ function engPitPanel(b, pj) {
         var q = engProject();
         engLedger(q, 'riverbay:wage:' + (q.build + 1), 'wage', sc.wage, 'grant', '第 ' + (q.build + 1) + ' 道工序工钱');
         q.funds.spent += sc.wage; q.crew.paid += sc.wage; q.crew.day = state.totalDay;
+        if (engTryConstructionFailure(q, steps[q.build])) return;
         q.build++; q.buildDay = state.totalDay;
       });
     }
@@ -10459,6 +10511,7 @@ function newEngProject() {
     crew: { day: 0, paid: 0 },
     trialDay: 0, maintDay: 0, maintCount: 0,
     reviewDay: 0, holdDay: 0, reinforced: false, preventionDay: 0,
+    recovery: { active: false, cause: '', affected: '', step: 0, stepName: '', day: 0, repaired: false, repairDay: 0, closedDay: 0 },
     funds: { granted: 0, spent: 0, donated: 0, tx: {} }
   };
 }
@@ -10526,6 +10579,11 @@ function normalizeEngProject(raw, legacy) {
   d.maintDay = num(r.maintDay, 100000); d.maintCount = num(r.maintCount, 100);
   d.reviewDay = num(r.reviewDay, 100000); d.holdDay = num(r.holdDay, 100000);
   d.reinforced = !!r.reinforced; d.preventionDay = num(r.preventionDay, 100000);
+  var rc = r.recovery || {};
+  d.recovery = { active: !!rc.active, cause: String(rc.cause || '').slice(0, 160),
+    affected: ['irrigation', 'navigation'].indexOf(rc.affected) >= 0 ? rc.affected : '',
+    step: num(rc.step, 4), stepName: String(rc.stepName || '').slice(0, 100), day: num(rc.day, 100000), repaired: !!rc.repaired,
+    repairDay: num(rc.repairDay, 100000), closedDay: num(rc.closedDay, 100000) };
   var f = r.funds || {}, tx = {};
   if (f.tx && typeof f.tx === 'object') Object.keys(f.tx).forEach(function (k) {
     var t = f.tx[k];
@@ -10533,6 +10591,10 @@ function normalizeEngProject(raw, legacy) {
   });
   d.funds = { granted: num(f.granted, ENG_GRANT_MAX), spent: num(f.spent, ENG_GRANT_MAX * 4), donated: num(f.donated, ENG_GRANT_MAX * 4), tx: tx };
   d.phase = ENG_PHASES.indexOf(r.phase) >= 0 ? r.phase : 'survey';
+  if (d.recovery.active && (d.phase !== 'build' || !d.scheme || d.recovery.step >= (ENG_SCHEMES[d.scheme] ? ENG_SCHEMES[d.scheme].build.length : 0))) {
+    d.recovery.active = false;
+    d.recovery.closedDay = d.recovery.closedDay || d.recovery.day;
+  }
 
   /* --- 自洽：不可能的组合必须被压回，而不是留下一个能反复领钱的存档 --- */
   var surveyDone = d.survey.level > 0 && d.survey.east && d.survey.silt;
@@ -10601,6 +10663,8 @@ function openEngineeringProjectLog() {
       else if (pj.reinforced) b.appendChild(el('p', 'req-chip ok', '坡体已加固；当前工程风险低于预警线。'));
       if (pj.preventionDay) b.appendChild(el('p', 'req-chip ok', '预防评审已通过：第 ' + pj.preventionDay + ' 天记入工程评价与信任。'));
       if (engWorkOnHold(pj)) b.appendChild(el('p', 'req-chip', '施工已暂停到明天，已完成工序保留。'));
+      if (pj.recovery && pj.recovery.active) b.appendChild(el('p', 'req-chip', '事故待恢复：' + engRecoveryService(pj.recovery.affected) + '暂时中断；第 ' + (pj.recovery.step + 1) + ' 道工序尚未完成，已完成部分保留。'));
+      else if (pj.recovery && pj.recovery.closedDay) b.appendChild(el('p', 'req-chip ok', '第 ' + pj.recovery.closedDay + ' 天已完成补修、复查与结案。'));
       b.appendChild(el('p', 'muted', '联系人：诺娅（水利站）· 马丁（风铃磨坊）· 柯里（议事屋）。材料来源：石灰采场采掘 → 测量石料棚切割 → 下游河港装运 → 水利站凭核验运单签收。'));
       var cert = el('div', 'panel-box');
       cert.appendChild(el('div', 'section-title', '认证与资历'));
@@ -10738,7 +10802,7 @@ function engSurveyDone(pj) { return pj.survey.level > 0 && !!pj.survey.east && !
 /* 基础工程认证：勘测读完只是够资格，实践验收通过并领证后才真的有证书 */
 function engHasCertificate() { var q = engProject(); return engPhaseIndex(q) >= 1 && !!q.practice; }
 /* 能不能推进工序：材料进场之后、封闸试运行之前 */
-function engCanBuild(q) { var i = engPhaseIndex(q); return i >= 3 && i <= 4; }
+function engCanBuild(q) { var i = engPhaseIndex(q); return i >= 3 && i <= 4 && !(q.recovery && q.recovery.active); }
 function engPracticeRoute() {
   /* 实践两条路：矿山排水或磨坊维修，任一条走通都能拿到认证，不额外强制个人战斗 */
   if (mineWorks().inspected) return 'mine';
@@ -10754,6 +10818,7 @@ function engSchemeBuild(pj) { var sc = ENG_SCHEMES[pj.scheme]; return sc ? sc.bu
 /* 一份「下一步」文案，三个地方共用：角色经历、N 记录、今日安排 */
 function engNextStepText() {
   var pj = engProject(), e = engCareer(), i = engPhaseIndex(pj), sc = ENG_SCHEMES[pj.scheme];
+  if (pj.recovery && pj.recovery.active) return '到闸基现场补修' + engRecoveryService(pj.recovery.affected) + '，再复查结案';
   if (i < 1) {
     if (!pj.survey.level) return '坝顶水尺 (20,18) 读水位';
     if (!pj.survey.east) return '东岸坡脚 (21,20) 探查坡体';
@@ -16656,8 +16721,8 @@ routes:{engineering:0,trade:0,patrol:0},rookie:{engineering:0,trade:0,patrol:0},
 passes:{visit:false,commission:false,command:false}};}
 /* 地区服务只读这份由项目记录写回的镜像：验收后是工程方案，验收前只可能是
    事故期间的应急处置。打开面板、重载或重复签字都不会让它叠加。 */
-function professionalWaterPolicy(){var w=professionalLifeState().waterworks;return w.certified?w.allocation:null;}
-function professionalShippingMinutes(base){var p=professionalLifeState(),policy=professionalWaterPolicy();return Math.max(20,base+(policy==='irrigation'?20:policy==='navigation'?-10:0)+(p.port.choice==='claim'?10:0));}
+function professionalWaterPolicy(){var p=professionalLifeState(),w=p.waterworks,q=p.projects&&p.projects[ENG_PROJECT_ID],f=q&&q.recovery;return f&&f.active&&f.affected==='irrigation'?null:(w.certified?w.allocation:null);}
+function professionalShippingMinutes(base){var p=professionalLifeState(),policy=professionalWaterPolicy(),q=p.projects&&p.projects[ENG_PROJECT_ID],f=q&&q.recovery;return Math.max(20,base+(policy==='irrigation'?20:policy==='navigation'?-10:0)+(f&&f.active&&f.affected==='navigation'?30:0)+(p.port.choice==='claim'?10:0));}
 function normalizeProfessionalLife(raw){var d=newProfessionalLife(),r=raw&&typeof raw==='object'?raw:{};function n(v,max){return Number.isFinite(v)?clamp(Math.floor(v),0,max):0;}
   var a=r.vineyard||{};d.vineyard={plan:['juice','wine'].indexOf(a.plan)>=0?a.plan:null,planDay:n(a.planDay,100000),harvestDay:n(a.harvestDay,100000),pressDay:n(a.pressDay,100000),delayed:!!a.delayed,harvested:n(a.harvested,12),pressed:n(a.pressed,12),product:['juice','wine'].indexOf(a.product)>=0?a.product:null,shipped:n(a.shipped,12)};
   a=r.clinic||{};d.clinic={diagnosed:!!a.diagnosed,sampleVerified:!!a.sampleVerified,receivedJuice:!!a.receivedJuice,medicine:n(a.medicine,12),patientDay:n(a.patientDay,100000),recovered:!!a.recovered};
@@ -19646,7 +19711,7 @@ window.__MOSS__ = {
       stone: pj.stone, kit: pj.kit, build: pj.build, mode: pj.mode, crew: pj.crew,
       trialDay: pj.trialDay, maintDay: pj.maintDay, maintCount: pj.maintCount,
       reviewDay: pj.reviewDay, holdDay: pj.holdDay, reinforced: pj.reinforced,
-      preventionDay: pj.preventionDay, warning: engWarning(pj), heldToday: engWorkOnHold(pj),
+      preventionDay: pj.preventionDay, recovery: pj.recovery, warning: engWarning(pj), heldToday: engWorkOnHold(pj),
       funds: pj.funds, fundsLeft: engFundsLeft(pj), risk: engRisk(pj),
       steps: engSchemeBuild(pj).map(function (s) { return s; }),
       scope: professionalLifeState().waterworks.scope,
