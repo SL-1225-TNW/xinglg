@@ -111,7 +111,7 @@ try {
   await clickWin(p, '加固坡体');
   info = await v(() => __MOSS__.engProjectInfo());
   check('加固消耗两块石头并消除本次预警', [
-    info.reinforced, info.warning, await v(() => __MOSS__.state.inventory.stone)
+    info.reinforced, info.warning, await v(() => __MOSS__.state.inventory.stone || 0)
   ], [true, null, 0]);
   const saved = await v(() => {
     const pj = __MOSS__.normalizeProfessionalLife(__MOSS__.state.professionalLife).projects.riverbay_gate;
