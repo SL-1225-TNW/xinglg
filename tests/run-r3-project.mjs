@@ -333,8 +333,15 @@ try {
   ok('验收当天不做养护检查', await btnCount(p, '闸门养护检查'), 0);
   await closeWin(p);
 
+  for (let day = 1; day <= 2; day++) {
+    await v(() => { __MOSS__.engAdvanceDay(); __MOSS__.state.energy = 80; __MOSS__.state.timeMinutes = 600; __MOSS__.devSwitchScene('waterworks', 20, 17); });
+    ok('周期第 ' + day + ' 天返回现场', await interactWith(p, 20, 18), true);
+    ok('三日周期内无需每日养护', await btnCount(p, '闸门养护检查'), 0);
+    await closeWin(p);
+  }
   await v(() => { __MOSS__.engAdvanceDay(); __MOSS__.state.energy = 80; __MOSS__.state.timeMinutes = 600; __MOSS__.devSwitchScene('waterworks', 20, 17); });
-  ok('隔一天后可以养护', await interactWith(p, 20, 18), true);
+  ok('养护周期到期后返回现场', await interactWith(p, 20, 18), true);
+  ok('三日周期到期后可以养护', await btnCount(p, '闸门养护检查'), 1);
   const maintBefore = (await v(() => __MOSS__.engProjectInfo())).maintCount;
   await clickWin(p, '闸门养护检查');
   pj = await v(() => __MOSS__.engProjectInfo());

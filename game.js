@@ -7919,13 +7919,14 @@ function todayPlanItems() {
      不必靠翻旧对话去找自己还欠着什么。 */
   var pj = engProject(), pji = engPhaseIndex(pj), ecur = engCareer();
   if (pji >= 1 || ecur.stage > 0 || (rookieState().engineering > 0 && rookieState().engineering < ROOKIE_JOBS.engineering.steps.length)) {
-    var riskWarning = engWarning(pj), recoveryPending = pj.recovery && pj.recovery.active;
+    var riskWarning = engWarning(pj), recoveryPending = pj.recovery && pj.recovery.active, maintenancePending = engMaintenanceDue(pj);
     out.push({
-      tier: 'soon', tag: recoveryPending ? '恢复' : riskWarning ? '预警' : '工程',
+      tier: 'soon', tag: recoveryPending ? '恢复' : maintenancePending ? '维护' : riskWarning ? '预警' : '工程',
       text: recoveryPending
         ? '河湾事故恢复 · 补修' + engRecoveryService(pj.recovery.affected) + '并复查结案'
-        : riskWarning ? '河湾闸门风险 ' + riskWarning.level + '/5 · ' + riskWarning.reasons.join('、') + ' · 到闸基复核或加固'
-          : '河湾闸门 · ' + ENG_PHASE_NAMES[pji] + ' · ' + engNextStepText(),
+        : maintenancePending ? '河湾闸门养护到期 · 前往水利控制室复查'
+          : riskWarning ? '河湾闸门风险 ' + riskWarning.level + '/5 · ' + riskWarning.reasons.join('、') + ' · 到闸基复核或加固'
+            : '河湾闸门 · ' + ENG_PHASE_NAMES[pji] + ' · ' + engNextStepText(),
       open: openEngineeringProjectLog
     });
   }
@@ -9986,6 +9987,7 @@ function remembers(who, what) {
 }
 
 var ENG_PHASE_NAMES = ['勘测', '认证', '方案', '材料', '施工', '试运行', '验收'];
+var ENG_MAINT_INTERVAL = 3;
 /* 应急处置的两种口径：先保农田 → 灌溉口径；先保通航 → 通航口径。
    验收后由工程方案取代，所以它不能和方案写进同一个字段。 */
 function engEmergencyAlloc(pj) {
@@ -10121,6 +10123,7 @@ function engBuildPanel(b, pj) {
   if (pj.phase === 'accepted') {
     box.appendChild(el('p', 'req-chip ok', '已验收：' + ENG_SCHEMES[pj.scheme].supply + ' ' + ENG_SCHEMES[pj.scheme].freight));
     box.appendChild(el('p', 'muted', '第 ' + pj.maintDay + ' 天完成最近一次养护检查，累计 ' + pj.maintCount + ' 次。'));
+    box.appendChild(el('p', 'muted', '下次养护从第 ' + engMaintenanceDueDay(pj) + ' 天起到期；每 ' + ENG_MAINT_INTERVAL + ' 天一个周期。'));
   } else {
     box.appendChild(el('p', 'muted', '亲自施工不领工钱，代价是你的时间与体力；委托施工按 ' + ENG_SCHEMES[pj.scheme].wage + ' 金／工日从机构余额里出，余额不够就停工。两条路推进的是同一份工程进度。工序只能在坝体闸基工作面完成。'));
     if (pj.mode === 'commission') box.appendChild(el('p', null, '河湾施工队 4 人 · 已开工 ' + pj.crew.day + ' 天 · 已付工钱 ' + pj.crew.paid + ' 金 · 机构余额 ' + engFundsLeft(pj) + ' 金。'));
@@ -10407,13 +10410,14 @@ function engAcceptPanel(b, pj, site) {
   } else {
     box.appendChild(el('div', 'section-title', '验收完成 · ' + sc.name));
     box.appendChild(el('p', 'req-chip ok', sc.supply + ' ' + sc.freight));
-    box.appendChild(el('p', 'muted', '第 ' + pj.maintDay + ' 天完成最近一次养护检查，累计 ' + pj.maintCount + ' 次。养护按周期来，不强制每天打卡。'));
-    if (state.totalDay > pj.maintDay) {
-      extendedWorkButton(b, at, '闸门养护检查 · 45分钟', { minutes: 45, energy: 3, guard: function () { var q = engProject(); return q.phase === 'accepted' && state.totalDay > q.maintDay; }, reason: '刚做完养护；下一次要隔一天。' }, function () {
+    box.appendChild(el('p', 'muted', '第 ' + pj.maintDay + ' 天完成最近一次养护检查，累计 ' + pj.maintCount + ' 次。每 ' + ENG_MAINT_INTERVAL + ' 天检查一次，不要求每日签到。'));
+    box.appendChild(el('p', 'muted', '下一次养护从第 ' + engMaintenanceDueDay(pj) + ' 天起到期。'));
+    if (engMaintenanceDue(pj)) {
+      extendedWorkButton(b, at, '闸门养护检查 · 45分钟', { minutes: 45, energy: 3, guard: function () { var q = engProject(); return engMaintenanceDue(q); }, reason: '下一周期尚未到期。' }, function () {
         var q = engProject(); q.maintDay = state.totalDay; q.maintCount++;
         p.trust = Math.min(100, (p.trust || 0) + 1); bumpCareer('engineering');
       });
-    } else box.appendChild(el('p', 'req-chip', '养护检查要隔一天再做，今天没有新的检视项。'));
+    } else box.appendChild(el('p', 'req-chip', '周期检查尚未到期；当前无需每日签到。'));
   }
   b.appendChild(box);
 }
@@ -10698,7 +10702,7 @@ function openEngineeringProjectLog() {
       mat.appendChild(el('div', 'section-title', '材料与施工'));
       mat.appendChild(el('p', null, '石料 ' + (pj.stone ? '已签收' : '未到货') + ' · 闸件套装 ' + (pj.kit ? '已进场' : '未进场') + ' · 工序 ' + pj.build + '/' + engSchemeBuild(pj).length + ' · 施工方式 ' + (pj.mode === 'self' ? '亲自施工' : pj.mode === 'commission' ? '委托河湾施工队' : '未定')));
       if (pj.mode === 'commission') mat.appendChild(el('p', null, '河湾施工队 4 人 · 已开工 ' + pj.crew.day + ' 天 · 已付工钱 ' + pj.crew.paid + ' 金' + (engFundsLeft(pj) < ENG_SCHEMES[pj.scheme].wage && pj.build < engSchemeBuild(pj).length ? ' · 已停工：机构余额不足' : '')));
-      mat.appendChild(el('p', null, '试运行：' + (pj.trialDay ? '第 ' + pj.trialDay + ' 天封闸' : '未启动') + ' · 养护 ' + pj.maintCount + ' 次'));
+      mat.appendChild(el('p', null, '试运行：' + (pj.trialDay ? '第 ' + pj.trialDay + ' 天封闸' : '未启动') + ' · 养护 ' + pj.maintCount + ' 次' + (pj.phase === 'accepted' ? ' · 下次从第 ' + engMaintenanceDueDay(pj) + ' 天起到期' : '')));
       b.appendChild(mat);
       engFundsPanel(b);
       var mem = e.memories, who = [];
@@ -10782,6 +10786,8 @@ function engWarning(pj) {
   return score >= 3 ? { level: score, reasons: reasons } : null;
 }
 function engWorkOnHold(pj) { return pj.holdDay === state.totalDay; }
+function engMaintenanceDueDay(pj) { return Math.max(1, (pj.maintDay || 0) + ENG_MAINT_INTERVAL); }
+function engMaintenanceDue(pj) { return pj.phase === 'accepted' && state.totalDay >= engMaintenanceDueDay(pj); }
 function engCanPreventRoute(pj) {
   var observedDay = Math.max(pj.survey.day || 0, pj.reviewDay || 0);
   return engSurveyDone(pj) && engRisk(pj) <= 2 &&
@@ -10847,7 +10853,8 @@ function engNextStepText() {
   }
   if (pj.phase === 'build') return '闸基工作面封闸并启动跨日试运行';
   if (pj.phase === 'trial') return state.totalDay > pj.trialDay ? '水利控制室复核试运行并签署验收' : '睡过一个游戏夜晚再回来验收';
-  return state.totalDay > pj.maintDay ? '水利控制室做一次闸门养护检查' : '养护检查要隔一天；日常维护按周期出现';
+  var dueDay = engMaintenanceDueDay(pj);
+  return engMaintenanceDue(pj) ? '河湾闸门养护已到期（第 ' + dueDay + ' 天起）' : '河湾闸门下次养护从第 ' + dueDay + ' 天起；每 ' + ENG_MAINT_INTERVAL + ' 天一周期，无需每日签到';
 }
 function engSchemeCost(pj) {
   var sc = ENG_SCHEMES[pj.scheme];
@@ -19716,6 +19723,7 @@ window.__MOSS__ = {
       survey: pj.survey, practice: pj.practice, emergency: pj.emergency, opinions: pj.opinions,
       stone: pj.stone, kit: pj.kit, build: pj.build, mode: pj.mode, crew: pj.crew,
       trialDay: pj.trialDay, maintDay: pj.maintDay, maintCount: pj.maintCount,
+      maintenanceNextDay: engMaintenanceDueDay(pj), maintenanceDue: engMaintenanceDue(pj),
       reviewDay: pj.reviewDay, holdDay: pj.holdDay, reinforced: pj.reinforced,
       preventionDay: pj.preventionDay, recovery: pj.recovery, warning: engWarning(pj), heldToday: engWorkOnHold(pj),
       funds: pj.funds, fundsLeft: engFundsLeft(pj), risk: engRisk(pj),
