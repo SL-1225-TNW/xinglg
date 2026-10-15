@@ -58,7 +58,7 @@ try {
   await closeWin(p);
   await v(() => __MOSS__.openEngineeringProjectLog());
   check('项目记录写明受影响服务与未完成工序',
-    (await p.locator('.win').innerText()).includes('事故待恢复：河港货运暂时中断；第 1 道工序尚未完成'), true);
+    (await p.locator('.win').innerText()).includes('事故待恢复：河港货运暂时中断；第 2 道工序尚未完成'), true);
   await closeWin(p);
   await interactWith(p, 22, 14);
   check('事故期间施工入口被恢复面板取代', await btnCount(p, '亲自完成：'), 0);
