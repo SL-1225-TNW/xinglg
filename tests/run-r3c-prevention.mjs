@@ -24,7 +24,7 @@ try {
     M.state.professionalLife.eng.incident = '';
     M.state.professionalLife.eng.choice = '';
     M.state.weather.today = 'sun';
-    M.devSwitchScene('waterworks_control', 8, 6);
+    M.devSwitchScene('waterworks_control', 9, 10);
   });
   await interactWith(p, 8, 6);
   check('低风险时出现主动预防晋升选项', await btnCount(p, '提交预防方案并晋升'), 1);
