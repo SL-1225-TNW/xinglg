@@ -183,6 +183,9 @@ try {
   ok('闸基工作面可以交互', await interactWith(p, 22, 14), true);
   await clickWin(p, '亲自施工');
   ok('选亲自施工后不再领工钱', (await v(() => __MOSS__.engProjectInfo())).mode, 'self');
+  ok('高风险施工前提供现场复核入口', await btnCount(p, '现场复核并登记'), 1);
+  await clickWin(p, '现场复核并登记');
+  ok('施工前登记了当天复核', (await v(() => __MOSS__.engProjectInfo())).reviewDay, await v(() => __MOSS__.state.totalDay));
   for (let i = 0; i < 3; i++) {
     await v(() => { __MOSS__.state.energy = 80; __MOSS__.state.timeMinutes = 600; });
     await clickWin(p, '亲自完成');
