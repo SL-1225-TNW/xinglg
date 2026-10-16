@@ -8140,6 +8140,7 @@ function performSettlement(auto, innRoom) {
 
     /* 4. 日期 +1 */
     state.totalDay += 1;
+    engDailySafety();
     summary.dailyAllowance = CFG.dailyAllowance;
     summary.income += summary.dailyAllowance;
     state.coins += summary.dailyAllowance;
@@ -8551,6 +8552,33 @@ function heartsText(v) {
   return '♥'.repeat(full) + '♡'.repeat(Math.max(0, 4 - full));
 }
 
+/* R3-C2：三个人对「闸门这件事最后怎么收的」各说一句不同的话。
+   依据只有 pj.safety.route 这条已保存事实 —— 预警期主动加固是预防，
+   漏检后应急控水＋补修＋隔夜复查是恢复。打开面板不会改口，读档后也不变。 */
+var ENG_OUTCOME_DIALOGUE = {
+  noya: {
+    prevented: '销钉是你在预警那天就守住的，不用我催。诺娅把这次记成「主动」。',
+    recovered: '渗漏是你补完的，可流程是出了事才动。诺娅希望下次能在预警当天就上闸基。'
+  },
+  martin: {
+    prevented: '马丁看过现场记录：你在预警期就加固了销钉，后续仍按已确认的用水方案办。',
+    recovered: '马丁看过补修记录：你已经完成隔夜复查，后续供水仍以工程验收方案为准。'
+  },
+  council: {
+    prevented: '柯里在议事屋说：这次没人拍桌子，因为没人需要拍。',
+    recovered: '柯里把补修记成一笔账：出了事再修，比先看一眼贵得多。'
+  }
+};
+/* 诺娅与马丁在现场还有各自的居民副本，说的仍是同一个人 */
+ENG_OUTCOME_DIALOGUE.water_engineer = ENG_OUTCOME_DIALOGUE.noya;
+ENG_OUTCOME_DIALOGUE.mill_martin = ENG_OUTCOME_DIALOGUE.martin;
+function engOutcomeDialogue(id) {
+  var g = ENG_OUTCOME_DIALOGUE[id];
+  if (!g) return '';
+  var o = '';
+  try { o = engOutcome(); } catch (err) { return ''; }
+  return o ? (g[o] || '') : '';
+}
 function npcDialogue(id) {
   var npc = NPCS[id], d = npcDaily(id);
   var stage = friendshipStage(state.npcFriendship[id] || 0);
@@ -8558,6 +8586,8 @@ function npcDialogue(id) {
   if (stage > 0 && stage > d.heartStage) {
     d.heartStage = stage;
     text = npc.heartLines[stage];
+  } else if (engOutcomeDialogue(id)) {
+    text = engOutcomeDialogue(id);
   } else if (state.questProgress[3] === 'unlocked' || (state.questProgress[2] === 'done' && state.questProgress[3] !== 'done')) {
     text = npc.bridgeLines[(d.chatCount + (id === 'yaya' ? 0 : 1)) % npc.bridgeLines.length];
   } else if (isRaining()) {
@@ -11187,7 +11217,24 @@ function engCareer() {
   var p = professionalLifeState();
   if (!p.eng) p.eng = { stage: 0, post: '', incident: '', hearing: '', choice: '', budget: 0, memories: {} };
   if (!p.eng.memories) p.eng.memories = {};
+  /* R3-C2：岗位评价有两条来源 —— 处置旧事故，或汛前预防加固。
+     旧档没有 preventive/postEval，这里补空值，不追溯改写已发生的记录。 */
+  if (typeof p.eng.preventive !== 'string') p.eng.preventive = '';
+  if (typeof p.eng.postEval !== 'string') p.eng.postEval = '';
   return p.eng;
+}
+/* 岗位评价是否已完成（两条来源都算），以及是怎么来的 */
+function engHasPostEval() {
+  var e = engCareer();
+  return !!(e.incident || e.preventive);
+}
+function engPostEvalText() {
+  var e = engCareer();
+  if (e.postEval === 'preventive') return '预防性加固';
+  if (e.postEval === 'incident') return '事故处置';
+  if (e.preventive) return '预防性加固';
+  if (e.incident) return '事故处置';
+  return '尚未取得';
 }
 /* 岗位带来的实际权限，不只是一个称谓 */
 function engCan() {
@@ -11268,14 +11315,14 @@ function openEngineeringChapter(b, ww) {
       p_trustUp(2);
     });
   }
-  if (e.stage === 1 && !e.incident) {
-    box.appendChild(el('p', 'req-chip', '旧闸门在一次夜雨中崩了销，下游同时淹了麦田和断航 —— 这就是这项改造的由来。接下来要处理事故。'));
+  if (e.stage === 1 && !engHasPostEval()) {
+    box.appendChild(el('p', 'req-chip', '岗位考核有两条路：汛期前到坝顶水尺做预防性巡检，或在控制室处置夜雨冲垮旧闸门销的事故。走哪条都会给你岗位评价，不必等出事。'));
   }
   if (e.stage >= 2 && !e.post) {
     extendedWorkButton(b, 'water', '接受正式工程岗位 · 60分钟', { minutes: 60, energy: 3, guard: function () { return e.stage >= 2 && !e.post; } }, function () {
       e.post = 'waterworks_engineer';
       e.stage = 4;
-      rememberChoice('noya', '事故后接下工程岗位');
+      rememberChoice('noya', (e.postEval === 'preventive' ? '汛前预防' : '事故处置') + '后接下工程岗位');
     });
   }
   /* 机构预算：一次拨付，进项目账，不进个人钱包，也不因为读档再发一次 */
@@ -11314,6 +11361,7 @@ function openEngineeringChapter(b, ww) {
   if (mem.martin && mem.martin.length) who.push('马丁：' + mem.martin.join('、'));
   if (mem.council && mem.council.length) who.push('柯里：' + mem.council.join('、'));
   if (who.length) box.appendChild(el('p', 'muted', '他们记得——' + who.join('；')));
+  if (engCouncilText()) box.appendChild(el('p', 'muted', engCouncilText()));
   b.appendChild(box);
   if (pj.funds.granted > 0 || pj.funds.spent > 0 || pj.funds.donated > 0) engFundsPanel(b);
   /* 施工、试运行与验收都在坝体现场完成，控制室里只留状态与账本 */
@@ -11349,7 +11397,7 @@ function engBuildPanel(b, pj) {
   });
   if (pj.phase === 'accepted') {
     box.appendChild(el('p', 'req-chip ok', '已验收：' + ENG_SCHEMES[pj.scheme].supply + ' ' + ENG_SCHEMES[pj.scheme].freight));
-    box.appendChild(el('p', 'muted', '第 ' + pj.maintDay + ' 天完成最近一次养护检查，累计 ' + pj.maintCount + ' 次。'));
+    box.appendChild(el('p', 'muted', engDutyText(pj)));
   } else {
     box.appendChild(el('p', 'muted', '亲自施工不领工钱，代价是你的时间与体力；委托施工按 ' + ENG_SCHEMES[pj.scheme].wage + ' 金／工日从机构余额里出，余额不够就停工。两条路推进的是同一份工程进度。工序只能在坝体闸基工作面完成。'));
     if (pj.mode === 'commission') box.appendChild(el('p', null, '河湾施工队 4 人 · 已开工 ' + pj.crew.day + ' 天 · 已付工钱 ' + pj.crew.paid + ' 金 · 机构余额 ' + engFundsLeft(pj) + ' 金。'));
@@ -11496,22 +11544,100 @@ function engPitPanel(b, pj) {
   if (pj.phase === 'build' && pj.build >= steps.length) {
     box.appendChild(el('p', 'req-chip ok', steps.length + ' 道工序全部完成，可以封闸进入跨日试运行。'));
     extendedWorkButton(b, 'riverbay_pit', '封闸并启动试运行 · 30分钟', { minutes: 30, energy: 2, guard: function () { var q = engProject(); return q.phase === 'build' && q.build >= steps.length; } }, function () {
-      var q = engProject(); q.trialDay = state.totalDay; engAdvance('trial');
+      var q = engProject(); q.trialDay = state.totalDay; engAdvance('trial');engStartSafety(q);
     });
   }
   if (pj.phase === 'trial') {
-    box.appendChild(el('p', 'req-chip', '闸门正在试运行（第 ' + pj.trialDay + ' 天封闸）；' + (state.totalDay > pj.trialDay ? '已跨过一个夜晚，到控制室复核验收。' : '必须跨过一个游戏夜晚才能验收。')));
+    box.appendChild(el('p', 'req-chip', '闸门正在试运行（第 ' + pj.trialDay + ' 天封闸）；' + (!engSafetyClear(pj)?engSafetyText(pj):state.totalDay > pj.trialDay ? '已跨过一个夜晚，到控制室复核验收。' : '必须跨过一个游戏夜晚才能验收。')));
   }
+  if(pj.phase==='trial')engSafetyPanel(b,pj,'riverbay_pit');
+  b.appendChild(box);
+}
+function newEngSafety(){return {status:'none',route:'',deadline:0,inspectionDay:0,repairDay:0};}
+function normalizeEngSafety(raw){
+  var s=newEngSafety();if(!raw||typeof raw!=='object')return s;
+  s.status=['none','watch','failed','emergency','repair','clear'].indexOf(raw.status)>=0?raw.status:'failed';
+  /* R3-C2：route 记的是「这件事最后怎么收的」，三种结果互不覆盖，
+     读档后据此还原真实经过，而不是靠当前状态反推。 */
+  s.route=['normal','prevent','recover'].indexOf(raw.route)>=0?raw.route:'';
+  ['deadline','inspectionDay','repairDay'].forEach(function(k){s[k]=isInt(raw[k])?clamp(raw[k],0,100000):0;});
+  if(s.status==='watch'&&!s.deadline)s.status='failed';
+  if(s.status==='repair'&&!s.repairDay)s.status='emergency';
+  return s;
+}
+function engSafetyClear(q){return !q.safety||q.safety.status==='none'||q.safety.status==='clear';}
+function engSafetyText(q){
+  var s=q.safety||newEngSafety();
+  if(s.status==='watch')return '试运行预警：销钉与渗水需复查；第 '+s.deadline+' 天结束前到闸基工作面 (22,14) 检查并加固。';
+  if(s.status==='failed')return '试运行部分失败：漏检导致销钉渗漏，验收暂停；到闸基先选应急控水，再补修和隔夜复查。';
+  if(s.status==='emergency')return '应急控水已登记；到闸基补修。可交木材1、石料1，或用时间与体力自行补修，无强制罚款。';
+  if(s.status==='repair')return state.totalDay>s.repairDay?'补修已过夜：到闸基复查，合格后再去控制室验收。':'补修当天不能结案；睡过一夜再到闸基复查。';
+  return s.inspectionDay?'现场复查已记录，可按跨日规则验收。':'试运行未发现需要加固的预警，仍须跨夜验收。';
+}
+function engStartSafety(q){
+  q.safety=newEngSafety();q.safety.status=engRisk(q)>=3?'watch':'clear';q.safety.route=engRisk(q)>=3?'':'normal';
+  if(q.safety.status==='watch'){q.safety.deadline=state.totalDay+1;toast(engSafetyText(q));}
+}
+/* R3-C2：只读已保存事实，还原「这件事最后怎么收的」。三种结果互不替代：
+   预警期主动加固＝预防；漏检后应急控水＋补修＋隔夜复查＝恢复；低风险正常跨夜＝未发生处置。 */
+function engOutcome(){
+  var s=engProject().safety;
+  if(!s||!s.route)return '';
+  if(s.route==='prevent')return 'prevented';
+  if(s.route==='recover')return 'recovered';
+  return '';
+}
+function engOutcomeText(){
+  var o=engOutcome();
+  if(o==='prevented')return '预警期主动加固，没有漏检';
+  if(o==='recovered')return '漏检后先应急控水，再补修并隔夜复查结案';
+  return engProject().safety&&engProject().safety.route==='normal'?'低风险试运行，按跨夜规则复核':'尚无试运行处置结果';
+}
+/* 柯里是议事员的判断口径，不是个可对话的 NPC，所以写进面板与项目记录，
+   诺娅和马丁的说法才走对话线。三处读同一条已保存事实。 */
+function engCouncilText(){
+  var o=engOutcome();
+  if(o==='prevented')return '柯里在议事屋说：这次没人拍桌子，因为没人需要拍。';
+  if(o==='recovered')return '柯里把补修记成一笔账：出了事再修，比先看一眼贵得多。';
+  return '';
+}
+/* 日期结算是漏检的唯一触发点；打开窗口、换场景与读档均只读取已保存事实。 */
+function engDailySafety(){
+  var p=state.professionalLife,q=p&&p.projects&&p.projects[ENG_PROJECT_ID];if(!q||q.phase!=='trial'||!q.safety)return;
+  var s=q.safety;if(s.status==='watch'&&state.totalDay>s.deadline){s.status='failed';toast('河湾试运行漏检：销钉渗漏，需到闸基应急处置与补修。');markDirty();}
+}
+function engSafetyPanel(b,q,site){
+  if(!q.safety||q.safety.status==='none')return;
+  var s=q.safety,box=el('div','panel-box');box.appendChild(el('div','section-title','试运行安全记录'));
+  box.appendChild(el('p','req-chip',engSafetyText(q)));
+  box.appendChild(el('p','muted','基础风险 '+engRisk(q)+' 级，来自已保存的水位、坡脚、淤积与方案。未通过复查时新工程效果不启用；原工序和机构余额保留，不重复收取班工。'));
+  function button(label,opts,apply){extendedWorkButton(box,'riverbay_pit',label,opts,apply);}
+  if(site==='riverbay_pit'&&s.status==='watch'){
+    if(!s.inspectionDay)button('现场检查销钉与渗水 · 20分钟',{minutes:20,energy:1,guard:function(){return q.phase==='trial'&&s.status==='watch'&&!s.inspectionDay;}},function(){s.inspectionDay=state.totalDay;});
+    else{
+      box.appendChild(el('p',null,'检查确认需要加固。材料路线耗时较短；缺料也可以自行加固。'));
+      button('交木材1、石料1并加固 · 30分钟',{need:{wood:1,stone:1},minutes:30,energy:2,guard:function(){return q.phase==='trial'&&s.status==='watch'&&s.inspectionDay>0;}},function(){s.status='clear';s.route='prevent';rememberChoice('noya','在试运行预警期主动加固');});
+      button('自行加固（不用材料）· 90分钟',{minutes:90,energy:5,guard:function(){return q.phase==='trial'&&s.status==='watch'&&s.inspectionDay>0;}},function(){s.status='clear';s.route='prevent';rememberChoice('noya','在试运行预警期自行加固');});
+    }
+  }
+  if(site==='riverbay_pit'&&s.status==='failed')[['field','先保农田'],['channel','先保通航']].forEach(function(o){button('应急控水：'+o[1]+' · 20分钟',{minutes:20,energy:1,guard:function(){return q.phase==='trial'&&s.status==='failed';}},function(){q.emergency=o[0];s.status='emergency';var p=professionalLifeState();deriveWaterworksFromProject(p,p.waterworks);rememberChoice('noya','试运行漏检后'+o[1]);});});
+  if(site==='riverbay_pit'&&s.status==='emergency'){
+    function repaired(){s.status='repair';s.repairDay=state.totalDay;}
+    button('交木材1、石料1并补修 · 30分钟',{need:{wood:1,stone:1},minutes:30,energy:2,guard:function(){return q.phase==='trial'&&s.status==='emergency';}},repaired);
+    button('自行补修（不用材料）· 90分钟',{minutes:90,energy:5,guard:function(){return q.phase==='trial'&&s.status==='emergency';}},repaired);
+  }
+  if(site==='riverbay_pit'&&s.status==='repair'&&state.totalDay>s.repairDay)button('隔夜复查销钉与渗水 · 25分钟',{minutes:25,energy:1,guard:function(){return q.phase==='trial'&&s.status==='repair'&&state.totalDay>s.repairDay;}},function(){s.status='clear';s.route='recover';s.inspectionDay=state.totalDay;rememberChoice('noya','完成试运行补修与隔夜复查');});
   b.appendChild(box);
 }
 function q0(v) { return v || '0'; }
 /* 验收：跨过一个夜晚才能签；奖励走稳定事务 ID，重复打开面板不会重复发。 */
 function engAcceptProject() {
   var p = professionalLifeState(), pj = engProject();
-  if (pj.phase !== 'trial' || state.totalDay <= pj.trialDay) return false;
+  if (pj.phase !== 'trial' || state.totalDay <= pj.trialDay || !engSafetyClear(pj)) return false;
   if (pj.funds.tx['riverbay:accept']) return false;
   engLedger(pj, 'riverbay:accept', 'reward', 90, 'grant', '验收报酬');
   pj.maintDay = state.totalDay;
+  engDutyStart(pj);            /* R3-C2：验收即接下周期养护责任，与工程验收同一次落盘 */
   engAdvance('accepted');           /* 单一方向写回：scope 升为 works，方案口径对地区生效 */
   bumpCareer('engineering', 2); bumpRoute('engineering', 2); bumpCareer('trade');
   p.trust = Math.min(100, (p.trust || 0) + 2);
@@ -11520,6 +11646,190 @@ function engAcceptProject() {
   markDirty();
   return true;
 }
+/* ============================================================
+   R3-C2：验收后的养护是「周期责任」，不是可以反复点的按钮。
+
+   责任只有这一份记录：周期长度、下次检视日、工作范围、联系人、
+   已完成次数，以及延期／交接／退出的全过程都存在 pj.duty 里。
+   评价按「走完一个周期」结算，逾期补做只留记录不发评价，
+   所以既不能每天打卡刷资历，也不会因为漏看就悄悄清零。
+   离岗与交接都不碰 pj.safety —— 未处理的事件永远留在原处。
+   ============================================================ */
+var ENG_DUTY_CYCLE = 3;
+var ENG_DUTY_SCOPE = '销钉与渗水复查；闸缝间隙与应急控水口径核对；岸坡与淤积目视';
+var ENG_DUTY_CONTACT = '诺娅（水利控制室）';
+var ENG_DUTY_SUCCESSOR = '玛尔（石灰采场工头）';
+var ENG_DUTY_MAX_DEFER = 3;
+function newEngDuty() {
+  return {
+    status: 'none', cycle: ENG_DUTY_CYCLE, startDay: 0, nextDay: 0, lastDay: 0, endDay: 0,
+    done: 0, sinceEval: 0, evalCount: 0, overdue: 0, deferCount: 0, defers: [],
+    successor: '', reason: ''
+  };
+}
+function normalizeEngDuty(raw) {
+  var d = newEngDuty();
+  if (!raw || typeof raw !== 'object') return d;
+  d.status = ['none', 'active', 'handed', 'released'].indexOf(raw.status) >= 0 ? raw.status : 'none';
+  d.cycle = isInt(raw.cycle) ? clamp(raw.cycle, 1, 14) : ENG_DUTY_CYCLE;
+  ['startDay', 'nextDay', 'lastDay', 'endDay'].forEach(function (k) { d[k] = isInt(raw[k]) ? clamp(raw[k], 0, 100000) : 0; });
+  d.done = isInt(raw.done) ? clamp(raw.done, 0, 9999) : 0;
+  d.sinceEval = isInt(raw.sinceEval) ? clamp(raw.sinceEval, 0, 9999) : 0;
+  d.evalCount = isInt(raw.evalCount) ? clamp(raw.evalCount, 0, 9999) : 0;
+  d.overdue = isInt(raw.overdue) ? clamp(raw.overdue, 0, 9999) : 0;
+  d.deferCount = isInt(raw.deferCount) ? clamp(raw.deferCount, 0, 999) : 0;
+  d.successor = typeof raw.successor === 'string' ? raw.successor.slice(0, 40) : '';
+  d.reason = typeof raw.reason === 'string' ? raw.reason.slice(0, 80) : '';
+  d.defers = Array.isArray(raw.defers) ? raw.defers.filter(function (x) {
+    return x && typeof x === 'object' && isInt(x.day);
+  }).slice(-12).map(function (x) {
+    return {
+      day: clamp(x.day, 0, 100000),
+      from: isInt(x.from) ? clamp(x.from, 0, 100000) : 0,
+      to: isInt(x.to) ? clamp(x.to, 0, 100000) : 0,
+      lateDays: isInt(x.lateDays) ? clamp(x.lateDays, 0, 100000) : 0,
+      why: typeof x.why === 'string' ? x.why.slice(0, 40) : ''
+    };
+  }) : [];
+  return d;
+}
+function engDuty(pj) { if (!pj.duty) pj.duty = newEngDuty(); return pj.duty; }
+function restoreEngDuty(pj){
+  if(pj.phase==='accepted'&&pj.duty.status==='none'&&pj.maintDay>0){
+    pj.duty.status='active';pj.duty.startDay=pj.maintDay;pj.duty.lastDay=pj.maintDay;pj.duty.nextDay=pj.maintDay+pj.duty.cycle;
+  }
+}
+/* 验收当天才开岗；旧档没有 duty 时不追溯生成。 */
+function engDutyStart(pj) {
+  var d = engDuty(pj);
+  if (d.status !== 'none') return;
+  d.status = 'active';
+  d.startDay = state.totalDay;
+  d.lastDay = state.totalDay;
+  d.nextDay = state.totalDay + d.cycle;
+}
+/* 逾期天数：>0 表示已经过了应检视日还没做 */
+function engDutyOverdue(pj) {
+  var d = engDuty(pj);
+  return d.status === 'active' ? Math.max(0, state.totalDay - d.nextDay) : 0;
+}
+function engDutyText(pj) {
+  var d = engDuty(pj), over = engDutyOverdue(pj);
+  if (d.status === 'none') return '养护责任尚未开始。';
+  if (d.status === 'handed') return '第 ' + d.endDay + ' 天交接给' + d.successor + '；你做过的 ' + d.done + ' 次检视与 ' + d.deferCount + ' 次延期仍记在你名下。';
+  if (d.status === 'released') return '第 ' + d.endDay + ' 天离岗；累计检视 ' + d.done + ' 次、延期 ' + d.deferCount + ' 次、逾期 ' + d.overdue + ' 次。' + (d.successor ? '继任：' + d.successor + '。' : '');
+  if (over > 0) return '逾期 ' + over + ' 天未检视；补做只留记录，不计岗位评价。';
+  return '下次检视日：第 ' + d.nextDay + ' 天（还有 ' + Math.max(0, d.nextDay - state.totalDay) + ' 天）。累计检视 ' + d.done + ' 次、评价 ' + d.evalCount + ' 次。';
+}
+/* 检视：一次只推进一个周期。评价按走完周期结算，不是每点一次涨一次。 */
+function engDutyInspect(pj) {
+  var d = engDuty(pj), p = professionalLifeState();
+  if (pj.phase !== 'accepted' || d.status !== 'active') return false;
+  if (state.totalDay < d.nextDay) return false;
+  var over = engDutyOverdue(pj);
+  d.lastDay = state.totalDay;
+  d.done++; d.sinceEval++;
+  d.nextDay = state.totalDay + d.cycle;
+  pj.maintDay = state.totalDay;
+  pj.maintCount = d.done;
+  if (over > 0) {
+    d.overdue++; d.sinceEval = 0;
+    rememberChoice('noya', '闸门养护逾期后才补做');
+  } else if (d.sinceEval >= d.cycle) {
+    d.sinceEval = 0; d.evalCount++;
+    bumpCareer('engineering');
+    p.trust = Math.min(100, (p.trust || 0) + 1);
+    rememberChoice('noya', '按期走完一个闸门养护周期');
+  }
+  markDirty();
+  return true;
+}
+/* 延期要留下理由和天数，累计封顶后只能交接或退出 */
+function engDutyDefer(pj, why) {
+  var d = engDuty(pj);
+  if (pj.phase !== 'accepted' || d.status !== 'active') return false;
+  if (d.deferCount >= ENG_DUTY_MAX_DEFER) return false;
+  var from = d.nextDay;
+  var lateDays=engDutyOverdue(pj);
+  if(lateDays>0)d.overdue++;
+  d.nextDay = d.nextDay + d.cycle;
+  d.deferCount++;
+  d.sinceEval = 0;
+  d.defers.push({ day: state.totalDay, from: from, to: d.nextDay, lateDays:lateDays, why: why || '' });
+  if (d.defers.length > 12) d.defers.shift();
+  rememberChoice('council', '为闸门养护申请过延期');
+  markDirty();
+  return true;
+}
+/* 交接与退出都要求安全记录已处理完；未处理的事件留在 pj.safety，交班不清账 */
+function engDutyClose(pj, status) {
+  var d = engDuty(pj);
+  if (pj.phase !== 'accepted' || d.status !== 'active') return false;
+  if (!engSafetyClear(pj)) return false;
+  var over = engDutyOverdue(pj);
+  if (over > 0) { d.overdue++; d.sinceEval = 0; }
+  d.status = status;
+  d.successor = ENG_DUTY_SUCCESSOR;
+  d.endDay = state.totalDay;
+  d.reason = status === 'handed'
+    ? '交接给继任工程员' + (over > 0 ? '（离岗时尚有逾期检视，已记入交接）' : '')
+    : '主动结束养护岗位' + (over > 0 ? '（离岗时尚有逾期检视，已记入交接）' : '');
+  rememberChoice('noya', status === 'handed' ? '把闸门养护责任交接出去' : '结束闸门养护岗位');
+  rememberChoice('council', status === 'handed' ? '同意你交出闸门养护岗' : '接受你辞去闸门养护岗');
+  markDirty();
+  return true;
+}
+function engDutyHandover(pj) { return engDutyClose(pj, 'handed'); }
+function engDutyRelease(pj) { return engDutyClose(pj, 'released'); }
+function engDutyPanel(b, pj, site) {
+  var at = site === 'water' ? 'water' : 'gauge';
+  var d = engDuty(pj), p = professionalLifeState();
+  var box = el('div', 'panel-box');
+  box.appendChild(el('div', 'section-title', '闸门养护 · 周期责任'));
+  box.appendChild(el('p', 'muted', '周期：每 ' + d.cycle + ' 天一次。工作范围：' + ENG_DUTY_SCOPE + '。联系人：' + ENG_DUTY_CONTACT + '。'));
+  box.appendChild(el('p', 'req-chip', engDutyText(pj)));
+  if (d.defers.length) {
+    box.appendChild(el('p', 'muted', '延期记录：' + d.defers.map(function (x) {
+      return '第' + x.day + '天 第' + x.from + '→' + x.to + '天' + (x.why ? '（' + x.why + '）' : '')+(x.lateDays?'；申请时已逾期'+x.lateDays+'天':'');
+    }).join('；')));
+  }
+  if (d.status === 'active') {
+    if (state.totalDay >= d.nextDay) {
+      extendedWorkButton(box, at, '闸门养护检视 · 45分钟', {
+        minutes: 45, energy: 3,
+        guard: function () { var q = engProject(); return q.phase === 'accepted' && engDuty(q).status === 'active' && state.totalDay >= engDuty(q).nextDay; },
+        reason: '刚检视过；下一个检视日还没到。'
+      }, function () { engDutyInspect(engProject()); });
+    } else box.appendChild(el('p', 'muted', '本周期检视已完成，不必每天来。'));
+    if (d.deferCount < ENG_DUTY_MAX_DEFER) {
+      extendedWorkButton(box, at, '申请延期一个周期 · 20分钟', {
+        minutes: 20,
+        guard: function () { var q = engProject(); return q.phase === 'accepted' && engDuty(q).status === 'active' && engDuty(q).deferCount < ENG_DUTY_MAX_DEFER; },
+        reason: '延期已达上限（' + ENG_DUTY_MAX_DEFER + ' 次），只能交接或退出。'
+      }, function () { engDutyDefer(engProject(), '人手不足'); });
+    } else box.appendChild(el('p', 'req-chip', '延期已用满 ' + ENG_DUTY_MAX_DEFER + ' 次：要交接或退出，责任才算说清楚。'));
+    /* 交接与退出的前置是安全记录已处理完 —— 交班不清掉未处理的闸门事件 */
+    var blocked = !engSafetyClear(pj);
+    if (blocked) box.appendChild(el('p', 'req-chip', '闸门还有未处理的安全事件，交接与退出都要先把它处理完。'));
+    extendedWorkButton(box, at, '交接给继任工程员 · 30分钟', {
+      minutes: 30, energy: 1,
+      guard: function () { var q = engProject(); return q.phase === 'accepted' && engDuty(q).status === 'active' && engSafetyClear(q); },
+      reason: blocked ? '闸门还有未处理的安全事件。' : ''
+    }, function () { engDutyHandover(engProject()); });
+    extendedWorkButton(box, at, '结束养护岗位 · 30分钟', {
+      minutes: 30, energy: 1,
+      guard: function () { var q = engProject(); return q.phase === 'accepted' && engDuty(q).status === 'active' && engSafetyClear(q); },
+      reason: blocked ? '闸门还有未处理的安全事件。' : ''
+    }, function () { engDutyRelease(engProject()); });
+  } else if(d.status==='none'){
+    box.appendChild(el('p','muted','旧工程缺少养护起始日期，可以从今天接回责任，不追溯补记检视或评价。'));
+    extendedWorkButton(box,at,'从今天接回养护责任 · 20分钟',{minutes:20,guard:function(){return engProject().phase==='accepted'&&engDuty(engProject()).status==='none'&&engSafetyClear(engProject());}},function(){engDutyStart(engProject());});
+  } else {
+    box.appendChild(el('p', 'muted', '责任已经' + (d.status === 'handed' ? '交出' : '结束') + '。你名下的检视、延期与逾期记录都保留在册，随时可查。'));
+  }
+  b.appendChild(box);
+}
+
 function engAcceptPanel(b, pj, site) {
   var at = site === 'water' ? 'water' : 'gauge';
   var i = engPhaseIndex(pj);
@@ -11529,19 +11839,16 @@ function engAcceptPanel(b, pj, site) {
   if (i === 5) {
     box.appendChild(el('div', 'section-title', '跨日试运行 · 待复核'));
     box.appendChild(el('p', 'muted', '闸门于第 ' + pj.trialDay + ' 天封闸。试运行要跨过一个游戏夜晚，确认渗水、销钉与水位都稳得住，再由你署名验收。'));
-    if (state.totalDay > pj.trialDay) {
-      extendedWorkButton(b, at, '复核试运行并签署验收 · 报酬 90 金', { minutes: 40, energy: 2, guard: function () { var q = engProject(); return q.phase === 'trial' && state.totalDay > q.trialDay && !q.funds.tx['riverbay:accept']; } }, function () { engAcceptProject(); });
-    } else box.appendChild(el('p', 'req-chip', '今天才封闸；睡一夜再来验收。'));
+    if(!engSafetyClear(pj))box.appendChild(el('p','req-chip',engSafetyText(pj)));
+    if (state.totalDay > pj.trialDay && engSafetyClear(pj)) {
+      extendedWorkButton(b, at, '复核试运行并签署验收 · 报酬 90 金', { minutes: 40, energy: 2, guard: function () { var q = engProject(); return q.phase === 'trial' && state.totalDay > q.trialDay && engSafetyClear(q) && !q.funds.tx['riverbay:accept']; } }, function () { engAcceptProject(); });
+    } else if(state.totalDay<=pj.trialDay)box.appendChild(el('p', 'req-chip', '今天才封闸；睡一夜再来验收。'));
   } else {
     box.appendChild(el('div', 'section-title', '验收完成 · ' + sc.name));
     box.appendChild(el('p', 'req-chip ok', sc.supply + ' ' + sc.freight));
-    box.appendChild(el('p', 'muted', '第 ' + pj.maintDay + ' 天完成最近一次养护检查，累计 ' + pj.maintCount + ' 次。养护按周期来，不强制每天打卡。'));
-    if (state.totalDay > pj.maintDay) {
-      extendedWorkButton(b, at, '闸门养护检查 · 45分钟', { minutes: 45, energy: 3, guard: function () { var q = engProject(); return q.phase === 'accepted' && state.totalDay > q.maintDay; }, reason: '刚做完养护；下一次要隔一天。' }, function () {
-        var q = engProject(); q.maintDay = state.totalDay; q.maintCount++;
-        p.trust = Math.min(100, (p.trust || 0) + 1); bumpCareer('engineering');
-      });
-    } else box.appendChild(el('p', 'req-chip', '养护检查要隔一天再做，今天没有新的检视项。'));
+    box.appendChild(el('p', 'muted', '验收当日起你承担闸门养护责任：按周期检视，不强制每日签到。'));
+    box.appendChild(el('p', 'muted', '试运行结果：' + engOutcomeText() + '。岗位评价来源：' + engPostEvalText() + '。'));
+    engDutyPanel(b, pj, site);
   }
   b.appendChild(box);
 }
@@ -11554,19 +11861,53 @@ function p_trustUp(n) {
 /* 事故处置：两个选项各自改变真实的系统状态，不是换个说法。
    处置写入项目记录的 emergency 字段 —— 那是验收前的应急口径，
    工程验收后会被正式方案取代，所以两边不会互相覆盖。 */
+function engPreventiveReady() {
+  var e = engCareer();
+  return e.stage === 1 && !e.incident && !e.preventive && !e.post;
+}
+/* R3-C2：岗位评价不必等出事。汛期前的一轮学徒加固走的是真实地点、真实材料，
+   和事故分支共享同一批物资口径；两条来源互不覆盖，已发生事故的旧档照旧。 */
+function engTakePostEval(route, how) {
+  var e = engCareer();
+  if (!engPreventiveReady()) return false;
+  e.preventive = 'gate';
+  e.postEval = 'preventive';
+  e.stage = 2;
+  rememberChoice('noya', '汛期前主动完成旧闸预防性加固');
+  rememberChoice('martin', how === 'mat' ? '汛期前用备料加固旧闸' : '汛期前靠巡检加固旧闸');
+  rememberChoice('council', '汛前没有等出事就动手');
+  p_trustUp(1);
+  return true;
+}
+function openPreventiveTrack(b) {
+  if (!engPreventiveReady()) return;
+  var box = el('div', 'panel-box');
+  box.appendChild(el('div', 'section-title', '汛前预防性巡检 · 旧闸检修口'));
+  box.appendChild(el('p', 'req-chip', '不必等出事。汛期前把旧闸的销钉与闸缝重新紧一遍，这轮学徒任务本身就是岗位考核的一部分。'));
+  box.appendChild(el('p', 'muted', '和后面的补救一样：备料路线省时间，缺料也能用劳动顶，两条都算数。做完记「预防」；旧闸事故分支保留给还没处置的玩家。'));
+  extendedWorkButton(box, 'gauge', '旧闸预防性加固（木材1 · 石料1）· 45分钟', { need: { wood: 1, stone: 1 }, minutes: 45, energy: 2, guard: function () { return engPreventiveReady(); } }, function () {
+    engTakePostEval('gate', 'mat');
+  });
+  extendedWorkButton(box, 'gauge', '旧闸预防性巡检加固（不用材料）· 120分钟', { minutes: 120, energy: 5, guard: function () { return engPreventiveReady(); } }, function () {
+    engTakePostEval('gate', 'labor');
+  });
+  b.appendChild(box);
+}
 function openIncidentChoice(b) {
   var e = engCareer();
+  if (!engPreventiveReady()) return;
   var box = el('div', 'panel-box');
   box.appendChild(el('div', 'section-title', '事故 · 夜雨冲垮闸门销'));
   box.appendChild(el('p', null, '水从缺口直冲下游，麦田刚返青，船闸也断了航。村民要你先保一样。'));
   box.appendChild(el('p', 'muted', '你的处理会被三方记住：诺娅看工程，马丁看磨坊额度，柯里看村里怎么评这次取舍。这只是应急口径，河湾工程验收后由正式方案接替。'));
+  box.appendChild(el('p', 'req-chip', '另一条路：到坝顶水尺做汛前预防性巡检，不用等出事也能拿到岗位评价。两条只算一条。'));
   extendedWorkButton(b, 'water', '先堵缺口保麦田 · 记牺牲通航', { minutes: 120, energy: 4, guard: function () { return e.stage === 1 && !e.incident; } }, function () {
-    e.incident = 'field'; e.choice = 'field'; e.stage = 2;
+    e.incident = 'field'; e.choice = 'field'; e.stage = 2; e.postEval = 'incident';
     rememberChoice('noya', '事故中先保农田'); rememberChoice('martin', '事故中先保农田');
     applyEngChoice();
   });
   extendedWorkButton(b, 'water', '先泄水保船闸 · 记麦田延灌', { minutes: 120, energy: 4, guard: function () { return e.stage === 1 && !e.incident; } }, function () {
-    e.incident = 'channel'; e.choice = 'channel'; e.stage = 2;
+    e.incident = 'channel'; e.choice = 'channel'; e.stage = 2; e.postEval = 'incident';
     rememberChoice('noya', '事故中先保通航'); rememberChoice('martin', '事故中先保通航');
     applyEngChoice();
   });
@@ -11628,7 +11969,9 @@ function newEngProject() {
     build: 0, buildDay: 0, mode: '',
     crew: { day: 0, paid: 0 },
     trialDay: 0, maintDay: 0, maintCount: 0,
-    funds: { granted: 0, spent: 0, donated: 0, tx: {} }
+    funds: { granted: 0, spent: 0, donated: 0, tx: {} },
+    safety: newEngSafety(),
+    duty: newEngDuty()
   };
 }
 /* 归一化。legacy 只在项目记录缺失的旧档上读一次，之后项目记录是唯一事实。 */
@@ -11676,6 +12019,7 @@ function normalizeEngProject(raw, legacy) {
       d.funds.spent = 0;
       d.funds.tx['legacy:grant'] = { kind: 'grant', amount: d.funds.granted, pool: 'grant', day: 0, label: '旧档已领取的机构预算' };
     }
+    restoreEngDuty(d);
     return d;
   }
   var s = r.survey || {};
@@ -11700,6 +12044,8 @@ function normalizeEngProject(raw, legacy) {
   });
   d.funds = { granted: num(f.granted, ENG_GRANT_MAX), spent: num(f.spent, ENG_GRANT_MAX * 4), donated: num(f.donated, ENG_GRANT_MAX * 4), tx: tx };
   d.phase = ENG_PHASES.indexOf(r.phase) >= 0 ? r.phase : 'survey';
+  d.safety=normalizeEngSafety(r.safety);
+  d.duty=normalizeEngDuty(r.duty);
 
   /* --- 自洽：不可能的组合必须被压回，而不是留下一个能反复领钱的存档 --- */
   var surveyDone = d.survey.level > 0 && d.survey.east && d.survey.silt;
@@ -11714,6 +12060,11 @@ function normalizeEngProject(raw, legacy) {
   /* 封闸日属于「试运行」阶段本身，清零会把已经跨过夜的工程退回未封闸 */
   if (ENG_PHASES.indexOf(d.phase) < 5) { d.trialDay = 0; d.maintDay = 0; }
   if (d.phase !== 'accepted') d.maintCount = 0;
+  /* R3-C2：养护责任只在验收之后存在；没验收的旧档不追溯生成岗位责任 */
+  if (d.phase !== 'accepted' && d.duty.status !== 'none') d.duty = newEngDuty();
+  /* 已经验收却没有责任记录的旧档（R3-C2 之前）从最后一次养护日起算周期，
+     否则这类存档会永久失去养护循环。不会凭空补检视次数，也不会追溯改写已发生的处置。 */
+  restoreEngDuty(d);
   /* 资金守恒：已入账不得超过拨付＋自愿补记；自愿补记永远只能来自个人钱包 */
   if (d.funds.granted > ENG_GRANT_MAX) d.funds.granted = ENG_GRANT_MAX;
   var pool = d.funds.granted + d.funds.donated;
@@ -11791,6 +12142,7 @@ function openEngineeringProjectLog() {
       mat.appendChild(el('p', null, '石料 ' + (pj.stone ? '已签收' : '未到货') + ' · 闸件套装 ' + (pj.kit ? '已进场' : '未进场') + ' · 工序 ' + pj.build + '/' + engSchemeBuild(pj).length + ' · 施工方式 ' + (pj.mode === 'self' ? '亲自施工' : pj.mode === 'commission' ? '委托河湾施工队' : '未定')));
       if (pj.mode === 'commission') mat.appendChild(el('p', null, '河湾施工队 4 人 · 已开工 ' + pj.crew.day + ' 天 · 已付工钱 ' + pj.crew.paid + ' 金' + (engFundsLeft(pj) < ENG_SCHEMES[pj.scheme].wage && pj.build < engSchemeBuild(pj).length ? ' · 已停工：机构余额不足' : '')));
       mat.appendChild(el('p', null, '试运行：' + (pj.trialDay ? '第 ' + pj.trialDay + ' 天封闸' : '未启动') + ' · 养护 ' + pj.maintCount + ' 次'));
+      mat.appendChild(el('p', 'muted', '岗位评价来源：' + engPostEvalText() + ' · 试运行结果：' + engOutcomeText() + ' · 养护：' + engDutyText(pj)));
       b.appendChild(mat);
       engFundsPanel(b);
       var mem = e.memories, who = [];
@@ -11870,6 +12222,7 @@ function engSchemeBuild(pj) { var sc = ENG_SCHEMES[pj.scheme]; return sc ? sc.bu
 /* 一份「下一步」文案，三个地方共用：角色经历、N 记录、今日安排 */
 function engNextStepText() {
   var pj = engProject(), e = engCareer(), i = engPhaseIndex(pj), sc = ENG_SCHEMES[pj.scheme];
+  if(pj.phase==='trial'&&!engSafetyClear(pj))return engSafetyText(pj);
   if (i < 1) {
     if (!pj.survey.level) return '坝顶水尺 (20,18) 读水位';
     if (!pj.survey.east) return '东岸坡脚 (21,20) 探查坡体';
@@ -11877,7 +12230,7 @@ function engNextStepText() {
     return engPracticeRoute() ? '水利控制室领取基础工程认证' : '先去验收' + (mineWorks().inspected ? '矿山排水' : '风铃磨坊水轮') + '，或换另一条实践路线';
   }
   if (e.stage === 0) return '水利控制室签署第一份独立工程报告';
-  if (!e.incident) return '处理夜雨冲垮旧闸门销的事故';
+  if (!engHasPostEval()) return '岗位考核二选一：坝顶水尺做汛前预防性巡检，或控制室处置夜雨冲垮旧闸门销的事故';
   if (!e.post) return '水利控制室接受正式工程岗位';
   if (!e.budgetGranted) return '申请本项目一次性机构拨付 ' + ENG_GRANT_MAX + ' 金';
   if (!pj.scheme) {
@@ -11892,7 +12245,11 @@ function engNextStepText() {
   }
   if (pj.phase === 'build') return '闸基工作面封闸并启动跨日试运行';
   if (pj.phase === 'trial') return state.totalDay > pj.trialDay ? '水利控制室复核试运行并签署验收' : '睡过一个游戏夜晚再回来验收';
-  return state.totalDay > pj.maintDay ? '水利控制室做一次闸门养护检查' : '养护检查要隔一天；日常维护按周期出现';
+  var dty = engDuty(pj);
+  if (dty.status === 'handed') return '闸门养护责任已于第 ' + dty.endDay + ' 天交接给' + dty.successor + '，记录仍在你名下';
+  if (dty.status === 'released') return '闸门养护岗位已于第 ' + dty.endDay + ' 天结束，检视与延期记录仍可查';
+  if (dty.status === 'active' && state.totalDay >= dty.nextDay) return '闸门养护检视已到期（第 ' + dty.nextDay + ' 天' + (engDutyOverdue(pj) > 0 ? '，逾期 ' + engDutyOverdue(pj) + ' 天' : '') + '），到控制室或坝顶水尺做一次';
+  return '闸门养护：下次检视日第 ' + dty.nextDay + ' 天，周期 ' + dty.cycle + ' 天，不必每日签到';
 }
 function engSchemeCost(pj) {
   var sc = ENG_SCHEMES[pj.scheme];
@@ -12574,10 +12931,13 @@ CHAR_BUILD.history = function (b) {
   charRow(career, '工程账本', '机构拨付 ' + engProject().funds.granted + ' 金 · 自愿补记 ' + engProject().funds.donated +
     ' 金 · 已支出 ' + engProject().funds.spent + ' 金（与个人钱包 ' + state.coins + ' 金分开）', 'char-val muted');
   charRow(career, '工程联系人', '诺娅（水利站）· 马丁（磨坊）· 柯里（议事屋）；材料走采场—测量棚—河港—水利站', 'char-val muted');
+  charRow(career, '岗位评价来源', engPostEvalText() + '（预防与事故两条路线都算数，不必等出事）', 'char-val muted');
+  charRow(career, '试运行结果', engOutcomeText(), 'char-val muted');
+  charRow(career, '养护责任', engDutyText(engProject()), 'char-val muted');
   charRow(career, '下一步', engNextStepText(), 'char-val muted');
   charRow(career, '授权分层', '到访 ' + (p.passes.visit ? '有' : '无') + ' · 接任务 ' + (p.passes.commission ? '有' : '无') +
     ' · 指挥 ' + (p.passes.command ? '有' : '无'), 'char-val muted');
-  charNote(career, '河湾闸门已打通勘测 → 方案 → 材料 → 施工 → 跨日试运行 → 验收 → 养护的完整闭环；真实预警与失败复查仍待 R3-C。');
+  charNote(career, '河湾闸门已打通勘测、施工与跨日验收；高风险试运行可现场预防，漏检后可补修并隔夜复查。岗位评价两条来源并存，养护按周期责任走，可延期、交接与退出。');
 
   var mil = charBox(b, '军队记录（机构授权，不等于个人战力）');
   charRow(mil, '登记', m.registered ? '已登记' : '未登记');
@@ -17764,7 +18124,7 @@ function normalizeWetlandLife(raw){var r=raw&&typeof raw==='object'?raw:{},w=new
   if(!w.causeFound)w.habitat=null;
   return w;
 }
-function newProfessionalLife(){return {vineyard:{plan:null,planDay:0,harvestDay:0,pressDay:0,delayed:false,harvested:0,pressed:0,product:null,shipped:0},clinic:{diagnosed:false,sampleVerified:false,receivedJuice:false,medicine:0,patientDay:0,recovered:false},port:{manifestChecked:false,choice:null,shipment:null,settled:false,shipmentDay:0,deliveries:0},quarry:{surveyed:false,face:null,props:false,extracted:0,lastExtractDay:0,cut:0},waterworks:{level:0,repair:null,receivedStone:false,millOpinion:false,meadowOpinion:false,portOpinion:false,allocation:null,testDay:0,certified:false,scope:''},projects:{},careers:{horticulture:0,medicine:0,trade:0,engineering:0},watershedContract:0,trust:0,access:{vineyard:false,clinic:false,port:false,quarry:false,waterworks:false},
+function newProfessionalLife(){return {vineyard:{plan:null,planDay:0,harvestDay:0,pressDay:0,delayed:false,harvested:0,pressed:0,product:null,shipped:0},clinic:{diagnosed:false,sampleVerified:false,receivedJuice:false,medicine:0,patientDay:0,recovered:false},port:{manifestChecked:false,choice:null,shipment:null,settled:false,shipmentDay:0,deliveries:0,riverContract:{status:'none',startedDay:0,dueDay:0,delayUsed:false,completedDay:0,lateDays:0,policy:null}},quarry:{surveyed:false,face:null,props:false,extracted:0,lastExtractDay:0,cut:0},waterworks:{level:0,repair:null,receivedStone:false,millOpinion:false,meadowOpinion:false,portOpinion:false,allocation:null,testDay:0,certified:false,scope:''},projects:{},careers:{horticulture:0,medicine:0,trade:0,engineering:0},watershedContract:0,trust:0,access:{vineyard:false,clinic:false,port:false,quarry:false,waterworks:false},
 /* 第七版规划「给职业提供不同的进入路线」：公共工程链之外再开三条替代入口，
    免得想做商人或巡林人的玩家必须先走完一整段公共工程。 */
 routes:{engineering:0,trade:0,patrol:0},rookie:{engineering:0,trade:0,patrol:0},
@@ -17777,7 +18137,7 @@ function professionalShippingMinutes(base){var p=professionalLifeState(),policy=
 function normalizeProfessionalLife(raw){var d=newProfessionalLife(),r=raw&&typeof raw==='object'?raw:{};function n(v,max){return Number.isFinite(v)?clamp(Math.floor(v),0,max):0;}
   var a=r.vineyard||{};d.vineyard={plan:['juice','wine'].indexOf(a.plan)>=0?a.plan:null,planDay:n(a.planDay,100000),harvestDay:n(a.harvestDay,100000),pressDay:n(a.pressDay,100000),delayed:!!a.delayed,harvested:n(a.harvested,12),pressed:n(a.pressed,12),product:['juice','wine'].indexOf(a.product)>=0?a.product:null,shipped:n(a.shipped,12)};
   a=r.clinic||{};d.clinic={diagnosed:!!a.diagnosed,sampleVerified:!!a.sampleVerified,receivedJuice:!!a.receivedJuice,medicine:n(a.medicine,12),patientDay:n(a.patientDay,100000),recovered:!!a.recovered};
-  a=r.port||{};d.port={manifestChecked:!!a.manifestChecked,choice:['claim','reship'].indexOf(a.choice)>=0?a.choice:null,shipment:['quarry','clinic','vineyard','waterworks','neighbor'].indexOf(a.shipment)>=0?a.shipment:null,settled:!!a.settled,shipmentDay:n(a.shipmentDay,100000)};
+  a=r.port||{};var rc=a.riverContract||{};d.port={manifestChecked:!!a.manifestChecked,choice:['claim','reship'].indexOf(a.choice)>=0?a.choice:null,shipment:['quarry','clinic','vineyard','waterworks','neighbor','river_contract'].indexOf(a.shipment)>=0?a.shipment:null,settled:!!a.settled,shipmentDay:n(a.shipmentDay,100000),riverContract:{status:['none','active','in_transit','delivered'].indexOf(rc.status)>=0?rc.status:'none',startedDay:n(rc.startedDay,100000),dueDay:n(rc.dueDay,100000),delayUsed:!!rc.delayUsed,completedDay:n(rc.completedDay,100000),lateDays:n(rc.lateDays,100000),policy:['irrigation','navigation'].indexOf(rc.policy)>=0?rc.policy:null}};
   a=r.quarry||{};d.quarry={surveyed:!!a.surveyed,face:['stable','carbonate'].indexOf(a.face)>=0?a.face:null,props:!!a.props,extracted:n(a.extracted,100000),lastExtractDay:n(a.lastExtractDay,100000),cut:n(a.cut,100000)};
   a=r.waterworks||{};d.waterworks={level:clamp(n(a.level,3),0,3),repair:['irrigation','navigation','pending'].indexOf(a.repair)>=0?a.repair:null,receivedStone:!!a.receivedStone,millOpinion:!!a.millOpinion,meadowOpinion:!!a.meadowOpinion,portOpinion:!!a.portOpinion,allocation:['irrigation','navigation'].indexOf(a.allocation)>=0?a.allocation:null,testDay:n(a.testDay,100000),certified:!!a.certified,scope:['survey','works'].indexOf(a.scope)>=0?a.scope:''};
   d.watershedContract=n(r.watershedContract,3);
@@ -17809,19 +18169,27 @@ function normalizeProfessionalLife(raw){var d=newProfessionalLife(),r=raw&&typeo
   var eg=legacyEng, pj=d.projects[ENG_PROJECT_ID];
   d.eng={stage:(Number.isFinite(eg.stage)?Math.max(0,Math.min(4,Math.floor(eg.stage))):0),post:String(eg.post||''),incident:['field','channel'].indexOf(eg.incident)>=0?eg.incident:'',
     hearing:pj.scheme?ENG_SCHEMES[pj.scheme].alloc:'',choice:['field','channel'].indexOf(eg.choice)>=0?eg.choice:'',
-    budget:pj.funds.granted,budgetGranted:!!eg.budgetGranted||pj.funds.granted>0,
+    budget:pj.funds.granted,budgetGranted:!!eg.budgetGranted||pj.funds.granted>0,preventive:eg.preventive==='gate'?'gate':'',postEval:eg.postEval==='preventive'||eg.postEval==='incident'?eg.postEval:'',
     memories:(eg.memories&&typeof eg.memories==='object')?JSON.parse(JSON.stringify(eg.memories)):{}};
-  /* 自洽：没基础工程认证就不可能越过见习；没处置事故不可能有岗位；没岗位不可能主持说明会 */
+  /* 自洽：没基础工程认证就不可能越过见习；没取得岗位评价（预防或事故任一）不可能有岗位；没岗位不可能主持说明会 */
   if(engPhaseIndex(pj)<1){d.eng.stage=0;d.eng.post='';d.eng.incident='';d.eng.hearing='';d.eng.budget=0;d.eng.budgetGranted=false;}
   else{
-    if(d.eng.stage>=2&&!d.eng.incident){d.eng.stage=1;d.eng.post='';d.eng.hearing='';}
+    if(d.eng.stage>=2&&!d.eng.incident&&!d.eng.preventive){d.eng.stage=1;d.eng.post='';d.eng.hearing='';}
     if(d.eng.stage>=3&&!d.eng.post){d.eng.stage=2;d.eng.hearing='';}
   }
   if(d.eng.stage<3){d.eng.post='';d.eng.budget=0;d.eng.budgetGranted=false;d.eng.hearing='';}
+  /* R3-C2：岗位评价两条来源互不覆盖；postEval 必须指向真实存在的那一条 */
+  if(d.eng.postEval&&!((d.eng.postEval==='preventive'&&d.eng.preventive)||(d.eng.postEval==='incident'&&d.eng.incident)))d.eng.postEval='';
+  if((d.eng.incident||d.eng.preventive)&&!d.eng.postEval)d.eng.postEval=d.eng.preventive?'preventive':'incident';
   ['noya','martin','council'].forEach(function(who){d.eng.memories[who]=Array.isArray(d.eng.memories[who])?d.eng.memories[who].filter(function(x){return typeof x==='string';}).slice(-20):[];});
   /* 最后一件事：把项目记录写回水利站镜像。到这里 access 已经完全填好，
      不会再被 r.access 覆盖，也不会有第二个写入方向。 */
   deriveWaterworksFromProject(d,d.waterworks);
+  var rc=d.port.riverContract;
+  if(!projectAcceptedFlag(d)&&rc.status!=='none')rc={status:'none',startedDay:0,dueDay:0,delayUsed:false,completedDay:0,lateDays:0,policy:null};
+  if(rc.status==='in_transit'&&(d.port.shipment!=='river_contract'||d.port.settled))rc.status='active';
+  if(rc.status==='delivered'&&!rc.completedDay){rc.status='active';rc.completedDay=0;}
+  d.port.riverContract=rc;
   return d;
 }
 function newMilitaryLife(){return {registered:false,trainingDays:[],qualification:0,rank:'resident',commandLimit:0,appointmentDay:0,unit:{id:'frontier_detail',count:0,wounded:0,training:0,equipment:0,morale:0,supply:0,discipline:0,scene:'camp'},campaign:{active:false,startedDay:0,deadlineDay:0,stage:0,scouted:null,scoutedDay:0,prepared:null,preparedDay:0,battle:null,battleDay:0,reported:false,result:null},battleRecords:[],neighbor:{opened:false,oldroadVerified:false,caseFound:false,evidence:0,choice:null,settled:false,signedDay:0,tradeReceived:false,localContract:false},institutionFund:0,followUpDay:0};}
@@ -18186,7 +18554,7 @@ function openWetlandSite(site){
 }
 function openProfessionSite(site){
   var p=professionalLifeState(),v=p.vineyard,c=p.clinic,portS=p.port,q=p.quarry,ww=p.waterworks,m=millLifeState();
-  openWindow({id:'professionlife',kind:'custom',wide:true,title:'省域职业服务 · '+({vineyard:'金叶葡萄园',press:'压榨房',cellar:'酒窖',clinic:'白鸢医舍',archive:'修道院档案室',port:'下游河港',lock:'船闸值守室',quarry:'石灰采场',shed:'石料验收棚',water:'水利控制室',gauge:'堤坝水尺',opinion_mill:'磨坊与麦田意见',opinion_meadow:'牧场供水意见',opinion_port:'河港航运意见'}[site]||site),build:function(b){b.classList.add('mill-life-panel');
+  openWindow({id:'professionlife',kind:'custom',wide:true,title:'省域职业服务 · '+({vineyard:'金叶葡萄园',press:'压榨房',cellar:'酒窖',clinic:'白鸢医舍',archive:'修道院档案室',port:'下游河港',lock:'船闸值守室',quarry:'石灰采场',shed:'石料验收棚',water:'水利控制室',gauge:'堤坝水尺',riverbay_pit:'闸基工作面',riverbay_east:'东岸坡脚',riverbay_silt:'下游淤积段',opinion_mill:'磨坊与麦田意见',opinion_meadow:'牧场供水意见',opinion_port:'河港航运意见'}[site]||site),build:function(b){b.classList.add('mill-life-panel');
     b.appendChild(el('p','work-summary','资历：园艺 '+p.careers.horticulture+' · 医务 '+p.careers.medicine+' · 商运 '+p.careers.trade+' · 工程 '+p.careers.engineering+'；互信 '+p.trust));
     b.appendChild(el('p','muted','合同和材料按真实地点结算。职业经历不通过重复点击刷等级；每个项目只登记一次。'));
     if(site==='vineyard'){
@@ -18221,12 +18589,26 @@ function openProfessionSite(site){
       b.appendChild(el('p',null,'米娅：装卸簿比货单多记两箱。你可以凭封签追索货款，也可以补运并修正关系。核验后可以安排实际批次转运。'));
       if(!portS.manifestChecked)extendedWorkButton(b,'port','核验封签与装卸簿 · 20分钟',{minutes:20,energy:1,guard:function(){return !portS.manifestChecked;}},function(){portS.manifestChecked=true;bumpRoute('trade');});
       if(portS.manifestChecked&&!portS.choice){[['claim','封存差额证据并追索 · 35金'],['reship','补运两箱并维护合作 · 消耗10金']].forEach(function(o){extendedWorkButton(b,'port',o[1],{minutes:25,coins:o[0]==='reship'?10:0,guard:function(){return portS.manifestChecked&&!portS.choice;}},function(){portS.choice=o[0];p.careers.trade=Math.max(p.careers.trade,1);p.trust=Math.min(100,p.trust+(o[0]==='reship'?2:1));if(o[0]==='claim')state.coins+=35;});});}
+      var river=portS.riverContract,riverProject=p.projects[ENG_PROJECT_ID];
+      if(projectAcceptedFlag(p)&&river.status==='none'){
+        b.appendChild(el('p','work-summary','河湾闸门已验收：河港可承接一份闸件复检运送合同。当前方案为 '+(riverProject.scheme==='conservative'?'灌溉优先，交期较紧':'兼顾通航，常规交期')+'；货物必须走实际运单并在水利站签收。'));
+        extendedWorkButton(b,'port','接受河湾闸件复检合同 · 15分钟',{minutes:15,guard:function(){return projectAcceptedFlag(p)&&river.status==='none';}},function(){river.status='active';river.startedDay=state.totalDay;river.dueDay=state.totalDay+(riverProject.scheme==='conservative'?3:4);river.policy=ENG_SCHEMES[riverProject.scheme].alloc;});
+      }
+      if(river.status==='active'||river.status==='in_transit'){
+        var riverLate=Math.max(river.lateDays,Math.max(0,state.totalDay-river.dueDay));
+        b.appendChild(el('p','req-chip', '闸件复检合同：'+(river.status==='in_transit'?'货物在途':'待备货')+' · 第 '+river.startedDay+' 天签约 · 交期第 '+river.dueDay+' 天 · '+(riverLate?'已逾期 '+riverLate+' 天':'尚未逾期')+' · '+(river.policy==='irrigation'?'灌溉优先':'通航优先')));
+        if(state.totalDay>river.dueDay&&!river.delayUsed)extendedWorkButton(b,'port','逾期处理：申请顺延两天 · 10分钟',{minutes:10,guard:function(){return (river.status==='active'||river.status==='in_transit')&&state.totalDay>river.dueDay&&!river.delayUsed;}},function(){river.lateDays=Math.max(river.lateDays,state.totalDay-river.dueDay);river.dueDay+=2;river.delayUsed=true;});
+        if(river.status==='active'&&invCount('sluice_kit')<1)extendedWorkButton(b,'port','备一套闸件复检包 · 消耗15金',{coins:15,out:'sluice_kit',qty:1,minutes:20,guard:function(){return river.status==='active'&&invCount('sluice_kit')<1;},reason:'先接受河湾闸件复检合同；背包已有复检包时可直接装运。'});
+      }
+      if(river.status==='delivered')b.appendChild(el('p','req-chip ok','闸件复检合同已于第 '+river.completedDay+' 天签收；'+(river.lateDays?'逾期 '+river.lateDays+' 天，结算20金。':'按期交付，结算35金。')));
       if(portS.manifestChecked){
+        if(river.status==='active'&&invCount('sluice_kit')>=1&&(!portS.shipment||portS.settled))extendedWorkButton(b,'port','装运闸件复检包至水利站 · 闸件 ×1',{need:{sluice_kit:1},out:'cargo_manifest',qty:1,minutes:professionalShippingMinutes(60),energy:2,guard:function(){return river.status==='active'&&invCount('sluice_kit')>=1&&(!portS.shipment||portS.settled);}},function(){portS.shipment='river_contract';portS.settled=false;portS.shipmentDay=state.totalDay;river.status='in_transit';p.careers.trade=Math.max(p.careers.trade,1);});
         if(invCount('grape_juice')>=2&&(!portS.shipment||portS.settled))extendedWorkButton(b,'port','装运葡萄汁至白鸢医舍 · 葡萄汁 ×2',{need:{grape_juice:2},out:'cargo_manifest',qty:1,minutes:professionalShippingMinutes(40),energy:2,guard:function(){return portS.manifestChecked&&invCount('grape_juice')>=2&&(!portS.shipment||portS.settled);}},function(){portS.shipment='clinic';portS.settled=false;portS.shipmentDay=state.totalDay;p.careers.trade=Math.max(p.careers.trade,1);});
         if(militaryLifeState().neighbor.settled&&militaryLifeState().neighbor.choice==='trade'&&invCount('grape_juice')>=1&&(!portS.shipment||portS.settled))extendedWorkButton(b,'port','装运葡萄汁至邻领互市行栈 · 葡萄汁 ×1',{need:{grape_juice:1},out:'cargo_manifest',qty:1,minutes:professionalShippingMinutes(60),energy:3,guard:function(){return militaryLifeState().neighbor.settled&&militaryLifeState().neighbor.choice==='trade'&&invCount('grape_juice')>=1&&(!portS.shipment||portS.settled);}},function(){portS.shipment='neighbor';portS.settled=false;portS.shipmentDay=state.totalDay;});
         if(invCount('stone_block')>=3&&(!portS.shipment||portS.settled))extendedWorkButton(b,'port','装运验收石料至水利站 · 石料 ×3',{need:{stone_block:3},out:'cargo_manifest',qty:1,minutes:professionalShippingMinutes(60),energy:3,guard:function(){return portS.manifestChecked&&invCount('stone_block')>=3&&(!portS.shipment||portS.settled);}},function(){portS.shipment='waterworks';portS.settled=false;portS.shipmentDay=state.totalDay;});
         if(portS.shipment==='clinic'&&!portS.settled)b.appendChild(el('p','req-chip','葡萄汁运单已发出；到医舍签收，不能传送代替货物。'));
         if(portS.shipment==='waterworks'&&!portS.settled)b.appendChild(el('p','req-chip','石料运单已发出；携带核验运单到水利站完成收货。'));
+        if(portS.shipment==='river_contract'&&!portS.settled)b.appendChild(el('p','req-chip','闸件复检包已发出；携带核验运单到水利站签收，不能传送代替货物。'));
         if(portS.shipment==='neighbor'&&!portS.settled)b.appendChild(el('p','req-chip','互市葡萄汁运单已发出；到邻领互市行栈签收。'));
       }
       if(portS.choice)b.appendChild(el('p','req-chip ok','货单处置：'+(portS.choice==='claim'?'已追索差额，后续优先级降低。':'已补运，合作方保留舱位。')));
@@ -18249,15 +18631,27 @@ function openProfessionSite(site){
       if(site==='gauge'||site==='water'){
         /* 石料运单必须在场签收：传送不能代替货物 */
         if(portS.shipment==='waterworks'&&!portS.settled&&invCount('cargo_manifest')>0)extendedWorkButton(b,site==='water'?'water':'gauge','签收石料运单 · 消耗核验运单',{need:{cargo_manifest:1},minutes:15,guard:function(){return portS.shipment==='waterworks'&&!portS.settled;}},function(){portS.settled=true;pj.stone=true;pj.stoneDay=state.totalDay;deriveWaterworksFromProject(p,p.waterworks);bumpCareer('trade',2);bumpRoute('trade');});
+        var river=portS.riverContract;
+        if(portS.shipment==='river_contract'&&!portS.settled&&invCount('cargo_manifest')>0&&river.status==='in_transit')extendedWorkButton(b,site==='water'?'water':'gauge','签收闸件复检包 · 消耗核验运单',{need:{cargo_manifest:1},minutes:15,guard:function(){return projectAcceptedFlag(p)&&portS.shipment==='river_contract'&&!portS.settled&&river.status==='in_transit';}},function(){var late=Math.max(river.lateDays,Math.max(0,state.totalDay-river.dueDay));portS.settled=true;river.status='delivered';river.completedDay=state.totalDay;river.lateDays=late;state.coins+=late?20:35;p.trust=Math.min(100,p.trust+(late?0:1));p.careers.trade=Math.max(p.careers.trade,1);rememberChoice('noya','河港闸件复检包于第 '+state.totalDay+' 天签收'+(late?'，逾期 '+late+' 天并办理过渡处理':'，按期交付'));bumpRoute('trade');toast('闸件复检包已签收，'+(late?'结算20金（逾期 '+late+' 天）。':'按期结算35金并提升互信。'));});
         engCertPanel(b,pj,site);
         engMaterialsPanel(b,pj,site);
         engAcceptPanel(b,pj,site);
       }
       if(site==='riverbay_pit')engPitPanel(b,pj);
-      if(engPhaseIndex(pj)>=1){openEngineeringChapter(b,ww);if(engCareer().stage===1&&!engCareer().incident)openIncidentChoice(b);}
+      if(site==='gauge')openPreventiveTrack(b);
+      if(engPhaseIndex(pj)>=1){openEngineeringChapter(b,ww);if(engCareer().stage===1&&!engHasPostEval())openIncidentChoice(b);}
     }
     if(site==='opinion_mill'||site==='opinion_meadow'||site==='opinion_port'){
-      var flag=site==='opinion_mill'?'millOpinion':site==='opinion_meadow'?'meadowOpinion':'portOpinion',who=site==='opinion_mill'?'磨坊麦田':'石楠牧场';b.appendChild(el('p',null,'把水利站的方案送到'+who+'与航运代表，记录他们愿意接受的供水时段。'));if(!ww[flag])extendedWorkButton(b,site,'记录上下游意见 · 10分钟',{minutes:10,guard:function(){return !ww[flag];}},function(){ww[flag]=true;});
+      var opinionKey=site==='opinion_mill'?'mill':site==='opinion_meadow'?'meadow':'port',
+          opinionText=site==='opinion_mill'?'把水利站方案送到磨坊与麦田，记录他们愿意接受的供水时段。':site==='opinion_meadow'?'把水利站方案送到石楠牧场，记录牧场愿意接受的供水时段。':'把水利站方案送到河港航运代表，记录他们愿意接受的通航时段。',
+          project=engProject();
+      b.appendChild(el('p',null,opinionText));
+      if(!project.opinions[opinionKey])extendedWorkButton(b,site,'记录上下游意见 · 10分钟',{minutes:10,guard:function(){return !engProject().opinions[opinionKey];}},function(){
+        var current=engProject();
+        if(current.opinions[opinionKey])return;
+        current.opinions[opinionKey]=true;
+        deriveWaterworksFromProject(p,ww);
+      });
     }
     b.appendChild(el('p','muted','该地点的任务与项目状态随存档保留。打开 N 手册可以查看职业与边境进度。'));
   },actions:[{label:'返回游戏',close:true}]});
@@ -20761,6 +21155,7 @@ window.__MOSS__ = {
       survey: pj.survey, practice: pj.practice, emergency: pj.emergency, opinions: pj.opinions,
       stone: pj.stone, kit: pj.kit, build: pj.build, mode: pj.mode, crew: pj.crew,
       trialDay: pj.trialDay, maintDay: pj.maintDay, maintCount: pj.maintCount,
+      safety: pj.safety, duty: pj.duty, outcome: engOutcome(), outcomeText: engOutcomeText(), dutyText: engDutyText(pj),
       funds: pj.funds, fundsLeft: engFundsLeft(pj), risk: engRisk(pj),
       steps: engSchemeBuild(pj).map(function (s) { return s; }),
       scope: professionalLifeState().waterworks.scope,
@@ -20789,7 +21184,7 @@ window.__MOSS__ = {
     pj.practice = 'mill';
     pj.phase = 'certify';
     deriveWaterworksFromProject(p, p.waterworks);
-    e.stage = 4; e.post = 'waterworks_engineer'; e.incident = 'channel'; e.choice = 'channel';
+    e.stage = 4; e.post = 'waterworks_engineer'; e.incident = 'channel'; e.choice = 'channel'; e.postEval = 'incident';
     applyEngChoice();
     pj.opinions = { mill: true, meadow: true, port: true };
     engGrantBudget();
@@ -20821,16 +21216,21 @@ window.__MOSS__ = {
     if (what === 'sign') { if (e.stage !== 0 || !engHasCertificate()) return false; e.stage = 1; rememberChoice('noya', '独立署名水利报告'); return true; }
     if (what === 'incident') {
       if (e.stage !== 1 || e.incident || ['field','channel'].indexOf(arg)<0) return false;
-      e.incident = arg; e.choice = arg; e.stage = 2;
+      e.incident = arg; e.choice = arg; e.stage = 2; e.postEval = 'incident';
       rememberChoice('noya', arg === 'field' ? '事故中先保农田' : '事故中先保通航');
       rememberChoice('martin', arg === 'field' ? '事故中先保农田' : '事故中先保通航');
       applyEngChoice();
       return true;
     }
-    if (what === 'post') { if (e.stage < 2 || e.post) return false; e.post = 'waterworks_engineer'; e.stage = 4; rememberChoice('noya', '事故后接下工程岗位'); return true; }
+    if (what === 'preventive') { return engTakePostEval('gate', arg === 'labor' ? 'labor' : 'mat'); }
+    if (what === 'post') { if (e.stage < 2 || e.post) return false; e.post = 'waterworks_engineer'; e.stage = 4; rememberChoice('noya', (e.postEval === 'preventive' ? '汛前预防' : '事故处置') + '后接下工程岗位'); return true; }
     if (what === 'budget') { if (e.stage < 3 || e.budgetGranted || engProject().funds.granted > 0) return false; return engGrantBudget(); }
     if (what === 'scheme') { return engConfirmScheme(arg); }
     if (what === 'accept') { return engAcceptProject(); }
+    if (what === 'dutyInspect') { return engDutyInspect(engProject()); }
+    if (what === 'defer') { return engDutyDefer(engProject(), arg || '人手不足'); }
+    if (what === 'handover') { return engDutyHandover(engProject()); }
+    if (what === 'release') { return engDutyRelease(engProject()); }
     return false;
   },
   syncPlayer: function () { syncPlayerPixel(); onSceneChanged(); },

@@ -197,6 +197,11 @@ try {
   pj = await v(() => __MOSS__.engProjectInfo());
   ok('封闸后进入跨日试运行', pj.phase, 'trial');
   ok('试运行封闸日已记录', pj.trialDay > 0, true);
+  // 本路线的雨天勘测已保存高风险；新规则须先现场检查加固，不能绕过预警直接验收。
+  ok('高风险试运行显示预警', await v(()=>__MOSS__.state.professionalLife.projects.riverbay_gate.safety.status), 'watch');
+  await clickWin(p,'现场检查销钉');
+  await clickWin(p,'自行加固（不用材料）');
+  ok('现场加固解除预警', await v(()=>__MOSS__.state.professionalLife.projects.riverbay_gate.safety.status), 'clear');
   await closeWin(p);
 
   /* ---------- 五、验收必须跨过一个夜晚 ---------- */
@@ -327,15 +332,27 @@ try {
   ok('兼顾通航验收后地区口径为通航优先', pj.policy, 'navigation');
   ok('通航优先让石料货运变快', pj.shipping, 50);
   ok('保守排水与兼顾通航的货运耗时确实不同', 80 - 50, 30);
-  ok('验收当天不做养护检查', await btnCount(p, '闸门养护检查'), 0);
+  ok('验收当天不做养护检视', await btnCount(p, '闸门养护检视'), 0);
   await closeWin(p);
 
+  /* R3-C2：养护是周期责任，不是「隔一天就能点」的按钮 */
+  const dutyOnAccept = (await v(() => __MOSS__.engProjectInfo())).duty;
+  ok('验收即接下周期养护责任', dutyOnAccept.status, 'active');
+  ok('养护周期为 3 天', dutyOnAccept.cycle, 3);
+  ok('验收当天不产生逾期', dutyOnAccept.overdue, 0);
   await v(() => { __MOSS__.engAdvanceDay(); __MOSS__.state.energy = 80; __MOSS__.state.timeMinutes = 600; __MOSS__.devSwitchScene('waterworks', 20, 17); });
-  ok('隔一天后可以养护', await interactWith(p, 20, 18), true);
+  await interactWith(p, 20, 18);
+  ok('周期未到不给养护检视按钮', await btnCount(p, '闸门养护检视'), 0);
+  ok('未到下次检视日不算逾期', (await v(() => __MOSS__.engProjectInfo())).duty.overdue, 0);
+  await closeWin(p);
+  await v(() => { __MOSS__.engAdvanceDay(); __MOSS__.engAdvanceDay(); __MOSS__.state.energy = 80; __MOSS__.state.timeMinutes = 600; __MOSS__.devSwitchScene('waterworks', 20, 17); });
+  ok('到下次检视日可以养护', await interactWith(p, 20, 18), true);
   const maintBefore = (await v(() => __MOSS__.engProjectInfo())).maintCount;
-  await clickWin(p, '闸门养护检查');
+  await clickWin(p, '闸门养护检视');
   pj = await v(() => __MOSS__.engProjectInfo());
   ok('养护次数真实累加', pj.maintCount, maintBefore + 1);
+  ok('检视后下次检视日按周期推进', pj.duty.nextDay, pj.duty.lastDay + pj.duty.cycle);
+  await closeWin(p);
   ok('养护不改变已验收的地区口径', pj.policy, 'navigation');
   await closeWin(p);
 

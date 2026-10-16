@@ -1,0 +1,7 @@
+import assert from 'node:assert/strict';
+import {launch,boot,clickWin} from './harness.mjs';
+const r=await launch();let n=0;const eq=(a,b,t)=>{assert.deepEqual(a,b,t);n++;console.log('PASS',t);};
+try{const p=r.page;await boot(p);await p.locator('#tutorialSkip').click();
+ const legacy=await p.evaluate(()=>{const M=__MOSS__,raw=M.serialize();raw.professionalLife.waterworks={level:3,certified:true,receivedStone:true,repair:'gate',allocation:'navigation',testDay:12,millOpinion:true,meadowOpinion:true,portOpinion:true};delete raw.professionalLife.projects;const a=M.normalizeSaveForTest(raw),b=M.normalizeSaveForTest(a);return {a:a.professionalLife.projects.riverbay_gate,b:b.professionalLife.projects.riverbay_gate};});eq(legacy.a,legacy.b,'无项目记录的旧档首次迁移即幂等');eq(legacy.a.duty.nextDay,15,'旧养护日期首次迁移就生成正确周期');
+ await p.evaluate(()=>{const M=__MOSS__;M.state.totalDay=3;M.engFixtureAccepted('balanced');const q=M.state.professionalLife.projects.riverbay_gate;q.duty.status='none';q.maintDay=0;q.trialDay=0;M.state.timeMinutes=480;M.state.energy=100;M.devSwitchScene('waterworks',20,19);});await p.waitForTimeout(200);await p.keyboard.press('e');await clickWin(p,'从今天接回养护责任');eq(await p.evaluate(()=>__MOSS__.engProjectInfo().duty.status),'active','日期缺失旧工程可主动接回责任');eq(await p.evaluate(()=>__MOSS__.engProjectInfo().duty.nextDay),6,'接回从当日重新计周期');eq(await p.evaluate(()=>__MOSS__.engProjectInfo().duty.done),0,'接回不补发检视次数');eq(r.errors,[],'旧档接回无页面异常');
+}finally{await r.browser.close();}console.log(`R3旧档养护 ${n} 项通过`);

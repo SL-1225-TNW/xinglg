@@ -107,6 +107,14 @@ jobs:
           node tests/run-alt-routes.mjs
           node tests/run-engineering-career.mjs
           node tests/run-engineering-ui.mjs
+          node tests/run-r3-safety.mjs
+          node tests/run-r3-safety.mjs --single-file
+          node tests/run-r3-duty.mjs
+          node tests/run-r3-duty.mjs --single-file
+          node tests/run-r3-duty-mobile.mjs
+          node tests/run-r3-legacy-duty.mjs
+          node tests/run-r3-water-contract.mjs
+          node tests/run-r3-water-contract.mjs --single-file
 
       # 上传验证前已构建的站点，部署直接复用。
       - name: Upload verified site
@@ -115,3 +123,18 @@ jobs:
           name: game-dist
           path: site
           retention-days: 14
+
+  r3-natural-route:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright test dependency
+        run: npm install --no-save --no-package-lock playwright@1.63.0
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Verify R3 from a fresh save through maintenance
+        run: node tests/run-r3-natural-entry.mjs

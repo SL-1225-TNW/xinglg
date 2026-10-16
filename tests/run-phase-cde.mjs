@@ -99,7 +99,7 @@ try {
   await pose('mill_village', 17, 24); await panel('openProfessionSite', 'opinion_mill'); await click('记录上下游意见 · 10分钟');
   await pose('meadow', 18, 17); await panel('openProfessionSite', 'opinion_meadow'); await click('记录上下游意见 · 10分钟');
   await pose('port_lockhouse', 14, 5); await panel('openProfessionSite', 'opinion_port'); await click('记录上下游意见 · 10分钟');
-  eq('磨坊、牧场、河港三方意见都记在册', await evaluate(() => { const w = __MOSS__.professionalLifeState().waterworks; return [w.millOpinion, w.meadowOpinion, w.portOpinion]; }), [true, true, true]);
+  eq('磨坊、牧场、河港三方意见同步写入项目台账与兼容字段', await evaluate(() => { const w = __MOSS__.professionalLifeState().waterworks; const o = __MOSS__.engProjectInfo().opinions; return { ledger: [o.mill, o.meadow, o.port], compatibility: [w.millOpinion, w.meadowOpinion, w.portOpinion] }; }), { ledger: [true, true, true], compatibility: [true, true, true] });
   // 工程内部的勘测→认证→说明会→施工由 run-r3-project 逐键验证；这里只关心交付后的下游后果
   await evaluate(() => __MOSS__.engFixtureAccepted('conservative'));
   eq('跨采场、河港、磨坊和牧场的水利合同验收', await evaluate(() => [__MOSS__.professionalLifeState().waterworks.certified, __MOSS__.professionalLifeState().waterworks.allocation, __MOSS__.professionalLifeState().watershedContract]), [true, 'irrigation', 3]);

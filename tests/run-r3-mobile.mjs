@@ -42,7 +42,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }
 
     // 1. 触屏打开闸基工作面
     await gotoPit();
-    eq(await p.evaluate(() => { const n = document.querySelector('.win-title'); return n ? n.textContent : ''; }), '省域职业服务 · riverbay_pit', '触屏能打开闸基工作面 ' + viewport.width);
+    eq(await p.evaluate(() => { const n = document.querySelector('.win-title'); return n ? n.textContent : ''; }), '省域职业服务 · 闸基工作面', '触屏能打开闸基工作面 ' + viewport.width);
     eq(await p.locator('.win button', { hasText: '亲自施工' }).count() > 0, true, '触屏面板给出施工方式 ' + viewport.width);
 
     // 2. 触屏施工三道工序
