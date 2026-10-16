@@ -18115,13 +18115,33 @@ function addMeadowEntities(ents,R){var sc=state.sceneId;if(sc.indexOf('meadow')!
 
 /* 阶段 C—E 扩展：湿地、职业地点与边境防务。状态复用现有存档日期、
    传送事务、动作成本和碰撞地图；离线时不运行隐藏结算。 */
-function newWetlandLife(){return {visited:false,permit:false,birdCount:2,baselineBirdCount:5,lastSurveyDay:0,surveyCount:0,plantSamples:0,waterSamples:0,upstreamSample:false,outfallSample:false,causeFound:false,habitat:null,restoredDay:0,patrolDay:0,stewardship:0};}
+function newWetlandLife(){return {visited:false,permit:false,birdCount:2,baselineBirdCount:5,lastSurveyDay:0,surveyCount:0,plantSamples:0,waterSamples:0,upstreamSample:false,outfallSample:false,causeFound:false,habitat:null,restoredDay:0,patrolDay:0,stewardship:0,recheck:null};}
+/* 湿地／河湾水位复查：登记表只写一次。普通调查 / 辨迹·识矿 两条入口
+   都不重复扣料、不刷资历；旧档缺字段时归一化成 null，下次再到访会重新登记。 */
+function wetlandRecheckShape(raw){var r=raw&&typeof raw==='object'?raw:null;if(!r)return null;
+  var eng=r.engSnapshot&&typeof r.engSnapshot==='object'?r.engSnapshot:null;
+  return {
+    day:Number.isFinite(r.day)?clamp(Math.floor(r.day),0,100000):0,
+    route:['normal','talent'].indexOf(r.route)>=0?r.route:'normal',
+    engPhase:['survey','certify','scheme','materials','build','trial','accepted'].indexOf(r.engPhase)>=0?r.engPhase:'survey',
+    engScheme:['conservative','balanced'].indexOf(r.engScheme)>=0?r.engScheme:'',
+    engAlloc:['irrigation','navigation'].indexOf(r.engAlloc)>=0?r.engAlloc:'',
+    habitat:['reeds','open_water'].indexOf(r.habitat)>=0?r.habitat:null,
+    note:typeof r.note==='string'?r.note.slice(0,400):'',
+    talentNote:typeof r.talentNote==='string'?r.talentNote.slice(0,400):'',
+    engSnapshot:eng?{
+      phase:['survey','certify','scheme','materials','build','trial','accepted'].indexOf(eng.phase)>=0?eng.phase:'survey',
+      scheme:['conservative','balanced'].indexOf(eng.scheme)>=0?eng.scheme:'',
+      alloc:['irrigation','navigation'].indexOf(eng.alloc)>=0?eng.alloc:''
+    }:null
+  };}
 function normalizeWetlandLife(raw){var r=raw&&typeof raw==='object'?raw:{},w=newWetlandLife();
   w.visited=!!r.visited;w.permit=!!r.permit;
   ['birdCount','baselineBirdCount','lastSurveyDay','surveyCount','plantSamples','waterSamples','restoredDay','patrolDay','stewardship'].forEach(function(k){w[k]=Number.isFinite(r[k])?clamp(Math.floor(r[k]),0,(k==='birdCount'||k==='baselineBirdCount')?12:100000):w[k];});
   w.upstreamSample=!!r.upstreamSample;w.outfallSample=!!r.outfallSample;w.causeFound=!!r.causeFound&&w.permit&&w.upstreamSample&&w.outfallSample&&w.surveyCount>0;w.habitat=r.habitat==='reeds'||r.habitat==='open_water'?r.habitat:null;
   if(!w.permit){w.plantSamples=0;w.waterSamples=0;w.upstreamSample=false;w.outfallSample=false;}
   if(!w.causeFound)w.habitat=null;
+  w.recheck=wetlandRecheckShape(r.recheck);
   return w;
 }
 function newProfessionalLife(){return {vineyard:{plan:null,planDay:0,harvestDay:0,pressDay:0,delayed:false,harvested:0,pressed:0,product:null,shipped:0},clinic:{diagnosed:false,sampleVerified:false,receivedJuice:false,medicine:0,patientDay:0,recovered:false},port:{manifestChecked:false,choice:null,shipment:null,settled:false,shipmentDay:0,deliveries:0,riverContract:{status:'none',startedDay:0,dueDay:0,delayUsed:false,completedDay:0,lateDays:0,policy:null}},quarry:{surveyed:false,face:null,props:false,extracted:0,lastExtractDay:0,cut:0},waterworks:{level:0,repair:null,receivedStone:false,millOpinion:false,meadowOpinion:false,portOpinion:false,allocation:null,testDay:0,certified:false,scope:''},projects:{},careers:{horticulture:0,medicine:0,trade:0,engineering:0},watershedContract:0,trust:0,access:{vineyard:false,clinic:false,port:false,quarry:false,waterworks:false},
@@ -18316,6 +18336,9 @@ addExtendedRoom('wetland_observation','芦苇湿地 · 观测屋',18,13,'wetland
 ],'wetland');
 extendedSite('wetland_observation',8,6,'水鸟与栖息地记录板','wetland_observe');
 extendedSite('wetland_observation',9,6,'水草样本与封存台','wetland_cause');
+/* R3-D：湿地／河湾水位复查入口。登记事实只写一次，普通调查／辨迹·识矿两条
+   入口都不重复扣料或不刷资历；联系人是湿地巡护员伊芙。 */
+extendedSite('wetland_observation',10,6,'水位复查记录板','wetland_recheck');
 var WETLAND_NODE=addExtendedNode('wetland.marsh','white_rose.southwest.reed_marsh','wetland','芦苇湿地','southwest','marsh',[[3,17],[4,17],[3,18]],'栈道、浅滩与观察屋。记录水鸟、采样并与巡护员共同恢复栖息地。','wetland');
 EXTENDED_REGION_BY_SCENE.wetland='wetland';EXTENDED_REGION_BY_SCENE.wetland_observation='wetland';
 appendTravelPairs(WETLAND_NODE.id,[['riverside.bank',10],['town.square',30],['farm.home',60],['meadow.pasture',30]]);
@@ -18550,7 +18573,80 @@ function openWetlandSite(site){
       extendedWorkButton(b,'wetland_cause','清理溢流口 · 木材 ×2／石头 ×4',{need:{wood:2,stone:4},minutes:60,energy:7,guard:function(){return w.causeFound&&!w.habitat;},reason:'先查清水路原因；溢流口只修复一次。'},function(){w.habitat='open_water';w.restoredDay=state.totalDay;w.birdCount=Math.min(12,w.birdCount+2);w.stewardship=Math.min(100,w.stewardship+4);professionalLifeState().trust=Math.min(100,professionalLifeState().trust+1);});
     }
     if(site==='wetland_cause'&&w.habitat)b.appendChild(el('p','req-chip ok','修复结果：'+(w.habitat==='reeds'?'浅滩有芦苇遮蔽，鸟群逐日回归。':'溢流口恢复，浅水区可用面积增加。')+'；水鸟 '+w.birdCount+' 只。'));
+    if(site==='wetland_recheck'){
+      /* R3-D：湿地／河湾水位复查。一次登记、两条入口；只读已存在的工程与湿地事实，
+         事实之外不写第二份工程账。联系人是湿地巡护员伊芙。 */
+      var pj=professionalLifeState().projects[ENG_PROJECT_ID]||newEngProject();
+      var ready=w.permit&&w.causeFound&&!!w.habitat;
+      var done=!!w.recheck;
+      b.appendChild(el('p',null,'伊芙：来复查湿地水鸟和水位。复查记录只写一次 —— 之后无论再打开多少次、补多少份水样都不会重写或再发奖。'));
+      if(!ready){
+        var miss=[];
+        if(!w.permit)miss.push('登记巡护许可');
+        if(!w.causeFound)miss.push('对照水样与旧水道图');
+        if(!w.habitat)miss.push('选择栖息地修复方式');
+        b.appendChild(el('p','req-chip','尚未具备复查条件：'+miss.join(' · ')+'。先把上面三件事做完，再到这里看水位和工程是怎么相互影响的。'));
+      }
+      /* 当前工程与湿地事实（按钮禁用时也照实显示） */
+      var engAccepted=pj.phase==='accepted';
+      var engLabel=engAccepted?('工程已验收 · 方案 = '+(ENG_SCHEMES[pj.scheme]?ENG_SCHEMES[pj.scheme].name:pj.scheme||'—')+(pj.scheme==='conservative'?'（灌溉优先）':pj.scheme==='balanced'?'（通航优先）':'')):(pj.phase==='build'||pj.phase==='trial'?'工程 '+ENG_PHASE_TEXT[pj.phase]:'工程尚未验收');
+      var habitatLabel=w.habitat==='reeds'?'栖息地已修复 · 补植芦苇浅滩（第 '+w.restoredDay+' 天）':w.habitat==='open_water'?'栖息地已修复 · 清理浅水溢流口（第 '+w.restoredDay+' 天）':'栖息地未修复';
+      b.appendChild(el('p','muted','当前事实 · '+engLabel+' · '+habitatLabel+'。'));
+      /* 两条入口：普通调查始终可用；辨迹／识矿需要至少一项已点出的天赋（不强迫学习） */
+      var hasTrack=hasTalent('read_tracks'),hasOre=hasTalent('read_ore');
+      var talentReady=hasTrack||hasOre;
+      /* 写一次：按钮只在 ready && !done 时挂上；旧记录会显示在下面 */
+      function writeRecheck(route,talentNote){
+        var cur=professionalLifeState().projects[ENG_PROJECT_ID]||newEngProject();
+        var snapEng=ENG_SCHEMES[cur.scheme]?{phase:cur.phase,scheme:cur.scheme,alloc:ENG_SCHEMES[cur.scheme].alloc}:{phase:cur.phase,scheme:cur.scheme||'',alloc:''};
+        w.recheck={day:state.totalDay,route:route,engPhase:cur.phase,engScheme:cur.scheme||'',engAlloc:snapEng.alloc,habitat:w.habitat,
+          note:wetlandRecheckNoteText(cur,w),
+          talentNote:talentNote||'',engSnapshot:snapEng};
+        rememberChoice('wetland_ranger','复查湿地水位 · 第 '+state.totalDay+' 天 · '+(route==='talent'?'辨迹／识矿':'普通调查')+(engAccepted?(' · 工程已验收 · '+(ENG_SCHEMES[pj.scheme]?ENG_SCHEMES[pj.scheme].name:pj.scheme)):' · 工程尚未验收'));
+      }
+      if(ready && !done){
+        extendedWorkButton(b,'wetland_recheck','水位复查 · 普通调查 · 10分钟',{minutes:10,energy:1,guard:function(){return ready && !w.recheck;},reason:'复查已登记，重复打开不会重复扣料或发奖。'},function(){writeRecheck('normal','');});
+        if(talentReady)extendedWorkButton(b,'wetland_recheck','水位复查 · 辨迹／识矿 · 15分钟',{minutes:15,energy:2,guard:function(){return ready && !w.recheck && (hasTrack||hasOre);},reason:hasTalent('read_tracks')||hasTalent('read_ore')?'复查已登记，重复打开不会重复扣料或发奖。':'需先学辨迹或识矿天赋，普通调查路线仍然可用。'},function(){writeRecheck('talent',(hasTrack?'辨迹：足迹方向显示湿地的水有自东向西的退潮势。':'')+(hasOre?'识矿：淤积段有尚未采尽的灰白碎屑，可在水源静稳后集中清理。':''));});
+        else b.appendChild(el('p','muted','辨迹／识矿路线可额外写出水源方向与未清理迹象，但你没学过这两项天赋 —— 普通调查已经能完整走完这次复查，不必为它专门去点天赋。'));
+      }else if(ready && done){
+        b.appendChild(wetlandRecheckResultBlock(w));
+        b.appendChild(el('p','muted','复查已于第 '+w.recheck.day+' 天登记（'+(w.recheck.route==='talent'?'辨迹／识矿':'普通调查')+'）；重复打开面板、重载存档、重复点击都不会再写一条新记录或变更上次结论。'));
+      }
+    }
   },actions:[{label:'返回游戏',close:true}]});
+}
+/* 把复查要点排成一句给玩家留存、也给巡护记录台和角色经历引用。
+   工程未验收时不擅自把水位变化归功于工程。 */
+function wetlandRecheckNoteText(pj,w){
+  if(!pj||!w)return '';
+  var engAccepted=pj.phase==='accepted';
+  var sc=ENG_SCHEMES[pj.scheme];
+  if(engAccepted && sc){
+    if(sc.alloc==='irrigation')return '工程已验收（保守排水）。牧场与磨坊供水优先，浅滩水位稳定，鸟群稳定在 '+w.birdCount+' 只；大型船队要分批靠岸，货运增加 20 分钟。';
+    if(sc.alloc==='navigation')return '工程已验收（兼顾通航）。水深保住航道，货运减少 10 分钟；农田改为分时供水，晴天牧草仍要人工浇；湿地水位受工程影响，自记水位 '+w.birdCount+' 只水鸟稳定。';
+    return '工程已验收，方案 = '+(pj.scheme||'—')+'；湿地栖息地 = '+(w.habitat||'未修复')+'。';
+  }
+  if(pj.phase==='build'||pj.phase==='trial')return '工程处于 '+ENG_PHASE_TEXT[pj.phase]+'；不把水位变化归功于工程，结论以湿地栖息地事实为准：'+(w.habitat==='reeds'?'补植芦苇遮蔽，浅滩水鸟 '+w.birdCount+' 只':w.habitat==='open_water'?'清理溢流口后浅水区恢复，水鸟 '+w.birdCount+' 只':'');
+  return '工程尚未验收；水位变化以湿地栖息地事实为准：'+(w.habitat==='reeds'?'浅滩芦苇遮蔽，水鸟回归至 '+w.birdCount+' 只；修复前减少的水鸟依赖栖息地恢复，不是工程。':w.habitat==='open_water'?'清理溢流口后浅水区可用面积增加，水鸟回升至 '+w.birdCount+' 只；水位短期波动来自湿地修复而非工程。':'');
+}
+function wetlandRecheckResultBlock(w){
+  var box=el('div','wetland-recheck');
+  var rec=w.recheck;
+  var eng=rec.engSnapshot||{};
+  var sc=ENG_SCHEMES[eng.scheme];
+  var engLine;
+  if(eng.phase==='accepted' && sc){
+    engLine='工程已验收 · '+(sc.name||eng.scheme||'—')+' · '+(ENG_PHASE_NAMES[6]||'已验收');
+  }else if(eng.phase==='build'||eng.phase==='trial'){
+    engLine='工程 '+ENG_PHASE_TEXT[eng.phase];
+  }else{
+    var pIdx=ENG_PHASES.indexOf(eng.phase);
+    engLine='工程尚未验收（阶段 = '+(pIdx>=0?ENG_PHASE_NAMES[pIdx]:eng.phase||'—')+'）';
+  }
+  box.appendChild(el('p','muted','复查登记 · 第 '+rec.day+' 天 · '+(rec.route==='talent'?'辨迹／识矿':'普通调查')+' · '+engLine+' · 湿地：'+(rec.habitat==='reeds'?'补植芦苇浅滩':rec.habitat==='open_water'?'清理浅水溢流口':'未修复')));
+  box.appendChild(el('p',null,rec.note||'（尚无总结）'));
+  if(rec.talentNote)box.appendChild(el('p','req-chip ok','天赋附注：'+rec.talentNote));
+  return box;
 }
 function openProfessionSite(site){
   var p=professionalLifeState(),v=p.vineyard,c=p.clinic,portS=p.port,q=p.quarry,ww=p.waterworks,m=millLifeState();
@@ -21411,6 +21507,12 @@ window.__MOSS__ = {
   openSettleLog: openSettleLog, settlementPages: settlementPages,
   toolShovel: toolShovel,
   saveNow: saveNow, serialize: serialize,
+  deriveWaterworksFromProject: deriveWaterworksFromProject,
+  newEngProject: newEngProject,
+  ENG_PHASES: ENG_PHASES,
+  ENG_PHASE_NAMES: ENG_PHASE_NAMES,
+  ENG_SCHEMES: ENG_SCHEMES,
+  engProject: engProject,
   openWindow: openWindow,
   replaceSave: function (raw) {
     var normalized = normalizeSave(raw);
