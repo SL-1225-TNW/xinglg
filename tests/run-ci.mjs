@@ -37,6 +37,7 @@ const BROWSER = [
   'run-engineering-career.mjs', 'run-engineering-ui.mjs', 'run-r3-project.mjs', 'run-r3-mobile.mjs', 'run-r3-safety.mjs', 'run-r3-duty.mjs', 'run-r3-duty-mobile.mjs', 'run-r3-legacy-duty.mjs', 'run-r3-water-contract.mjs', 'run-r3-wetland-recheck.mjs', 'run-r3-mill-duty.mjs',
   'run-r4-calendar.mjs',
   'run-r4-farm-care.mjs',
+  'run-r4-farm-plan.mjs',
   /* 白蔷薇宫城 P1：布局契约、楼层通行、存档迁移与手机端分层验收 */
   'run-palace-layout.mjs', 'run-palace-save.mjs', 'run-palace-floors.mjs', 'run-palace-mobile.mjs', 'run-palace-wayfinding.mjs', 'run-palace-east-wing.mjs', 'run-palace-service.mjs',
   'run-university.mjs',
@@ -84,6 +85,7 @@ run('run-r3-wetland-recheck-single-file', path.join(here, 'run-r3-wetland-rechec
 run('run-r3-mill-duty-single-file', path.join(here, 'run-r3-mill-duty.mjs'), ['--single-file']);
 run('run-r4-calendar-single-file', path.join(here, 'run-r4-calendar.mjs'), ['--single-file']);
 run('run-r4-farm-care-single-file', path.join(here, 'run-r4-farm-care.mjs'), ['--single-file']);
+run('run-r4-farm-plan-single-file', path.join(here, 'run-r4-farm-plan.mjs'), ['--single-file']);
 
 console.log(failed ? `\n共 ${failed} 项失败。` : '\n两层全部通过。');
 process.exit(failed ? 1 : 0);

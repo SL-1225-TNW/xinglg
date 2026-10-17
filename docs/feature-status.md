@@ -169,6 +169,7 @@
 - R3-D 风铃磨坊工程养护复核：风铃磨坊机房 (15,11) 新增「马丁的工程养护复核」入口，与水利控制室、河港面板、船闸值守室共用同一份事实；六种状态（未到期 / 到期 / 逾期 / 延期 / 交接 / 退出）都能直接看到；沿用既有 3 天养护周期与评价上限，不再造周期、不再发奖；河港面板与船闸值守室只复读，不挂按钮；今日安排与项目手册都挂出独立入口，玩家不必靠测试脚本去找。证据见 [`tests/run-r3-mill-duty.mjs`](../tests/run-r3-mill-duty.mjs) 57 项（源码 / 单文件版各一轮）。
 - R4 第一块：四季年历单源派生。`SEASONS=[春,夏,秋,冬]`、`DAYS_PER_SEASON=28`、`DAYS_PER_YEAR=112`；HUD 显示「N 年 X 季 第 D 天（总第 M 天）」并按季节染色；旧档 `totalDay` 单源派生，不动一行，归一化往返幂等。证据见 [`tests/run-r4-calendar.mjs`](../tests/run-r4-calendar.mjs) 18 项（源码 / 单文件版各一轮）。
 - R4 第二块：农场照料委托。`state.farmCare` 状态 + `bookFarmCare / cancelFarmCare / applyFarmCareTick` 三件套；预约一次性扣款、跨日结算、缺料只增 `shortageDays`、取消按剩余天数退款、已结算日不抹除；`openFarmCarePanel` 给 3/5/7/10/14 天材料与费用预览；`serialize + normalizeFarmCare` 双向闭环。证据见 [`tests/run-r4-farm-care.mjs`](../tests/run-r4-farm-care.mjs) 46 项（源码 / 单文件版各一轮）。
+- R4 第三块：3／7 天农场计划。`state.farmPlan` 状态 + `bookFarmPlan(3|7)` 一次性扣 6 金/天；`applyFarmPlanTick` 由 settle 在跨日时推进；`pausedDays` 在关键事件（雨）到来时只增不增 `deliveredDays`；`resumePlanToday` 让玩家主动把暂停的当天重新结算；`serialize + normalizeFarmPlan` 双向闭环。证据见 [`tests/run-r4-farm-plan.mjs`](../tests/run-r4-farm-plan.mjs) 36 项（源码 / 单文件版各一轮）。
 - 替代路线：小镇任务板 →「小镇入门」提供公共水泵维修、本地货单交付、林缘安全调查；三条均有独立自然新档验收，不依赖修桥、湿地、城门证或边境巡防。完成只给到访引荐，军事委任与指挥权另行取得。
 - 军队招募和装备合同已有首轮玩法；账本以 militaryLife.core 和 institution 为准，旧职级字段是兼容视图。
 - 角色常驻入口已交付：顶栏「角色」、键盘 P、手机按钮与暂停菜单都能打开，属性/天赋/武器/经历四页始终可查看。R1 已接上角色等级、五属性、经验发放、属性点分配、洗点；R2 已接上十个入门天赋、免费试刀试剑、独立装备与旧/铜/铁/精钢升级、两段可同奖绕行的个人遭遇。军需装备合同不属于个人武器系统。

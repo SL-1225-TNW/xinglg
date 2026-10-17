@@ -920,6 +920,7 @@ function newGameState() {
     millLife: newMillLife(),
     meadowLife: newMeadowLife(),
     farmCare: newFarmCare(),
+    farmPlan: newFarmPlan(),
     shipping: {},
     houseChest: {},
     tutorial: newTutorial('active'),
@@ -1029,6 +1030,7 @@ function serialize() {
     millLife: state.millLife || newMillLife(),
     meadowLife: state.meadowLife || newMeadowLife(),
     farmCare: state.farmCare || newFarmCare(),
+    farmPlan: state.farmPlan || newFarmPlan(),
     char: state.char || newCharState(),
     /* 白蔷薇宫城布局版本。刻意不升 SCHEMA_VERSION：版本号一变旧档会被判损坏。 */
     palace: state.palace || newPalaceState(),
@@ -1140,6 +1142,7 @@ function normalizeSave(raw) {
   s.millLife = normalizeMillLife(raw.millLife);
   s.meadowLife = normalizeMeadowLife(raw.meadowLife);
   s.farmCare = normalizeFarmCare(raw.farmCare);
+  s.farmPlan = normalizeFarmPlan(raw.farmPlan);
   if (raw.sceneId && raw.sceneId.indexOf('mill_') === 0 && !raw.bridgeRepaired && !(raw.millLife&&raw.millLife.legacyAccess)) { s.sceneId='town'; s.player={x:22,y:21,face:'up'}; }
   if ((s.sceneId==='city'||s.sceneId.indexOf('city_')===0||s.sceneId.indexOf('palace_')===0)&&!s.exploration.city){s.sceneId='town';s.player={x:14,y:22,face:'up'};}
   if ((s.sceneId === 'forest' && !s.exploration.forest) || (s.sceneId.indexOf('mine') === 0 && (!s.exploration.mine || +s.sceneId.slice(4)>s.exploration.depth))) { s.sceneId='town';s.player={x:14,y:2,face:'down'}; }
@@ -6944,6 +6947,9 @@ function performSettlement(auto, innRoom) {
        applyFarmCareTick 只结算到达 startDay..endDay 范围的那一天；
        已经在 lastDeliveryDay/lastShortageDay 上记账的同一天会自己跳过。 */
     applyFarmCareTick();
+    /* R4 第三块：3／7 天计划逐日结算。
+       关键事件（雨、袭扰）到来时只增 pausedDays，不推进 deliveredDays。 */
+    applyFarmPlanTick();
     summary.dailyAllowance = CFG.dailyAllowance;
     summary.income += summary.dailyAllowance;
     state.coins += summary.dailyAllowance;
@@ -17086,6 +17092,117 @@ function farmCareTotalMaterials(c) {
   for (var k in mat) if (Object.prototype.hasOwnProperty.call(mat, k)) out[k] = mat[k] * total;
   return out;
 }
+/* R4 第三块：3／7 天农场计划。
+   玩家在芽芽任务板可以预约一段 3 天或 7 天的「计划」，结算逻辑由 performSettlement 推进。
+   关键事件（雨、袭扰、主动暂停）到来时只增 pausedDays，不顺手推进；玩家可在 UI 主动恢复，
+   恢复逻辑把暂停当天的 lastDeliveryDay 清掉，让它能被重新结算。
+   跨周期跨玩家身份的接口只读状态；不直接改 state.farmCare 或 engineering。 */
+function newFarmPlan() {
+  return {
+    booked: false,
+    days: 3,
+    startDay: 0,
+    endDay: 0,
+    deliveredDays: 0,
+    pausedDays: 0,
+    pausedReasons: [],
+    lastDeliveryDay: 0,
+    feePerDay: 0
+  };
+}
+function farmPlanState() { return state.farmPlan || (state.farmPlan = newFarmPlan()); }
+function farmPlanTotalDays(c) { c = c || farmPlanState(); return Math.max(0, c.endDay - c.startDay + 1); }
+function farmPlanDaysLeft(c) { c = c || farmPlanState(); var total = farmPlanTotalDays(c); var used = (c.deliveredDays || 0) + (c.pausedDays || 0); return Math.max(0, total - used); }
+function farmPlanTotalFee(c) { c = c || farmPlanState(); return Math.max(0, Math.round(farmPlanTotalDays(c) * (c.feePerDay || 0))); }
+function bookFarmPlan(days) {
+  var c = farmPlanState();
+  if (c.booked) return false;
+  var n = days === 7 ? 7 : 3;
+  var fee = n * 6;
+  if (state.coins < fee) return false;
+  state.coins -= fee;
+  c.booked = true;
+  c.days = n;
+  c.startDay = state.totalDay;
+  c.endDay = state.totalDay + n - 1;
+  c.deliveredDays = 0;
+  c.pausedDays = 0;
+  c.pausedReasons = [];
+  c.lastDeliveryDay = 0;
+  c.feePerDay = 6;
+  markDirty(); saveNow();
+  return true;
+}
+function cancelFarmPlan() {
+  var c = farmPlanState();
+  if (!c.booked) return false;
+  var refund = farmPlanDaysLeft(c) * (c.feePerDay || 0);
+  state.coins += refund;
+  c.booked = false;
+  c.startDay = 0;
+  c.endDay = 0;
+  c.deliveredDays = 0;
+  c.pausedDays = 0;
+  c.pausedReasons = [];
+  c.lastDeliveryDay = 0;
+  markDirty(); saveNow();
+  return refund;
+}
+/* 跨日结算。performSettlement 在 totalDay += 1 之后调用。
+   只结算 startDay..endDay 范围内当天；同日重复调用会自己跳过。
+   关键事件用 pausePlan(reason) 主动暂停：当天的 lastDeliveryDay 被记为 0，
+   下次再跨过同一天可重新结算。 */
+function applyFarmPlanTick() {
+  var c = farmPlanState();
+  if (!c.booked) return;
+  if (state.totalDay < c.startDay || state.totalDay > c.endDay) return;
+  if (state.totalDay === c.lastDeliveryDay) return;
+  if (isRaining()) {
+    pausePlanNow(c, '雨天');
+    return;
+  }
+  c.deliveredDays++;
+  c.lastDeliveryDay = state.totalDay;
+  markDirty();
+}
+function pausePlanNow(c, reason) {
+  c = c || farmPlanState();
+  c.pausedDays++;
+  c.lastDeliveryDay = state.totalDay;
+  c.pausedReasons.push({ day: state.totalDay, reason: reason || '关键事件' });
+  if (c.pausedReasons.length > 12) c.pausedReasons.shift();
+  markDirty();
+}
+/* 玩家主动「恢复」当天（暂停时清掉 lastDeliveryDay，让下次结算能再来一次） */
+function resumePlanToday(c) {
+  c = c || farmPlanState();
+  if (!c.booked) return false;
+  if (c.pausedDays <= 0) return false;
+  c.pausedDays = Math.max(0, c.pausedDays - 1);
+  c.lastDeliveryDay = 0;
+  markDirty();
+  return true;
+}
+function normalizeFarmPlan(raw) {
+  var d = newFarmPlan();
+  if (!raw || typeof raw !== 'object') return d;
+  d.booked = !!raw.booked;
+  d.days = [3, 7].indexOf(raw.days) >= 0 ? raw.days : 3;
+  d.startDay = Math.max(0, Math.floor(isInt(raw.startDay) ? raw.startDay : 0));
+  d.endDay = Math.max(0, Math.floor(isInt(raw.endDay) ? raw.endDay : 0));
+  d.deliveredDays = Math.max(0, Math.floor(isInt(raw.deliveredDays) ? raw.deliveredDays : 0));
+  d.pausedDays = Math.max(0, Math.floor(isInt(raw.pausedDays) ? raw.pausedDays : 0));
+  d.lastDeliveryDay = Math.max(0, Math.floor(isInt(raw.lastDeliveryDay) ? raw.lastDeliveryDay : 0));
+  d.feePerDay = Math.max(0, Math.floor(isInt(raw.feePerDay) ? raw.feePerDay : 6));
+  if (Array.isArray(raw.pausedReasons)) {
+    d.pausedReasons = raw.pausedReasons.filter(function (x) {
+      return x && typeof x === 'object' && isInt(x.day) && typeof x.reason === 'string';
+    }).slice(-12).map(function (x) {
+      return { day: Math.max(0, Math.floor(x.day)), reason: x.reason.slice(0, 40) };
+    });
+  }
+  return d;
+}
 function bookFarmCare(days) {
   var c = farmCareState();
   if (c.booked) return false;
@@ -20564,6 +20681,16 @@ window.__MOSS__ = {
   cancelFarmCare: cancelFarmCare,
   applyFarmCareTick: applyFarmCareTick,
   openFarmCarePanel: function () { openFarmCarePanel(); },
+  newFarmPlan: newFarmPlan,
+  farmPlanState: farmPlanState,
+  bookFarmPlan: bookFarmPlan,
+  cancelFarmPlan: cancelFarmPlan,
+  applyFarmPlanTick: applyFarmPlanTick,
+  resumePlanToday: resumePlanToday,
+  pausePlanNow: pausePlanNow,
+  farmPlanTotalDays: farmPlanTotalDays,
+  farmPlanDaysLeft: farmPlanDaysLeft,
+  farmPlanTotalFee: farmPlanTotalFee,
   deriveWaterworksFromProject: deriveWaterworksFromProject,
   newEngProject: newEngProject,
   ENG_PHASES: ENG_PHASES,
