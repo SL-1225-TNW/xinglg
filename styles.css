@@ -108,6 +108,11 @@ button{font-family:inherit}
 .hud-value{font-size:14px;font-weight:700;color:var(--paper);white-space:nowrap}
 #hudCoins .hud-value{color:var(--gold)}
 #hudWeather .hud-value.rain{color:#9fd0e8}
+/* R4：四季年历在顶部 HUD 显示当前季，色彩按季节切换 */
+#hudDate .hud-value.season-春{color:#A8C39C}
+#hudDate .hud-value.season-夏{color:#E0B765}
+#hudDate .hud-value.season-秋{color:#D08552}
+#hudDate .hud-value.season-冬{color:#B4CCDD}
 #hudEnergy .hud-value.low{
   color:#ffe1d8;background:rgba(176,63,49,.46);border-radius:4px;padding:1px 4px;
   box-shadow:0 0 0 1px rgba(255,162,139,.62);animation:energy-alert 1s steps(2,end) infinite;

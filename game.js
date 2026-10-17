@@ -864,6 +864,40 @@ var state = null;
 var saveTimer = null;
 var saveFailed = false;
 
+/* R4 第一块：四季年历。当前游戏只用一维 totalDay 描述日期；
+   引入年/季/年内日概念后，旧档不动一行：calendar 字段由 totalDay 单源
+   派生，加层不影响现有换算与 426 项自然新档断言。 */
+var SEASONS = ['春', '夏', '秋', '冬'];
+var SEASON_BG_COLORS = { '春': '#7A9B6E', '夏': '#D7A956', '秋': '#C57C3B', '冬': '#8AA6B5' };
+var DAYS_PER_SEASON = 28;
+var DAYS_PER_YEAR = DAYS_PER_SEASON * SEASONS.length; /* 112 */
+function totalDayOf(seasonIdx, dayOfYear) { return seasonIdx * DAYS_PER_SEASON + dayOfYear; }
+function yearSeasonOfDay(day) {
+  /* 第 1 天起算，0-based。季节和年内日从 1 开始显示。
+     (Y-1) * DAYS_PER_YEAR + seasonIdx * DAYS_PER_SEASON + dayOfYear = totalDay */
+  var d = Math.max(0, (Number.isFinite(day) ? Math.floor(day) : 1) - 1);
+  var year = Math.floor(d / DAYS_PER_YEAR) + 1;
+  var inYear = d % DAYS_PER_YEAR;
+  var seasonIdx = Math.floor(inYear / DAYS_PER_SEASON);
+  var dayOfYear = (inYear % DAYS_PER_SEASON) + 1;
+  return {
+    year: year,
+    seasonIdx: seasonIdx,
+    seasonName: SEASONS[seasonIdx] || SEASONS[0],
+    dayOfYear: dayOfYear,
+    total: d + 1,
+    seasonStart: (year - 1) * DAYS_PER_YEAR + seasonIdx * DAYS_PER_SEASON + 1,
+    seasonEnd: (year - 1) * DAYS_PER_YEAR + (seasonIdx + 1) * DAYS_PER_SEASON
+  };
+}
+function formatYearSeason(day) {
+  var c = yearSeasonOfDay(day);
+  return c.year + '年' + c.seasonName + '第' + c.dayOfYear + '天';
+}
+function seasonHudClass() {
+  return 'season-' + (yearSeasonOfDay(state.totalDay).seasonName);
+}
+
 function newGameState() {
   var s = {
     version: SCHEMA_VERSION,
@@ -8317,7 +8351,9 @@ function drawQuestMarkers(g, ox, oy) {
 function refreshHud() {
   if (!state) return;
   var dEl = $('#hudDate').querySelector('.hud-value');
-  dEl.textContent = '春日 · 第 ' + state.totalDay + ' 天';
+  var cal = yearSeasonOfDay(state.totalDay);
+  dEl.textContent = cal.year + '年' + cal.seasonName + '季 · 第' + cal.dayOfYear + '天（总第' + cal.total + '天）';
+  dEl.className = 'hud-value season-' + cal.seasonName;
   $('#hudTime').querySelector('.hud-value').textContent = fmtTime(state.timeMinutes);
   var wEl = $('#hudWeather').querySelector('.hud-value');
   var rainy = isRaining();
@@ -20349,6 +20385,12 @@ window.__MOSS__ = {
   openSettleLog: openSettleLog, settlementPages: settlementPages,
   toolShovel: toolShovel,
   saveNow: saveNow, serialize: serialize,
+  refreshHud: refreshHud,
+  yearSeasonOfDay: yearSeasonOfDay,
+  formatYearSeason: formatYearSeason,
+  SEASONS: SEASONS,
+  DAYS_PER_SEASON: DAYS_PER_SEASON,
+  DAYS_PER_YEAR: DAYS_PER_YEAR,
   deriveWaterworksFromProject: deriveWaterworksFromProject,
   newEngProject: newEngProject,
   ENG_PHASES: ENG_PHASES,
