@@ -2162,6 +2162,7 @@ function newGameState() {
     fishpond: newFishpondState(),
     millLife: newMillLife(),
     meadowLife: newMeadowLife(),
+    farmCare: newFarmCare(),
     shipping: {},
     houseChest: {},
     tutorial: newTutorial('active'),
@@ -2270,6 +2271,7 @@ function serialize() {
        不再单独存 soil，避免序列化丢弃、归一化写回造成往返不一致。 */
     millLife: state.millLife || newMillLife(),
     meadowLife: state.meadowLife || newMeadowLife(),
+    farmCare: state.farmCare || newFarmCare(),
     char: state.char || newCharState(),
     /* 白蔷薇宫城布局版本。刻意不升 SCHEMA_VERSION：版本号一变旧档会被判损坏。 */
     palace: state.palace || newPalaceState(),
@@ -2380,6 +2382,7 @@ function normalizeSave(raw) {
   if (s.sceneId === 'r2_hollow') { s.sceneId='mine1'; s.player={x:14,y:20,face:'up'}; }
   s.millLife = normalizeMillLife(raw.millLife);
   s.meadowLife = normalizeMeadowLife(raw.meadowLife);
+  s.farmCare = normalizeFarmCare(raw.farmCare);
   if (raw.sceneId && raw.sceneId.indexOf('mill_') === 0 && !raw.bridgeRepaired && !(raw.millLife&&raw.millLife.legacyAccess)) { s.sceneId='town'; s.player={x:22,y:21,face:'up'}; }
   if ((s.sceneId==='city'||s.sceneId.indexOf('city_')===0||s.sceneId.indexOf('palace_')===0)&&!s.exploration.city){s.sceneId='town';s.player={x:14,y:22,face:'up'};}
   if ((s.sceneId === 'forest' && !s.exploration.forest) || (s.sceneId.indexOf('mine') === 0 && (!s.exploration.mine || +s.sceneId.slice(4)>s.exploration.depth))) { s.sceneId='town';s.player={x:14,y:2,face:'down'}; }
@@ -8180,6 +8183,10 @@ function performSettlement(auto, innRoom) {
     /* 4. 日期 +1 */
     state.totalDay += 1;
     engDailySafety();
+    /* R4 第二块：跨日结算当天照料结果。
+       applyFarmCareTick 只结算到达 startDay..endDay 范围的那一天；
+       已经在 lastDeliveryDay/lastShortageDay 上记账的同一天会自己跳过。 */
+    applyFarmCareTick();
     summary.dailyAllowance = CFG.dailyAllowance;
     summary.income += summary.dailyAllowance;
     state.coins += summary.dailyAllowance;
@@ -18060,6 +18067,45 @@ function millLifeTaskText(){var m=millLifeState(),pj=professionalLifeState().pro
   var schemeLine=scheme?'工程方案 '+scheme.name+' · 磨坊额度 '+scheme.supply:'';
   var base=m.delivery?'村庄早餐已交付 · 水轮继续按协定工作':m.inspected?'水轮已验收 · 向面包房交付乡村面包 ×2':m.trialDay?(state.totalDay>m.trialDay?'试运行结束 · 到议事屋验收':'试运行中 · 睡过一夜后到议事屋验收'):m.allocation?'用水协议已定 · 到议事屋启动试运行':m.repair?'水轮已修 · 听取麦田与面包房意见，到议事屋选择用水协议':'调查进水渠与机房齿轮，再到马丁工作台选择修法';
   return [base,schemeLine,dutyLine].filter(function(s){return s;}).join(' · ');}
+/* 农场照料委托面板：从任务板/N 委托/今日安排都能进。
+   扣款只在预约时一次性锁定，已结算的天数无法退回；
+   中断 / 缺料只增加 shortageDays，绝不偷偷扣材料。 */
+function openFarmCarePanel() {
+  var c = farmCareState();
+  function previewN(n) {
+    var fee = n * (c.costPerDay.coins || 0);
+    var mats = {};
+    var mat = c.materialPerDay || {};
+    for (var k in mat) if (Object.prototype.hasOwnProperty.call(mat, k)) mats[k] = mat[k] * n;
+    return { fee: fee, mats: mats };
+  }
+  openWindow({
+    id: 'farmcare', kind: 'custom', title: '农场照料委托 · 芽芽任务板',
+    build: function (b) {
+      b.appendChild(el('p', 'work-summary',
+        c.booked
+          ? ('已预约：第 ' + c.startDay + ' → 第 ' + c.endDay + ' 天 · 共 ' + farmCareTotalDays(c) + ' 天 · 已结算 ' + c.deliveredDays + ' 天 / 缺料 ' + c.shortageDays + ' 天')
+          : ('未预约。每日消耗：' + (c.costPerDay.coins || 0) + ' 金 + ' + Object.keys(c.materialPerDay || {}).map(function (k) { return itemName(k) + ' ×' + c.materialPerDay[k]; }).join(' · '))
+      ));
+      if (!c.booked) {
+        b.appendChild(el('p', 'muted', '预订 N 天的全天农场照料：扣款一次锁定工钱，每日结算时扣库存材料；缺料的日子只留记录，不偷偷扣材料、不擅自种收。'));
+        [3, 5, 7, 10, 14].forEach(function (n) {
+          var p = previewN(n);
+          extendedWorkButton(b, 'farmcare', '预约 ' + n + ' 天 · ' + p.fee + ' 金' + (Object.keys(p.mats).length ? ' · ' + Object.keys(p.mats).map(function (k) { return itemName(k) + ' ×' + p.mats[k]; }).join(' · ') : ''),
+            { minutes: 15, guard: function () { return !c.booked && state.coins >= p.fee; }, reason: c.booked ? '已经预约' : (state.coins < p.fee ? '金币不足' : '无法重复预约') },
+            function (nn) { return function () { bookFarmCare(nn); }; }(n));
+        });
+      } else {
+        b.appendChild(el('p', 'muted', '已结算 ' + c.deliveredDays + ' 天 · 待结算 ' + farmCareDaysLeft(c) + ' 天 · 上次结算日第 ' + c.lastDeliveryDay + ' 天。'));
+        extendedWorkButton(b, 'farmcare', '取消委托 · 退回剩余 ' + farmCareDaysLeft(c) + ' 天 (' + (farmCareDaysLeft(c) * (c.costPerDay.coins || 0)) + ' 金)',
+          { minutes: 10, guard: function () { return c.booked; }, reason: '已经完成的天数不退，未结算的天数按日退。' },
+          function () { var r = cancelFarmCare(); if (r > 0) toast('取消委托，退回 ' + r + ' 金。'); else toast('取消委托。'); });
+      }
+      b.appendChild(el('p', 'muted', '本面板只读当前预约；跨日结算由 settle → applyFarmCareTick 推进，不靠重复打开或反复点击刷结果。'));
+    },
+    actions: [{ label: '返回游戏', close: true }]
+  });
+}
 function openMillLife(site) {
   if(site==='gate'){openWindow({id:'millgate',kind:'custom',title:'东南乡道',build:function(b){b.appendChild(el('p',null,'乡道通向风铃磨坊与麦田村。修好小桥后可步行进入，首次到访后登记免费传送。'));},actions:[{label:'前往风铃磨坊与麦田村',kind:'primary',onClick:function(){if(!state.bridgeRepaired&&!millLifeState().legacyAccess){toast('先完成小镇东侧修桥委托。');return;}closeWindow();doSwitchScene('mill_village',3,18);}},{label:'返回',close:true}]});return;}
   openWindow({id:'milllife',kind:'custom',wide:true,title:'水轮与村庄早餐',build:function(b){
@@ -18226,6 +18272,123 @@ function addMeadowEntities(ents,R){var sc=state.sceneId;if(sc.indexOf('meadow')!
 /* 阶段 C—E 扩展：湿地、职业地点与边境防务。状态复用现有存档日期、
    传送事务、动作成本和碰撞地图；离线时不运行隐藏结算。 */
 function newWetlandLife(){return {visited:false,permit:false,birdCount:2,baselineBirdCount:5,lastSurveyDay:0,surveyCount:0,plantSamples:0,waterSamples:0,upstreamSample:false,outfallSample:false,causeFound:false,habitat:null,restoredDay:0,patrolDay:0,stewardship:0,recheck:null};}
+/* R4 第二块：农场照料委托。
+   玩家可以预订 N 天的全天照料；面板先给出材料／费用预览，扣款一次锁定。
+   每日结算逻辑由 applyFarmCareTick() 在跨日时推进；
+   物料不足时停下并记录 shortageDays，不偷偷扣材料、不重发工钱，也不擅自收成。
+   取消时若还没跨日可按剩余天数退款；跨日之后只能停约，不能回退已完成天数。 */
+function newFarmCare() {
+  return {
+    booked: false,
+    startDay: 0,
+    endDay: 0,
+    bookedDays: 0,
+    deliveredDays: 0,
+    shortageDays: 0,
+    daysPerVisit: 1,
+    costPerDay: { coins: 8 },
+    materialPerDay: { seed_radish: 1 },
+    lastDeliveryDay: 0,
+    lastShortageDay: 0
+  };
+}
+function farmCareState() { return state.farmCare || (state.farmCare = newFarmCare()); }
+function normalizeFarmCare(raw) {
+  var d = newFarmCare();
+  if (!raw || typeof raw !== 'object') return d;
+  d.booked = !!raw.booked;
+  d.startDay = Math.max(0, Math.floor(isInt(raw.startDay) ? raw.startDay : 0));
+  d.endDay = Math.max(0, Math.floor(isInt(raw.endDay) ? raw.endDay : 0));
+  d.bookedDays = Math.max(0, Math.floor(isInt(raw.bookedDays) ? raw.bookedDays : 0));
+  d.deliveredDays = Math.max(0, Math.floor(isInt(raw.deliveredDays) ? raw.deliveredDays : 0));
+  d.shortageDays = Math.max(0, Math.floor(isInt(raw.shortageDays) ? raw.shortageDays : 0));
+  d.lastDeliveryDay = Math.max(0, Math.floor(isInt(raw.lastDeliveryDay) ? raw.lastDeliveryDay : 0));
+  d.lastShortageDay = Math.max(0, Math.floor(isInt(raw.lastShortageDay) ? raw.lastShortageDay : 0));
+  if (raw.costPerDay && typeof raw.costPerDay === 'object') {
+    var fee = Math.max(0, Math.floor(isInt(raw.costPerDay.coins) ? raw.costPerDay.coins : 8));
+    d.costPerDay = { coins: fee };
+  }
+  if (raw.materialPerDay && typeof raw.materialPerDay === 'object') {
+    var mat = {};
+    for (var k in raw.materialPerDay) if (Object.prototype.hasOwnProperty.call(raw.materialPerDay, k)) {
+      var v = Math.max(0, Math.floor(isInt(raw.materialPerDay[k]) ? raw.materialPerDay[k] : 0));
+      mat[k] = v;
+    }
+    d.materialPerDay = mat;
+  }
+  return d;
+}
+function farmCareTotalDays(c) { c = c || farmCareState(); return Math.max(0, c.endDay - c.startDay + 1); }
+function farmCareDaysLeft(c) { c = c || farmCareState(); var total = farmCareTotalDays(c); var used = (c.deliveredDays || 0) + (c.shortageDays || 0); return Math.max(0, total - used); }
+function farmCareTotalFee(c) { c = c || farmCareState(); var total = farmCareTotalDays(c); return Math.round(total * (c.costPerDay && c.costPerDay.coins || 0)); }
+function farmCareTotalMaterials(c) {
+  c = c || farmCareState();
+  var total = farmCareTotalDays(c);
+  var out = {};
+  var mat = c.materialPerDay || {};
+  for (var k in mat) if (Object.prototype.hasOwnProperty.call(mat, k)) out[k] = mat[k] * total;
+  return out;
+}
+function bookFarmCare(days) {
+  var c = farmCareState();
+  if (c.booked) return false;
+  var n = Math.max(1, Math.min(14, Math.floor(days || 3)));
+  var fee = n * (c.costPerDay.coins || 0);
+  if (state.coins < fee) return false;
+  state.coins -= fee;
+  c.booked = true;
+  c.bookedDays = n;
+  c.startDay = state.totalDay;
+  c.endDay = state.totalDay + n - 1;
+  c.deliveredDays = 0;
+  c.shortageDays = 0;
+  c.lastDeliveryDay = 0;
+  c.lastShortageDay = 0;
+  markDirty(); saveNow();
+  return true;
+}
+function cancelFarmCare() {
+  var c = farmCareState();
+  if (!c.booked) return false;
+  var refund = farmCareDaysLeft(c) * (c.costPerDay.coins || 0);
+  state.coins += refund;
+  c.booked = false;
+  c.startDay = 0;
+  c.endDay = 0;
+  c.bookedDays = 0;
+  /* deliveredDays / shortageDays / lastDeliveryDay / lastShortageDay
+     都是「已结算」的证据：取消预约不抹除历史，便于玩家复盘与跨存档查看。 */
+  markDirty(); saveNow();
+  return refund;
+}
+/* 跨日结算：performSettlement 推进 totalDay 后调用。
+   只结算最新一天，不与同一天补结算，所以 shortageDays 不被同日重放。 */
+function applyFarmCareTick() {
+  var c = farmCareState();
+  if (!c.booked) return;
+  if (state.totalDay < c.startDay || state.totalDay > c.endDay) return;
+  if (state.totalDay === c.lastDeliveryDay || state.totalDay === c.lastShortageDay) return;
+  var mat = c.materialPerDay || {};
+  var missing = null;
+  for (var k in mat) {
+    if (!Object.prototype.hasOwnProperty.call(mat, k)) continue;
+    var need = mat[k];
+    var have = (state.inventory && state.inventory[k]) || 0;
+    if (have < need) { missing = k; break; }
+  }
+  if (!missing) {
+    for (var k2 in mat) {
+      if (!Object.prototype.hasOwnProperty.call(mat, k2)) continue;
+      invRemove(k2, mat[k2]);
+    }
+    c.deliveredDays++;
+    c.lastDeliveryDay = state.totalDay;
+  } else {
+    c.shortageDays++;
+    c.lastShortageDay = state.totalDay;
+  }
+  markDirty();
+}
 /* 湿地／河湾水位复查：登记表只写一次。普通调查 / 辨迹·识矿 两条入口
    都不重复扣料、不刷资历；旧档缺字段时归一化成 null，下次再到访会重新登记。 */
 function wetlandRecheckShape(raw){var r=raw&&typeof raw==='object'?raw:null;if(!r)return null;
@@ -21634,6 +21797,16 @@ window.__MOSS__ = {
   SEASONS: SEASONS,
   DAYS_PER_SEASON: DAYS_PER_SEASON,
   DAYS_PER_YEAR: DAYS_PER_YEAR,
+  newFarmCare: newFarmCare,
+  farmCareState: farmCareState,
+  farmCareTotalDays: farmCareTotalDays,
+  farmCareDaysLeft: farmCareDaysLeft,
+  farmCareTotalFee: farmCareTotalFee,
+  farmCareTotalMaterials: farmCareTotalMaterials,
+  bookFarmCare: bookFarmCare,
+  cancelFarmCare: cancelFarmCare,
+  applyFarmCareTick: applyFarmCareTick,
+  openFarmCarePanel: function () { openFarmCarePanel(); },
   deriveWaterworksFromProject: deriveWaterworksFromProject,
   newEngProject: newEngProject,
   ENG_PHASES: ENG_PHASES,
