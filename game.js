@@ -7951,6 +7951,13 @@ function todayPlanItems() {
   if (pji >= 1 || ecur.stage > 0 || (rookieState().engineering > 0 && rookieState().engineering < ROOKIE_JOBS.engineering.steps.length)) {
     out.push({ tier: 'soon', tag: '工程', text: '河湾闸门 · ' + ENG_PHASE_NAMES[pji] + ' · ' + engNextStepText(), open: openEngineeringProjectLog });
   }
+  /* P0-3：风铃磨坊的工程养护复核单独挂一条，且只能进马厂入口；
+     与上方工程条目同一份事实，避免在两个面板各算一次。 */
+  var dty = engDuty(pj);
+  if (pj.phase === 'accepted' && dty.status === 'active' && state.totalDay >= dty.nextDay) {
+    var overdue = engDutyOverdue(pj);
+    out.push({ tier: 'soon', tag: '磨坊', text: '风铃磨坊 · ' + (overdue > 0 ? '养护逾期 ' + overdue + ' 天' : '养护到期待复核') + ' · 马丁 (15,11) · 与控制室同一份事实', open: function () { openMillLife('mill_duty'); } });
+  }
   return out;
 }
 var TODAY_PLAN_SIG = '';
@@ -10543,12 +10550,24 @@ function engDutyClose(pj, status) {
 }
 function engDutyHandover(pj) { return engDutyClose(pj, 'handed'); }
 function engDutyRelease(pj) { return engDutyClose(pj, 'released'); }
-function engDutyPanel(b, pj, site) {
-  var at = site === 'water' ? 'water' : 'gauge';
+function engDutyPanel(b, pj, site, atOverride) {
+  /* R3-D/P0-2：磨坊、河港、控制室三处面板读同一份事实。
+     atOverride 让闸门养护责任既能落在 water/gauge，也能落在 mill_duty 上；
+     site 仍用来挑选口吻，没有 atOverride 时按旧逻辑默认 water/gauge。 */
+  var at = atOverride || (site === 'water' ? 'water' : 'gauge');
   var d = engDuty(pj), p = professionalLifeState();
+  var isMill = atOverride === 'mill_duty';
+  var speaker = isMill ? '马丁' : ENG_DUTY_CONTACT;
   var box = el('div', 'panel-box');
-  box.appendChild(el('div', 'section-title', '闸门养护 · 周期责任'));
-  box.appendChild(el('p', 'muted', '周期：每 ' + d.cycle + ' 天一次。工作范围：' + ENG_DUTY_SCOPE + '。联系人：' + ENG_DUTY_CONTACT + '。'));
+  box.appendChild(el('div', 'section-title', isMill ? '磨坊工程养护 · 周期复核' : '闸门养护 · 周期责任'));
+  box.appendChild(el('p', 'muted', '周期：每 ' + d.cycle + ' 天一次。工作范围：' + ENG_DUTY_SCOPE + '。联系人：' + speaker + '。'));
+  var scheme = ENG_SCHEMES[pj.scheme];
+  if (scheme) {
+    var quotaHint = scheme.alloc === 'irrigation'
+      ? '工程验收为保守排水，磨坊额度按 ' + scheme.supply + '；河港货运受政策影响。'
+      : '工程验收为兼顾通航，磨坊额度按 ' + scheme.supply + '；货运受政策影响。';
+    box.appendChild(el('p', 'muted', quotaHint));
+  }
   box.appendChild(el('p', 'req-chip', engDutyText(pj)));
   if (d.defers.length) {
     box.appendChild(el('p', 'muted', '延期记录：' + d.defers.map(function (x) {
@@ -10557,7 +10576,7 @@ function engDutyPanel(b, pj, site) {
   }
   if (d.status === 'active') {
     if (state.totalDay >= d.nextDay) {
-      extendedWorkButton(box, at, '闸门养护检视 · 45分钟', {
+      extendedWorkButton(box, at, (isMill ? '磨坊工程养护检视 · 45分钟' : '闸门养护检视 · 45分钟'), {
         minutes: 45, energy: 3,
         guard: function () { var q = engProject(); return q.phase === 'accepted' && engDuty(q).status === 'active' && state.totalDay >= engDuty(q).nextDay; },
         reason: '刚检视过；下一个检视日还没到。'
@@ -10568,12 +10587,12 @@ function engDutyPanel(b, pj, site) {
         minutes: 20,
         guard: function () { var q = engProject(); return q.phase === 'accepted' && engDuty(q).status === 'active' && engDuty(q).deferCount < ENG_DUTY_MAX_DEFER; },
         reason: '延期已达上限（' + ENG_DUTY_MAX_DEFER + ' 次），只能交接或退出。'
-      }, function () { engDutyDefer(engProject(), '人手不足'); });
+      }, function () { engDutyDefer(engProject(), isMill ? '人手不足' : '人手不足'); });
     } else box.appendChild(el('p', 'req-chip', '延期已用满 ' + ENG_DUTY_MAX_DEFER + ' 次：要交接或退出，责任才算说清楚。'));
     /* 交接与退出的前置是安全记录已处理完 —— 交班不清掉未处理的闸门事件 */
     var blocked = !engSafetyClear(pj);
     if (blocked) box.appendChild(el('p', 'req-chip', '闸门还有未处理的安全事件，交接与退出都要先把它处理完。'));
-    extendedWorkButton(box, at, '交接给继任工程员 · 30分钟', {
+    extendedWorkButton(box, at, (isMill ? '交接磨坊工程养护给继任者 · 30分钟' : '交接给继任工程员 · 30分钟'), {
       minutes: 30, energy: 1,
       guard: function () { var q = engProject(); return q.phase === 'accepted' && engDuty(q).status === 'active' && engSafetyClear(q); },
       reason: blocked ? '闸门还有未处理的安全事件。' : ''
@@ -10584,11 +10603,33 @@ function engDutyPanel(b, pj, site) {
       reason: blocked ? '闸门还有未处理的安全事件。' : ''
     }, function () { engDutyRelease(engProject()); });
   } else if(d.status==='none'){
-    box.appendChild(el('p','muted','旧工程缺少养护起始日期，可以从今天接回责任，不追溯补记检视或评价。'));
-    extendedWorkButton(box,at,'从今天接回养护责任 · 20分钟',{minutes:20,guard:function(){return engProject().phase==='accepted'&&engDuty(engProject()).status==='none'&&engSafetyClear(engProject());}},function(){engDutyStart(engProject());});
+    box.appendChild(el('p','muted', isMill ? '旧工程缺少养护起始日期，可以从今天在磨坊接回责任，不追溯补记检视或评价。' : '旧工程缺少养护起始日期，可以从今天接回责任，不追溯补记检视或评价。'));
+    extendedWorkButton(box,at, isMill ? '从今天在磨坊接回养护责任 · 20分钟' : '从今天接回养护责任 · 20分钟',{minutes:20,guard:function(){return engProject().phase==='accepted'&&engDuty(engProject()).status==='none'&&engSafetyClear(engProject());}},function(){engDutyStart(engProject());});
   } else {
     box.appendChild(el('p', 'muted', '责任已经' + (d.status === 'handed' ? '交出' : '结束') + '。你名下的检视、延期与逾期记录都保留在册，随时可查。'));
   }
+  b.appendChild(box);
+}
+/* 河港与船闸值守室只读地呈现同一份事实。
+   不挂按钮，避免从远处重复扣料或重复结算；玩家要看按钮得回到工程现场（控制室或磨坊）。 */
+function engDutyReadout(b, pj, scopeLabel) {
+  var d = engDuty(pj);
+  if (!pj || pj.phase !== 'accepted') return;
+  var scheme = ENG_SCHEMES[pj.scheme];
+  var box = el('div', 'panel-box');
+  box.appendChild(el('div', 'section-title', '水利联系 · 同一份事实'));
+  box.appendChild(el('p', 'muted', scopeLabel || '本面板只读闸门养护记录；按钮在控制室与风铃磨坊。'));
+  if (scheme) box.appendChild(el('p', 'muted', '方案：' + scheme.name + ' · 额度 ' + scheme.supply + ' · 货运 ' + scheme.freight));
+  box.appendChild(el('p', 'req-chip', engDutyText(pj)));
+  if (d.status === 'handed' || d.status === 'released') {
+    box.appendChild(el('p', 'muted', '责任已经' + (d.status === 'handed' ? '交出' : '结束') + '。你名下的检视、延期与逾期记录都保留在册，随时可查。'));
+  }
+  if (d.defers.length) {
+    box.appendChild(el('p', 'muted', '延期记录：' + d.defers.map(function (x) {
+      return '第' + x.day + '天 第' + x.from + '→' + x.to + '天' + (x.why ? '（' + x.why + '）' : '');
+    }).join('；')));
+  }
+  box.appendChild(el('p', 'muted', '累计检视 ' + d.done + ' 次 · 评价 ' + d.evalCount + ' 次 · 延期 ' + d.deferCount + ' 次 · 逾期 ' + d.overdue + ' 次。'));
   b.appendChild(box);
 }
 
@@ -10912,8 +10953,22 @@ function openEngineeringProjectLog() {
       if (mem.martin && mem.martin.length) who.push('马丁：' + mem.martin.join('、'));
       if (mem.council && mem.council.length) who.push('柯里：' + mem.council.join('、'));
       if (who.length) b.appendChild(el('p', 'muted', '他们记得——' + who.join('；')));
+      /* P0-3：在项目手册里也挂一条进入风铃磨坊的入口：
+         控制室、坝顶水尺、风铃磨坊三处都进同一份事实；这里只挂按钮，不再增结算。 */
+      if (pj.phase === 'accepted') {
+        var goMill = el('div', 'panel-box');
+        goMill.appendChild(el('div', 'section-title', '同期养护 · 三处入口'));
+        goMill.appendChild(el('p', 'muted', '闸门养护责任可以到水利控制室、坝顶水尺或风铃磨坊 (15,11) 三处之一完成；都走同一份事实，按钮不会重复扣料或再发一次奖。'));
+        b.appendChild(goMill);
+      }
     },
-    actions: [{ label: '返回游戏', kind: 'primary', close: true }]
+    actions: [
+      { label: '去风铃磨坊 · 马丁 (15,11)', close: false, onClick: function () {
+          if (state.bridgeRepaired || millLifeState().legacyAccess) { closeWindow(); openMillLife('mill_duty'); }
+          else { toast('先修好小镇东侧小桥。'); }
+        } },
+      { label: '返回游戏', kind: 'primary', close: true }
+    ]
   });
 }
 /* 唯一的前进入口：改完立刻把镜像写回，旧字段与项目进度不可能各说各话。
@@ -11010,8 +11065,8 @@ function engNextStepText() {
   var dty = engDuty(pj);
   if (dty.status === 'handed') return '闸门养护责任已于第 ' + dty.endDay + ' 天交接给' + dty.successor + '，记录仍在你名下';
   if (dty.status === 'released') return '闸门养护岗位已于第 ' + dty.endDay + ' 天结束，检视与延期记录仍可查';
-  if (dty.status === 'active' && state.totalDay >= dty.nextDay) return '闸门养护检视已到期（第 ' + dty.nextDay + ' 天' + (engDutyOverdue(pj) > 0 ? '，逾期 ' + engDutyOverdue(pj) + ' 天' : '') + '），到控制室或坝顶水尺做一次';
-  return '闸门养护：下次检视日第 ' + dty.nextDay + ' 天，周期 ' + dty.cycle + ' 天，不必每日签到';
+  if (dty.status === 'active' && state.totalDay >= dty.nextDay) return '闸门养护检视已到期（第 ' + dty.nextDay + ' 天' + (engDutyOverdue(pj) > 0 ? '，逾期 ' + engDutyOverdue(pj) + ' 天' : '') + '），到水利控制室、坝顶水尺或风铃磨坊做一次；三处都走同一份事实';
+  return '闸门养护：下次检视日第 ' + dty.nextDay + ' 天，周期 ' + dty.cycle + ' 天，不必每日签到；到控制室、坝顶水尺或风铃磨坊做都行';
 }
 function engSchemeCost(pj) {
   var sc = ENG_SCHEMES[pj.scheme];
@@ -16620,7 +16675,7 @@ makeMillLifeRoom('mill_workshop','风铃磨坊 · 机房',20,14,[29,16]);
 makeMillLifeRoom('mill_bakery','麦田村 · 面包房',18,12,[10,17]);
 makeMillLifeRoom('mill_hall','麦田村 · 议事屋',18,12,[19,11]);
 ['mill_village','mill_workshop','mill_bakery','mill_hall'].forEach(function(id){SCENE_ORDER.push(id);INTERACTABLES[id]=[];});
-var MILL_LIFE_SITES={gate:{scene:'town',x:22,y:22,label:'东南乡道 · 风铃磨坊'},intake:{scene:'mill_village',x:31,y:20,label:'检查进水渠'},gear:{scene:'mill_workshop',x:13,y:7,label:'检查传动齿轮'},mill:{scene:'mill_workshop',x:9,y:6,label:'马丁的维修与磨粉台'},farmer:{scene:'mill_village',x:11,y:25,label:'听取农田用水意见'},baker:{scene:'mill_bakery',x:9,y:6,label:'烘焙台与供水意见'},hall:{scene:'mill_hall',x:9,y:5,label:'议事与试运行记录'},delivery:{scene:'mill_bakery',x:5,y:7,label:'交付村庄早餐'}};
+var MILL_LIFE_SITES={gate:{scene:'town',x:22,y:22,label:'东南乡道 · 风铃磨坊'},intake:{scene:'mill_village',x:31,y:20,label:'检查进水渠'},gear:{scene:'mill_workshop',x:13,y:7,label:'检查传动齿轮'},mill:{scene:'mill_workshop',x:9,y:6,label:'马丁的维修与磨粉台'},mill_duty:{scene:'mill_workshop',x:15,y:11,label:'马丁的工程养护复核'},farmer:{scene:'mill_village',x:11,y:25,label:'听取农田用水意见'},baker:{scene:'mill_bakery',x:9,y:6,label:'烘焙台与供水意见'},hall:{scene:'mill_hall',x:9,y:5,label:'议事与试运行记录'},delivery:{scene:'mill_bakery',x:5,y:7,label:'交付村庄早餐'}};
 Object.keys(MILL_LIFE_SITES).forEach(function(k){var p=MILL_LIFE_SITES[k];INTERACTABLES[p.scene].push({kind:'millLife',work:k,x:p.x,y:p.y,label:p.label,stand:[[p.x,p.y+1],[p.x-1,p.y],[p.x+1,p.y],[p.x,p.y-1]]});});
 [['mill_workshop',29,16,'风铃磨坊机房'],['mill_bakery',10,17,'麦田村面包房'],['mill_hall',19,11,'村议事屋']].forEach(function(p){INTERACTABLES.mill_village.push({kind:'millDoor',to:p[0],x:p[1],y:p[2],label:'进入'+p[3],stand:[[p[1],p[2]],[p[1],p[2]+1]]});});
 fillRect(MAPS.town,21,19,23,23,T_PATH,false);
@@ -16721,14 +16776,28 @@ function cityWork(opts) {
   return ok;
 }
 function millLifeButton(b,site,label,opts,apply){b.appendChild(mkBtn(label,'',function(){millLifeAction(site,opts,apply);}));}
-function millLifeTaskText(){var m=millLifeState();return m.delivery?'村庄早餐已交付 · 水轮继续按协定工作':m.inspected?'水轮已验收 · 向面包房交付乡村面包 ×2':m.trialDay?(state.totalDay>m.trialDay?'试运行结束 · 到议事屋验收':'试运行中 · 睡过一夜后到议事屋验收'):m.allocation?'用水协议已定 · 到议事屋启动试运行':m.repair?'水轮已修 · 听取麦田与面包房意见，到议事屋选择用水协议':'调查进水渠与机房齿轮，再到马丁工作台选择修法';}
+function millLifeTaskText(){var m=millLifeState(),pj=professionalLifeState().projects[ENG_PROJECT_ID],scheme=pj&&ENG_SCHEMES[pj.scheme],duty=pj&&pj.duty;
+  var dutyLine=duty?(duty.status==='active'?(state.totalDay>=duty.nextDay?'养护到期待复核（'+engDutyOverdue(pj)+' 天逾期）':'下次养护检视 第 '+duty.nextDay+' 天'):duty.status==='handed'?'养护岗位已交接 · 继任 '+duty.successor:duty.status==='released'?'养护岗位已结束':'养护责任未开始'):'';
+  var schemeLine=scheme?'工程方案 '+scheme.name+' · 磨坊额度 '+scheme.supply:'';
+  var base=m.delivery?'村庄早餐已交付 · 水轮继续按协定工作':m.inspected?'水轮已验收 · 向面包房交付乡村面包 ×2':m.trialDay?(state.totalDay>m.trialDay?'试运行结束 · 到议事屋验收':'试运行中 · 睡过一夜后到议事屋验收'):m.allocation?'用水协议已定 · 到议事屋启动试运行':m.repair?'水轮已修 · 听取麦田与面包房意见，到议事屋选择用水协议':'调查进水渠与机房齿轮，再到马丁工作台选择修法';
+  return [base,schemeLine,dutyLine].filter(function(s){return s;}).join(' · ');}
 function openMillLife(site) {
   if(site==='gate'){openWindow({id:'millgate',kind:'custom',title:'东南乡道',build:function(b){b.appendChild(el('p',null,'乡道通向风铃磨坊与麦田村。修好小桥后可步行进入，首次到访后登记免费传送。'));},actions:[{label:'前往风铃磨坊与麦田村',kind:'primary',onClick:function(){if(!state.bridgeRepaired&&!millLifeState().legacyAccess){toast('先完成小镇东侧修桥委托。');return;}closeWindow();doSwitchScene('mill_village',3,18);}},{label:'返回',close:true}]});return;}
   openWindow({id:'milllife',kind:'custom',wide:true,title:'水轮与村庄早餐',build:function(b){
     b.classList.add('mill-life-panel');
     var m=millLifeState();b.appendChild(el('p','work-summary',millLifeTaskText()));
     b.appendChild(el('p','muted','任务记录随存档保存。维修与用水协议只能完成一次；粮食与面包允许合法购买。N「册」可随时查看任务。'));
-    if(site==='journal'){b.appendChild(el('p',null,'首次进入：小镇东南 (22,22) 乡道路牌按 E。村内：进水渠 (31,20)，机房门 (29,16)，面包房门 (10,17)，议事屋门 (19,11)，麦田 (11,25)。'));return;}
+    if(site==='journal'){b.appendChild(el('p',null,'首次进入：小镇东南 (22,22) 乡道路牌按 E。村内：进水渠 (31,20)，机房门 (29,16)，面包房门 (10,17)，议事屋门 (19,11)，麦田 (11,25)。工程养护复核：机房 (15,11)。'));return;}
+    if(site==='mill_duty'){
+      /* R3-D/P0-2：在风铃磨坊新增一项可重复使用的工程养护复核。
+         联系人马丁，与控制室、河港面板共用同一份事实；
+         不增加额外周期或评价，沿用既有 3 天周期与 evalCount 上限；
+         按钮不重复扣料、不刷资历，重复打开只复读事实。 */
+      var millDutyP=professionalLifeState().projects[ENG_PROJECT_ID]||newEngProject();
+      b.appendChild(el('p',null,'马丁：河湾闸门建好之后，每三天要把闸缝与流量对一遍。我手上有测尺与流量板，顺便复核一次。'));
+      b.appendChild(el('p','muted','这项复核就是控制室那个周期检视，换个地点走相同的事实：你按键、记录、评价都记在同一份账上，不会因为这里是磨坊就多算一次。'));
+      engDutyPanel(b, millDutyP, 'mill_duty', 'mill_duty');
+    }
     if(site==='intake'){b.appendChild(el('p',null,'进水槽有落叶淤积，但没有断流。问题更像是传动磨损。'));if(!m.intake)millLifeButton(b,site,'记录进水渠 · 10分钟',{minutes:10,energy:2,guard:function(){return !m.intake;}},function(){m.intake=true;});}
     if(site==='gear'){b.appendChild(el('p',null,'两颗齿轮齿缺损，水轮木桨也有裂纹。可以补齿轮，也可以替换木桨降低负荷。'));if(!m.gear)millLifeButton(b,site,'记录齿轮磨损 · 10分钟',{minutes:10,energy:2,guard:function(){return !m.gear;}},function(){m.gear=true;});}
     if(site==='mill'){
@@ -17445,6 +17514,7 @@ function openProfessionSite(site){
     if(site==='port'){
       b.appendChild(el('p','muted','当前运货耗时：医舍 '+professionalShippingMinutes(40)+' 分钟，石料／互市 '+professionalShippingMinutes(60)+' 分钟。验收后的灌溉优先需小船分批，多20分钟；通航优先少10分钟。追索货差后须追加10分钟封签复核。'));
       b.appendChild(el('p',null,'米娅：装卸簿比货单多记两箱。你可以凭封签追索货款，也可以补运并修正关系。核验后可以安排实际批次转运。'));
+      engDutyReadout(b, p.projects[ENG_PROJECT_ID], '米娅会按闸门养护状态调整出口与装卸节奏；具体执行入口在控制室与风铃磨坊。');
       if(!portS.manifestChecked)extendedWorkButton(b,'port','核验封签与装卸簿 · 20分钟',{minutes:20,energy:1,guard:function(){return !portS.manifestChecked;}},function(){portS.manifestChecked=true;bumpRoute('trade');});
       if(portS.manifestChecked&&!portS.choice){[['claim','封存差额证据并追索 · 35金'],['reship','补运两箱并维护合作 · 消耗10金']].forEach(function(o){extendedWorkButton(b,'port',o[1],{minutes:25,coins:o[0]==='reship'?10:0,guard:function(){return portS.manifestChecked&&!portS.choice;}},function(){portS.choice=o[0];p.careers.trade=Math.max(p.careers.trade,1);p.trust=Math.min(100,p.trust+(o[0]==='reship'?2:1));if(o[0]==='claim')state.coins+=35;});});}
       var river=portS.riverContract,riverProject=p.projects[ENG_PROJECT_ID];
@@ -17471,7 +17541,7 @@ function openProfessionSite(site){
       }
       if(portS.choice)b.appendChild(el('p','req-chip ok','货单处置：'+(portS.choice==='claim'?'已追索差额，后续优先级降低。':'已补运，合作方保留舱位。')));
     }
-    if(site==='lock')b.appendChild(el('p',null,'莱昂：船闸水尺会随降雨变化。人的省内快速传送不会搬运货物；货船只有靠泊并核验后才算抵港。当前水利方案：'+(ww.allocation==='irrigation'?'优先农田用水':ww.allocation==='navigation'?'优先通航':'待协商')+'。'));
+    if(site==='lock'){b.appendChild(el('p',null,'莱昂：船闸水尺会随降雨变化。人的省内快速传送不会搬运货物；货船只有靠泊并核验后才算抵港。当前水利方案：'+(ww.allocation==='irrigation'?'优先农田用水':ww.allocation==='navigation'?'优先通航':'待协商')+'。'));engDutyReadout(b, p.projects[ENG_PROJECT_ID], '船闸按闸门养护记录核发短期靠泊额度；执行入口仍在控制室与风铃磨坊。');}
     if(site==='quarry'){
       b.appendChild(el('p',null,'玛尔：先量裂隙和支护，再选稳定面或石灰层。每个游戏日只安排一次采掘，避免重复挖同一批原石。'));
       if(!q.surveyed)extendedWorkButton(b,'quarry','测量裂隙 · 20分钟',{minutes:20,energy:2,guard:function(){return !q.surveyed;}},function(){q.surveyed=true;p.access.quarry=true;bumpRoute('engineering');});
@@ -17781,6 +17851,16 @@ Object.keys(INTERACTABLES).forEach(function(scene){(INTERACTABLES[scene]||[]).fo
   var key=it.work.indexOf('profession:')===0?it.work.slice(11):it.work;
   if(!EXTENDED_ACTION_POINTS[key])EXTENDED_ACTION_POINTS[key]={scene:scene,x:it.x,y:it.y,label:it.label};
 });});
+/* R3-D/P0-2：磨坊工程养护复核走的是 millLife 触发，单独注册动作点
+   让面板里的检视／延期／交接／退出按钮能跑到对应坐标 */
+if(MILL_LIFE_SITES.mill_duty && !EXTENDED_ACTION_POINTS.mill_duty){
+  EXTENDED_ACTION_POINTS.mill_duty={
+    scene:MILL_LIFE_SITES.mill_duty.scene,
+    x:MILL_LIFE_SITES.mill_duty.x,
+    y:MILL_LIFE_SITES.mill_duty.y,
+    label:MILL_LIFE_SITES.mill_duty.label
+  };
+}
 
 var baseDrawMillLifeFurniture=drawMillLifeFurniture;
 function drawExtendedFurniture(g,f){
@@ -20275,6 +20355,17 @@ window.__MOSS__ = {
   ENG_PHASE_NAMES: ENG_PHASE_NAMES,
   ENG_SCHEMES: ENG_SCHEMES,
   engProject: engProject,
+  engDuty: engDuty,
+  engDutyReadout: engDutyReadout,
+  engDutyInspect: engDutyInspect,
+  engDutyDefer: engDutyDefer,
+  engDutyHandover: engDutyHandover,
+  engDutyRelease: engDutyRelease,
+  engDutyOverdue: engDutyOverdue,
+  ENG_DUTY_CYCLE: ENG_DUTY_CYCLE,
+  ENG_DUTY_MAX_DEFER: ENG_DUTY_MAX_DEFER,
+  ENG_DUTY_SUCCESSOR: ENG_DUTY_SUCCESSOR,
+  openMillLife: openMillLife,
   openWindow: openWindow,
   replaceSave: function (raw) {
     var normalized = normalizeSave(raw);
