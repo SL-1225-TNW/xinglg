@@ -1,5 +1,7 @@
 import { launch, boot } from './harness.mjs';
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /* 全地图试玩巡检
    目标：像玩家一样把 6 张地图、31 个城市设施全部走一遍，记录：
@@ -138,8 +140,11 @@ try {
   report.errors = uniq;
 
   /* ---------- 输出报告 ---------- */
-  fs.writeFileSync('/root/xinglg/tests/playtest-report.json', JSON.stringify(report, null, 2));
-  console.log('\n报告已存 /root/xinglg/tests/playtest-report.json');
+  /* 报告写到脚本自己的目录：原来写死 /root/xinglg/... ，换台机器就崩，
+     试玩跑完了却在最后一步报错，看起来像功能坏了。 */
+  const reportPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'playtest-report.json');
+  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+  console.log('\n报告已存 ' + reportPath);
 
 } catch (e) {
   console.error('崩溃：', e.message, e.stack?.split('\n')[1] || '');

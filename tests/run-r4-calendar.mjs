@@ -5,9 +5,10 @@
 import assert from 'node:assert/strict';
 import { launch, boot } from './harness.mjs';
 
+const single = process.argv.includes('--single-file');
 let checks = 0;
 const eq = (a, b, n) => { assert.deepEqual(a, b, n); checks++; console.log('PASS', n); };
-const r = await launch({}), p = r.page;
+const r = await launch(single ? { url: new URL('../苔芽农场-单文件版.html', import.meta.url).href } : {}), p = r.page;
 await boot(p);
 await p.locator('#tutorialSkip').click();
 
@@ -87,4 +88,4 @@ eq(roundtrip.aDay, roundtrip.bDay, '归一化往返 totalDay 不变');
 eq(roundtrip.aCoins, roundtrip.bCoins, '归一化往返 coins 不变');
 
 await r.browser.close();
-console.log(`R4 四季年历 ${checks} 项通过`);
+console.log(`R4 四季年历 ${checks} 项通过${single ? '（单文件）' : ''}`);

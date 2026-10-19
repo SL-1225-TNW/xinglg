@@ -38,6 +38,11 @@ const BROWSER = [
   'run-r4-calendar.mjs',
   'run-r4-farm-care.mjs',
   'run-r4-farm-plan.mjs',
+  'run-r4-outwork.mjs',
+  'run-r4-season.mjs',
+  'run-r4-settlement-aid.mjs',
+  'run-r4-legacy-save.mjs',
+  'run-r4-mobile.mjs',
   /* 白蔷薇宫城 P1：布局契约、楼层通行、存档迁移与手机端分层验收 */
   'run-palace-layout.mjs', 'run-palace-save.mjs', 'run-palace-floors.mjs', 'run-palace-mobile.mjs', 'run-palace-wayfinding.mjs', 'run-palace-east-wing.mjs', 'run-palace-service.mjs',
   'run-university.mjs',
@@ -86,6 +91,10 @@ run('run-r3-mill-duty-single-file', path.join(here, 'run-r3-mill-duty.mjs'), ['-
 run('run-r4-calendar-single-file', path.join(here, 'run-r4-calendar.mjs'), ['--single-file']);
 run('run-r4-farm-care-single-file', path.join(here, 'run-r4-farm-care.mjs'), ['--single-file']);
 run('run-r4-farm-plan-single-file', path.join(here, 'run-r4-farm-plan.mjs'), ['--single-file']);
+run('run-r4-outwork-single-file', path.join(here, 'run-r4-outwork.mjs'), ['--single-file']);
+run('run-r4-season-single-file', path.join(here, 'run-r4-season.mjs'), ['--single-file']);
+run('run-r4-settlement-aid-single-file', path.join(here, 'run-r4-settlement-aid.mjs'), ['--single-file']);
+run('run-r4-legacy-save-single-file', path.join(here, 'run-r4-legacy-save.mjs'), ['--single-file']);
 
 console.log(failed ? `\n共 ${failed} 项失败。` : '\n两层全部通过。');
 process.exit(failed ? 1 : 0);

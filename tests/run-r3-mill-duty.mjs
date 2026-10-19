@@ -6,8 +6,6 @@
    - 重复点击、重载存档、跨周期、交接、退出都不会触发额外结算或叠加评价；
    - 河港面板与船闸值守室只读同一份事实，没有按钮。 */
 import assert from 'node:assert/strict';
-import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { launch, boot, closeWin, clickWin, winText } from './harness.mjs';
 
 const single = process.argv.includes('--single-file');
@@ -15,7 +13,7 @@ let count = 0;
 const eq = (a, b, n) => { assert.deepEqual(a, b, n); count++; console.log('PASS', n); };
 const ok = (c, n) => { assert.ok(c, n); count++; console.log('PASS', n); };
 
-const r = await launch(single ? { url: pathToFileURL(path.resolve('苔芽农场-单文件版.html')).href } : {}), p = r.page;
+const r = await launch(single ? { url: new URL('../苔芽农场-单文件版.html', import.meta.url).href } : {}), p = r.page;
 await boot(p);
 await p.locator('#tutorialSkip').click();
 
@@ -248,4 +246,6 @@ await atMillDuty();
 eq(await btnCount('磨坊工程养护检视'), 0, '工程未验收时检视按钮不挂');
 ok(await winHas('旧工程缺少养护起始日期') || await winHas('从今天在磨坊接回养护责任'), '未验收状态下显示接回/起始提示');
 
+eq(r.errors, [], '磨坊养护复核无浏览器异常');
+await r.browser.close();
 console.log(`R3-D 磨坊工程养护复核 ${count} 项通过${single ? '（单文件版）' : ''}`);

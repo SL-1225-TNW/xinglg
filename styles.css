@@ -601,7 +601,9 @@ button{font-family:inherit}
   background:rgba(0,0,0,.22);border-radius:6px}
 .item-ico canvas{image-rendering:pixelated;width:26px;height:26px;display:block}
 .item-main{flex:1 1 auto;min-width:0}
-.item-name{font-size:13px;font-weight:600;display:flex;align-items:baseline;gap:6px}
+.item-name{font-size:13px;font-weight:600;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+/* 作物名 + 应季标签同行时，名字不能被挤成竖排一列 */
+.item-name > span:first-child{white-space:nowrap}
 .item-count{font-size:12px;color:var(--gold);font-weight:700}
 .item-desc{font-size:11px;color:var(--text-dim);line-height:1.45}
 .item-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}

@@ -13,7 +13,7 @@
       "w": 32,
       "h": 24,
       "indoor": false,
-      "colors": 55,
+      "colors": 56,
       "n": 56
     },
     {
@@ -29,7 +29,7 @@
       "w": 40,
       "h": 28,
       "indoor": false,
-      "colors": 64,
+      "colors": 56,
       "n": 56
     },
     {
@@ -45,7 +45,7 @@
       "w": 28,
       "h": 24,
       "indoor": false,
-      "colors": 18,
+      "colors": 34,
       "n": 56
     },
     {
@@ -53,7 +53,7 @@
       "w": 28,
       "h": 24,
       "indoor": false,
-      "colors": 21,
+      "colors": 18,
       "n": 56
     },
     {
@@ -61,15 +61,15 @@
       "w": 16,
       "h": 12,
       "indoor": true,
-      "colors": 87,
+      "colors": 116,
       "n": 56
     },
     {
       "sid": "city_castle",
-      "w": 34,
-      "h": 24,
+      "w": 64,
+      "h": 48,
       "indoor": true,
-      "colors": 38,
+      "colors": 55,
       "n": 56
     },
     {
@@ -77,7 +77,7 @@
       "w": 30,
       "h": 20,
       "indoor": true,
-      "colors": 37,
+      "colors": 58,
       "n": 56
     },
     {
@@ -85,7 +85,7 @@
       "w": 28,
       "h": 18,
       "indoor": true,
-      "colors": 38,
+      "colors": 43,
       "n": 56
     },
     {
@@ -93,7 +93,7 @@
       "w": 26,
       "h": 20,
       "indoor": true,
-      "colors": 51,
+      "colors": 70,
       "n": 56
     },
     {
@@ -101,7 +101,7 @@
       "w": 28,
       "h": 20,
       "indoor": true,
-      "colors": 47,
+      "colors": 53,
       "n": 56
     },
     {
@@ -109,7 +109,7 @@
       "w": 30,
       "h": 20,
       "indoor": true,
-      "colors": 33,
+      "colors": 74,
       "n": 56
     },
     {
@@ -117,7 +117,7 @@
       "w": 24,
       "h": 18,
       "indoor": true,
-      "colors": 48,
+      "colors": 91,
       "n": 56
     },
     {
@@ -125,7 +125,7 @@
       "w": 14,
       "h": 11,
       "indoor": true,
-      "colors": 31,
+      "colors": 33,
       "n": 56
     },
     {
@@ -133,7 +133,7 @@
       "w": 14,
       "h": 11,
       "indoor": true,
-      "colors": 31,
+      "colors": 33,
       "n": 56
     },
     {
@@ -141,7 +141,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 27,
+      "colors": 38,
       "n": 56
     },
     {
@@ -149,7 +149,7 @@
       "w": 26,
       "h": 18,
       "indoor": true,
-      "colors": 53,
+      "colors": 56,
       "n": 56
     },
     {
@@ -157,7 +157,7 @@
       "w": 26,
       "h": 18,
       "indoor": true,
-      "colors": 38,
+      "colors": 59,
       "n": 56
     },
     {
@@ -165,7 +165,7 @@
       "w": 22,
       "h": 16,
       "indoor": true,
-      "colors": 30,
+      "colors": 80,
       "n": 56
     },
     {
@@ -173,7 +173,7 @@
       "w": 30,
       "h": 20,
       "indoor": true,
-      "colors": 42,
+      "colors": 66,
       "n": 56
     },
     {
@@ -181,7 +181,7 @@
       "w": 26,
       "h": 18,
       "indoor": true,
-      "colors": 33,
+      "colors": 55,
       "n": 56
     },
     {
@@ -189,7 +189,7 @@
       "w": 24,
       "h": 16,
       "indoor": true,
-      "colors": 21,
+      "colors": 40,
       "n": 56
     },
     {
@@ -197,7 +197,7 @@
       "w": 22,
       "h": 14,
       "indoor": true,
-      "colors": 21,
+      "colors": 26,
       "n": 56
     },
     {
@@ -205,7 +205,7 @@
       "w": 36,
       "h": 20,
       "indoor": true,
-      "colors": 30,
+      "colors": 56,
       "n": 56
     },
     {
@@ -213,7 +213,7 @@
       "w": 34,
       "h": 22,
       "indoor": true,
-      "colors": 36,
+      "colors": 56,
       "n": 56
     },
     {
@@ -221,7 +221,7 @@
       "w": 34,
       "h": 22,
       "indoor": true,
-      "colors": 48,
+      "colors": 47,
       "n": 56
     },
     {
@@ -229,7 +229,7 @@
       "w": 30,
       "h": 20,
       "indoor": true,
-      "colors": 44,
+      "colors": 50,
       "n": 56
     },
     {
@@ -237,7 +237,7 @@
       "w": 26,
       "h": 18,
       "indoor": true,
-      "colors": 44,
+      "colors": 48,
       "n": 56
     },
     {
@@ -245,7 +245,7 @@
       "w": 30,
       "h": 20,
       "indoor": true,
-      "colors": 36,
+      "colors": 56,
       "n": 56
     },
     {
@@ -253,7 +253,7 @@
       "w": 36,
       "h": 24,
       "indoor": true,
-      "colors": 44,
+      "colors": 60,
       "n": 56
     },
     {
@@ -261,7 +261,7 @@
       "w": 32,
       "h": 22,
       "indoor": true,
-      "colors": 37,
+      "colors": 33,
       "n": 56
     },
     {
@@ -269,7 +269,7 @@
       "w": 32,
       "h": 22,
       "indoor": true,
-      "colors": 52,
+      "colors": 61,
       "n": 56
     },
     {
@@ -277,7 +277,7 @@
       "w": 32,
       "h": 22,
       "indoor": true,
-      "colors": 37,
+      "colors": 36,
       "n": 56
     },
     {
@@ -285,7 +285,7 @@
       "w": 32,
       "h": 20,
       "indoor": true,
-      "colors": 51,
+      "colors": 57,
       "n": 56
     },
     {
@@ -293,7 +293,7 @@
       "w": 34,
       "h": 22,
       "indoor": true,
-      "colors": 46,
+      "colors": 43,
       "n": 56
     },
     {
@@ -301,7 +301,7 @@
       "w": 26,
       "h": 20,
       "indoor": true,
-      "colors": 42,
+      "colors": 50,
       "n": 56
     },
     {
@@ -309,7 +309,7 @@
       "w": 38,
       "h": 26,
       "indoor": true,
-      "colors": 38,
+      "colors": 36,
       "n": 56
     },
     {
@@ -317,7 +317,7 @@
       "w": 34,
       "h": 24,
       "indoor": true,
-      "colors": 52,
+      "colors": 46,
       "n": 56
     },
     {
@@ -325,7 +325,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 26,
+      "colors": 67,
       "n": 56
     },
     {
@@ -333,7 +333,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 28,
+      "colors": 38,
       "n": 56
     },
     {
@@ -341,7 +341,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 28,
+      "colors": 38,
       "n": 56
     },
     {
@@ -349,7 +349,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 28,
+      "colors": 38,
       "n": 56
     },
     {
@@ -357,7 +357,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 26,
+      "colors": 38,
       "n": 56
     },
     {
@@ -365,7 +365,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 28,
+      "colors": 38,
       "n": 56
     },
     {
@@ -373,7 +373,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 27,
+      "colors": 38,
       "n": 56
     },
     {
@@ -381,7 +381,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 27,
+      "colors": 38,
       "n": 56
     },
     {
@@ -389,7 +389,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 26,
+      "colors": 38,
       "n": 56
     },
     {
@@ -397,7 +397,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 27,
+      "colors": 38,
       "n": 56
     },
     {
@@ -405,7 +405,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 27,
+      "colors": 38,
       "n": 56
     },
     {
@@ -413,7 +413,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 27,
+      "colors": 38,
       "n": 56
     },
     {
@@ -421,7 +421,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 28,
+      "colors": 38,
       "n": 56
     },
     {
@@ -429,7 +429,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 28,
+      "colors": 38,
       "n": 56
     },
     {
@@ -437,7 +437,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 28,
+      "colors": 38,
       "n": 56
     },
     {
@@ -445,7 +445,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 28,
+      "colors": 38,
       "n": 56
     },
     {
@@ -453,7 +453,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 28,
+      "colors": 38,
       "n": 56
     },
     {
@@ -461,7 +461,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 28,
+      "colors": 38,
       "n": 56
     },
     {
@@ -469,7 +469,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 28,
+      "colors": 38,
       "n": 56
     },
     {
@@ -477,7 +477,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 28,
+      "colors": 38,
       "n": 56
     },
     {
@@ -485,7 +485,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 28,
+      "colors": 38,
       "n": 56
     },
     {
@@ -493,7 +493,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 28,
+      "colors": 38,
       "n": 56
     },
     {
@@ -501,7 +501,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 28,
+      "colors": 38,
       "n": 56
     },
     {
@@ -509,7 +509,7 @@
       "w": 16,
       "h": 13,
       "indoor": true,
-      "colors": 28,
+      "colors": 38,
       "n": 56
     },
     {
@@ -517,7 +517,487 @@
       "w": 640,
       "h": 480,
       "indoor": false,
-      "colors": 13,
+      "colors": 12,
+      "n": 56
+    },
+    {
+      "sid": "mill_village",
+      "w": 48,
+      "h": 36,
+      "indoor": false,
+      "colors": 43,
+      "n": 56
+    },
+    {
+      "sid": "mill_workshop",
+      "w": 20,
+      "h": 14,
+      "indoor": true,
+      "colors": 47,
+      "n": 56
+    },
+    {
+      "sid": "mill_bakery",
+      "w": 18,
+      "h": 12,
+      "indoor": true,
+      "colors": 40,
+      "n": 56
+    },
+    {
+      "sid": "mill_hall",
+      "w": 18,
+      "h": 12,
+      "indoor": true,
+      "colors": 35,
+      "n": 56
+    },
+    {
+      "sid": "meadow",
+      "w": 44,
+      "h": 34,
+      "indoor": false,
+      "colors": 55,
+      "n": 56
+    },
+    {
+      "sid": "meadow_barn",
+      "w": 18,
+      "h": 13,
+      "indoor": true,
+      "colors": 38,
+      "n": 56
+    },
+    {
+      "sid": "meadow_vet",
+      "w": 18,
+      "h": 12,
+      "indoor": true,
+      "colors": 40,
+      "n": 56
+    },
+    {
+      "sid": "wetland",
+      "w": 46,
+      "h": 34,
+      "indoor": false,
+      "colors": 38,
+      "n": 56
+    },
+    {
+      "sid": "wetland_observation",
+      "w": 18,
+      "h": 13,
+      "indoor": true,
+      "colors": 25,
+      "n": 56
+    },
+    {
+      "sid": "vineyard",
+      "w": 46,
+      "h": 34,
+      "indoor": false,
+      "colors": 35,
+      "n": 56
+    },
+    {
+      "sid": "clinic",
+      "w": 38,
+      "h": 30,
+      "indoor": false,
+      "colors": 48,
+      "n": 56
+    },
+    {
+      "sid": "port",
+      "w": 44,
+      "h": 34,
+      "indoor": false,
+      "colors": 34,
+      "n": 56
+    },
+    {
+      "sid": "quarry",
+      "w": 40,
+      "h": 32,
+      "indoor": false,
+      "colors": 34,
+      "n": 56
+    },
+    {
+      "sid": "waterworks",
+      "w": 40,
+      "h": 32,
+      "indoor": false,
+      "colors": 32,
+      "n": 56
+    },
+    {
+      "sid": "vineyard_press",
+      "w": 20,
+      "h": 14,
+      "indoor": true,
+      "colors": 30,
+      "n": 56
+    },
+    {
+      "sid": "vineyard_cellar",
+      "w": 18,
+      "h": 13,
+      "indoor": true,
+      "colors": 29,
+      "n": 56
+    },
+    {
+      "sid": "clinic_ward",
+      "w": 18,
+      "h": 13,
+      "indoor": true,
+      "colors": 48,
+      "n": 56
+    },
+    {
+      "sid": "clinic_archive",
+      "w": 18,
+      "h": 13,
+      "indoor": true,
+      "colors": 53,
+      "n": 56
+    },
+    {
+      "sid": "port_office",
+      "w": 18,
+      "h": 13,
+      "indoor": true,
+      "colors": 49,
+      "n": 56
+    },
+    {
+      "sid": "port_lockhouse",
+      "w": 18,
+      "h": 13,
+      "indoor": true,
+      "colors": 38,
+      "n": 56
+    },
+    {
+      "sid": "quarry_shed",
+      "w": 18,
+      "h": 13,
+      "indoor": true,
+      "colors": 30,
+      "n": 56
+    },
+    {
+      "sid": "waterworks_control",
+      "w": 18,
+      "h": 13,
+      "indoor": true,
+      "colors": 37,
+      "n": 56
+    },
+    {
+      "sid": "cloud_pass",
+      "w": 44,
+      "h": 32,
+      "indoor": false,
+      "colors": 35,
+      "n": 56
+    },
+    {
+      "sid": "border_camp",
+      "w": 38,
+      "h": 30,
+      "indoor": false,
+      "colors": 53,
+      "n": 56
+    },
+    {
+      "sid": "old_road",
+      "w": 42,
+      "h": 30,
+      "indoor": false,
+      "colors": 30,
+      "n": 56
+    },
+    {
+      "sid": "neighbor_border",
+      "w": 44,
+      "h": 34,
+      "indoor": false,
+      "colors": 31,
+      "n": 56
+    },
+    {
+      "sid": "border_barracks",
+      "w": 20,
+      "h": 14,
+      "indoor": true,
+      "colors": 37,
+      "n": 56
+    },
+    {
+      "sid": "border_depot",
+      "w": 18,
+      "h": 13,
+      "indoor": true,
+      "colors": 33,
+      "n": 56
+    },
+    {
+      "sid": "oldroad_survey",
+      "w": 18,
+      "h": 13,
+      "indoor": true,
+      "colors": 38,
+      "n": 56
+    },
+    {
+      "sid": "neighbor_office",
+      "w": 20,
+      "h": 14,
+      "indoor": true,
+      "colors": 35,
+      "n": 56
+    },
+    {
+      "sid": "neighbor_exchange",
+      "w": 18,
+      "h": 13,
+      "indoor": true,
+      "colors": 33,
+      "n": 56
+    },
+    {
+      "sid": "palace_grounds",
+      "w": 120,
+      "h": 96,
+      "indoor": false,
+      "colors": 28,
+      "n": 56
+    },
+    {
+      "sid": "palace_gallery",
+      "w": 28,
+      "h": 16,
+      "indoor": false,
+      "colors": 20,
+      "n": 56
+    },
+    {
+      "sid": "palace_terrace",
+      "w": 40,
+      "h": 28,
+      "indoor": false,
+      "colors": 19,
+      "n": 56
+    },
+    {
+      "sid": "palace_f1",
+      "w": 64,
+      "h": 48,
+      "indoor": true,
+      "colors": 59,
+      "n": 56
+    },
+    {
+      "sid": "palace_east_wing",
+      "w": 36,
+      "h": 24,
+      "indoor": true,
+      "colors": 113,
+      "n": 56
+    },
+    {
+      "sid": "palace_f3",
+      "w": 64,
+      "h": 48,
+      "indoor": true,
+      "colors": 45,
+      "n": 56
+    },
+    {
+      "sid": "palace_basement",
+      "w": 36,
+      "h": 24,
+      "indoor": true,
+      "colors": 80,
+      "n": 56
+    },
+    {
+      "sid": "palace_east_upper",
+      "w": 36,
+      "h": 24,
+      "indoor": true,
+      "colors": 75,
+      "n": 56
+    },
+    {
+      "sid": "city_library_upper",
+      "w": 30,
+      "h": 20,
+      "indoor": true,
+      "colors": 68,
+      "n": 56
+    },
+    {
+      "sid": "city_university_main_upper",
+      "w": 36,
+      "h": 24,
+      "indoor": true,
+      "colors": 65,
+      "n": 56
+    },
+    {
+      "sid": "city_inn_upper",
+      "w": 30,
+      "h": 24,
+      "indoor": true,
+      "colors": 58,
+      "n": 56
+    },
+    {
+      "sid": "r2_training",
+      "w": 14,
+      "h": 12,
+      "indoor": true,
+      "colors": 15,
+      "n": 56
+    },
+    {
+      "sid": "r2_hollow",
+      "w": 14,
+      "h": 12,
+      "indoor": true,
+      "colors": 15,
+      "n": 56
+    },
+    {
+      "sid": "clinic_patient",
+      "w": 22,
+      "h": 18,
+      "indoor": true,
+      "colors": 61,
+      "n": 56
+    },
+    {
+      "sid": "clinic_cloister",
+      "w": 24,
+      "h": 18,
+      "indoor": true,
+      "colors": 53,
+      "n": 56
+    },
+    {
+      "sid": "city_hall_upper",
+      "w": 22,
+      "h": 18,
+      "indoor": true,
+      "colors": 53,
+      "n": 56
+    },
+    {
+      "sid": "city_market_upper",
+      "w": 30,
+      "h": 20,
+      "indoor": true,
+      "colors": 55,
+      "n": 56
+    },
+    {
+      "sid": "city_market_yard",
+      "w": 22,
+      "h": 18,
+      "indoor": true,
+      "colors": 52,
+      "n": 56
+    },
+    {
+      "sid": "farm_attic",
+      "w": 20,
+      "h": 16,
+      "indoor": true,
+      "colors": 43,
+      "n": 56
+    },
+    {
+      "sid": "city_tailor_upper",
+      "w": 24,
+      "h": 18,
+      "indoor": true,
+      "colors": 52,
+      "n": 56
+    },
+    {
+      "sid": "city_tailor_yard",
+      "w": 20,
+      "h": 16,
+      "indoor": true,
+      "colors": 42,
+      "n": 56
+    },
+    {
+      "sid": "city_home1_upper",
+      "w": 16,
+      "h": 15,
+      "indoor": true,
+      "colors": 46,
+      "n": 56
+    },
+    {
+      "sid": "city_home1_garden",
+      "w": 22,
+      "h": 18,
+      "indoor": true,
+      "colors": 58,
+      "n": 56
+    },
+    {
+      "sid": "palace_west_wing",
+      "w": 38,
+      "h": 26,
+      "indoor": true,
+      "colors": 89,
+      "n": 56
+    },
+    {
+      "sid": "palace_west_upper",
+      "w": 38,
+      "h": 26,
+      "indoor": true,
+      "colors": 75,
+      "n": 56
+    },
+    {
+      "sid": "palace_chapel",
+      "w": 32,
+      "h": 24,
+      "indoor": true,
+      "colors": 59,
+      "n": 56
+    },
+    {
+      "sid": "palace_chapel_upper",
+      "w": 32,
+      "h": 24,
+      "indoor": true,
+      "colors": 62,
+      "n": 56
+    },
+    {
+      "sid": "palace_keep",
+      "w": 28,
+      "h": 22,
+      "indoor": true,
+      "colors": 62,
+      "n": 56
+    },
+    {
+      "sid": "palace_keep_upper",
+      "w": 28,
+      "h": 22,
+      "indoor": true,
+      "colors": 54,
       "n": 56
     }
   ],
@@ -592,14 +1072,6 @@
       "x": 15,
       "y": 9,
       "label": "柜台",
-      "err": null
-    },
-    {
-      "room": "castle",
-      "service": "castle",
-      "x": 17,
-      "y": 5,
-      "label": "王座厅",
       "err": null
     },
     {
@@ -777,17 +1249,6 @@
       "type": "density",
       "data": [
         {
-          "room": "tailor",
-          "props": 5,
-          "kinds": 5,
-          "staff": 1,
-          "spots": 1,
-          "w": 24,
-          "h": 18,
-          "area": 432,
-          "density": 296.3
-        },
-        {
           "room": "sawmill",
           "props": 9,
           "kinds": 8,
@@ -843,14 +1304,14 @@
           "density": 345.1
         },
         {
-          "room": "uni_main",
-          "props": 12,
+          "room": "tailor",
+          "props": 6,
           "kinds": 6,
           "staff": 1,
           "spots": 1,
-          "w": 36,
-          "h": 24,
-          "area": 864,
+          "w": 24,
+          "h": 18,
+          "area": 432,
           "density": 355.6
         },
         {
@@ -887,31 +1348,9 @@
           "density": 382.9
         },
         {
-          "room": "market",
-          "props": 9,
-          "kinds": 8,
-          "staff": 1,
-          "spots": 1,
-          "w": 30,
-          "h": 20,
-          "area": 600,
-          "density": 384
-        },
-        {
-          "room": "library",
-          "props": 9,
-          "kinds": 6,
-          "staff": 1,
-          "spots": 1,
-          "w": 30,
-          "h": 20,
-          "area": 600,
-          "density": 384
-        },
-        {
           "room": "inn",
           "props": 9,
-          "kinds": 8,
+          "kinds": 9,
           "staff": 1,
           "spots": 1,
           "w": 30,
@@ -920,15 +1359,15 @@
           "density": 384
         },
         {
-          "room": "shipyard",
-          "props": 9,
-          "kinds": 8,
+          "room": "uni_main",
+          "props": 13,
+          "kinds": 7,
           "staff": 1,
           "spots": 1,
-          "w": 30,
-          "h": 20,
-          "area": 600,
-          "density": 384
+          "w": 36,
+          "h": 24,
+          "area": 864,
+          "density": 385.2
         },
         {
           "room": "carriage",
@@ -986,6 +1425,28 @@
           "density": 414.6
         },
         {
+          "room": "market",
+          "props": 10,
+          "kinds": 9,
+          "staff": 1,
+          "spots": 1,
+          "w": 30,
+          "h": 20,
+          "area": 600,
+          "density": 426.7
+        },
+        {
+          "room": "library",
+          "props": 10,
+          "kinds": 7,
+          "staff": 1,
+          "spots": 1,
+          "w": 30,
+          "h": 20,
+          "area": 600,
+          "density": 426.7
+        },
+        {
           "room": "quay_store",
           "props": 12,
           "kinds": 5,
@@ -1008,6 +1469,17 @@
           "density": 426.7
         },
         {
+          "room": "shipyard",
+          "props": 10,
+          "kinds": 9,
+          "staff": 1,
+          "spots": 1,
+          "w": 30,
+          "h": 20,
+          "area": 600,
+          "density": 426.7
+        },
+        {
           "room": "uni_dorm",
           "props": 12,
           "kinds": 7,
@@ -1017,17 +1489,6 @@
           "h": 22,
           "area": 704,
           "density": 436.4
-        },
-        {
-          "room": "castle",
-          "props": 14,
-          "kinds": 7,
-          "staff": 1,
-          "spots": 1,
-          "w": 34,
-          "h": 24,
-          "area": 816,
-          "density": 439.2
         },
         {
           "room": "bank",
@@ -1085,26 +1546,37 @@
           "density": 498.7
         },
         {
+          "room": "castle",
+          "props": 77,
+          "kinds": 20,
+          "staff": 0,
+          "spots": 4,
+          "w": 64,
+          "h": 48,
+          "area": 3072,
+          "density": 641.7
+        },
+        {
           "room": "hall",
-          "props": 8,
-          "kinds": 6,
+          "props": 10,
+          "kinds": 8,
           "staff": 0,
           "spots": 1,
           "w": 22,
           "h": 16,
           "area": 352,
-          "density": 581.8
+          "density": 727.3
         },
         {
           "room": "home",
-          "props": 5,
-          "kinds": 5,
+          "props": 6,
+          "kinds": 6,
           "staff": 0,
           "spots": 1,
           "w": 16,
           "h": 13,
           "area": 208,
-          "density": 615.4
+          "density": 738.5
         },
         {
           "room": "park",

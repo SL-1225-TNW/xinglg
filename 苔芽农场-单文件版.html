@@ -609,7 +609,9 @@ button{font-family:inherit}
   background:rgba(0,0,0,.22);border-radius:6px}
 .item-ico canvas{image-rendering:pixelated;width:26px;height:26px;display:block}
 .item-main{flex:1 1 auto;min-width:0}
-.item-name{font-size:13px;font-weight:600;display:flex;align-items:baseline;gap:6px}
+.item-name{font-size:13px;font-weight:600;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+/* 作物名 + 应季标签同行时，名字不能被挤成竖排一列 */
+.item-name > span:first-child{white-space:nowrap}
 .item-count{font-size:12px;color:var(--gold);font-weight:700}
 .item-desc{font-size:11px;color:var(--text-dim);line-height:1.45}
 .item-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
@@ -1413,11 +1415,13 @@ var ITEMS = {
   compost:      { name: '熟肥',     kind: 'material', sell: 2, desc: '由堆肥箱沤出的肥料，给田地补回肥力（每份 +8）。' }
 };
 
-/* --- 作物表 --- */
+/* --- 作物表 ---
+   seasons：可下种的季节。季节外不播下，已在地里的作物跨季照常生长、
+   不会因为换季被清掉或减产——见 toolSeed 的注释与跨季提示。 */
 var CROPS = {
-  radish:     { id: 'radish',     name: '萝卜', seed: 'seed_radish',     produce: 'radish',     seedPrice: 5,  sell: 9, growDays: 3, regrow: 0, yield: 3 },
-  potato:     { id: 'potato',     name: '土豆', seed: 'seed_potato',     produce: 'potato',     seedPrice: 12, sell: 20, growDays: 5, regrow: 0, yield: 3 },
-  strawberry: { id: 'strawberry', name: '草莓', seed: 'seed_strawberry', produce: 'strawberry', seedPrice: 25, sell: 15, growDays: 6, regrow: 3, yield: 3 }
+  radish:     { id: 'radish',     name: '萝卜', seed: 'seed_radish',     produce: 'radish',     seedPrice: 5,  sell: 9,  growDays: 3, regrow: 0, yield: 3, seasons: ['春', '秋'] },
+  potato:     { id: 'potato',     name: '土豆', seed: 'seed_potato',     produce: 'potato',     seedPrice: 12, sell: 20, growDays: 5, regrow: 0, yield: 3, seasons: ['春', '夏'] },
+  strawberry: { id: 'strawberry', name: '草莓', seed: 'seed_strawberry', produce: 'strawberry', seedPrice: 25, sell: 15, growDays: 6, regrow: 3, yield: 3, seasons: ['春'] }
 };
 var CROP_ORDER = ['radish', 'potato', 'strawberry'];
 
@@ -2141,6 +2145,152 @@ function seasonHudClass() {
   return 'season-' + (yearSeasonOfDay(state.totalDay).seasonName);
 }
 
+/* --- R4 第三批：新档安置援助 ---
+   原先是「每天固定 50 金」，没有起点也没有终点，等于永久挂账。
+   现在改成：新档的前 SETTLE_ALLOWANCE_DAYS 个**经营日**每天发一次，
+   第 8 个经营日起停发，并在当天结算里写明援助已经结束。
+   外出工作的日子不算经营日、也不发援助——那一趟拿的是日薪，不是安置费。
+   计数存在存档里并只由日结算推进，所以重载、反复打开面板、跨存档都改不了它。 */
+var SETTLE_ALLOWANCE_DAYS = 7;
+function newSettlementAid() { return { startDay: 1, days: 0, endedDay: 0, skippedAway: 0 }; }
+function normalizeSettlementAid(raw) {
+  var d = newSettlementAid();
+  if (!raw || typeof raw !== 'object') return d;
+  d.startDay = Math.max(1, Math.floor(isInt(raw.startDay) ? raw.startDay : 1));
+  d.days = Math.max(0, Math.floor(isInt(raw.days) ? raw.days : 0));
+  d.endedDay = Math.max(0, Math.floor(isInt(raw.endedDay) ? raw.endedDay : 0));
+  d.skippedAway = Math.max(0, Math.floor(isInt(raw.skippedAway) ? raw.skippedAway : 0));
+  /* 旧档没有这份账：从今天起重新给满七个经营日，不追溯、不惩罚。 */
+  return d;
+}
+function settlementAidState() { return state.settlementAid || (state.settlementAid = newSettlementAid()); }
+function settlementAidLeft(c) { c = c || settlementAidState(); return Math.max(0, SETTLE_ALLOWANCE_DAYS - (c.days || 0)); }
+/* 在离农计划生效期间睡下的那天：不算经营日，也不发安置援助。 */
+function settlementAidAwayDay() {
+  var p = farmPlanState();
+  return !!(p.booked && state.totalDay >= p.startDay && state.totalDay <= p.endDay);
+}
+/* 日结算唯一入口。返回 true 表示今天发了钱。 */
+function applySettlementAid(summary) {
+  var c = settlementAidState();
+  if (settlementAidAwayDay()) { c.skippedAway = (c.skippedAway || 0) + 1; return false; }
+  if (c.endedDay) return false;
+  if ((c.days || 0) >= SETTLE_ALLOWANCE_DAYS) {
+    c.endedDay = state.totalDay;
+    if (summary) summary.allowanceEnd = '安置援助已结束：前 ' + SETTLE_ALLOWANCE_DAYS + ' 个经营日的援助已经发完，往后要靠收成、外勤和合同。';
+    return false;
+  }
+  c.days = (c.days || 0) + 1;
+  var last = c.days >= SETTLE_ALLOWANCE_DAYS;
+  if (last) c.endedDay = state.totalDay;
+  if (summary) {
+    summary.dailyAllowance = CFG.dailyAllowance;
+    summary.allowanceDay = c.days;
+    summary.allowanceTotal = SETTLE_ALLOWANCE_DAYS;
+    if (last) summary.allowanceEnd = '安置援助今天发完：' + SETTLE_ALLOWANCE_DAYS + ' 个经营日已经用满，明天起不再发放。';
+  }
+  return true;
+}
+function settlementAidText() {
+  var c = settlementAidState();
+  if (c.endedDay) return '安置援助已于第 ' + c.endedDay + ' 天结束（共发放 ' + c.days + ' 个经营日）。';
+  return '安置援助还剩 ' + settlementAidLeft(c) + ' / ' + SETTLE_ALLOWANCE_DAYS + ' 个经营日（外出工作的日子不算）。';
+}
+
+/* --- R4 第二批：季节首轮玩法 ---
+   三条规则，边界写在代码里，不靠文案糊过去：
+   1) 播种季节：每种作物有 seasons，季节外 toolSeed 直接拒绝并说明原因；
+   2) 季末提示：剩余天数不够成熟时给出 req-chip 文案，说明会跨季继续长；
+   3) 跨季保护：已在地里的作物换季不清除、不减产、照常累积 age。
+      生长仍然只看「有没有浇水」，季节不会替玩家浇水，也不会替玩家收成。 */
+function seasonOfDay(day) { return yearSeasonOfDay(day === undefined ? state.totalDay : day).seasonName; }
+function seasonDaysLeft(day) {
+  var y = yearSeasonOfDay(day === undefined ? state.totalDay : day);
+  return Math.max(0, y.seasonEnd - y.total + 1);   /* 含今天 */
+}
+function cropSowSeasons(cid) {
+  var c = CROPS[cid];
+  return (c && c.seasons && c.seasons.length) ? c.seasons.slice() : SEASONS.slice();
+}
+function cropSowableNow(cid, day) { return cropSowSeasons(cid).indexOf(seasonOfDay(day)) >= 0; }
+function cropSowSeasonText(cid) { return cropSowSeasons(cid).join('、'); }
+/* 本季应季作物：给种子铺与今日安排一个能直接念出来的清单。 */
+function seasonCropsNow(day) {
+  var s = seasonOfDay(day);
+  return CROP_ORDER.filter(function (cid) { return cropSowSeasons(cid).indexOf(s) >= 0; });
+}
+/* 冬天没有可下种的作物，界面上不写空清单，直接说明这一季该做什么。 */
+function seasonSowableText(day) {
+  var list = seasonCropsNow(day).map(function (cid) { return CROPS[cid].name; });
+  return list.length ? list.join('、') : '本季不宜下种（地里已长的作物照常跨季生长）';
+}
+function seasonEndWarning(cid, day) {
+  var c = CROPS[cid];
+  if (!c) return '';
+  var left = seasonDaysLeft(day);
+  if (left > c.growDays) return '';
+  return '本季只剩 ' + left + ' 天，' + c.name + '还要 ' + c.growDays + ' 天才熟；它会跨季继续生长，不会枯掉，只是这块地要多占 ' + (c.growDays - left) + ' 天。';
+}
+
+/* 芽芽的季度备货：每个季节一份，一季只能交一次，换季自动刷新。
+   这是季节供给差异的落点——不是文案，是真的材料换种子。
+   冬休整地那份特意给开春留种，免得冬天变成「无事可做又买不到种」。 */
+var SEASON_STOCK = [
+  { id: 'spring', name: '春播备货', need: { radish: 3 }, items: { seed_radish: 2, seed_potato: 2 }, coins: 60,
+    text: '芽芽：春天土松，先把地喂上。这三棵萝卜我按种子价折给你，再搭两包春播的种。' },
+  { id: 'summer', name: '夏管补种', need: { potato: 3 }, items: { seed_potato: 3, bread: 1 }, coins: 80,
+    text: '芽芽：夏天只剩下土豆还肯长。这三颗我换成土豆种，面包是我自己烤的，别嫌弃。' },
+  { id: 'autumn', name: '秋储留种', need: { radish: 4 }, items: { seed_radish: 3, seed_strawberry: 1 }, coins: 100,
+    text: '芽芽：秋天是留种的季节。多给我四棵萝卜，我把今年筛过的萝卜种和一小包草莓种都给你。' },
+  { id: 'winter', name: '冬田整地', need: { wood: 4 }, items: { seed_radish: 3, seed_potato: 2 }, coins: 140,
+    text: '芽芽：冬天种不下去，田埂总得修。四份木料换你一冬的工夫，开春直接有春播的种。' }
+];
+function newSeasonStock() { return { year: 0, seasonIdx: -1, count: 0 }; }
+function normalizeSeasonStock(raw) {
+  var d = newSeasonStock();
+  if (!raw || typeof raw !== 'object') return d;
+  d.year = Math.max(0, Math.floor(isInt(raw.year) ? raw.year : 0));
+  d.seasonIdx = Math.max(-1, Math.min(SEASONS.length - 1, Math.floor(isInt(raw.seasonIdx) ? raw.seasonIdx : -1)));
+  d.count = Math.max(0, Math.floor(isInt(raw.count) ? raw.count : 0));
+  /* 已经交过的季节必须是真的交过：不允许伪造一个「本季已完成」卡掉这一季。 */
+  if (d.seasonIdx < 0) d.year = 0;
+  return d;
+}
+function seasonStockState() { return state.seasonStock || (state.seasonStock = newSeasonStock()); }
+function seasonStockSpec() { return SEASON_STOCK[yearSeasonOfDay(state.totalDay).seasonIdx]; }
+/* 一季一份：交过以后同一季不再刷新，跨季才出现新的备货单。 */
+function seasonStockReady() {
+  var y = yearSeasonOfDay(state.totalDay), s = seasonStockState();
+  return !(s.year === y.year && s.seasonIdx === y.seasonIdx);
+}
+function seasonStockMissing(spec) {
+  spec = spec || seasonStockSpec();
+  if (!spec) return [];
+  var miss = [];
+  var need = spec.need || {};
+  for (var id in need) if (Object.prototype.hasOwnProperty.call(need, id) && invCount(id) < need[id]) miss.push(id);
+  return miss;
+}
+function completeSeasonStock() {
+  var y = yearSeasonOfDay(state.totalDay), spec = seasonStockSpec();
+  if (!spec || !seasonStockReady()) return false;
+  var need = spec.need || {};
+  for (var id in need) if (Object.prototype.hasOwnProperty.call(need, id) && invCount(id) < need[id]) return false;
+  var give = spec.items || {};
+  for (var gid in give) if (Object.prototype.hasOwnProperty.call(give, gid)) {
+    if (!bagAccepts(gid, give[gid])) { toast('背包装不下备货单上的东西，先腾一格。'); return false; }
+  }
+  for (var k in need) if (Object.prototype.hasOwnProperty.call(need, k)) invRemove(k, need[k]);
+  var out = [];
+  for (var g in give) if (Object.prototype.hasOwnProperty.call(give, g)) { invAdd(g, give[g]); out.push(itemName(g) + ' ×' + give[g]); }
+  state.coins += spec.coins;
+  var s = seasonStockState();
+  s.year = y.year; s.seasonIdx = y.seasonIdx; s.count = (s.count || 0) + 1;
+  markDirty(); saveNow(); refreshHud();
+  toast('芽芽的' + spec.name + '完成：' + out.join('、') + '，' + spec.coins + ' 金。');
+  return true;
+}
+
 function newGameState() {
   var s = {
     version: SCHEMA_VERSION,
@@ -2186,7 +2336,9 @@ function newGameState() {
     university: newUniversityState(),
     southGate: newSouthGateState(),
     industry: newIndustryState(),
-    construction: newConstructionState()
+    construction: newConstructionState(),
+    seasonStock: newSeasonStock(),
+    settlementAid: newSettlementAid()
   };
   s.inventory.seed_radish = 8;
   s.inventory.seed_potato = 2;
@@ -2281,6 +2433,8 @@ function serialize() {
     southGate: state.southGate || newSouthGateState(),
     industry: state.industry || newIndustryState(),
     construction: state.construction || newConstructionState(),
+    seasonStock: state.seasonStock || newSeasonStock(),
+    settlementAid: state.settlementAid || newSettlementAid(),
     savedAt: Date.now()
   };
 }
@@ -2386,6 +2540,8 @@ function normalizeSave(raw) {
   s.meadowLife = normalizeMeadowLife(raw.meadowLife);
   s.farmCare = normalizeFarmCare(raw.farmCare);
   s.farmPlan = normalizeFarmPlan(raw.farmPlan);
+  s.seasonStock = normalizeSeasonStock(raw.seasonStock);
+  s.settlementAid = normalizeSettlementAid(raw.settlementAid);
   if (raw.sceneId && raw.sceneId.indexOf('mill_') === 0 && !raw.bridgeRepaired && !(raw.millLife&&raw.millLife.legacyAccess)) { s.sceneId='town'; s.player={x:22,y:21,face:'up'}; }
   if ((s.sceneId==='city'||s.sceneId.indexOf('city_')===0||s.sceneId.indexOf('palace_')===0)&&!s.exploration.city){s.sceneId='town';s.player={x:14,y:22,face:'up'};}
   if ((s.sceneId === 'forest' && !s.exploration.forest) || (s.sceneId.indexOf('mine') === 0 && (!s.exploration.mine || +s.sceneId.slice(4)>s.exploration.depth))) { s.sceneId='town';s.player={x:14,y:2,face:'down'}; }
@@ -2475,11 +2631,13 @@ function normalizeSave(raw) {
   return s;
 }
 
-/* 日结算记录：保留最近 7 天，日历里可以回看。 */
+/* 日结算记录：保留最近 7 天，日历里可以回看。
+   从尾部往前取，再翻回时间顺序——原来从头部往后取，结果第 7 天之后
+   日志就永远停在旧记录上，回看看到的不是最近发生的事。 */
 function normalizeSettleHistory(v) {
   var out = [];
   if (!Array.isArray(v)) return out;
-  for (var i = 0; i < v.length && out.length < 7; i++) {
+  for (var i = v.length - 1; i >= 0 && out.length < 7; i--) {
     var e = v[i];
     if (!e || typeof e !== 'object') continue;
     var rec = {
@@ -2522,6 +2680,7 @@ function normalizeSettleHistory(v) {
     }
     out.push(rec);
   }
+  out.reverse();   /* 收集时从新到旧，翻回按天正序，回看页才从早到晚排 */
   return out;
 }
 
@@ -2586,7 +2745,7 @@ function sanitizeStructures(v) {
     var s = v[i];
     if (!s || typeof s !== 'object') continue;
     var d = s.device;
-    if (['chest', 'sprinkler', 'jam_jar', 'compost'].indexOf(d) < 0) continue;
+    if (['chest', 'sprinkler', 'jam_jar', 'compost', 'coop', 'pasture'].indexOf(d) < 0) continue;
     var x = s.x, y = s.y;
     if (!isInt(x) || !isInt(y)) continue;
     var rec = { id: s.id || ('s' + i), device: d, x: x, y: y };
@@ -2595,6 +2754,19 @@ function sanitizeStructures(v) {
       rec.input = isInt(s.input) ? s.input : 0;
       rec.startDay = isInt(s.startDay) ? s.startDay : 0;
       rec.ready = !!s.ready;
+    }
+    /* 畜养设备也必须随存档保留；照料委托与手动照料共用这一份账。 */
+    if (d === 'coop' || d === 'pasture') {
+      var L = s.livestock && typeof s.livestock === 'object' ? s.livestock : {};
+      rec.livestock = {
+        fedDay: Math.max(-1, Math.floor(isInt(L.fedDay) ? L.fedDay : -1)),
+        wateredDay: Math.max(-1, Math.floor(isInt(L.wateredDay) ? L.wateredDay : -1)),
+        pending: Math.max(0, Math.floor(isInt(L.pending) ? L.pending : 0)),
+        lastProductDay: Math.max(0, Math.floor(isInt(L.lastProductDay) ? L.lastProductDay : 0)),
+        mood: Math.max(0, Math.floor(isInt(L.mood) ? L.mood : 0)),
+        fedQty: Math.max(0, Math.floor(isInt(L.fedQty) ? L.fedQty : 0)),
+        stock: Number.isFinite(L.stock) ? clamp(L.stock, 0, 0.999999) : 0
+      };
     }
     out.push(rec);
   }
@@ -7362,6 +7534,13 @@ function toolSeed(tx, ty) {
   var cropId = state.selectedSeed;
   var crop = CROPS[cropId];
   var seedId = crop.seed;
+  /* 季节闸门：反季不播。这里不扣种子、不改地块，失败后玩家可以先去买当季的。
+     已在地的作物不受这条限制——换季不会清掉它们，见文件头的季节注释。 */
+  if (!cropSowableNow(cropId)) {
+    toast('现在是' + seasonOfDay() + '季，' + crop.name + '只在' + cropSowSeasonText(cropId) + '季下种。种子留着到那一季再播。');
+    Audio2.play('fail');
+    return false;
+  }
   if (invCount(seedId) <= 0) { toast('没有' + crop.name + '种子了，去种子铺买一些。'); Audio2.play('fail'); return false; }
   invRemove(seedId, 1);
   // 轮作提示必须在写入 lastGroup 之前算，否则永远拿不到"上一季"
@@ -7380,6 +7559,9 @@ function toolSeed(tx, ty) {
   var ft = fertilityTier(plotFertility(p));
   if (ft.id === 'low') extra = '（肥力' + ft.label + '：' + ft.hint + '）';
   else if (rot) extra = '（' + rot.text + '）';
+  /* 季末提醒只提示、不拦：跨季继续生长是既定规则，不该让玩家不敢下种。 */
+  var sw = seasonEndWarning(cropId);
+  if (sw) extra += '（' + sw + '）';
   toast((isRaining() ? '播下' + crop.name + '，雨天不用浇水。' : '播下' + crop.name + '，记得浇水。') + extra);
   markDirty(); refreshHud();
   return true;
@@ -8063,6 +8245,9 @@ function requestSleep(innRoom) {
         body.appendChild(el('p', 'muted', '背包里有 ' + ov.seedShort + ' 种作物缺种子，想种的话记得补货。'));
       }
       body.appendChild(el('p', 'muted', '出货箱里的物品会在睡觉时统一结算。'));
+      /* 援助是有终点的，睡觉前就告诉玩家还剩几天，别等发完才发现。 */
+      if (ov.aidEnded) body.appendChild(el('p', 'muted', '安置援助已经发完了。以后的收入要靠收成、外勤和合同。'));
+      else body.appendChild(el('p', 'muted', '安置援助还剩 ' + ov.aidLeft + ' / ' + SETTLE_ALLOWANCE_DAYS + ' 个经营日，每天 ' + CFG.dailyAllowance + ' 金；外出工作的日子不算经营日。'));
     },
     actions: [
       { label: '再玩一会儿', kind: 'ghost', close: true },
@@ -8081,6 +8266,7 @@ function performSettlement(auto, innRoom) {
   try { backup = deepClone(state); } catch (e) { backup = null; }
   var summary = {
     sold: [], income: 0, dailyAllowance: 0, matured: 0, jam: 0, matureDetail: [], grew: [],
+    allowanceDay: 0, allowanceTotal: SETTLE_ALLOWANCE_DAYS, allowanceEnd: '',
     day: state.totalDay, auto: !!auto,
     newDay: state.totalDay + 1,
     weatherFrom: state.weather.today,
@@ -8186,14 +8372,9 @@ function performSettlement(auto, innRoom) {
     /* 4. 日期 +1 */
     state.totalDay += 1;
     engDailySafety();
-    /* R4 第二块：跨日结算当天照料结果。
-       applyFarmCareTick 只结算到达 startDay..endDay 范围的那一天；
-       已经在 lastDeliveryDay/lastShortageDay 上记账的同一天会自己跳过。 */
-    applyFarmCareTick();
-    /* R4 第三块：3／7 天计划逐日结算。
-       关键事件（雨、袭扰）到来时只增 pausedDays，不推进 deliveredDays。 */
-    applyFarmPlanTick();
-    summary.dailyAllowance = CFG.dailyAllowance;
+    /* 安置援助改成有终点的账：前 7 个经营日每天发一次，离农日不发。
+       这里是日结算唯一发放点，别处不再重复加。 */
+    applySettlementAid(summary);
     summary.income += summary.dailyAllowance;
     state.coins += summary.dailyAllowance;
     if (state.sceneId === 'house' && state.tutorial && state.tutorial.flags.watered) tutorialEvent('slept');
@@ -8236,6 +8417,12 @@ function performSettlement(auto, innRoom) {
         if (pl) pl.water = true;
       });
     });
+
+    /* R4：先进入新一天、滚动天气并重置田地，再让委托照料“今天”。
+       这样当天签约不会倒算，照料浇下的水也不会被后面的清晨重置抹掉。 */
+    summary.farmCare = applyFarmCareTick() || null;
+    /* 长期计划与照料使用同一个新日期；雨天等事件会在当日行动前暂停。 */
+    applyFarmPlanTick();
 
     /* 8. 资源刷新 */
     regenResources();
@@ -8317,9 +8504,10 @@ function stageLabel(g) {
    但天气那页一定留着，让玩家每次都看到"明天是什么天"。 */
 function settlementPages(s) {
   var pages = [];
-  if (s.sold.length || s.income) {
+  if (s.sold.length || s.income || s.allowanceEnd) {
     var lines = s.income ? ['总收入 ' + s.income + ' 金（现有 ' + state.coins + ' 金）'] : [];
-    if (s.dailyAllowance) lines.push('每日补助 → ' + s.dailyAllowance + ' 金');
+    if (s.dailyAllowance) lines.push('安置援助 +' + s.dailyAllowance + ' 金（第 ' + s.allowanceDay + ' / ' + s.allowanceTotal + ' 个经营日）');
+    if (s.allowanceEnd) lines.push(s.allowanceEnd);
     s.sold.forEach(function (x) { lines.push(x.name + ' ×' + x.qty + ' → ' + x.value + ' 金'); });
     if (!s.sold.length) lines.push('出货箱是空的，今天没有卖出东西。');
     pages.push(settleStep('sold', '出货与收入', lines));
@@ -8507,7 +8695,7 @@ function openSettleLog() {
           block.appendChild(line);
         }
         add('收入', r.income + ' 金');
-        if (r.dailyAllowance) add('每日补助', r.dailyAllowance + ' 金');
+        if (r.dailyAllowance) add('安置援助', r.dailyAllowance + ' 金');
         add('卖出', r.sold.length ? r.sold.map(function (x) { return x.name + ' ×' + x.qty; }).join('、') : '无');
         add('成熟', r.matured ? (r.matureDetail.join('、') || (r.matured + ' 株')) : '无');
         add('果酱', r.jam ? (r.jam + ' 份') : '无');
@@ -9247,6 +9435,22 @@ function todayPlanItems() {
   if (pj.phase === 'accepted' && dty.status === 'active' && state.totalDay >= dty.nextDay) {
     var overdue = engDutyOverdue(pj);
     out.push({ tier: 'soon', tag: '磨坊', text: '风铃磨坊 · ' + (overdue > 0 ? '养护逾期 ' + overdue + ' 天' : '养护到期待复核') + ' · 马丁 (15,11) · 与控制室同一份事实', open: function () { openMillLife('mill_duty'); } });
+  }
+  var fc = farmCareState(), fp = farmPlanState();
+  if (fp.pauseDay === state.totalDay) {
+    out.push({ tier: 'must', tag: '计划', text: '长期计划已暂停 · ' + (((fp.pausedReasons || []).slice(-1)[0] || {}).reason || '需要处理') + ' · 可恢复或取消', open: openFarmSchedulePanel });
+  } else if (fp.booked || fc.booked) {
+    var planPart = !fp.booked ? '未安排离农计划'
+      : (fp.wagePerDay
+        ? farmOutworkName(fp.kind) + ' · 剩余 ' + farmPlanDaysLeft(fp) + ' 天' + (fp.dueDay && state.totalDay > fp.dueDay ? ' · 已过合同期限' : '')
+        : '计划剩余 ' + farmPlanDaysLeft(fp) + ' 天');
+    out.push({ tier: 'soon', tag: '安排', text: '长期安排 · ' + planPart + ' · ' + (fc.booked ? ('照料覆盖至第 ' + fc.endDay + ' 天') : '没有照料委托'), open: openFarmSchedulePanel });
+  }
+  /* 季末提示：只在最后一周出现，平时不占「今日安排」的位置。 */
+  var sLeft = seasonDaysLeft();
+  if (sLeft <= 7) {
+    out.push({ tier: 'soon', tag: '季节', text: seasonOfDay() + '季还剩 ' + sLeft + ' 天 · 本季可下种 '
+      + seasonSowableText() + ' · 地里已长的作物会跨季继续长', open: openShop });
   }
   return out;
 }
@@ -10036,11 +10240,40 @@ function openShop() {
   openWindow({
     id: 'shop', kind: 'shop', wide: true, title: '芽芽种子铺',
     build: function (b) {
+      var y = yearSeasonOfDay(state.totalDay);
       b.appendChild(el('p', 'muted', '金币：' + state.coins + ' 金。买下的种子会放进背包。'));
+      /* 季节首轮：当前季节、距季末天数与本季应季作物，摆在买种之前。 */
+      b.appendChild(el('p', 'work-summary',
+        formatYearSeason(state.totalDay) + ' · 距本季结束还有 ' + seasonDaysLeft() + ' 天 · 本季可下种：'
+        + seasonSowableText()));
+      b.appendChild(el('p', 'muted', '反季的种子照样买得到，但翻土播种时会被芽芽拦下来；已经长在地里的作物换季照常长，不会枯。'));
+      var spec = seasonStockSpec();
+      if (spec) {
+        var sbox = el('div', 'panel-box');
+        sbox.appendChild(el('div', 'section-title', y.seasonName + '季备货 · ' + spec.name));
+        sbox.appendChild(el('p', null, spec.text));
+        var needTxt = Object.keys(spec.need || {}).map(function (id) { return itemName(id) + ' ×' + spec.need[id]; }).join('、');
+        var giveTxt = Object.keys(spec.items || {}).map(function (id) { return itemName(id) + ' ×' + spec.items[id]; }).join('、');
+        if (seasonStockReady()) {
+          sbox.appendChild(el('p', 'muted', '交付：' + needTxt + ' → ' + giveTxt + ' · ' + spec.coins + ' 金。每季一份，换季再来。'));
+          var miss = seasonStockMissing(spec);
+          var sb = mkBtn('交付' + spec.name, 'primary', function () {
+            if (completeSeasonStock()) { refreshWindow(); refreshHotbar(); }
+            else toast(seasonStockMissing(spec).length ? '还差：' + seasonStockMissing(spec).map(itemName).join('、') : '背包腾出空间再来。');
+          });
+          sb.disabled = miss.length > 0;
+          sbox.appendChild(sb);
+          if (miss.length) sbox.appendChild(el('p', 'req-chip', '还差：' + miss.map(itemName).join('、') + '。'));
+        } else {
+          sbox.appendChild(el('p', 'req-chip ok', '本季的' + spec.name + '已经交过了（' + y.year + '年' + y.seasonName + '季）。下次换季会出现新的备货单。'));
+        }
+        b.appendChild(sbox);
+      }
       b.appendChild(el('div', 'section-title', '购买种子'));
       var g = el('div', 'grid');
       CROP_ORDER.forEach(function (cid) {
         var c = CROPS[cid];
+        var sowNow = cropSowableNow(cid);
         var row = el('div', 'shop-row');
         var ic = el('div', 'item-ico');
         var cv = getIcon(c.seed); if (cv) ic.appendChild(cv);
@@ -10049,7 +10282,13 @@ function openShop() {
         var nm = el('div', 'item-name');
         nm.appendChild(el('span', null, c.name + '种子'));
         main.appendChild(nm);
-        main.appendChild(el('div', 'item-desc', '单价 ' + c.seedPrice + ' 金 · ' + c.growDays + ' 天成熟' + (c.regrow ? '，之后每 ' + c.regrow + ' 天可再收' : '') + ' · 售价 ' + c.sell + ' 金'));
+        /* 应季标签放描述行：种子行本身很窄，标签挤在标题行会被裁掉半个字。 */
+        var d1 = el('div', 'item-desc');
+        d1.appendChild(el('span', 'req-chip' + (sowNow ? ' ok' : ''), sowNow ? '应季' : '非当季'));
+        d1.appendChild(el('span', null, ' 单价 ' + c.seedPrice + ' 金 · ' + c.growDays + ' 天成熟'
+          + (c.regrow ? '，之后每 ' + c.regrow + ' 天可再收' : '') + ' · 售价 ' + c.sell + ' 金'));
+        main.appendChild(d1);
+        main.appendChild(el('div', 'item-desc', '可下种季节：' + cropSowSeasonText(cid) + '季' + (sowNow ? '' : '（现在买下，翻土时会被拦）')));
         row.appendChild(main);
         var acts = el('div', 'item-actions');
         acts.appendChild(mkBtn('买 1 份', 'sm', function () { buySeed(cid, 1); refreshWindow(); refreshHotbar(); }));
@@ -10344,6 +10583,7 @@ function openQuestLog(site) {
          保证"今天该做什么"在任何屏幕上都有可点入口（§3.2）。 */
       if(QUEST_TAB==='rookie'){renderRookieJobs(b);return;}
       if(QUEST_TAB==='main')appendTodayPlan(b);
+      b.appendChild(mkBtn('长期安排 · 农场照料与 3／7 天计划','sm',openFarmSchedulePanel));
       b.appendChild(mkBtn('石楠草甸 · '+meadowTaskText(),'sm',function(){openMeadowLife('journal');}));
       b.appendChild(mkBtn('风铃磨坊 · '+millLifeTaskText(),'sm',function(){openMillLife('journal');}));
       /* 河湾工程的统一记录：进度、账本、联系人、材料来源和下一步都在这一页 */
@@ -14405,7 +14645,7 @@ var TRAVEL_MIN = {
   provinceShort: 30,    // 一般省内地点
   provinceLong: 60,
   provinceRemote: 90,   // 省内偏远公共节点（上限）
-  dailyAllowance: 50    // 现有每日补助（尚不随传送发放，§10.6 待办）
+  dailyAllowance: 50    // 安置援助单日金额；期限与离农规则由 settlementAid 统一结算
 };
 
 /* 每个公共传送站记录多个候选落点；排除建筑、家具、水面、作物、
@@ -16467,6 +16707,8 @@ function farmOverview() {
   return {
     needWater: needWater, ripe: ripe, growing: growing, fallow: fallow,
     lowFert: lowFert, seedShort: seedShort,
+    aidLeft: settlementAidState().endedDay ? 0 : settlementAidLeft(),
+    aidEnded: !!settlementAidState().endedDay,
     any: needWater > 0 || ripe > 0 || seedShort > 0 || lowFert.length > 0
   };
 }
@@ -18073,6 +18315,12 @@ function millLifeTaskText(){var m=millLifeState(),pj=professionalLifeState().pro
   var schemeLine=scheme?'工程方案 '+scheme.name+' · 磨坊额度 '+scheme.supply:'';
   var base=m.delivery?'村庄早餐已交付 · 水轮继续按协定工作':m.inspected?'水轮已验收 · 向面包房交付乡村面包 ×2':m.trialDay?(state.totalDay>m.trialDay?'试运行结束 · 到议事屋验收':'试运行中 · 睡过一夜后到议事屋验收'):m.allocation?'用水协议已定 · 到议事屋启动试运行':m.repair?'水轮已修 · 听取麦田与面包房意见，到议事屋选择用水协议':'调查进水渠与机房齿轮，再到马丁工作台选择修法';
   return [base,schemeLine,dutyLine].filter(function(s){return s;}).join(' · ');}
+function farmScheduleButton(parent, label, opts, apply) {
+  parent.appendChild(mkBtn(label, '', function () {
+    var o = Object.assign({}, opts || {}); o.apply = apply;
+    performAction(o);
+  }));
+}
 /* 农场照料委托面板：从任务板/N 委托/今日安排都能进。
    扣款只在预约时一次性锁定，已结算的天数无法退回；
    中断 / 缺料只增加 shortageDays，绝不偷偷扣材料。 */
@@ -18091,23 +18339,120 @@ function openFarmCarePanel() {
       b.appendChild(el('p', 'work-summary',
         c.booked
           ? ('已预约：第 ' + c.startDay + ' → 第 ' + c.endDay + ' 天 · 共 ' + farmCareTotalDays(c) + ' 天 · 已结算 ' + c.deliveredDays + ' 天 / 缺料 ' + c.shortageDays + ' 天')
-          : ('未预约。每日消耗：' + (c.costPerDay.coins || 0) + ' 金 + ' + Object.keys(c.materialPerDay || {}).map(function (k) { return itemName(k) + ' ×' + c.materialPerDay[k]; }).join(' · '))
+          : ('未预约。每日工钱：' + (c.costPerDay.coins || 0) + ' 金；现有牲畜每日需要口粮 ' + farmCareFeedNeed() + ' 份')
       ));
       if (!c.booked) {
-        b.appendChild(el('p', 'muted', '预订 N 天的全天农场照料：扣款一次锁定工钱，每日结算时扣库存材料；缺料的日子只留记录，不偷偷扣材料、不擅自种收。'));
+        b.appendChild(el('p', 'muted', '当天签约，次日清晨开始。委托只给已有作物浇水、给已有牲畜喂水喂食，并把蛋／羊毛收到暂存箱；不播种、不出售、不修工程、不替你接任务。'));
         [3, 5, 7, 10, 14].forEach(function (n) {
           var p = previewN(n);
-          extendedWorkButton(b, 'farmcare', '预约 ' + n + ' 天 · ' + p.fee + ' 金' + (Object.keys(p.mats).length ? ' · ' + Object.keys(p.mats).map(function (k) { return itemName(k) + ' ×' + p.mats[k]; }).join(' · ') : ''),
+          farmScheduleButton(b, '预约 ' + n + ' 天 · ' + p.fee + ' 金' + (farmCareFeedNeed() ? ' · 按现有牲畜预计口粮 ' + (farmCareFeedNeed() * n) + ' 份' : ''),
             { minutes: 15, guard: function () { return !c.booked && state.coins >= p.fee; }, reason: c.booked ? '已经预约' : (state.coins < p.fee ? '金币不足' : '无法重复预约') },
             function (nn) { return function () { bookFarmCare(nn); }; }(n));
         });
       } else {
         b.appendChild(el('p', 'muted', '已结算 ' + c.deliveredDays + ' 天 · 待结算 ' + farmCareDaysLeft(c) + ' 天 · 上次结算日第 ' + c.lastDeliveryDay + ' 天。'));
-        extendedWorkButton(b, 'farmcare', '取消委托 · 退回剩余 ' + farmCareDaysLeft(c) + ' 天 (' + (farmCareDaysLeft(c) * (c.costPerDay.coins || 0)) + ' 金)',
+        farmScheduleButton(b, '取消委托 · 退回剩余 ' + farmCareDaysLeft(c) + ' 天 (' + (farmCareDaysLeft(c) * (c.costPerDay.coins || 0)) + ' 金)',
           { minutes: 10, guard: function () { return c.booked; }, reason: '已经完成的天数不退，未结算的天数按日退。' },
           function () { var r = cancelFarmCare(); if (r > 0) toast('取消委托，退回 ' + r + ' 金。'); else toast('取消委托。'); });
       }
+      if (c.lastSummary) b.appendChild(el('p', 'muted', '最近结算：' + c.lastSummary));
+      b.appendChild(el('p', null, '委托暂存箱：' + farmCareStoredText(c)));
+      var claim = mkBtn('领取暂存产物', 'sm', function () {
+        if (claimFarmCareProducts()) { toast('已领取委托暂存产物。'); renderWindow(); }
+        else toast(farmCareStoredText(c) === '暂无' ? '暂存箱里没有产物。' : '背包空间不足。');
+      });
+      claim.disabled = farmCareStoredText(c) === '暂无'; b.appendChild(claim);
       b.appendChild(el('p', 'muted', '本面板只读当前预约；跨日结算由 settle → applyFarmCareTick 推进，不靠重复打开或反复点击刷结果。'));
+    },
+    actions: [{ label: '返回游戏', close: true }]
+  });
+}
+function openFarmSchedulePanel() {
+  var plan = farmPlanState(), care = farmCareState();
+  openWindow({
+    id: 'farm_schedule', kind: 'custom', wide: true, title: '长期安排 · 芽芽任务板',
+    build: function (b) {
+      b.appendChild(el('p', 'work-summary', '统一查看离农计划与农场照料；两者使用同一世界日期，不会另造一套日历。'));
+      var careBox = el('div', 'panel-box');
+      careBox.appendChild(el('div', 'section-title', '农场照料委托'));
+      careBox.appendChild(el('p', null, care.booked
+        ? ('覆盖第 ' + care.startDay + '—' + care.endDay + ' 天 · 已完成 ' + care.deliveredDays + ' 天 · 中断 ' + care.shortageDays + ' 天')
+        : (care.completedDay ? '上一份委托已于第 ' + care.completedDay + ' 天结束。' : '尚未预约。')));
+      careBox.appendChild(el('p', 'muted', '暂存产物：' + farmCareStoredText(care) + (care.lastSummary ? ' · ' + care.lastSummary : '')));
+      if (farmCareFeedNeed()) {
+        var feedPreview = farmCareFeedCoverage(plan.booked ? farmPlanDaysLeft(plan) : 7);
+        careBox.appendChild(el('p', feedPreview.days < (plan.booked ? farmPlanDaysLeft(plan) : 3) ? 'req-chip' : 'muted',
+          '牲畜口粮：每日 ' + feedPreview.needPerDay + ' 份；现有库存按当前喂法可完整覆盖 ' + feedPreview.days + ' 天。缺料当天照料会中断。'));
+      }
+      careBox.appendChild(mkBtn(care.booked ? '查看／取消照料委托' : '安排照料委托', 'sm', openFarmCarePanel));
+      b.appendChild(careBox);
+
+      var box = el('div', 'panel-box');
+      box.appendChild(el('div', 'section-title', '3／7 天离农计划'));
+      if (!plan.booked) {
+        box.appendChild(el('p', null, plan.completedDay ? ('上一段计划已于第 ' + plan.completedDay + ' 天完成。') : '尚未安排。'));
+        var lastLine = farmPlanOutworkLine(plan.lastOutwork);
+        if (lastLine) box.appendChild(el('p', 'muted', '上一段外出：' + lastLine + '。'));
+        box.appendChild(el('p', 'muted', '当天登记，次日开始。雨天等关键情况会先暂停并顺延；离开期间农场要另有照料委托顶上。'));
+        box.appendChild(el('div', 'section-title', '外出工作 · 按天结算日薪'));
+        Object.keys(OUTWORK_ASSIGNMENTS).forEach(function (key) {
+          var job = OUTWORK_ASSIGNMENTS[key], unlocked = farmOutworkUnlocked(job);
+          var sub = el('div', 'panel-box');
+          sub.appendChild(el('div', 'section-title', job.name + ' · ' + (unlocked ? '可报名' : '未开放')));
+          sub.appendChild(el('p', null, job.intro));
+          sub.appendChild(el('p', 'muted', '联系人：' + job.person + ' · 日薪 ' + job.wage + ' 金 · 合同期限 = 原定结束日 + ' + (job.grace || 0) + ' 天，过期后按半薪结算。'));
+          if (job.career) sub.appendChild(el('p', 'muted', '整段做完记一次「' + job.career + '」职业资历。'));
+          if (job.route) sub.appendChild(el('p', 'muted', '整段做完记一次「' + job.route + '」路线记录。'));
+          if (!unlocked) {
+            sub.appendChild(el('p', 'req-chip', job.needText));
+          } else {
+            var gap3 = farmPlanCareGap(3);
+            if (!gap3.ok) box.appendChild(el('p', 'req-chip', '暂时不能离农：' + farmPlanCareGapText(gap3)));
+            else box.appendChild(el('p', 'muted', farmPlanCareGapText(gap3)));
+            [3, 7].forEach(function (n) {
+              var fee = n * 6;
+              farmScheduleButton(sub, '安排 ' + n + ' 天 · ' + job.name + ' · 委托金 ' + fee + ' 金 · 日薪 ' + job.wage + ' 金／天', {
+                minutes: 15,
+                guard: function () { return !plan.booked && state.coins >= fee && farmPlanCareGap(n).ok; },
+                reason: state.coins < fee ? '金币不足。' : (farmPlanCareGap(n).ok ? '已有一段计划。' : farmPlanCareGapText(farmPlanCareGap(n)))
+              }, function (k) {
+                return function () { if (bookFarmPlan(n, k)) toast('已登记外出工作：' + job.name + ' · ' + n + ' 天。'); };
+              }(key));
+            });
+          }
+          box.appendChild(sub);
+        });
+        box.appendChild(el('p', 'muted', '自理行程：没有日薪，也没有职业与路线记录，只付委托金——想清楚再点。'));
+        [3, 7].forEach(function (n) {
+          var selfGap = farmPlanCareGap(n);
+          farmScheduleButton(box, '安排 ' + n + ' 天 · ' + (n * 6) + ' 金', {
+            minutes: 15,
+            guard: function () { return !plan.booked && state.coins >= n * 6 && farmPlanCareGap(n).ok; },
+            reason: state.coins < n * 6 ? '金币不足。' : (selfGap.ok ? '已有计划。' : farmPlanCareGapText(selfGap))
+          }, function (days) { return function () { bookFarmPlan(days); }; }(n));
+        });
+      } else {
+        box.appendChild(el('p', null, '计划第 ' + plan.startDay + '—' + plan.endDay + ' 天 · 已完成 ' + plan.deliveredDays + ' / ' + plan.days + ' 天 · 剩余 ' + farmPlanDaysLeft(plan) + ' 天。'));
+        if (plan.wagePerDay) {
+          box.appendChild(el('p', 'work-summary', farmPlanOutworkSummary(plan)));
+          if (plan.dueDay && state.totalDay > plan.dueDay) box.appendChild(el('p', 'req-chip', '已超过合同期限（第 ' + plan.dueDay + ' 天），之后每天按半薪结算。'));
+          (plan.deliveryLog || []).slice(-5).forEach(function (x) {
+            box.appendChild(el('p', 'muted', '第 ' + x.day + ' 天：' + x.pay + ' 金' + (x.reason ? '（' + x.reason + '）' : '（全额）')));
+          });
+        } else {
+          box.appendChild(el('p', 'muted', '自理行程：这一段没有日薪，也没有职业与路线记录。'));
+        }
+        if (care.booked) box.appendChild(el('p', 'muted', '照料覆盖到第 ' + care.endDay + ' 天' + (care.endDay >= plan.endDay ? '，当前覆盖完整。' : '，短于离农计划，请补约或提前回来。')));
+        else box.appendChild(el('p', 'req-chip', '没有有效的农场照料委托；离农计划不会自动浇水或喂养。'));
+        if (plan.pauseDay === state.totalDay) {
+          box.appendChild(el('p', 'req-chip', '计划今天因关键情况暂停：' + ((plan.pausedReasons[plan.pausedReasons.length - 1] || {}).reason || '需要处理') + '。'));
+          box.appendChild(mkBtn('接受当前条件并恢复今天', 'primary', function () { if (resumePlanToday()) { toast('计划已恢复，今天计入进度。'); renderWindow(); } }));
+        }
+        farmScheduleButton(box, '取消剩余计划 · 预计退 ' + (farmPlanDaysLeft(plan) * plan.feePerDay) + ' 金', {
+          minutes: 10, guard: function () { return plan.booked; }
+        }, function () { var refund = cancelFarmPlan(); toast('已取消剩余计划，退回 ' + refund + ' 金。'); });
+      }
+      b.appendChild(box);
     },
     actions: [{ label: '返回游戏', close: true }]
   });
@@ -18293,9 +18638,13 @@ function newFarmCare() {
     shortageDays: 0,
     daysPerVisit: 1,
     costPerDay: { coins: 8 },
-    materialPerDay: { seed_radish: 1 },
+    /* 不把种子当作日常照料材料：委托不替玩家决定播种什么。 */
+    materialPerDay: {},
     lastDeliveryDay: 0,
-    lastShortageDay: 0
+    lastShortageDay: 0,
+    completedDay: 0,
+    storedProducts: {},
+    lastSummary: ''
   };
 }
 function farmCareState() { return state.farmCare || (state.farmCare = newFarmCare()); }
@@ -18310,6 +18659,9 @@ function normalizeFarmCare(raw) {
   d.shortageDays = Math.max(0, Math.floor(isInt(raw.shortageDays) ? raw.shortageDays : 0));
   d.lastDeliveryDay = Math.max(0, Math.floor(isInt(raw.lastDeliveryDay) ? raw.lastDeliveryDay : 0));
   d.lastShortageDay = Math.max(0, Math.floor(isInt(raw.lastShortageDay) ? raw.lastShortageDay : 0));
+  d.completedDay = Math.max(0, Math.floor(isInt(raw.completedDay) ? raw.completedDay : 0));
+  d.storedProducts = sanitizeInv(raw.storedProducts);
+  d.lastSummary = typeof raw.lastSummary === 'string' ? raw.lastSummary.slice(0, 240) : '';
   if (raw.costPerDay && typeof raw.costPerDay === 'object') {
     var fee = Math.max(0, Math.floor(isInt(raw.costPerDay.coins) ? raw.costPerDay.coins : 8));
     d.costPerDay = { coins: fee };
@@ -18335,6 +18687,56 @@ function farmCareTotalMaterials(c) {
   for (var k in mat) if (Object.prototype.hasOwnProperty.call(mat, k)) out[k] = mat[k] * total;
   return out;
 }
+function farmCareLivestock() {
+  return (state.structures || []).filter(function (st) { return isLivestock(st.device); });
+}
+function farmCareFeedNeed() {
+  return farmCareLivestock().reduce(function (n, st) { return n + LIVESTOCK[st.device].food; }, 0);
+}
+/* 先给可选口粮较少的牲畜分配，避免鸡先吃掉羊唯一可用的草莓。 */
+function farmCareFeedPlanFrom(source) {
+  var shadow = Object.assign({}, source || {}), use = {}, missing = [];
+  var list = farmCareLivestock().slice().sort(function (a, b) {
+    return LIVESTOCK[a.device].feedList.length - LIVESTOCK[b.device].feedList.length;
+  });
+  list.forEach(function (st) {
+    var cfg = LIVESTOCK[st.device], need = cfg.food;
+    for (var i = 0; i < cfg.feedList.length && need > 0; i++) {
+      var id = cfg.feedList[i], take = Math.min(need, shadow[id] || 0);
+      if (take > 0) { shadow[id] -= take; use[id] = (use[id] || 0) + take; need -= take; }
+    }
+    if (need > 0) missing.push(cfg.name + '还缺口粮 ' + need);
+  });
+  return { ok: missing.length === 0, use: use, missing: missing, remaining: shadow };
+}
+function farmCareFeedPlan() { return farmCareFeedPlanFrom(state.inventory || {}); }
+/* 离农前给玩家看的口粮预警：按真实分配顺序逐日试算，不把鸡能吃的萝卜
+   错算成羊也能吃。只做预览，不锁库存；玩家仍可接受缺料中断风险。 */
+function farmCareFeedCoverage(maxDays) {
+  var limit = Math.max(0, Math.min(28, Math.floor(maxDays || 14)));
+  var shadow = Object.assign({}, state.inventory || {}), days = 0, last = { missing: [] };
+  if (!farmCareFeedNeed()) return { days: 0, needPerDay: 0, missing: [] };
+  while (days < limit) {
+    last = farmCareFeedPlanFrom(shadow);
+    if (!last.ok) break;
+    shadow = last.remaining; days++;
+  }
+  return { days: days, needPerDay: farmCareFeedNeed(), missing: last.missing || [] };
+}
+function farmCareStoredText(c) {
+  c = c || farmCareState();
+  var ids = Object.keys(c.storedProducts || {}).filter(function (id) { return c.storedProducts[id] > 0; });
+  return ids.length ? ids.map(function (id) { return itemName(id) + ' ×' + c.storedProducts[id]; }).join('、') : '暂无';
+}
+function claimFarmCareProducts() {
+  var c = farmCareState(), ids = Object.keys(c.storedProducts || {}).filter(function (id) { return c.storedProducts[id] > 0; });
+  if (!ids.length) return false;
+  for (var i = 0; i < ids.length; i++) if (!bagAccepts(ids[i], c.storedProducts[ids[i]])) return false;
+  ids.forEach(function (id) { invAdd(id, c.storedProducts[id]); });
+  c.storedProducts = {};
+  markDirty(); saveNow(); refreshHud();
+  return true;
+}
 /* R4 第三块：3／7 天农场计划。
    玩家在芽芽任务板可以预约一段 3 天或 7 天的「计划」，结算逻辑由 performSettlement 推进。
    关键事件（雨、袭扰、主动暂停）到来时只增 pausedDays，不顺手推进；玩家可在 UI 主动恢复，
@@ -18350,37 +18752,130 @@ function newFarmPlan() {
     pausedDays: 0,
     pausedReasons: [],
     lastDeliveryDay: 0,
-    feePerDay: 0
+    pauseDay: 0,
+    resumeDay: 0,
+    completedDay: 0,
+    feePerDay: 0,
+    /* R4 第四块：离农期间做的具体外出工作。日薪、职业与路线记录只写在
+       真正结算的那一天；自理性行程 kind='' 时这些字段保持空。 */
+    kind: '',
+    wagePerDay: 0,
+    careerKey: '',
+    routeKey: '',
+    dueDay: 0,
+    earnedCoins: 0,
+    lateDays: 0,
+    careGapDays: 0,
+    deliveryLog: [],
+    /* 上一趟外出的成绩快照：取消或完成后写一次，新一趟开始时清空。 */
+    lastOutwork: null
   };
 }
 function farmPlanState() { return state.farmPlan || (state.farmPlan = newFarmPlan()); }
-function farmPlanTotalDays(c) { c = c || farmPlanState(); return Math.max(0, c.endDay - c.startDay + 1); }
-function farmPlanDaysLeft(c) { c = c || farmPlanState(); var total = farmPlanTotalDays(c); var used = (c.deliveredDays || 0) + (c.pausedDays || 0); return Math.max(0, total - used); }
+function farmPlanTotalDays(c) { c = c || farmPlanState(); return c.days || Math.max(0, c.endDay - c.startDay + 1); }
+function farmPlanDaysLeft(c) { c = c || farmPlanState(); return Math.max(0, farmPlanTotalDays(c) - (c.deliveredDays || 0)); }
 function farmPlanTotalFee(c) { c = c || farmPlanState(); return Math.max(0, Math.round(farmPlanTotalDays(c) * (c.feePerDay || 0))); }
-function bookFarmPlan(days) {
+/* R4 第四块：离农计划里真正做的事。
+   一份计划 = 签约时一次性委托金（每天 6 金）+ 每天结算的日薪。
+   报酬只挂在「真的过完这一天」上：settlement 推进 totalDay 之后才发，
+   同一天重复 tick 不重复发；合同期限之后仍在外，日薪减半并记逾期。 */
+var OUTWORK_ASSIGNMENTS = {
+  harvest_help: {
+    name: '麦田秋收帮工', person: '麦田村 · 阿贝尔（麦田农夫）',
+    career: 'horticulture', route: '', wage: 22, grace: 2, require: null,
+    intro: '麦田这一季收不完人手。帮工按天结算，日薪 22 金，整段做完记园艺资历。'
+  },
+  caravan_courier: {
+    name: '镇际货车押运', person: '市集 · 路易（市集采购员）',
+    career: 'trade', route: 'trade', wage: 34, grace: 2,
+    require: function () { return (professionalLifeState().routes.trade || 0) >= 2; },
+    needText: '车队只带已经办过到访引荐的人；先完成小镇商旅入门。'
+  },
+  ridge_survey: {
+    name: '林缘测距记录', person: '湿地观察屋 · 伊芙（湿地巡护员）',
+    career: '', route: 'patrol', wage: 26, grace: 2,
+    require: function () { return (professionalLifeState().routes.patrol || 0) >= 2; },
+    needText: '林缘测距要巡林入门先例；先完成小镇巡林入门。'
+  }
+};
+function farmOutwork(kind) { return kind && Object.prototype.hasOwnProperty.call(OUTWORK_ASSIGNMENTS, kind) ? OUTWORK_ASSIGNMENTS[kind] : null; }
+function farmOutworkUnlocked(a) { return !!a && (!a.require || a.require() === true); }
+function farmOutworkName(kind) { var a = farmOutwork(kind); return a ? a.name : '自理行程'; }
+/* 家里有牲畜或种着作物时，离农前必须有覆盖到计划结束日的照料委托。
+   什么都不会发生的新档可以直接出门，不需要先买一份照料。 */
+function farmPlanCareGap(days) {
+  var end = state.totalDay + (days || 3);
+  var need = farmCareFeedNeed(), crops = 0;
+  for (var key in state.plots) if (Object.prototype.hasOwnProperty.call(state.plots, key)) {
+    var pl = state.plots[key]; if (pl && pl.crop && !pl.mature) crops++;
+  }
+  if (!need && !crops) return { ok: true, gap: 0, end: end, need: 0, crops: 0 };
+  var c = farmCareState();
+  var cover = c.booked ? Math.min(c.endDay, end) : 0;
+  return { ok: cover >= end, gap: Math.max(0, end - cover), end: end, need: need, crops: crops };
+}
+function farmPlanCareGapText(gap) {
+  if (gap.ok) return '照料委托覆盖到第 ' + gap.end + ' 天。';
+  return '还差 ' + gap.gap + ' 天照料（需覆盖到第 ' + gap.end + ' 天）：家里有 ' + gap.need + ' 份牲畜口粮、' + gap.crops + ' 块未熟作物没人管。';
+}
+function bookFarmPlan(days, kind) {
   var c = farmPlanState();
   if (c.booked) return false;
   var n = days === 7 ? 7 : 3;
+  var job = farmOutwork(kind);
+  if (kind && !job) return false;
+  if (job && !farmOutworkUnlocked(job)) return false;
+  /* 自理行程也是离农，不能借“没有日薪”绕过作物／牲畜照料门禁。 */
+  if (!farmPlanCareGap(n).ok) return false;
   var fee = n * 6;
   if (state.coins < fee) return false;
   state.coins -= fee;
   c.booked = true;
   c.days = n;
-  c.startDay = state.totalDay;
-  c.endDay = state.totalDay + n - 1;
+  /* 当天预约，次日清晨开始；不会在签约前倒算当天。 */
+  c.startDay = state.totalDay + 1;
+  c.endDay = c.startDay + n - 1;
   c.deliveredDays = 0;
   c.pausedDays = 0;
   c.pausedReasons = [];
   c.lastDeliveryDay = 0;
+  c.pauseDay = 0;
+  c.resumeDay = 0;
+  c.completedDay = 0;
   c.feePerDay = 6;
+  c.kind = job ? kind : '';
+  c.wagePerDay = job ? job.wage : 0;
+  c.careerKey = job ? job.career : '';
+  c.routeKey = job ? job.route : '';
+  /* 合同期限跟着签约时的天数定；之后每暂停一天都更容易逾期。 */
+  c.dueDay = c.endDay + (job ? (job.grace || 0) : 0);
+  /* 每一趟外出自成一笔账：新一趟从零开始，上一趟的成绩留在 lastOutwork。 */
+  c.earnedCoins = 0;
+  c.lateDays = 0;
+  c.careGapDays = 0;
+  c.deliveryLog = [];
   markDirty(); saveNow();
   return true;
+}
+/* 一趟外出结束时留一份快照：完成和取消都算，玩家回头能看到自己挣过什么。 */
+function farmPlanCloseOutwork(c, endDay, reason) {
+  c = c || farmPlanState();
+  if (!c.kind) return null;
+  var o = {
+    kind: c.kind, days: c.deliveredDays || 0, earned: c.earnedCoins || 0,
+    late: c.lateDays || 0, careGapDays: c.careGapDays || 0,
+    endDay: Math.max(0, endDay || 0), reason: reason || ''
+  };
+  c.lastOutwork = o;
+  return o;
 }
 function cancelFarmPlan() {
   var c = farmPlanState();
   if (!c.booked) return false;
   var refund = farmPlanDaysLeft(c) * (c.feePerDay || 0);
   state.coins += refund;
+  /* 先留快照再清账：取消剩余天数不抹掉这一趟已经挣到和缺勤过的记录。 */
+  farmPlanCloseOutwork(c, state.totalDay, '已取消剩余天数');
   c.booked = false;
   c.startDay = 0;
   c.endDay = 0;
@@ -18388,6 +18883,13 @@ function cancelFarmPlan() {
   c.pausedDays = 0;
   c.pausedReasons = [];
   c.lastDeliveryDay = 0;
+  c.pauseDay = 0;
+  c.resumeDay = 0;
+  c.kind = '';
+  c.wagePerDay = 0;
+  c.careerKey = '';
+  c.routeKey = '';
+  c.dueDay = 0;
   markDirty(); saveNow();
   return refund;
 }
@@ -18400,29 +18902,96 @@ function applyFarmPlanTick() {
   if (!c.booked) return;
   if (state.totalDay < c.startDay || state.totalDay > c.endDay) return;
   if (state.totalDay === c.lastDeliveryDay) return;
-  if (isRaining()) {
+  if (isRaining() && c.resumeDay !== state.totalDay) {
     pausePlanNow(c, '雨天');
     return;
   }
   c.deliveredDays++;
   c.lastDeliveryDay = state.totalDay;
+  c.pauseDay = 0;
+  c.resumeDay = 0;
+  var done = c.deliveredDays >= c.days;
+  if (c.wagePerDay > 0) settleFarmOutworkDay(c);
+  if (done) {
+    c.booked = false; c.completedDay = state.totalDay;
+    farmPlanCloseOutwork(c, state.totalDay, '整段完成');
+    /* 整段做完才算一次资历与路线记录；不是每睡一天就发一份。 */
+    if (c.careerKey) bumpCareer(c.careerKey, 1);
+    if (c.routeKey) bumpRoute(c.routeKey, 1);
+  }
   markDirty();
+}
+/* 一天的外出成果。两种情况只减半，不清零：
+   1) 过了合同期限才回来 / 顺延过头 —— 车队按逾期结半日薪；
+   2) 家里这一天没人照看或照料缺料中断 —— 提前收工。
+   两者都写进 deliveryLog，玩家能在面板上看到每一天到底怎么结算的。 */
+function settleFarmOutworkDay(c) {
+  c = c || farmPlanState();
+  var care = farmCareState();
+  var late = c.dueDay > 0 && state.totalDay > c.dueDay;
+  /* 覆盖窗口看日期，不看 booked：照料结算完最后一天会把 booked 收成 false，
+     但那一天确实有人照料过；取消委托才会把窗口清零。 */
+  var careActive = state.totalDay >= care.startDay && state.totalDay <= care.endDay;
+  var starved = careActive && state.totalDay === care.lastShortageDay;
+  var unattended = farmCareLivestock().length > 0 && !careActive;
+  var short = starved || unattended;
+  var pay = c.wagePerDay;
+  if (late) pay = Math.floor(pay / 2);
+  if (short) pay = Math.floor(pay / 2);
+  if (pay > 0) { state.coins += pay; c.earnedCoins = (c.earnedCoins || 0) + pay; }
+  if (late) c.lateDays = (c.lateDays || 0) + 1;
+  if (short) c.careGapDays = (c.careGapDays || 0) + 1;
+  grantCharExpDaily('daily', late || short ? 8 : 15);
+  c.deliveryLog.push({
+    day: state.totalDay, pay: pay, late: late,
+    reason: short ? (starved ? '农场缺料中断' : '家中牲畜无人照料') : (late ? '超过合同期限' : '')
+  });
+  if (c.deliveryLog.length > 12) c.deliveryLog.shift();
+  return pay;
+}
+function farmPlanOutworkSummary(c) {
+  c = c || farmPlanState();
+  if (!c.wagePerDay) return '';
+  var job = farmOutwork(c.kind);
+  var s = farmOutworkName(c.kind) + ' · 已结算 ' + c.deliveredDays + ' 天 · 挣得 ' + (c.earnedCoins || 0) + ' 金';
+  if (c.lateDays) s += ' · 逾期 ' + c.lateDays + ' 天';
+  if (c.careGapDays) s += ' · 家中断档 ' + c.careGapDays + ' 天';
+  if (c.dueDay) s += ' · 合同期限第 ' + c.dueDay + ' 天' + (job ? '（原定结束日 + ' + (job.grace || 0) + ' 天，仍在外按半薪）' : '');
+  return s;
+}
+/* 已结束的某一趟：完成或取消之后，面板上读的是这一行。 */
+function farmPlanOutworkLine(o) {
+  if (!o || !farmOutwork(o.kind)) return '';
+  var s = farmOutworkName(o.kind) + ' · ' + (o.days || 0) + ' 天 · 挣得 ' + (o.earned || 0) + ' 金';
+  if (o.late) s += ' · 逾期 ' + o.late + ' 天';
+  if (o.careGapDays) s += ' · 家中断档 ' + o.careGapDays + ' 天';
+  if (o.endDay) s += ' · 结束于第 ' + o.endDay + ' 天';
+  if (o.reason) s += '（' + o.reason + '）';
+  return s;
 }
 function pausePlanNow(c, reason) {
   c = c || farmPlanState();
+  if (c.pauseDay === state.totalDay) return false;
   c.pausedDays++;
+  c.pauseDay = state.totalDay;
   c.lastDeliveryDay = state.totalDay;
+  c.endDay++;
   c.pausedReasons.push({ day: state.totalDay, reason: reason || '关键事件' });
   if (c.pausedReasons.length > 12) c.pausedReasons.shift();
   markDirty();
+  return true;
 }
-/* 玩家主动「恢复」当天（暂停时清掉 lastDeliveryDay，让下次结算能再来一次） */
+/* 玩家主动接受当天条件并恢复；同一天立即补结算，不必再睡一夜。 */
 function resumePlanToday(c) {
   c = c || farmPlanState();
   if (!c.booked) return false;
-  if (c.pausedDays <= 0) return false;
+  if (c.pauseDay !== state.totalDay) return false;
   c.pausedDays = Math.max(0, c.pausedDays - 1);
+  c.pauseDay = 0;
+  c.resumeDay = state.totalDay;
+  c.endDay = Math.max(c.startDay, c.endDay - 1);
   c.lastDeliveryDay = 0;
+  applyFarmPlanTick();
   markDirty();
   return true;
 }
@@ -18436,7 +19005,46 @@ function normalizeFarmPlan(raw) {
   d.deliveredDays = Math.max(0, Math.floor(isInt(raw.deliveredDays) ? raw.deliveredDays : 0));
   d.pausedDays = Math.max(0, Math.floor(isInt(raw.pausedDays) ? raw.pausedDays : 0));
   d.lastDeliveryDay = Math.max(0, Math.floor(isInt(raw.lastDeliveryDay) ? raw.lastDeliveryDay : 0));
+  d.pauseDay = Math.max(0, Math.floor(isInt(raw.pauseDay) ? raw.pauseDay : 0));
+  d.resumeDay = Math.max(0, Math.floor(isInt(raw.resumeDay) ? raw.resumeDay : 0));
+  d.completedDay = Math.max(0, Math.floor(isInt(raw.completedDay) ? raw.completedDay : 0));
   d.feePerDay = Math.max(0, Math.floor(isInt(raw.feePerDay) ? raw.feePerDay : 6));
+  /* 工作表里已经不存在的 kind 归一化成自理行程，不能带着死引用发工资。 */
+  d.kind = farmOutwork(raw.kind) ? String(raw.kind) : '';
+  d.wagePerDay = d.kind
+    ? Math.max(0, Math.floor(isInt(raw.wagePerDay) ? raw.wagePerDay : (farmOutwork(raw.kind) || {}).wage || 0))
+    : 0;
+  d.careerKey = d.kind && ['horticulture', 'medicine', 'trade', 'engineering'].indexOf(raw.careerKey) >= 0 ? raw.careerKey : '';
+  d.routeKey = d.kind && ['engineering', 'trade', 'patrol'].indexOf(raw.routeKey) >= 0 ? raw.routeKey : '';
+  d.dueDay = Math.max(0, Math.floor(isInt(raw.dueDay) ? raw.dueDay : 0));
+  if (d.booked && !d.dueDay) d.dueDay = d.endDay;
+  d.earnedCoins = Math.max(0, Math.floor(isInt(raw.earnedCoins) ? raw.earnedCoins : 0));
+  d.lateDays = Math.max(0, Math.floor(isInt(raw.lateDays) ? raw.lateDays : 0));
+  d.careGapDays = Math.max(0, Math.floor(isInt(raw.careGapDays) ? raw.careGapDays : 0));
+  if (Array.isArray(raw.deliveryLog)) {
+    d.deliveryLog = raw.deliveryLog.filter(function (x) {
+      return x && typeof x === 'object' && isInt(x.day);
+    }).slice(-12).map(function (x) {
+      return {
+        day: Math.max(0, Math.floor(x.day)),
+        pay: Math.max(0, Math.floor(isInt(x.pay) ? x.pay : 0)),
+        late: x.late === true,
+        reason: typeof x.reason === 'string' ? x.reason.slice(0, 40) : ''
+      };
+    });
+  }
+  if (raw.lastOutwork && typeof raw.lastOutwork === 'object' && farmOutwork(raw.lastOutwork.kind)) {
+    var lo = raw.lastOutwork;
+    d.lastOutwork = {
+      kind: String(lo.kind),
+      days: Math.max(0, Math.floor(isInt(lo.days) ? lo.days : 0)),
+      earned: Math.max(0, Math.floor(isInt(lo.earned) ? lo.earned : 0)),
+      late: Math.max(0, Math.floor(isInt(lo.late) ? lo.late : 0)),
+      careGapDays: Math.max(0, Math.floor(isInt(lo.careGapDays) ? lo.careGapDays : 0)),
+      endDay: Math.max(0, Math.floor(isInt(lo.endDay) ? lo.endDay : 0)),
+      reason: typeof lo.reason === 'string' ? lo.reason.slice(0, 40) : ''
+    };
+  }
   if (Array.isArray(raw.pausedReasons)) {
     d.pausedReasons = raw.pausedReasons.filter(function (x) {
       return x && typeof x === 'object' && isInt(x.day) && typeof x.reason === 'string';
@@ -18455,12 +19063,15 @@ function bookFarmCare(days) {
   state.coins -= fee;
   c.booked = true;
   c.bookedDays = n;
-  c.startDay = state.totalDay;
-  c.endDay = state.totalDay + n - 1;
+  /* 照料从次日清晨开始，签约当天仍由玩家自己负责。 */
+  c.startDay = state.totalDay + 1;
+  c.endDay = c.startDay + n - 1;
   c.deliveredDays = 0;
   c.shortageDays = 0;
   c.lastDeliveryDay = 0;
   c.lastShortageDay = 0;
+  c.completedDay = 0;
+  c.lastSummary = '';
   markDirty(); saveNow();
   return true;
 }
@@ -18485,26 +19096,34 @@ function applyFarmCareTick() {
   if (!c.booked) return;
   if (state.totalDay < c.startDay || state.totalDay > c.endDay) return;
   if (state.totalDay === c.lastDeliveryDay || state.totalDay === c.lastShortageDay) return;
-  var mat = c.materialPerDay || {};
-  var missing = null;
-  for (var k in mat) {
-    if (!Object.prototype.hasOwnProperty.call(mat, k)) continue;
-    var need = mat[k];
-    var have = (state.inventory && state.inventory[k]) || 0;
-    if (have < need) { missing = k; break; }
-  }
-  if (!missing) {
-    for (var k2 in mat) {
-      if (!Object.prototype.hasOwnProperty.call(mat, k2)) continue;
-      invRemove(k2, mat[k2]);
-    }
-    c.deliveredDays++;
-    c.lastDeliveryDay = state.totalDay;
-  } else {
+  var feed = farmCareFeedPlan();
+  if (!feed.ok) {
     c.shortageDays++;
     c.lastShortageDay = state.totalDay;
+    c.lastSummary = '第 ' + state.totalDay + ' 天中断：' + feed.missing.join('、') + '。田地与动物没有伪装成已照料。';
+    markDirty();
+    return { ok: false, reason: c.lastSummary };
   }
+  Object.keys(feed.use).forEach(function (id) { invRemove(id, feed.use[id]); });
+  var watered = 0, tended = 0, collected = 0;
+  for (var key in state.plots) if (Object.prototype.hasOwnProperty.call(state.plots, key)) {
+    var plot = state.plots[key];
+    if (plot && plot.crop && !plot.mature) { if (!plot.water) watered++; plot.water = true; }
+  }
+  farmCareLivestock().forEach(function (st) {
+    var cfg = LIVESTOCK[st.device], L = livestockOf(st);
+    L.fedDay = state.totalDay; L.wateredDay = state.totalDay; L.fedQty = cfg.food; tended++;
+    if (L.pending > 0) {
+      c.storedProducts[cfg.product] = (c.storedProducts[cfg.product] || 0) + L.pending;
+      collected += L.pending; L.pending = 0;
+    }
+  });
+  c.deliveredDays++;
+  c.lastDeliveryDay = state.totalDay;
+  c.lastSummary = '第 ' + state.totalDay + ' 天：浇水 ' + watered + ' 块，照料牲畜 ' + tended + ' 处，暂存产物 ' + collected + ' 份。';
+  if (state.totalDay >= c.endDay) { c.booked = false; c.completedDay = state.totalDay; }
   markDirty();
+  return { ok: true, watered: watered, tended: tended, collected: collected };
 }
 /* 湿地／河湾水位复查：登记表只写一次。普通调查 / 辨迹·识矿 两条入口
    都不重复扣料、不刷资历；旧档缺字段时归一化成 null，下次再到访会重新登记。 */
@@ -21907,6 +22526,9 @@ window.__MOSS__ = {
   performSettlement: performSettlement,
   openSettleLog: openSettleLog, settlementPages: settlementPages,
   toolShovel: toolShovel,
+  toolSeed: toolSeed,
+  toolHarvest: toolHarvest,
+  openShop: function () { openShop(); },
   saveNow: saveNow, serialize: serialize,
   refreshHud: refreshHud,
   yearSeasonOfDay: yearSeasonOfDay,
@@ -21914,16 +22536,48 @@ window.__MOSS__ = {
   SEASONS: SEASONS,
   DAYS_PER_SEASON: DAYS_PER_SEASON,
   DAYS_PER_YEAR: DAYS_PER_YEAR,
+  seasonOfDay: seasonOfDay,
+  seasonDaysLeft: seasonDaysLeft,
+  cropSowSeasons: cropSowSeasons,
+  cropSowableNow: cropSowableNow,
+  cropSowSeasonText: cropSowSeasonText,
+  seasonCropsNow: seasonCropsNow,
+  seasonSowableText: seasonSowableText,
+  seasonEndWarning: seasonEndWarning,
+  SEASON_STOCK: SEASON_STOCK,
+  newSeasonStock: newSeasonStock,
+  normalizeSeasonStock: normalizeSeasonStock,
+  seasonStockState: seasonStockState,
+  seasonStockSpec: seasonStockSpec,
+  seasonStockReady: seasonStockReady,
+  seasonStockMissing: seasonStockMissing,
+  completeSeasonStock: completeSeasonStock,
+  SETTLE_ALLOWANCE_DAYS: SETTLE_ALLOWANCE_DAYS,
+  newSettlementAid: newSettlementAid,
+  normalizeSettlementAid: normalizeSettlementAid,
+  settlementAidState: settlementAidState,
+  settlementAidLeft: settlementAidLeft,
+  settlementAidAwayDay: settlementAidAwayDay,
+  settlementAidText: settlementAidText,
+  applySettlementAid: applySettlementAid,
+  requestSleep: function () { requestSleep(); },
+  farmOverview: farmOverview,
   newFarmCare: newFarmCare,
   farmCareState: farmCareState,
   farmCareTotalDays: farmCareTotalDays,
   farmCareDaysLeft: farmCareDaysLeft,
   farmCareTotalFee: farmCareTotalFee,
   farmCareTotalMaterials: farmCareTotalMaterials,
+  farmCareFeedNeed: farmCareFeedNeed,
+  farmCareFeedPlan: farmCareFeedPlan,
+  farmCareFeedCoverage: farmCareFeedCoverage,
+  farmCareStoredText: farmCareStoredText,
+  claimFarmCareProducts: claimFarmCareProducts,
   bookFarmCare: bookFarmCare,
   cancelFarmCare: cancelFarmCare,
   applyFarmCareTick: applyFarmCareTick,
   openFarmCarePanel: function () { openFarmCarePanel(); },
+  openFarmSchedulePanel: function () { openFarmSchedulePanel(); },
   newFarmPlan: newFarmPlan,
   farmPlanState: farmPlanState,
   bookFarmPlan: bookFarmPlan,
@@ -21934,6 +22588,16 @@ window.__MOSS__ = {
   farmPlanTotalDays: farmPlanTotalDays,
   farmPlanDaysLeft: farmPlanDaysLeft,
   farmPlanTotalFee: farmPlanTotalFee,
+  normalizeFarmPlan: normalizeFarmPlan,
+  OUTWORK_ASSIGNMENTS: OUTWORK_ASSIGNMENTS,
+  farmOutwork: farmOutwork,
+  farmOutworkUnlocked: farmOutworkUnlocked,
+  farmOutworkName: farmOutworkName,
+  farmPlanCareGap: farmPlanCareGap,
+  farmPlanCareGapText: farmPlanCareGapText,
+  farmPlanOutworkSummary: farmPlanOutworkSummary,
+  farmPlanOutworkLine: farmPlanOutworkLine,
+  ROOKIE_JOBS: ROOKIE_JOBS,
   deriveWaterworksFromProject: deriveWaterworksFromProject,
   newEngProject: newEngProject,
   ENG_PHASES: ENG_PHASES,

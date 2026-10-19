@@ -1,9 +1,7 @@
 import assert from 'node:assert/strict';
-import path from 'node:path';
-import {pathToFileURL} from 'node:url';
 import {launch,boot} from './harness.mjs';
 for (const file of ['index.html','苔芽农场-单文件版.html']) {
- const {browser,page,errors}=await launch({url:pathToFileURL(path.resolve(file)).href});
+ const {browser,page,errors}=await launch({url:new URL('../'+file,import.meta.url).href});
  const pose=async(scene,x,y,extra={})=>{
   if(await page.evaluate(()=>!!__MOSS__.ui.window)) await page.keyboard.press('Escape');
   await page.evaluate(({scene,x,y,extra})=>{const m=window.__MOSS__,s=m.state;Object.assign(s,extra);s.sceneId=scene;s.player={x,y,face:'up'};m.game.fishing=null;m.startGame(s);},{scene,x,y,extra});
@@ -67,17 +65,17 @@ for (const file of ['index.html','苔芽农场-单文件版.html']) {
   await page.getByRole('button',{name:'确认睡觉',exact:true}).click();
   await page.waitForFunction(()=>__MOSS__.ui.window?.id==='settlement');
   assert.equal(await page.evaluate(()=>__MOSS__.state.coins),168,'手动睡觉应有出货 18 + 补助 50');
-  assert((await page.locator('#windowLayer').innerText()).includes('每日补助'));
+  assert((await page.locator('#windowLayer').innerText()).includes('安置援助'));
   assert.equal(await page.evaluate(()=>__MOSS__.state.settleHistory.at(-1).dailyAllowance),50);
   await finish();
   await page.reload();await page.getByRole('button',{name:'继续游戏',exact:true}).click();
-  assert.equal(await page.evaluate(()=>__MOSS__.state.coins),168,'刷新不能重复领每日补助');
+  assert.equal(await page.evaluate(()=>__MOSS__.state.coins),168,'刷新不能重复领安置援助');
   assert.equal(await page.evaluate(()=>__MOSS__.state.settleHistory.at(-1).dailyAllowance),50,'补助记录应能读回');
   await page.evaluate(()=>__MOSS__.state.timeMinutes=1319.99);
   await page.waitForFunction(()=>__MOSS__.ui.window?.id==='settlement');
   assert.equal(await page.evaluate(()=>__MOSS__.state.coins),218,'自动过夜也应获得 50');
   assert.equal(await page.evaluate(()=>__MOSS__.state.totalDay),3);
-  console.log('PASS',file,'手动/自动每日补助/出货叠加/记录/刷新不重复领取');
+  console.log('PASS',file,'手动/自动安置援助/出货叠加/记录/刷新不重复领取');
   assert.equal(errors.length,0,errors.join('\n'));
  } finally {await browser.close();}
 }

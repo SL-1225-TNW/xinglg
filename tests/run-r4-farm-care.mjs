@@ -1,152 +1,106 @@
-/* R4 第二块：农场照料委托。
-   验证五大要点：
-   - 预约一次性扣款、可预览材料与费用；
-   - 取消时按剩余天数退款，已结算的不退；
-   - 缺料日子只增加 shortageDays，不偷偷扣材料、不重复发奖；
-   - 跨日由 applyFarmCareTick 推进，重复调用同一日不重复扣；
-   - 没有任何按钮在重复打开、刷新、重载时改变已结算/已扣料数值。 */
+/* R4 农场照料委托：真实跨日、真实田地/牲畜、暂存产物和存档。 */
 import assert from 'node:assert/strict';
 import { launch, boot } from './harness.mjs';
 
+const single = process.argv.includes('--single-file');
 let checks = 0;
 const eq = (a, b, n) => { assert.deepEqual(a, b, n); checks++; console.log('PASS', n); };
 const ok = (c, n) => { assert.ok(c, n); checks++; console.log('PASS', n); };
 
-const r = await launch({}), p = r.page;
+const r = await launch(single ? { url: new URL('../苔芽农场-单文件版.html', import.meta.url).href } : {}), p = r.page;
 await boot(p);
 await p.locator('#tutorialSkip').click();
 
-async function readFC() {
+async function snapCare() {
   return p.evaluate(() => {
-    var c = __MOSS__.farmCareState();
-    var o = Object.assign({}, c);
-    o.__today = __MOSS__.state.totalDay;
-    o.__coins = __MOSS__.state.coins;
-    o.__seed = (__MOSS__.state.inventory && __MOSS__.state.inventory.seed_radish) || 0;
-    return o;
+    const c = __MOSS__.farmCareState();
+    const coop = __MOSS__.state.structures.find(s => s.device === 'coop');
+    return {
+      care: JSON.parse(JSON.stringify(c)), day: __MOSS__.state.totalDay,
+      coins: __MOSS__.state.coins, radish: __MOSS__.state.inventory.radish || 0,
+      plot: JSON.parse(JSON.stringify(__MOSS__.state.plots['6,4'] || null)),
+      coop: coop ? JSON.parse(JSON.stringify(coop.livestock || null)) : null
+    };
   });
 }
 
-/* 默认未预约 */
-const init = await readFC();
-ok(!init.booked, '初始未预约');
-eq(init.deliveredDays, 0, '初始 deliveredDays=0');
-eq(init.shortageDays, 0, '初始 shortageDays=0');
-eq(init.__seed, 8, '初始有 8 颗萝卜种子');
-
-/* 预览与扣款：5 天 · 5×8=40 金 */
-const preview = await p.evaluate(() => __MOSS__.farmCareTotalFee({ startDay: 1, endDay: 5, costPerDay: __MOSS__.farmCareState().costPerDay }));
-eq(preview, 40, '5 天预览 = 40 金');
-const previewMat = await p.evaluate(() => __MOSS__.farmCareTotalMaterials({ startDay: 1, endDay: 5, materialPerDay: __MOSS__.farmCareState().materialPerDay }));
-eq(previewMat, { seed_radish: 5 }, '5 天预览材料 = seed_radish ×5');
-
-const coinsBefore = init.__coins;
-
-/* 预约 5 天 */
-const book = await p.evaluate(() => __MOSS__.bookFarmCare(5));
-ok(book, 'bookFarmCare(5) 成功');
-const booked = await readFC();
-eq(booked.startDay, 1, '预约 startDay = 今天');
-eq(booked.endDay, 5, '预约 endDay = 今天+4');
-eq(booked.bookedDays, 5, '预约 bookedDays = 5');
-eq(booked.deliveredDays, 0, '预约后 deliveredDays 仍未结算 = 0');
-eq(booked.shortageDays, 0, '预约后 shortageDays 仍未缺料 = 0');
-eq(booked.__coins, coinsBefore - 40, '预约一次扣 40 金');
-
-/* 预约期间金币低于 costPerDay.coins 不能补预约 */
-const rebook = await p.evaluate(() => __MOSS__.bookFarmCare(2));
-ok(!rebook, '已预约时再次 bookFarmCare 失败');
-
-/* 跨过 1 天：applyFarmCareTick 立即结算今天（day=1）→ deliveredDays=1，材料减 1 */
-await p.evaluate(() => { __MOSS__.state.totalDay = 1; __MOSS__.applyFarmCareTick(); });
-const d1 = await readFC();
-eq(d1.deliveredDays, 1, '跨到 day=1 后 deliveredDays=1');
-eq(d1.shortageDays, 0, '跨到 day=1 后 shortageDays=0');
-eq(d1.__seed, 7, 'day=1 结算消耗 1 颗种子');
-
-/* 重复 tick 同一日：不重复扣 */
-await p.evaluate(() => __MOSS__.applyFarmCareTick());
-const d1Rep = await readFC();
-eq(d1Rep.deliveredDays, 1, '同日重复 tick 不再累加 deliveredDays');
-eq(d1Rep.__seed, 7, '同日重复 tick 不再扣材料');
-
-/* day=2：库存还有 7 颗，仍然够 */
-await p.evaluate(() => { __MOSS__.state.totalDay = 2; __MOSS__.applyFarmCareTick(); });
-const d2 = await readFC();
-eq(d2.deliveredDays, 2, 'day=2 deliveredDays=2');
-eq(d2.shortageDays, 0, 'day=2 shortageDays 仍是 0');
-eq(d2.__seed, 6, 'day=2 又减 1 颗');
-
-/* day=3：把种子清到 0，再 tick → shortageDays+1，材料不变 */
-await p.evaluate(() => { __MOSS__.state.totalDay = 3; __MOSS__.state.inventory.seed_radish = 0; __MOSS__.applyFarmCareTick(); });
-const d3 = await readFC();
-eq(d3.deliveredDays, 2, 'day=3 缺料，deliveredDays 不再增长');
-eq(d3.shortageDays, 1, 'day=3 缺料，shortageDays+1');
-eq(d3.__seed, 0, 'day=3 缺料不扣');
-
-/* 重复 tick 同一日：依然不重复扣料 */
-await p.evaluate(() => __MOSS__.applyFarmCareTick());
-const d3Rep = await readFC();
-eq(d3Rep.shortageDays, 1, '缺料日重复 tick 不再累加 shortageDays');
-eq(d3Rep.__seed, 0, '缺料日重复 tick 不消耗材料');
-
-/* day=4：补 5 颗种子 → 应该恢复成功结算 */
-await p.evaluate(() => { __MOSS__.state.totalDay = 4; __MOSS__.state.inventory.seed_radish = 5; __MOSS__.applyFarmCareTick(); });
-const d4 = await readFC();
-eq(d4.deliveredDays, 3, 'day=4 补料后继续结算 deliveredDays=3');
-eq(d4.shortageDays, 1, 'day=4 shortageDays 保持 1');
-eq(d4.__seed, 4, 'day=4 减 1 颗');
-
-/* 取消剩余 1 天（day=5 即 endDay 当天还没 tick）：
-   我们的 endDay=5，day=4 时还没结算 day=5，所以剩余是 1 天，退 8 金。 */
-const refund = await p.evaluate(() => __MOSS__.cancelFarmCare());
-eq(refund, 8, '取消当日退回 1 天 = 8 金');
-const cancelled = await readFC();
-ok(!cancelled.booked, '取消后 booked=false');
-eq(cancelled.deliveredDays, 3, '取消不改变 deliveredDays');
-eq(cancelled.shortageDays, 1, '取消不改变 shortageDays');
-eq(cancelled.__coins, init.__coins - 40 + 8, '金币净支出 40-8=32');
-
-/* 重新预约：从今天（仍然 day=4）再来一份；advance 到 day=5，settle 出第 4 天。
-   退 8 金后钱包还剩 18，仅够 1 天预约 8 金 + 已结算 3 天的话剩余 1 天；
-   这里补足到 50 金，确保测试不卡在金币断言上。 */
-await p.evaluate(() => { __MOSS__.state.coins = 50; });
-const rebook2 = await p.evaluate(() => __MOSS__.bookFarmCare(3));
-ok(rebook2, '取消后可以再次预约');
-await p.evaluate(() => { __MOSS__.state.totalDay = 5; __MOSS__.applyFarmCareTick(); });
-const d5 = await readFC();
-eq(d5.deliveredDays, 1, '新预约的 day=5 再次结算一次');
-eq(d5.bookedDays, 3, '新预约 bookedDays = 3');
-eq(d5.endDay, 6, '新预约 endDay = 当前+2');
-
-/* 重载存档 → 不会重复扣料 */
-const beforeReload = (await readFC()).__seed;
-await p.evaluate(() => __MOSS__.saveNow());
-await p.reload();
-await p.getByRole('button', { name: '继续游戏', exact: true }).click();
-const afterReload = await readFC();
-eq(afterReload.__seed, beforeReload, '重载后种子数不变');
-eq(afterReload.deliveredDays, d5.deliveredDays, '重载后 deliveredDays 不变');
-ok(!afterReload.booked || afterReload.endDay === 6, '重载后预约字段一致');
-
-/* 重复打开面板：不应该产生结算 */
-const repeats = await p.evaluate(() => {
-  for (var i = 0; i < 5; i++) __MOSS__.openFarmCarePanel();
-  return __MOSS__.farmCareState().deliveredDays;
+await p.evaluate(() => {
+  const M = __MOSS__;
+  M.state.coins = 100;
+  M.state.totalDay = 1;
+  M.state.weather = { today: 'sun', tomorrow: 'sun' };
+  M.state.inventory.radish = 8;
+  M.state.plots['6,4'] = { tilled: true, water: false, crop: 'radish', age: 0, mature: false, harvested: false, regrow: 0, fertility: 70, lastGroup: 'root', prevGroup: null };
+  M.state.structures.push({ id: 'care-coop', device: 'coop', x: 12, y: 8,
+    livestock: { fedDay: -1, wateredDay: -1, pending: 1, lastProductDay: 1, mood: 0, fedQty: 0, stock: 0 } });
 });
-eq(repeats, d5.deliveredDays, '重复打开面板不重复结算');
 
-/* 元数据校验 */
-const meta = await p.evaluate(() => ({
-  costPerDay: __MOSS__.farmCareState().costPerDay,
-  materialPerDay: __MOSS__.farmCareState().materialPerDay,
-  defaultDays: 3,
-  totalDays: __MOSS__.farmCareTotalDays(__MOSS__.farmCareState()),
-  daysLeft: __MOSS__.farmCareDaysLeft(__MOSS__.farmCareState())
-}));
-eq(meta.costPerDay, { coins: 8 }, '默认 costPerDay.coins = 8');
-eq(meta.materialPerDay, { seed_radish: 1 }, '默认 materialPerDay = {seed_radish:1}');
-ok(meta.totalDays >= 0 && meta.daysLeft >= 0, '总数与剩余都是非负数');
+const init = await snapCare();
+ok(!init.care.booked, '初始未预约');
+eq(await p.evaluate(() => __MOSS__.farmCareFeedNeed()), 2, '一座鸡舍每日需要 2 份口粮');
+eq(await p.evaluate(() => __MOSS__.farmCareTotalMaterials({ startDay: 2, endDay: 4, materialPerDay: {} })), {}, '照料委托不再假装每日播种');
 
+await p.evaluate(() => __MOSS__.openFarmCarePanel());
+await p.getByRole('button', { name: /预约 3 天 · 24 金/ }).click();
+ok((await snapCare()).care.booked, '玩家点击面板预约 3 天成功');
+let s = await snapCare();
+eq(s.care.startDay, 2, '当天签约，次日开始');
+eq(s.care.endDay, 4, '三天覆盖第 2—4 天');
+eq(s.coins, 76, '一次锁定 24 金工钱');
+
+await p.evaluate(() => __MOSS__.performSettlement(true));
+s = await snapCare();
+eq(s.day, 2, '正常睡觉进入第 2 天');
+eq(s.care.deliveredDays, 1, '首个真实清晨结算一次');
+eq(s.plot.water, true, '委托真实浇灌已有作物');
+eq(s.coop.fedDay, 2, '委托真实喂养鸡舍');
+eq(s.coop.wateredDay, 2, '委托真实给鸡舍添水');
+eq(s.radish, 6, '鸡舍消耗 2 份允许口粮');
+eq(s.care.storedProducts, { egg: 1 }, '已有鸡蛋进入委托暂存箱');
+
+await p.evaluate(() => __MOSS__.applyFarmCareTick());
+const same = await snapCare();
+eq(same.care.deliveredDays, 1, '同日重复 tick 不重复结算');
+eq(same.radish, 6, '同日重复 tick 不重复扣口粮');
+
+await p.evaluate(() => { __MOSS__.state.inventory.radish = 0; __MOSS__.state.inventory.potato = 0; __MOSS__.state.inventory.strawberry = 0; __MOSS__.state.weather.tomorrow = 'sun'; __MOSS__.performSettlement(true); });
+s = await snapCare();
+eq(s.day, 3, '第二次睡觉进入第 3 天');
+eq(s.care.deliveredDays, 1, '缺料日不冒充已照料');
+eq(s.care.shortageDays, 1, '缺料日留下中断记录');
+ok(/鸡舍还缺口粮/.test(s.care.lastSummary), '中断记录说明缺什么');
+await p.evaluate(() => __MOSS__.applyFarmCareTick());
+eq((await snapCare()).care.shortageDays, 1, '缺料日重复 tick 不重复登记');
+
+const refund = await p.evaluate(() => __MOSS__.cancelFarmCare());
+eq(refund, 8, '取消只退最后一个未结算日');
+ok(!(await snapCare()).care.booked, '取消后预约结束');
+
+ok(await p.evaluate(() => __MOSS__.claimFarmCareProducts()), '可以领取暂存产物');
+eq(await p.evaluate(() => __MOSS__.state.inventory.egg), 1, '暂存鸡蛋进入背包');
+eq(await p.evaluate(() => __MOSS__.farmCareStoredText()), '暂无', '领取后暂存箱清空');
+
+await p.keyboard.press('Escape');
+await p.keyboard.press('j');
+await p.getByRole('button', { name: /长期安排 · 农场照料/ }).click();
+ok(await p.locator('.win').getByText('统一查看离农计划与农场照料', { exact: false }).count(), '玩家从 J 委托日志进入长期安排');
+const beforeOpen = (await snapCare()).care.deliveredDays;
+for (let i = 0; i < 3; i++) await p.evaluate(() => __MOSS__.openFarmSchedulePanel());
+eq((await snapCare()).care.deliveredDays, beforeOpen, '重复打开面板不推进结算');
+
+const round = await p.evaluate(() => {
+  const a = __MOSS__.normalizeSaveForTest(__MOSS__.serialize());
+  const b = __MOSS__.normalizeSaveForTest(a);
+  return {
+    aCare: a.farmCare, bCare: b.farmCare,
+    aCoop: a.structures.find(s => s.device === 'coop'),
+    bCoop: b.structures.find(s => s.device === 'coop')
+  };
+});
+ok(!!round.aCoop && !!round.bCoop, '鸡舍不会在读档归一化时消失');
+eq(round.bCoop, round.aCoop, '鸡舍畜养账本往返幂等');
+eq(round.bCare, round.aCare, '照料委托账本往返幂等');
+
+eq(r.errors, [], '照料流程无浏览器异常');
 await r.browser.close();
-console.log(`R4 农场照料委托 ${checks} 项通过`);
+console.log(`R4 农场照料委托 ${checks} 项通过${single ? '（单文件）' : ''}`);
