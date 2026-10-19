@@ -120,7 +120,7 @@ https://sl-1225-tnw.github.io/xinglg/
 
 ## 有什么内容
 
-> **功能注册盘点见 [`docs/feature-status.md`](docs/feature-status.md)**，运行 `node tests/build-status-doc.mjs` 会启动浏览器读取最终注册信息。注册不代表新档已解锁，也不代表全部剧情已验收；具体边界见 [接手审查](docs/takeover-review-2026-10-11.md)。
+> **功能注册盘点见 [`docs/feature-status.md`](docs/feature-status.md)**，运行 `node tests/build-status-doc.mjs` 会启动浏览器读取最终注册信息。注册不代表新档已解锁，也不代表全部剧情已验收；具体边界见 [接手审查](docs/takeover-review-2026-10-11.md)，R5 的交付证据与遗留问题见 [收口总结](docs/r5-收口总结-2026-10-19.md)。
 
 - **全境地图**：最终注册的 M 地图有 18 个区域标记、18 个公共传送节点。场景与室内另计；首次到访登记和职业条件决定具体开放范围，详见状态表。
 - **快速传送**：按 `M` 或点手机常驻「地图」按钮，选中**已解锁且已到访登记**的公共地点即可直接前往，
