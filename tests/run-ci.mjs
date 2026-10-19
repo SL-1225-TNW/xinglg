@@ -46,6 +46,8 @@ const BROWSER = [
   /* 白蔷薇宫城 P1：布局契约、楼层通行、存档迁移与手机端分层验收 */
   'run-palace-layout.mjs', 'run-palace-save.mjs', 'run-palace-floors.mjs', 'run-palace-mobile.mjs', 'run-palace-wayfinding.mjs', 'run-palace-east-wing.mjs', 'run-palace-service.mjs',
   'run-university.mjs',
+  /* R5-0 经济止血：票据报价、兑付期限、典当与旧档兼容，源码与单文件版各一轮 */
+  'run-r5-finance-safety.mjs',
   'run-south-gate.mjs',
   'run-industry.mjs',
   'run-clinic-construction.mjs',
@@ -95,6 +97,7 @@ run('run-r4-outwork-single-file', path.join(here, 'run-r4-outwork.mjs'), ['--sin
 run('run-r4-season-single-file', path.join(here, 'run-r4-season.mjs'), ['--single-file']);
 run('run-r4-settlement-aid-single-file', path.join(here, 'run-r4-settlement-aid.mjs'), ['--single-file']);
 run('run-r4-legacy-save-single-file', path.join(here, 'run-r4-legacy-save.mjs'), ['--single-file']);
+run('run-r5-finance-safety-single-file', path.join(here, 'run-r5-finance-safety.mjs'), ['--single-file']);
 
 console.log(failed ? `\n共 ${failed} 项失败。` : '\n两层全部通过。');
 process.exit(failed ? 1 : 0);

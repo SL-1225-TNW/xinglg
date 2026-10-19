@@ -176,6 +176,9 @@ try {
   });
   await openSvc('bank');
   const c0 = await page.evaluate(() => window.__MOSS__.state.coins);
+  // 价格读 R5-0 的权威报价表，不在用例里另写一份数字
+  const pledgeAmt = await page.evaluate(() => window.__MOSS__.BILL_QUOTES.warehouse_deed.pledge);
+  const redeemAmt = pledgeAmt + Math.floor(pledgeAmt * 0.1);
   await page.locator('.win-body button', { hasText: '典当' }).first().click();
   await page.waitForTimeout(220);
   const s1 = await page.evaluate(() => ({
@@ -184,7 +187,7 @@ try {
     deed: (window.__MOSS__.state.inventory.warehouse_deed || 0)
   }));
   T('典当后契据离手', s1.deed === 0, 'deed=' + s1.deed);
-  T('典当后金币增加', s1.coins === c0 + 500, `${c0} → ${s1.coins}`);
+  T('典当后金币增加', s1.coins === c0 + pledgeAmt, `${c0} → ${s1.coins}，应加 ${pledgeAmt}`);
   T('pledge 记 1 条', s1.pledges === 1, '实际 ' + s1.pledges);
 
   await page.locator('.win-body button', { hasText: '赎回' }).first().click();
@@ -195,7 +198,7 @@ try {
     deed: (window.__MOSS__.state.inventory.warehouse_deed || 0)
   }));
   T('赎回后契据回包', s2.deed === 1, 'deed=' + s2.deed);
-  T('赎回扣 550', s2.coins === c0 + 500 - 550, `${c0 + 500} → ${s2.coins}，应扣 550`);
+  T('赎回扣本金加一成息', s2.coins === c0 + pledgeAmt - redeemAmt, `${c0 + pledgeAmt} → ${s2.coins}，应扣 ${redeemAmt}`);
   T('赎回后 pledge 清空', s2.pledges === 0, '实际 ' + s2.pledges);
 
   /* ---------- 9. 大学进阶课：体力不足不扣钱 ---------- */

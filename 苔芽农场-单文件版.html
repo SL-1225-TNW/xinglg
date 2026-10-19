@@ -1392,10 +1392,10 @@ var ITEMS = {
   field_note:    { name: '考察笔记',   kind: 'material', sell: 90, food: 0, desc: '实验楼里记下的标本与数据，最受研究同行看重，售价 90 金。' },
   translation:   { name: '译稿',       kind: 'material', sell: 130, food: 0, desc: '把旧语文献译成的白蔷薇文，图书馆按页付酬，售价 130 金。' },
   /* 金融：票据可兑付，是这条链的价值载体 */
-  bill:          { name: '商业票据',   kind: 'material', sell: 60, food: 0, desc: '国立银行开的期票，到期前可在银行兑成金币，售价 60 金。' },
-  share_cert:    { name: '交易所股票', kind: 'material', sell: 110, food: 0, desc: '谷物交易所的份额凭证，随行情涨落，售价 110 金。' },
-  warehouse_deed:{ name: '货栈契据',   kind: 'material', sell: 190, food: 0, desc: '码头货栈的长期租约，押给银行能换一大笔款，售价 190 金。' },
-  bond:          { name: '市政公债',   kind: 'material', sell: 160, food: 0, desc: '市政厅为市政工程发行的债券，年息一分，售价 160 金。' },
+  bill:          { name: '商业票据',   kind: 'material', sell: 60, food: 0, desc: '国立银行开的期票，凭票面随时可在银行兑付，售价 60 金。' },
+  share_cert:    { name: '交易所股票', kind: 'material', sell: 110, food: 0, desc: '谷物交易所的份额凭证，按票面在银行结算，售价 110 金。' },
+  warehouse_deed:{ name: '货栈契据',   kind: 'material', sell: 190, food: 0, desc: '码头货栈的长期租约，可兑付也可典当支现，售价 190 金。' },
+  bond:          { name: '市政公债',   kind: 'material', sell: 160, food: 0, desc: '市政厅为市政工程发行的债券，认购后满一个季节才兑付。' },
   gem: {name:'紫晶',kind:'material',sell:100,food:0,desc:'探索获得，可出售，售价 100 金。'},
   jam:       { name: '莓果酱', kind: 'craft', sell: 50, food: 25, desc: '果酱罐熬制的果酱，售价 50 金。' },
   egg:       { name: '鸡蛋', kind: 'material', sell: 9, food: 8, desc: '草场鸡下的蛋，售价 9 金，也可以直接吃。' },
@@ -1414,6 +1414,24 @@ var ITEMS = {
   wool:         { name: '羊毛',     kind: 'material', sell: 30, food: 0,  desc: '剪下来的羊毛，蓬松厚实，售价 30 金。' },
   compost:      { name: '熟肥',     kind: 'material', sell: 2, desc: '由堆肥箱沤出的肥料，给田地补回肥力（每份 +8）。' }
 };
+
+/* R5-0 票据单一权威报价表。
+ * cost    取得成本的金币当量（含折算的材料），只用来守住不变式
+ * coins   实际向玩家收的金币；0 表示靠材料作保，不收现钱
+ * face    票面兑付价；term 是兑付期限（天），0 表示随时可兑
+ * pledge  典当估值；source 取得来源
+ * 守住的不变式：cost ≥ face、cost ≥ pledge、pledge × 1.1 ≥ pledge。
+ * 票据是凭证不是金条：任何一张都不许靠倒手凭空生出金币。 */
+var BILL_QUOTES = {
+  bill:           { cost: 110, coins: 0,   face: 87,  term: 0,  pledge: 0,   source: '金库开票 · 铜锭 2' },
+  share_cert:     { cost: 252, coins: 200, face: 160, term: 0,  pledge: 0,   source: '交易所认购 · 200 金 + 面粉 2' },
+  warehouse_deed: { cost: 204, coins: 0,   face: 200, term: 0,  pledge: 150, source: '金库立契 · 板材 6' },
+  bond:           { cost: 240, coins: 240, face: 250, term: 28, pledge: 160, source: '市政厅认购 · 240 金' }
+};
+var BILL_IDS = ['bill', 'share_cert', 'warehouse_deed', 'bond'];
+/* 典当估值不得超过无条件票面，且赎回要连本带息；这两个数只在这里算一次。 */
+function billPledgeValue(id){ var q=BILL_QUOTES[id]; return q&&q.pledge?Math.min(q.pledge,q.face):0; }
+function billRedeemDue(id){ var q=BILL_QUOTES[id]; return q?Math.round(q.face)+Math.floor(q.face*0.1):0; }
 
 /* --- 作物表 ---
    seasons：可下种的季节。季节外不播下，已在地里的作物跨季照常生长、
@@ -3160,12 +3178,53 @@ function normalizeExploration(raw){
  if(raw.dailyJobs&&typeof raw.dailyJobs==='object'){e.dailyJobs.day=Math.floor(num(raw.dailyJobs.day,-1,-1,1e6));if(Array.isArray(raw.dailyJobs.ids))e.dailyJobs.ids=raw.dailyJobs.ids.filter(function(id){return !!LIVING_JOBS[id];}).slice(0,3);}
  ['storyDone','bondDone'].forEach(function(k){if(raw[k]&&typeof raw[k]==='object')Object.keys(raw[k]).forEach(function(id){if(raw[k][id])e[k][id]=true;});});
  if(raw.journalChoices&&typeof raw.journalChoices==='object')Object.keys(raw.journalChoices).forEach(function(id){var v=raw.journalChoices[id];if(v&&Number.isInteger(v.day)&&Number.isInteger(v.option))e.journalChoices[id]={day:Math.max(-1,v.day),option:v.option};});
- if(Array.isArray(raw.pledges))e.pledges=raw.pledges.filter(function(p){return p&&ITEMS[p.id]&&Number.isFinite(p.amt)&&p.amt>0;}).slice(0,20).map(function(p){return{id:p.id,amt:Math.floor(p.amt),day:Math.max(-1,Math.floor(num(p.day,-1,-1,1e6)))};});
+ if(Array.isArray(raw.pledges))e.pledges=raw.pledges.filter(function(p){return p&&ITEMS[p.id]&&Number.isFinite(p.amt)&&p.amt>0;}).slice(0,20).map(function(p){return{id:p.id,amt:Math.floor(p.amt),day:Math.max(-1,Math.floor(num(p.day,-1,-1,1e6))),hold:Number.isFinite(p.hold)?Math.max(0,Math.floor(p.hold)):null};});
+  /* 票据批次与流水：只保留合法票据、合法正整数；坏值整条丢弃，不猜。 */
+  e.billLots=[];if(Array.isArray(raw.billLots))e.billLots=raw.billLots.filter(function(l){return l&&BILL_QUOTES[l.item]&&Number.isFinite(l.qty)&&Number.isFinite(l.day)&&l.qty>0&&l.day>=0;}).slice(0,60).map(function(l){return{item:l.item,qty:Math.floor(l.qty),day:Math.floor(l.day)};});
+  e.billTx=[];if(Array.isArray(raw.billTx))e.billTx=raw.billTx.filter(function(t){return t&&BILL_QUOTES[t.item]&&Number.isFinite(t.amt);}).slice(-40).map(function(t){return{tx:String(t.tx||''),item:t.item,kind:String(t.kind||''),amt:Math.round(t.amt),day:Math.max(0,Math.floor(num(t.day,0,0,1e6))),src:String(t.src||'')};});
  if(!e.forest){e.mine=false;e.hut=false;}if(!e.mine)e.depth=1;
  ['forest_cache','mine_cache'].forEach(function(k){e.treasures[k]=!!(raw.treasures&&raw.treasures[k]);});
  Object.keys(EXPLORE_NODES).forEach(function(sc){Object.keys(EXPLORE_NODES[sc]).forEach(function(k){var n=EXPLORE_NODES[sc][k],key=sc+':'+k,v=raw.nodes&&raw.nodes[key];if(v&&typeof v==='object')e.nodes[key]={hp:clamp(Math.floor(num(v.hp,n.hp,0,n.hp)),0,n.hp),day:Math.floor(num(v.day,0,0,1e6))};});});return e;
 }
 function exploreState(){if(!state.exploration)state.exploration=normalizeExploration();var e=state.exploration;if(!e.cityStories)e.cityStories={};if(!Number.isFinite(e.cityReputation))e.cityReputation=0;if(typeof e.smithCoupon!=='boolean')e.smithCoupon=false;return e;}
+/* --- R5-0 票据批次账本 ---
+ * 只回答两件事：这张票是哪天拿到的（公债满期要用），以及这笔钱走过哪条路。
+ * 批次与背包数量对不上时以背包为准多退少补；查不到来源的老票据按已满期处理，
+ * 这样旧档既不会被卡住，也不会因为缺记录而凭空多出兑付资格。 */
+function billLotsSync(item){
+  var q=BILL_QUOTES[item];if(!q)return 0;
+  var e=exploreState();if(!Array.isArray(e.billLots))e.billLots=[];
+  var lots=e.billLots,i,sum=0,L;
+  for(i=0;i<lots.length;i++){L=lots[i];
+    if(!L||L.item!==item||!Number.isFinite(L.qty)||!Number.isFinite(L.day)||L.qty<=0||L.day<0){lots.splice(i--,1);continue;}
+    L.qty=Math.floor(L.qty);L.day=Math.floor(L.day);sum+=L.qty;}
+  var held=invCount(item);
+  while(sum>held&&lots.length){L=lots[lots.length-1];var cut=Math.min(L.qty,sum-held);L.qty-=cut;sum-=cut;if(L.qty<=0)lots.pop();}
+  if(sum<held)lots.push({item:item,qty:held-sum,day:0});
+  return sum;
+}
+/* 现在就能兑付的张数：只算已满 term 的批次，不足就少给，绝不预支 */
+function billRedeemable(item){
+  var q=BILL_QUOTES[item];if(!q)return 0;
+  billLotsSync(item);
+  var held=invCount(item);if(!q.term)return held;
+  var n=0;exploreState().billLots.forEach(function(L){if(L.item===item&&state.totalDay-L.day>=q.term)n+=L.qty;});
+  return Math.max(0,Math.min(n,held));
+}
+/* 未满期票据还要等几天；没有未满期的返回 0 */
+function billMaturityWait(item){
+  var q=BILL_QUOTES[item];if(!q||!q.term)return 0;
+  billLotsSync(item);var soon=-1;
+  exploreState().billLots.forEach(function(L){if(L.item!==item)return;var left=q.term-(state.totalDay-L.day);if(left>0&&(soon<0||left<soon))soon=left;});
+  return soon<0?0:soon;
+}
+/* 票据流水：来源、成本、处置方式和事务 ID 都留痕 */
+function billTxLog(item,kind,amt,src){
+  var e=exploreState();if(!Array.isArray(e.billTx))e.billTx=[];
+  e.billTx.push({tx:'bill:'+kind+':'+item+':d'+state.totalDay+':#'+(e.billTx.length+1),
+    item:item,kind:kind,amt:Math.round(amt),day:state.totalDay,src:src||(BILL_QUOTES[item]&&BILL_QUOTES[item].source)||''});
+  if(e.billTx.length>40)e.billTx.splice(0,e.billTx.length-40);
+}
 function exploreNode(sc,x,y){var def=EXPLORE_NODES[sc]&&EXPLORE_NODES[sc][key2(x,y)];if(!def)return null;
  if(sc==='mine2'&&x>20&&y>11&&y<17&&!mineWorks().pump)return null;
  var e=exploreState(),key=sc+':'+key2(x,y),saved=e.nodes[key];
@@ -3188,6 +3247,7 @@ function gatherExplore(tool,x,y){
  addParticle(x,y,expected==='axe'?'wood':'stone');Audio2.play(expected==='axe'?'chop':'breakrock');markDirty();refreshHud();refreshHotbar();return true;
 }
 function payExplore(cost){
+ for(var k in cost)if(!Number.isFinite(cost[k])||cost[k]<0){toast('账目有误，这笔交易没有执行。');return false;}
  for(var k in cost)if((k==='coins'?state.coins:invCount(k))<cost[k]){toast('材料不足，需要 '+Object.keys(cost).map(function(id){return(id==='coins'?'金币':itemName(id))+' ×'+cost[id];}).join('、'));return false;}
  for(var k in cost)if(k==='coins')state.coins-=cost[k];else invRemove(k,cost[k]);return true;
 }
@@ -5638,36 +5698,50 @@ function openCityService(it) {
       b.appendChild(r1);
       b.appendChild(el('hr'));
       b.appendChild(el('p', 'strong', '票据兑付'));
-      var bills = ['bill', 'share_cert', 'warehouse_deed', 'bond'];
+      b.appendChild(el('p', 'muted', '银行一律按票面付款，不看镇价，也不给当场贴水；有期限的票据满期才能兑。'));
       var any = false, row2 = el('div', 'row');
-      bills.forEach(function (id) {
+      BILL_IDS.forEach(function (id) {
         var n = invCount(id); if (!n) return; any = true;
-        var p = Math.round((ITEMS[id].sell || 0) * 1.45);
-        row2.appendChild(mkBtn('兑付 ' + itemName(id) + ' ×' + n + ' → ' + (p * n) + ' 金', '', function () {
-          invRemove(id, n); state.coins += p * n;
-          markDirty(); refreshHud(); saveNow(); refreshWindow();
-          toast('银行按票面另加贴水，兑得 ' + (p * n) + ' 金。');
-        }));
+        var q = BILL_QUOTES[id], ok = billRedeemable(id), wait = billMaturityWait(id);
+        var face = Math.round(q.face);
+        if (ok > 0) {
+          row2.appendChild(mkBtn('兑付 ' + itemName(id) + ' ×' + ok + ' → ' + (face * ok) + ' 金', '', function () {
+            var can = billRedeemable(id); if (!can) { toast('还没有满期的票据。'); return; }
+            invRemove(id, can); state.coins += face * can;
+            billTxLog(id, 'redeem', -face * can, '银行按票面兑付');
+            markDirty(); refreshHud(); saveNow(); refreshWindow();
+            toast('银行按票面兑得 ' + (face * can) + ' 金。');
+          }));
+        }
+        if (ok < n || wait > 0) {
+          b.appendChild(el('p', 'muted', itemName(id) + '：共 ' + n + ' 张，本季已兑付 ' + Math.min(ok, n) + ' 张' +
+            (wait > 0 ? '，未满期的还要等 ' + wait + ' 天。' : '，其余待兑。')));
+        }
       });
       if (!any) b.appendChild(el('p', 'muted', '你手上没有可兑付的票据。'));
       else b.appendChild(row2);
       b.appendChild(el('hr'));
       b.appendChild(el('p', 'strong', '抵押借款'));
-      b.appendChild(el('p', 'muted', '典当契据或公债可当场支现款；赎当须按本金加一成息银，原物归还。'));
-      var r3 = el('div', 'row');
-      [['warehouse_deed', 500], ['bond', 420]].forEach(function (pair) {
-        var id = pair[0], amt = pair[1];
+      b.appendChild(el('p', 'muted', '典当契据或公债可当场支现款；典当估值低于票面，赎当须按本金加一成息银，原物归还。'));
+      var r3 = el('div', 'row'), pledgeable = false;
+      BILL_IDS.forEach(function (id) {
+        var amt = billPledgeValue(id); if (!amt) return;
+        pledgeable = true;
         r3.appendChild(mkBtn('典当' + itemName(id) + ' → 支取 ' + amt + ' 金', '', function () {
           if (!invCount(id)) { toast('你手上没有' + itemName(id) + '。'); return; }
+          var hold = 0, lots = (exploreState().billLots || []).filter(function (L) { return L.item === id; });
+          if (lots.length) hold = Math.min.apply(null, lots.map(function (L) { return L.day; }));
           invRemove(id, 1);
           if (!ex.pledges) ex.pledges = [];
-          ex.pledges.push({ id: id, amt: amt, day: state.totalDay });
+          ex.pledges.push({ id: id, amt: amt, day: state.totalDay, hold: hold });
           state.coins += amt;
+          billTxLog(id, 'pledge', amt, '银行典当支现');
           markDirty(); refreshHud(); saveNow(); refreshWindow();
           toast('典当' + itemName(id) + '，支取 ' + amt + ' 金。');
         }));
       });
-      b.appendChild(r3);
+      if (!pledgeable) b.appendChild(el('p', 'muted', '目前没有可以典当的票据。'));
+      else b.appendChild(r3);
       /* --- 赎当：取出典当时仍在库中的那一件 --- */
       if (ex.pledges && ex.pledges.length) {
         b.appendChild(el('p', 'strong', '在押之物'));
@@ -5678,6 +5752,14 @@ function openCityService(it) {
             if (!bagAccepts(p.id, 1)) { toast('背包满了，放不下赎物。'); return; }
             if (!payExplore({ coins: due })) return;
             invAdd(p.id, 1);
+            /* 赎回来的票据接着原来的持有日算满期，不因过了一趟银行就提前可兑。
+             * 旧档在押记录没有 hold，查不到来源就按已满期处理，和批次账本同一口径。 */
+            if (BILL_QUOTES[p.id]) {
+              var e2 = exploreState();
+              if (!Array.isArray(e2.billLots)) e2.billLots = [];
+              e2.billLots.push({ item: p.id, qty: 1, day: Number.isFinite(p.hold) ? p.hold : 0 });
+            }
+            billTxLog(p.id, 'unpledge', due, '赎回原物');
             ex.pledges.splice(i, 1);
             markDirty(); refreshHud(); saveNow(); refreshWindow();
             toast('赎回了' + itemName(p.id) + '。');
@@ -5730,11 +5812,16 @@ function openCityService(it) {
       b.appendChild(el('p', 'strong', '发行份额'));
       b.appendChild(el('p', 'muted', '拿工业品和粮食作保，可以认购交易所股票。'));
       var r3 = el('div', 'row');
-      r3.appendChild(mkBtn('认购股票 ×1 · 200 金 + 面粉 2', '', function () {
+      var certIssue = BILL_QUOTES.share_cert.coins;
+      r3.appendChild(mkBtn('认购股票 ×1 · ' + certIssue + ' 金 + 面粉 2', '', function () {
         if (invCount('flour') < 2) { toast('需要面粉 ×2 作保。'); return; }
         if (!bagAccepts('share_cert', 1)) { toast('背包满了，放不下股票。'); return; }
-        if (!payExplore({ coins: 200 })) return;
+        if (!payExplore({ coins: certIssue })) return;
         invRemove('flour', 2); invAdd('share_cert', 1);
+        var e2 = exploreState();
+        if (!Array.isArray(e2.billLots)) e2.billLots = [];
+        e2.billLots.push({ item: 'share_cert', qty: 1, day: state.totalDay });
+        billTxLog('share_cert', 'issue', -certIssue, BILL_QUOTES.share_cert.source);
         markDirty(); refreshHud(); saveNow(); refreshWindow();
         toast('认购成功，拿到一份交易所股票。');
       }));
@@ -5752,8 +5839,8 @@ function openCityService(it) {
       r1.appendChild(mkBtn('开商业票据 ×1 · 铜锭 2 · 体力 10', '', function () {
         cityWork({ need: [['copper_ingot', 2]], out: 'bill', qty: 1, energy: 10, minutes: 60, done: '开出一张商业票据' });
       }));
-      r1.appendChild(mkBtn('立货栈契据 ×1 · 板材 4 · 体力 12', '', function () {
-        cityWork({ need: [['plank', 4]], out: 'warehouse_deed', qty: 1, energy: 12, minutes: 60, done: '立下一份货栈契据' });
+      r1.appendChild(mkBtn('立货栈契据 ×1 · 板材 6 · 体力 12', '', function () {
+        cityWork({ need: [['plank', 6]], out: 'warehouse_deed', qty: 1, energy: 12, minutes: 60, done: '立下一份货栈契据' });
       }));
       b.appendChild(r1);
     }, ['bill', 'share_cert'], '旧票据在这里贴现，按九折。');
@@ -5792,17 +5879,26 @@ function openCityService(it) {
       b.appendChild(el('p', null, info.desc));
       b.appendChild(el('p', 'muted', info.who + '。'));
       b.appendChild(el('p', 'strong', '市政工程公债'));
-      b.appendChild(el('p', 'muted', '本季修河堤与铺南街，公债随时可兑，年息一分。'));
+      b.appendChild(el('p', 'muted', '本季修河堤与铺南街。公债按票面 ' + BILL_QUOTES.bond.face + ' 金兑付，认购后满 ' + BILL_QUOTES.bond.term + ' 天到期；急用钱可典当，先扣一成息银。'));
+      var bondIssue = BILL_QUOTES.bond.coins;
       var r1 = el('div', 'row');
-      r1.appendChild(mkBtn('认购公债 ×1 · 150 金', '', function () {
+      r1.appendChild(mkBtn('认购公债 ×1 · ' + bondIssue + ' 金', '', function () {
         if (!bagAccepts('bond', 1)) { toast('背包满了。'); return; }
-        if (payExplore({ coins: 150 })) { invAdd('bond', 1); markDirty(); refreshHud(); saveNow(); refreshWindow(); toast('认购一份市政公债。'); }
+        if (payExplore({ coins: bondIssue })) {
+          invAdd('bond', 1);
+          var e2 = exploreState();
+          if (!Array.isArray(e2.billLots)) e2.billLots = [];
+          e2.billLots.push({ item: 'bond', qty: 1, day: state.totalDay });
+          billTxLog('bond', 'issue', -bondIssue, '市政厅认购公债');
+          markDirty(); refreshHud(); saveNow(); refreshWindow();
+          toast('认购一份市政公债，第 ' + (state.totalDay + BILL_QUOTES.bond.term) + ' 日到期。');
+        }
       }));
       b.appendChild(r1);
       b.appendChild(el('hr'));
       b.appendChild(el('p', 'strong', '税册与公示'));
       var ex = exploreState();
-      var tax = Math.round((state.coins + ex.bankDeposit) * 0.02);
+      var tax = Math.round((state.coins + Math.max(0, Math.floor(ex.bankDeposit || 0))) * 0.02);
       b.appendChild(el('p', null, '本季应缴人头税约 ' + tax + ' 金。'));
       var r2 = el('div', 'row');
       r2.appendChild(mkBtn('缴纳税金 · ' + tax + ' 金', '', function () {
@@ -18306,7 +18402,16 @@ function cityWork(opts) {
     energy: opts.energy || 0, minutes: opts.minutes || 30,
     guard: opts.guard, reason: opts.reason
   });
-  if (ok) toast((opts.done || '完成了') + '，获得 ' + itemName(opts.out) + ' ×' + (opts.qty || 1) + '。');
+  if (ok) {
+    /* R5-0：票据出厂就登记取得日与来源，日后兑付、典当才查得到出处 */
+    if (BILL_QUOTES[opts.out]) {
+      var e2 = exploreState(), n2 = opts.qty || 1;
+      if (!Array.isArray(e2.billLots)) e2.billLots = [];
+      e2.billLots.push({ item: opts.out, qty: n2, day: state.totalDay });
+      billTxLog(opts.out, 'issue', 0, BILL_QUOTES[opts.out].source);
+    }
+    toast((opts.done || '完成了') + '，获得 ' + itemName(opts.out) + ' ×' + (opts.qty || 1) + '。');
+  }
   return ok;
 }
 function millLifeButton(b,site,label,opts,apply){b.appendChild(mkBtn(label,'',function(){millLifeAction(site,opts,apply);}));}
@@ -22480,6 +22585,13 @@ window.__MOSS__ = {
   },
   /* openCityService 收的是 interactable 对象（读 it.service），不是 service 字符串 */
   devOpenService: function (service) { openCityService({ kind: 'cityService', service: service }); },
+  /* R5-0 票据报价与批次账本：用例从这里读同一份规则，不在测试里重写价格 */
+  BILL_QUOTES: BILL_QUOTES,
+  BILL_IDS: BILL_IDS,
+  billPledgeValue: billPledgeValue,
+  billRedeemable: billRedeemable,
+  billMaturityWait: billMaturityWait,
+  billLotsSync: billLotsSync,
   get game() { return Game; },
   get ui() { return UI; },
   get cam() { return cam; },
