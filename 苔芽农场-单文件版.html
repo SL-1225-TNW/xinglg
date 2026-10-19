@@ -1415,7 +1415,183 @@ var ITEMS = {
   compost:      { name: '熟肥',     kind: 'material', sell: 2, desc: '由堆肥箱沤出的肥料，给田地补回肥力（每份 +8）。' }
 };
 
-/* R5-0 票据单一权威报价表。
+/* R5-C 有限信用合同：一份市立小额周转贷。
+ * 只做本金、期限、利息、偿还、逾期和一次协商，不做宏观市场，也不铺第二张合同。
+ * 放款不是收入：它只是把将来要还的钱提前放到账上，日结算的收入账不会记它。
+ * 合同的钱只往一个方向走 —— 放款 +N，还款 −M，且 M ≥ N，差额就是利息。
+ * ============================================================ */
+var CREDIT_PRINCIPAL = 300;
+var CREDIT_RATE = 0.15;
+var CREDIT_DAYS = 14;
+var CREDIT_LATE_PER_DAY = 2;
+var CREDIT_LATE_CAP = 40;
+var CREDIT_DEFAULT_DAYS = 7;
+var CREDIT_RENEGOTIATE_RATE = 0.21;
+var CREDIT_RENEGOTIATE_DAYS = 7;
+/* 只有这些能抵债：原料与石料，不动票据、作物与设备，免得一次违约把家底抄空 */
+var CREDIT_SEIZABLE = ['gem', 'stone_block', 'iron_ingot', 'copper_ingot', 'limestone', 'hardwood', 'plank', 'timber'];
+function newCredit() {
+  return { status: 'none', principal: 0, rate: CREDIT_RATE, startDay: 0, dueDay: 0, dueTotal: 0,
+    paid: 0, lateDays: 0, lateFee: 0, lastCheckDay: 0, renegotiated: false, seized: [], tx: [] };
+}
+function normalizeCredit(raw) {
+  var c = newCredit();
+  if (!raw || typeof raw !== 'object') return c;
+  c.status = ['none', 'active', 'default'].indexOf(raw.status) >= 0 ? raw.status : 'none';
+  c.principal = Math.min(1000000, Math.max(0, isInt(raw.principal) ? raw.principal : 0));
+  /* 利率只接受 0—50% 之间的实数，超界就退回标准利率，不把坏档当成超高息合同 */
+  c.rate = (isFinite(raw.rate) && raw.rate > 0 && raw.rate <= 0.5) ? raw.rate : CREDIT_RATE;
+  ['startDay', 'dueDay', 'lastCheckDay'].forEach(function (k) { c[k] = isInt(raw[k]) ? clamp(raw[k], 0, 1000000) : 0; });
+  c.dueTotal = isInt(raw.dueTotal) ? Math.max(0, raw.dueTotal) : 0;
+  c.paid = Math.min(1000000, Math.max(0, isInt(raw.paid) ? raw.paid : 0));
+  c.lateDays = Math.min(100000, Math.max(0, isInt(raw.lateDays) ? raw.lateDays : 0));
+  c.lateFee = Math.min(CREDIT_LATE_CAP, Math.max(0, isInt(raw.lateFee) ? raw.lateFee : 0));
+  c.renegotiated = !!raw.renegotiated;
+  c.seized = Array.isArray(raw.seized) ? raw.seized.filter(function (s) {
+    return s && ITEMS[s.id] && isInt(s.qty) && s.qty > 0;
+  }).slice(0, 12).map(function (s) {
+    return { id: s.id, qty: Math.min(999, s.qty), day: isInt(s.day) ? clamp(s.day, 0, 1000000) : 0 };
+  }) : [];
+  c.tx = Array.isArray(raw.tx) ? raw.tx.filter(function (t) { return t && typeof t === 'object' && isInt(t.amt); })
+    .slice(-40).map(function (t) {
+      return { tx: String(t.tx || '').slice(0, 48), kind: String(t.kind || '').slice(0, 16), amt: t.amt, day: isInt(t.day) ? clamp(t.day, 0, 1000000) : 0, note: String(t.note || '').slice(0, 60) };
+    }) : [];
+  /* 自洽：没放款的档不该留着还款日与罚息；欠款不得低于本金 */
+  if (c.status === 'none') { c.dueDay = 0; c.dueTotal = 0; c.lateDays = 0; c.lateFee = 0; c.paid = 0; c.renegotiated = false; }
+  if (c.dueTotal < c.principal) c.dueTotal = c.principal;
+  return c;
+}
+function creditState() { var e = exploreState(); if (!e.credit || typeof e.credit !== 'object') e.credit = newCredit(); return e.credit; }
+function creditTx(kind, amt, note) {
+  var c = creditState();
+  c.tx.push({ tx: 'credit:' + kind + ':d' + state.totalDay + ':#' + (c.tx.length + 1), kind: kind, amt: amt, day: state.totalDay, note: note || '' });
+  if (c.tx.length > 40) c.tx.splice(0, c.tx.length - 40);
+}
+/* 当前欠款 = 本金 + 利息 + 罚息 − 已还；永远不小于本金，不允许凭空归零 */
+function creditDebt(c) {
+  c = c || creditState();
+  return Math.max(c.principal, c.dueTotal + c.lateFee - c.paid);
+}
+/* 逾期天数由日期派生，不靠计时器；同一天重复调用不会重复计罚息 */
+function creditTick() {
+  var c = creditState();
+  if (c.status === 'none' || !c.dueDay) return c;
+  if (state.totalDay > c.lastCheckDay) {
+    c.lateDays = Math.max(0, state.totalDay - c.dueDay);
+    c.lateFee = Math.min(CREDIT_LATE_CAP, c.lateDays * CREDIT_LATE_PER_DAY);
+    if (c.lateDays >= CREDIT_DEFAULT_DAYS && c.status === 'active') c.status = 'default';
+    c.lastCheckDay = state.totalDay;
+  }
+  /* 违约扣押一次就够：按欠款从可抵债清单里取最贵的一件，不清空玩家整包。
+     已经扣过就不再扣 —— 反复开银行不能变成连续抄家。 */
+  if (c.status === 'default' && c.lateDays >= CREDIT_DEFAULT_DAYS && !c.seized.length) creditSeizeOnce();
+  return c;
+}
+function creditSeizeOnce() {
+  var c = creditState();
+  var debt = creditDebt(c);
+  for (var i = 0; i < CREDIT_SEIZABLE.length; i++) {
+    var id = CREDIT_SEIZABLE[i], n = invCount(id);
+    if (!n) continue;
+    var value = (ITEMS[id].sell || 0);
+    if (value <= 0) continue;
+    var take = Math.min(n, Math.max(1, Math.ceil(debt / value)));
+    invRemove(id, take);
+    c.seized.push({ id: id, qty: take, day: state.totalDay });
+    creditTx('seize', -value * take, '违约扣押 ' + itemName(id) + ' ×' + take);
+    return true;
+  }
+  return false;
+}
+function creditTake() {
+  var c = creditState();
+  if (c.status !== 'none') return false;
+  var due = Math.round(CREDIT_PRINCIPAL * (1 + CREDIT_RATE));
+  c.status = 'active';
+  c.principal = CREDIT_PRINCIPAL; c.rate = CREDIT_RATE;
+  c.startDay = state.totalDay; c.dueDay = state.totalDay + CREDIT_DAYS;
+  c.dueTotal = due; c.paid = 0; c.lateDays = 0; c.lateFee = 0;
+  c.lastCheckDay = state.totalDay; c.renegotiated = false;
+  state.coins += CREDIT_PRINCIPAL;
+  creditTx('draw', CREDIT_PRINCIPAL, '市立小额周转贷放款');
+  toast('放款 ' + CREDIT_PRINCIPAL + ' 金，第 ' + c.dueDay + ' 天前归还 ' + due + ' 金。放款不算收入。');
+  markDirty();
+  return true;
+}
+/* 一次性还清：还清就把合同归档，扣押物退还 */
+function creditRepay() {
+  creditTick();
+  var c = creditState();
+  if (c.status === 'none') return false;
+  var debt = creditDebt(c);
+  if (!payExplore({ coins: debt })) return false;
+  c.paid += debt;
+  state.coins = state.coins;              // payExplore 已扣款，这里只登记账
+  creditTx('repay', -debt, '一次性还清本金与利息');
+  var back = c.seized.splice(0, c.seized.length);
+  back.forEach(function (s) { invAdd(s.id, s.qty); });
+  c.status = 'none'; c.principal = 0; c.dueTotal = 0; c.paid = 0; c.lateFee = 0; c.lateDays = 0;
+  c.dueDay = 0; c.renegotiated = false; c.lastCheckDay = 0;
+  toast('合同结清，' + (back.length ? '扣押物已归还。' : ''));
+  markDirty();
+  return true;
+}
+/* 一次协商：展期 7 天，利息上浮到 21%。用过就没有第二次。 */
+function creditRenegotiate() {
+  creditTick();
+  var c = creditState();
+  if (c.status === 'none' || c.renegotiated) return false;
+  c.renegotiated = true;
+  c.rate = CREDIT_RENEGOTIATE_RATE;
+  c.dueTotal = Math.round(c.principal * (1 + CREDIT_RENEGOTIATE_RATE));
+  c.dueDay = state.totalDay + CREDIT_RENEGOTIATE_DAYS;
+  c.lateDays = 0; c.lateFee = 0; c.lastCheckDay = state.totalDay;
+  creditTx('renegotiate', 0, '一次协商：展期 ' + CREDIT_RENEGOTIATE_DAYS + ' 天，利息 ' + Math.round(CREDIT_RENEGOTIATE_RATE * 100) + '%');
+  toast('谈成一次展期：第 ' + c.dueDay + ' 天前还 ' + c.dueTotal + ' 金。只能谈这一次。');
+  markDirty();
+  return true;
+}
+/* ---------- 银行窗口里的合同面板 ---------- */
+function creditPanel(b) {
+  var c = creditTick();
+  var box = el('div', 'panel-box');
+  box.appendChild(el('div', 'section-title', '市立小额周转贷'));
+  if (c.status === 'none') {
+    box.appendChild(el('p', 'muted', '本金 ' + CREDIT_PRINCIPAL + ' 金，期限 ' + CREDIT_DAYS + ' 天，利息 ' +
+      Math.round(CREDIT_RATE * 100) + '%，到期一次还清 ' + Math.round(CREDIT_PRINCIPAL * (1 + CREDIT_RATE)) +
+      ' 金。逾期每天加 ' + CREDIT_LATE_PER_DAY + ' 金罚息（封顶 ' + CREDIT_LATE_CAP + ' 金），逾期满 ' +
+      CREDIT_DEFAULT_DAYS + ' 天按违约处置。放款不是收入，是借来的钱。'));
+    box.appendChild(el('p', 'muted', '手上没有别的钱时它能救一个急，但要先想清楚第 ' + CREDIT_DAYS + ' 天拿什么还。'));
+    box.appendChild(mkBtn('申请周转贷 · 本金 ' + CREDIT_PRINCIPAL + ' 金 · 30分钟', '', function () {
+      creditTake(); refreshWindow();
+    }));
+    b.appendChild(box);
+    return;
+  }
+  var debt = creditDebt(c);
+  box.appendChild(el('p', 'req-chip' + (c.status === 'default' ? '' : ' ok'),
+    (c.status === 'default' ? '违约处置中' : '在贷') + ' · 第 ' + c.startDay + ' 天放款 · 第 ' + c.dueDay +
+    ' 天到期 · 还欠 ' + debt + ' 金'));
+  box.appendChild(el('p', null, '本金 ' + c.principal + ' 金，利息 ' + Math.round(c.rate * 100) + '%，' +
+    '到期应付 ' + c.dueTotal + ' 金，已还 ' + c.paid + ' 金，罚息 ' + c.lateFee + ' 金。' +
+    (c.lateDays > 0 ? '已逾期 ' + c.lateDays + ' 天。' : '还有 ' + Math.max(0, c.dueDay - state.totalDay) + ' 天到期。')));
+  if (c.seized.length) box.appendChild(el('p', 'muted', '违约扣押：' + c.seized.map(function (s) { return itemName(s.id) + ' ×' + s.qty; }).join('、') + '。还清合同后原物归还。'));
+  if (c.lateDays > 0) box.appendChild(el('p', 'muted', '罚息按逾期天数累计，封顶 ' + CREDIT_LATE_CAP + ' 金；重复打开面板不会重复计。'));
+  if (c.renegotiated) box.appendChild(el('p', 'muted', '已经协商过一次：展期到第 ' + c.dueDay + ' 天，利息上浮到 ' + Math.round(c.rate * 100) + '%。'));
+  var row = el('div', 'row');
+  row.appendChild(mkBtn('一次性还清 ' + debt + ' 金', '', function () { creditRepay(); refreshWindow(); }));
+  if (!c.renegotiated) {
+    row.appendChild(mkBtn('申请一次协商 · 展期 ' + CREDIT_RENEGOTIATE_DAYS + ' 天 · 利息上浮 · 30分钟', '', function () {
+      creditRenegotiate(); refreshWindow();
+    }));
+  }
+  box.appendChild(row);
+  b.appendChild(box);
+  if (c.tx.length) box.appendChild(el('p', 'muted', '最近流水：' + c.tx.slice(-4).map(function (t) {
+    return '第' + t.day + '天 ' + t.kind + (t.amt ? (t.amt > 0 ? ' +' + t.amt : ' ' + t.amt) : '') + (t.note ? '（' + t.note + '）' : '');
+  }).join('；')));
+}
+/* R5-C 票据单一权威报价表。
  * cost    取得成本的金币当量（含折算的材料），只用来守住不变式
  * coins   实际向玩家收的金币；0 表示靠材料作保，不收现钱
  * face    票面兑付价；term 是兑付期限（天），0 表示随时可兑
@@ -3182,6 +3358,8 @@ function normalizeExploration(raw){
   /* 票据批次与流水：只保留合法票据、合法正整数；坏值整条丢弃，不猜。 */
   e.billLots=[];if(Array.isArray(raw.billLots))e.billLots=raw.billLots.filter(function(l){return l&&BILL_QUOTES[l.item]&&Number.isFinite(l.qty)&&Number.isFinite(l.day)&&l.qty>0&&l.day>=0;}).slice(0,60).map(function(l){return{item:l.item,qty:Math.floor(l.qty),day:Math.floor(l.day)};});
   e.billTx=[];if(Array.isArray(raw.billTx))e.billTx=raw.billTx.filter(function(t){return t&&BILL_QUOTES[t.item]&&Number.isFinite(t.amt);}).slice(-40).map(function(t){return{tx:String(t.tx||''),item:t.item,kind:String(t.kind||''),amt:Math.round(t.amt),day:Math.max(0,Math.floor(num(t.day,0,0,1e6))),src:String(t.src||'')};});
+  /* R5-C：信用合同账。旧档没有这个键就补一份「没借过款」的干净账。 */
+  e.credit=normalizeCredit(raw.credit);
  if(!e.forest){e.mine=false;e.hut=false;}if(!e.mine)e.depth=1;
  ['forest_cache','mine_cache'].forEach(function(k){e.treasures[k]=!!(raw.treasures&&raw.treasures[k]);});
  Object.keys(EXPLORE_NODES).forEach(function(sc){Object.keys(EXPLORE_NODES[sc]).forEach(function(k){var n=EXPLORE_NODES[sc][k],key=sc+':'+k,v=raw.nodes&&raw.nodes[key];if(v&&typeof v==='object')e.nodes[key]={hp:clamp(Math.floor(num(v.hp,n.hp,0,n.hp)),0,n.hp),day:Math.floor(num(v.day,0,0,1e6))};});});return e;
@@ -5767,14 +5945,14 @@ function openCityService(it) {
         });
         b.appendChild(prow);
       }
+      b.appendChild(el('hr'));
+      creditPanel(b);
     }, actions: [{ label: '离开', close: true }] });
     return;
   }
-
   /* ---------- 金融：谷物交易所（行情涨跌，粮食变现主口）---------- */
   if (s === 'exchange') {
-    openWindow({ id: 'city_exchange', kind: 'custom', title: info.name, build: function (b) {
-      b.appendChild(el('p', null, info.desc));
+    openWindow({ id: 'city_exchange', kind: 'custom', title: info.name, build: function (b) {      b.appendChild(el('p', null, info.desc));
       b.appendChild(el('p', 'muted', info.who + '。'));
       b.appendChild(el('p', 'strong', '今日行情'));
       var ex = exploreState();
@@ -8468,6 +8646,9 @@ function performSettlement(auto, innRoom) {
     /* 4. 日期 +1 */
     state.totalDay += 1;
     engDailySafety();
+    /* R5-C：跨日只推进贷款的逾期天数，不在这里自动扣钱——
+       扣押与罚息都由 creditTick 在玩家看到账面前结算一次。 */
+    creditTick();
     /* 安置援助改成有终点的账：前 7 个经营日每天发一次，离农日不发。
        这里是日结算唯一发放点，别处不再重复加。 */
     applySettlementAid(summary);
@@ -22972,6 +23153,14 @@ window.__MOSS__ = {
   /* R5-0 票据报价与批次账本：用例从这里读同一份规则，不在测试里重写价格 */
   BILL_QUOTES: BILL_QUOTES,
   BILL_IDS: BILL_IDS,
+  /* R5-C 信用合同：用例从真实界面点按钮，接口层只用于读同一份账 */
+  CREDIT_PRINCIPAL: CREDIT_PRINCIPAL,
+  CREDIT_RATE: CREDIT_RATE,
+  CREDIT_DAYS: CREDIT_DAYS,
+  creditState: creditState,
+  creditDebt: creditDebt,
+  creditTick: creditTick,
+  normalizeExploration: normalizeExploration,
   billPledgeValue: billPledgeValue,
   billRedeemable: billRedeemable,
   billMaturityWait: billMaturityWait,
