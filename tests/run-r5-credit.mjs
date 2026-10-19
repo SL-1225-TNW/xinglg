@@ -208,24 +208,32 @@ console.log('\n【8】坏档归一化');
 const norm = await p.evaluate(() => {
   const M = __MOSS__;
   const bad = M.normalizeExploration({
-    credit: { status: 'weird', principal: -50, rate: 99, dueDay: 'x', dueTotal: 10, paid: -3,
+    credit: { status: 'default', principal: -50, rate: 99, dueDay: 'x', dueTotal: 10, paid: -3,
       lateDays: -1, lateFee: 999, renegotiated: 'yes',
       seized: [{ id: 'not_an_item', qty: 2 }, { id: 'gem', qty: 3, day: 7 }, null],
       tx: [{ kind: 'draw', amt: 300, day: 1 }, { amt: 'x' }, null] }
   });
+  const badStatus = M.normalizeExploration({ credit: { status: 'weird', seized: [{ id: 'gem', qty: 1, day: 7 }], review: { day: 7, seizeDay: 7 } } });
   const good = M.normalizeExploration({ credit: { status: 'active', principal: 300, rate: 0.15, dueDay: 30, dueTotal: 345, paid: 100 } });
   const empty = M.normalizeExploration({});
   const missing = M.normalizeExploration(undefined);
   const idle = M.normalizeExploration({ credit: { status: 'none', dueDay: 40, dueTotal: 345, paid: 300, lateDays: 5 } });
-  return { bad: bad.credit, good: good.credit, empty: empty.credit, missing: missing.credit, idle: idle.credit, again: M.normalizeExploration({ credit: bad.credit }).credit };
+  return {
+    bad: bad.credit, badStatus: badStatus.credit, good: good.credit,
+    empty: empty.credit, missing: missing.credit, idle: idle.credit,
+    again: M.normalizeExploration({ credit: bad.credit }).credit
+  };
 });
-eq(norm.bad.status, 'none', '非法状态退回未借过款');
+eq(norm.bad.status, 'default', '非法状态退回最接近的处置中状态，不会凭空变成在贷');
 eq(norm.bad.principal, 0, '负本金归零');
 eq(norm.bad.rate, 0.15, '超出范围的利率退回 15%');
 eq(norm.bad.renegotiated, false, '非布尔的协商标记退回 false');
 eq(norm.bad.seized.length, 1, '扣押清单里不存在的物品被丢掉');
 eq(norm.bad.seized[0].id, 'gem', '合法扣押记录保留');
 eq(norm.bad.tx.length, 1, '流水里非数值金额的记录被丢掉');
+eq(norm.badStatus.status, 'none', '完全非法的状态退回没借过款');
+eq(norm.badStatus.seized, [], '没借过款的档不留扣押记录');
+eq(norm.badStatus.review, null, '没借过款的档不留复核记录');
 eq(norm.good.status, 'active', '合法在贷档原样保留');
 eq(norm.good.paid, 100, '已还金额原样保留');
 eq(norm.empty.status, 'none', '缺 credit 键时补一份干净账');

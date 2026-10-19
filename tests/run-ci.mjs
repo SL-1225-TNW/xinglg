@@ -52,6 +52,8 @@ const BROWSER = [
   'run-r5-post-term.mjs',
   /* R5-C 有限信用合同：放款不计收入、罚息、违约扣押、一次协商与资金守恒 */
   'run-r5-credit.mjs',
+  /* R5-B 有限复核：只接违约扣押争议，证据、时限、一次复核与有限结果 */
+  'run-r5-review.mjs',
   'run-south-gate.mjs',
   'run-industry.mjs',
   'run-clinic-construction.mjs',
@@ -104,6 +106,7 @@ run('run-r4-legacy-save-single-file', path.join(here, 'run-r4-legacy-save.mjs'),
 run('run-r5-finance-safety-single-file', path.join(here, 'run-r5-finance-safety.mjs'), ['--single-file']);
 run('run-r5-post-term-single-file', path.join(here, 'run-r5-post-term.mjs'), ['--single-file']);
 run('run-r5-credit-single-file', path.join(here, 'run-r5-credit.mjs'), ['--single-file']);
+run('run-r5-review-single-file', path.join(here, 'run-r5-review.mjs'), ['--single-file']);
 
 console.log(failed ? `\n共 ${failed} 项失败。` : '\n两层全部通过。');
 process.exit(failed ? 1 : 0);

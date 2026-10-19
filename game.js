@@ -170,6 +170,109 @@ var ITEMS = {
   compost:      { name: '熟肥',     kind: 'material', sell: 2, desc: '由堆肥箱沤出的肥料，给田地补回肥力（每份 +8）。' }
 };
 
+/* R5-B 有限复核：只接已经落地、已经影响玩家的决定 —— 目前只有 R5-C 的违约扣押。
+ * 证据、时限、一次复核、有限结果四件事都要能复查；
+ * 复核永远不清掉欠款本身，也永远不会凭空发一笔钱。
+ * ============================================================ */
+var REVIEW_WINDOW = 7;        /* 扣押后 7 天内可申请 */
+var REVIEW_DELAY = 3;         /* 受理后第 3 天出结果 */
+var REVIEW_RELIEF_CAP = 20;   /* 罚息减免封顶 20 金 */
+function normalizeCreditReview(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  if (!isInt(raw.day) && !isInt(raw.seizeDay)) return null;
+  var day = isInt(raw.day) ? clamp(raw.day, 0, 1000000) : 0;
+  return {
+    tx: typeof raw.tx === 'string' ? raw.tx.slice(0, 48) : '',
+    day: day,
+    seizeDay: isInt(raw.seizeDay) ? clamp(raw.seizeDay, 0, 1000000) : day,
+    dueDay: isInt(raw.dueDay) ? clamp(raw.dueDay, 0, 1000000) : day,
+    value: isInt(raw.value) ? Math.max(0, raw.value) : 0,
+    debtAt: isInt(raw.debtAt) ? Math.max(0, raw.debtAt) : 0,
+    status: ['filed', 'granted', 'upheld'].indexOf(raw.status) >= 0 ? raw.status : 'filed',
+    decidedDay: isInt(raw.decidedDay) ? clamp(raw.decidedDay, 0, 1000000) : 0,
+    relief: Math.min(REVIEW_RELIEF_CAP, Math.max(0, isInt(raw.relief) ? raw.relief : 0)),
+    reason: typeof raw.reason === 'string' ? raw.reason.slice(0, 80) : ''
+  };
+}
+/* 还有没有可复核的扣押：必须在时限内、这份扣押还没复核过 */
+function creditReviewTarget() {
+  var c = creditTick();
+  if (c.status !== 'default' || !c.seized.length) return null;
+  var s = c.seized[c.seized.length - 1];
+  if (c.review && c.review.seizeDay === s.day) return null;
+  if (state.totalDay - s.day > REVIEW_WINDOW) return null;
+  return s;
+}
+function creditFileReview() {
+  var c = creditTick();
+  var s = creditReviewTarget();
+  if (!s) return false;
+  c.review = {
+    tx: 'review:seize:d' + state.totalDay + ':#' + (c.tx.length + 1),
+    day: state.totalDay, seizeDay: s.day, dueDay: state.totalDay + REVIEW_DELAY,
+    value: (ITEMS[s.id] ? (ITEMS[s.id].sell || 0) : 0) * s.qty,
+    debtAt: creditDebt(c), status: 'filed', decidedDay: 0, relief: 0, reason: ''
+  };
+  creditTx('review', 0, '申请复核第 ' + s.day + ' 天的违约扣押');
+  toast('复核已受理，第 ' + c.review.dueDay + ' 天出结果。');
+  markDirty();
+  return true;
+}
+/* 裁定只有一个客观标准：扣押当日取走的东西是不是超过了当时的欠款。
+   超出的部分退还、罚息减免封顶 ' + REVIEW_RELIEF_CAP + ' 金；没超出就维持原判，理由写清当时那两笔数。 */
+function creditResolveReview() {
+  var c = creditState();
+  var rv = c.review;
+  if (!rv || rv.status !== 'filed' || state.totalDay < rv.dueDay) return null;
+  if (rv.value > rv.debtAt) {
+    rv.status = 'granted'; rv.relief = Math.min(REVIEW_RELIEF_CAP, c.lateFee);
+    c.lateFee = Math.max(0, c.lateFee - rv.relief);
+    var back = c.seized.filter(function (s) { return s.day === rv.seizeDay; });
+    if (back.length) {
+      invAdd(back[0].id, back[0].qty);
+      c.seized = c.seized.filter(function (x) { return x.day !== rv.seizeDay; });
+      rv.reason = '扣押当日取走 ' + rv.value + ' 金，超过当时欠款 ' + rv.debtAt + ' 金：多扣部分原物归还，罚息减免 ' + rv.relief + ' 金，欠款本金不变。';
+    } else {
+      rv.reason = '多扣 ' + (rv.value - rv.debtAt) + ' 金，罚息减免 ' + rv.relief + ' 金，欠款本金不变。';
+    }
+  } else {
+    rv.status = 'upheld'; rv.relief = 0;
+    rv.reason = '扣押当日取走 ' + rv.value + ' 金，未超过当时欠款 ' + rv.debtAt + ' 金：维持原判，罚息不变。';
+  }
+  rv.decidedDay = state.totalDay;
+  creditTx('review_result', 0, rv.status === 'granted' ? '复核成立' : '复核不成立');
+  markDirty();
+  return rv;
+}
+/* 复核只在银行面板里存在一个入口：先结算已有结果，再决定要不要给新申请 */
+function creditReviewPanel(b) {
+  var c = creditState();
+  creditResolveReview();
+  var rv = c.review, s = rv ? null : creditReviewTarget();
+  if (!rv && !s) return;
+  var box = el('div', 'panel-box');
+  box.appendChild(el('div', 'section-title', '违约处置 · 复核'));
+  if (!rv) {
+    box.appendChild(el('p', 'muted', '你对第 ' + s.day + ' 天的扣押有异议，可以在 ' + REVIEW_WINDOW +
+      ' 天内申请一次复核。复核只看一件事：扣押当日取走的东西是不是超过了当时的欠款。'));
+    box.appendChild(el('p', 'req-chip', '证据：第 ' + s.day + ' 天扣押 ' + itemName(s.id) + ' ×' + s.qty +
+      '，当时欠款 ' + creditDebt(c) + ' 金。'));
+    box.appendChild(mkBtn('申请复核 · 30分钟', '', function () { creditFileReview(); refreshWindow(); }));
+    b.appendChild(box);
+    return;
+  }
+  box.appendChild(el('p', 'req-chip' + (rv.status === 'granted' ? ' ok' : ''),
+    rv.status === 'filed' ? '复核已受理' : rv.status === 'granted' ? '复核成立' : '复核不成立'));
+  box.appendChild(el('p', 'muted', '申请日第 ' + rv.day + ' 天，扣押日第 ' + rv.seizeDay + ' 天，结果应在第 ' + rv.dueDay + ' 天给出。'));
+  box.appendChild(el('p', null, '证据：扣押当日取走 ' + rv.value + ' 金，当时欠款 ' + rv.debtAt + ' 金。'));
+  if (rv.status === 'filed') box.appendChild(el('p', 'muted', '还没到出结果的日子；每份扣押只能复核一次。'));
+  else {
+    box.appendChild(el('p', null, '第 ' + rv.decidedDay + ' 天裁定：' + rv.reason));
+    box.appendChild(el('p', 'muted', '复核最多减免 ' + REVIEW_RELIEF_CAP + ' 金罚息，不清欠款本金，也不发钱。'));
+  }
+  b.appendChild(box);
+}
+
 /* R5-C 有限信用合同：一份市立小额周转贷。
  * 只做本金、期限、利息、偿还、逾期和一次协商，不做宏观市场，也不铺第二张合同。
  * 放款不是收入：它只是把将来要还的钱提前放到账上，日结算的收入账不会记它。
@@ -187,7 +290,7 @@ var CREDIT_RENEGOTIATE_DAYS = 7;
 var CREDIT_SEIZABLE = ['gem', 'stone_block', 'iron_ingot', 'copper_ingot', 'limestone', 'hardwood', 'plank', 'timber'];
 function newCredit() {
   return { status: 'none', principal: 0, rate: CREDIT_RATE, startDay: 0, dueDay: 0, dueTotal: 0,
-    paid: 0, lateDays: 0, lateFee: 0, lastCheckDay: 0, renegotiated: false, seized: [], tx: [] };
+    paid: 0, lateDays: 0, lateFee: 0, lastCheckDay: 0, renegotiated: false, seized: [], review: null, tx: [] };
 }
 function normalizeCredit(raw) {
   var c = newCredit();
@@ -201,18 +304,21 @@ function normalizeCredit(raw) {
   c.paid = Math.min(1000000, Math.max(0, isInt(raw.paid) ? raw.paid : 0));
   c.lateDays = Math.min(100000, Math.max(0, isInt(raw.lateDays) ? raw.lateDays : 0));
   c.lateFee = Math.min(CREDIT_LATE_CAP, Math.max(0, isInt(raw.lateFee) ? raw.lateFee : 0));
-  c.renegotiated = !!raw.renegotiated;
+  /* 只认真布尔：坏档里的 "yes"/1 不算已协商过，否则会被字符串永久锁死协商 */
+  c.renegotiated = raw.renegotiated === true;
   c.seized = Array.isArray(raw.seized) ? raw.seized.filter(function (s) {
     return s && ITEMS[s.id] && isInt(s.qty) && s.qty > 0;
   }).slice(0, 12).map(function (s) {
     return { id: s.id, qty: Math.min(999, s.qty), day: isInt(s.day) ? clamp(s.day, 0, 1000000) : 0 };
   }) : [];
+  /* R5-B：复核只对已落地的那次扣押有效，缺字段或整条坏掉都退回「没有复核」 */
+  c.review = normalizeCreditReview(raw.review);
   c.tx = Array.isArray(raw.tx) ? raw.tx.filter(function (t) { return t && typeof t === 'object' && isInt(t.amt); })
     .slice(-40).map(function (t) {
       return { tx: String(t.tx || '').slice(0, 48), kind: String(t.kind || '').slice(0, 16), amt: t.amt, day: isInt(t.day) ? clamp(t.day, 0, 1000000) : 0, note: String(t.note || '').slice(0, 60) };
     }) : [];
   /* 自洽：没放款的档不该留着还款日与罚息；欠款不得低于本金 */
-  if (c.status === 'none') { c.dueDay = 0; c.dueTotal = 0; c.lateDays = 0; c.lateFee = 0; c.paid = 0; c.renegotiated = false; }
+  if (c.status === 'none') { c.dueDay = 0; c.dueTotal = 0; c.lateDays = 0; c.lateFee = 0; c.paid = 0; c.renegotiated = false; c.seized = []; c.review = null; }
   if (c.dueTotal < c.principal) c.dueTotal = c.principal;
   return c;
 }
@@ -287,6 +393,10 @@ function creditRepay() {
   back.forEach(function (s) { invAdd(s.id, s.qty); });
   c.status = 'none'; c.principal = 0; c.dueTotal = 0; c.paid = 0; c.lateFee = 0; c.lateDays = 0;
   c.dueDay = 0; c.renegotiated = false; c.lastCheckDay = 0;
+  /* 合同结清＝争议一并了结：复核记录不再挂在已归档的合同上，
+     裁定结果保留在 credit.tx 流水里，随时可查。 */
+  if (c.review) creditTx('review_closed', 0, c.review.status === 'granted' ? '结清前复核成立' : (c.review.status === 'upheld' ? '结清前复核不成立' : '结清前复核未出结果'));
+  c.review = null;
   toast('合同结清，' + (back.length ? '扣押物已归还。' : ''));
   markDirty();
   return true;
@@ -4702,6 +4812,7 @@ function openCityService(it) {
       }
       b.appendChild(el('hr'));
       creditPanel(b);
+      creditReviewPanel(b);
     }, actions: [{ label: '离开', close: true }] });
     return;
   }
@@ -21915,6 +22026,7 @@ window.__MOSS__ = {
   creditState: creditState,
   creditDebt: creditDebt,
   creditTick: creditTick,
+  creditReviewTarget: creditReviewTarget,
   normalizeExploration: normalizeExploration,
   billPledgeValue: billPledgeValue,
   billRedeemable: billRedeemable,
