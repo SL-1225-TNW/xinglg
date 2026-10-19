@@ -179,6 +179,27 @@ eq(norm.idle.review, null, '没借过款的档不留复核记录');
 
 /* ---------- 8. 存档往返 ---------- */
 console.log('\n【8】存档往返');
+await defaulted({ gem: 50 });
+const originalDebt = await debt();
+const originalSeizure = (await credit()).seized[0];
+await setDay(originalSeizure.day + 2);
+await openBank(); await click(/申请复核/);
+eq((await credit()).review.debtAt, originalDebt, '延后申请仍使用扣押当日欠款，不使用申请日增长的罚息');
+await setDay((await credit()).review.dueDay);
+await openBank();
+eq((await credit()).review.status, 'granted', '超额扣押裁定成立');
+const returned = await inv('gem');
+const reliefGranted = (await credit()).review.relief;
+await setDay((await credit()).dueDay + 30);
+await openBank(); await openBank();
+eq(await inv('gem'), returned, '复核退还后跨日重开银行不会再次扣押');
+eq((await credit()).lateFee, 40 - reliefGranted, '裁定减免跨日持续有效');
+await p.evaluate(() => __MOSS__.saveNow());
+await p.reload(); await p.waitForFunction(() => !!window.__MOSS__);
+await p.locator('.boot-actions button').first().click();
+await p.waitForFunction(() => window.__MOSS__.state && document.getElementById('boot').hidden);
+await openBank();
+eq(await inv('gem'), returned, '退还后读档仍不会再次扣押');
 await defaulted({ iron_ingot: 2 });
 await openBank(); await click(/申请复核/);
 await setDay((await credit()).review.dueDay);

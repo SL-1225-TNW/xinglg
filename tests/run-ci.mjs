@@ -54,13 +54,29 @@ const BROWSER = [
   'run-r5-credit.mjs',
   /* R5-B 有限复核：只接违约扣押争议，证据、时限、一次复核与有限结果 */
   'run-r5-review.mjs',
+  /* R5-D 军事权限整理：授权链唯一事实、越权可读拒绝、点名与风险预览、旧档不提权不降权 */
+  'run-r5-military.mjs',
+  /* R5 自然入口：从 M 地图/真实门口/按 E 走到银行柜台、水利控制室、营地登记点，
+     不调用 devOpenService / devSwitchScene / devOpenBorder（审查报告第五节第 3 条） */
+  'run-r5-natural-entry.mjs',
+  /* R5 触屏：390×844 竖屏 + 触摸输入走完同三条路径（审查报告第五节第 4 条） */
+  'run-r5-mobile-touch.mjs',
+  /* 探索线：森林/矿山三道闸门、三层矿洞、采集再生、存档重载与钢制工具，
+     脚本内部自带 index.html + 单文件版两轮 */
+  'run-exploration.mjs',
+  /* 探索线手机端：390×844 竖屏 + 触摸闸门与矿洞渲染 */
+  'run-exploration-mobile.mjs',
   'run-south-gate.mjs',
   'run-industry.mjs',
   'run-clinic-construction.mjs',
   'run-construction-completion.mjs',
   'run-construction-saves.mjs',
   'run-v3.mjs', 'run-guide.mjs',
-  'run-edge.mjs', 'run-main.mjs', 'run-responsive-layout.mjs'
+  'run-edge.mjs', 'run-main.mjs', 'run-responsive-layout.mjs',
+  /* 界面与手感：快捷栏、窗口、触屏布局与字号 */
+  'run-ui.mjs',
+  /* 农场手感的修复回归：铲除改种、委托方向指示、分页结算与收成记录 */
+  'run-fixes.mjs'
 ].filter((f) => fs.existsSync(path.join(here, f)));
 
 let failed = 0;
@@ -107,6 +123,10 @@ run('run-r5-finance-safety-single-file', path.join(here, 'run-r5-finance-safety.
 run('run-r5-post-term-single-file', path.join(here, 'run-r5-post-term.mjs'), ['--single-file']);
 run('run-r5-credit-single-file', path.join(here, 'run-r5-credit.mjs'), ['--single-file']);
 run('run-r5-review-single-file', path.join(here, 'run-r5-review.mjs'), ['--single-file']);
+run('run-r5-military-single-file', path.join(here, 'run-r5-military.mjs'), ['--single-file']);
+run('run-r5-natural-entry-single-file', path.join(here, 'run-r5-natural-entry.mjs'), ['--single-file']);
+run('run-r5-mobile-touch-single-file', path.join(here, 'run-r5-mobile-touch.mjs'), ['--single-file']);
+run('run-fixes-single-file', path.join(here, 'run-fixes.mjs'), ['--single-file']);
 
 console.log(failed ? `\n共 ${failed} 项失败。` : '\n两层全部通过。');
 process.exit(failed ? 1 : 0);

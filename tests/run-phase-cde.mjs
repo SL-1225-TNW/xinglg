@@ -117,7 +117,9 @@ try {
   eq('机构军费与个人金币分账', await evaluate(() => [__MOSS__.militaryLifeState().institutionFund, __MOSS__.state.inventory.military_rations]), [90, 4]);
   await pose('border_barracks', 16, 7); await panel('openMilitarySite', 'campaign'); await click('签收七日巡防委任 · 开始任务');
   await pose('cloud_pass', 17, 17); await panel('openMilitarySite', 'pass_route'); await click('沿山脊巡查 · 记录高处桥面 · 20分钟');
-  eq('侦察后部队真实部署在关口且保留审计路簿', await evaluate(() => [__MOSS__.militaryLifeState().unit.scene, __MOSS__.state.inventory.route_evidence]), ['pass', 2]);
+  eq('侦察只留审计路簿，部队仍按名册留在营地', await evaluate(() => [__MOSS__.militaryLifeState().unit.scene, __MOSS__.state.inventory.route_evidence]), ['camp', 2]);
+  await night(); await pose('border_barracks', 16, 7); await panel('openMilitarySite', 'campaign'); await click('点名并部署到云峰关口 · 20分钟');
+  eq('点名之后部队才真实部署到关口，并记下投入人数', await evaluate(() => { const c = __MOSS__.militaryLifeState().campaign; return [__MOSS__.militaryLifeState().unit.scene, c.musterDay > 0, c.mustered]; }), ['pass', true, 8]);
   await night(); await pose('border_barracks', 16, 7); await panel('openMilitarySite', 'campaign'); await click('准备医疗护送 · 草药包 ×1／口粮 ×2');
   await night(); await pose('border_barracks', 16, 7); await panel('openMilitarySite', 'campaign'); await click('掩护居民与医帐撤离 · 规则裁判');
   const battle = await evaluate(() => __MOSS__.militaryLifeState().campaign.battle);

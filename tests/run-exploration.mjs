@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict';
-import path from 'node:path';import {pathToFileURL}from'node:url';
+import path from 'node:path';
+import{pathToFileURL,fileURLToPath}from'node:url';
 import{launch,boot,walkTo}from'./harness.mjs';
+/* 截图目录与游戏入口都按本文件定位：run-ci 用 tests/ 作 cwd，
+   相对路径会去找 tests/index.html 并在 tests/ 下生成 output 副本 */
+const ROOT=path.join(path.dirname(fileURLToPath(import.meta.url)),'..');
+const SHOT=(name)=>path.join(ROOT,'output','playwright',name);
 for(const file of ['index.html','苔芽农场-单文件版.html']){
-const{browser,page,errors}=await launch({url:pathToFileURL(path.resolve(file)).href});
+const{browser,page,errors}=await launch({url:pathToFileURL(path.join(ROOT,file)).href});
 const pose=async(sc,x,y)=>{await page.evaluate(({sc,x,y})=>{let m=__MOSS__;m.state.sceneId=sc;m.state.player={x,y,face:'up'};m.game.fishing=null;m.state.energy=100;m.startGame(m.state);},{sc,x,y});};
 const repair=async()=>{await page.getByRole('button',{name:'确认修复 / 升级',exact:true}).click();};
 try{
@@ -16,7 +21,7 @@ assert(await walkTo(page,30,5));await page.keyboard.press('e');await repair();as
 await page.keyboard.press('e');await page.waitForFunction(()=>__MOSS__.state.sceneId==='mine1');await page.waitForTimeout(300);
 assert(await walkTo(page,4,4));
 for(let i=0;i<3;i++)assert(await page.evaluate(()=>__MOSS__.useTool('pickaxe',4,3)));
-assert.equal(await page.evaluate(()=>__MOSS__.state.inventory.copper_ore),3);
+assert.equal(await page.evaluate(()=>__MOSS__.state.inventory.copper_ore),4); // R2 把 mine1 (4,3) 设为 rich 矿点，qty 4
 await page.evaluate(()=>{__MOSS__.state.inventory.hardwood=20;__MOSS__.state.inventory.copper_ore=20;});
 assert(await walkTo(page,22,4));await page.keyboard.press('e');await page.getByRole('button',{name:'修复轨道',exact:true}).click();await page.waitForFunction(()=>__MOSS__.state.sceneId==='mine2');await page.waitForTimeout(300);
 assert.equal(await page.evaluate(()=>__MOSS__.exploreState().depth),2);
@@ -34,6 +39,6 @@ await pose('forest',3,7);await page.evaluate(()=>__MOSS__.state.inventory.tool_r
 await pose('forest',23,11);await page.keyboard.press('e');await repair();await page.evaluate(()=>__MOSS__.state.inventory.mushroom=5);await page.keyboard.press('e');let before=await page.evaluate(()=>__MOSS__.state.coins);await page.getByRole('button',{name:'交付补给',exact:true}).click();assert.equal(await page.evaluate(()=>__MOSS__.state.coins),before+100);await page.getByRole('button',{name:'交付补给',exact:true}).click();assert.equal(await page.evaluate(()=>__MOSS__.state.coins),before+100);await page.keyboard.press('Escape');
 await pose('forest',37,24);await page.keyboard.press('e');before=await page.evaluate(()=>__MOSS__.state.coins);await page.keyboard.press('e');assert.equal(await page.evaluate(()=>__MOSS__.state.coins),before);
 await pose('town',20,8);await page.keyboard.press('e');await page.getByRole('button',{name:'升级钢制斧头与镐子',exact:true}).click();await repair();assert.equal(await page.evaluate(()=>__MOSS__.exploreState().tools),true);
-await pose('forest',14,16);await page.screenshot({path:'/tmp/explore-forest.png'});await pose('mine3',13,12);await page.screenshot({path:'/tmp/explore-mine.png'});
+await pose('forest',14,16);await page.screenshot({path:SHOT('explore-forest.png')});await pose('mine3',13,12);await page.screenshot({path:SHOT('explore-mine.png')});
 assert.equal(errors.length,0,errors.join('\n'));console.log('PASS',file,'gates, walking, 3 floors, gathering, return routes, save reload, regen, fishing, daily request, treasure, steel tools');
 }finally{await browser.close();}}

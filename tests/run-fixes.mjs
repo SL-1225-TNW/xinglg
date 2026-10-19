@@ -1,9 +1,12 @@
-/* 修复回归：独立浏览器、明确的边界夹具，操作经真实键盘/按钮完成。 */
+/* 修复回归：独立浏览器、明确的边界夹具，操作经真实键盘/按钮完成。
+   node run-fixes.mjs              —— 跑源码入口 index.html
+   node run-fixes.mjs --single-file —— 跑打包产物 苔芽农场-单文件版.html */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {launch, boot, GAME_URL, snap, lastToast, hud, winOpen, winTitle, winText, clickWin, closeWin} from './harness.mjs';
 
-const {browser, page, errors} = await launch();
+const single = process.argv.includes('--single-file');
+const {browser, page, errors} = await launch(single ? {url: new URL('../苔芽农场-单文件版.html', import.meta.url).href} : {});
 let passed = 0;
 function eq(name, actual, expected) {
   assert.deepEqual(actual, expected, name);
@@ -206,16 +209,27 @@ try {
   await page.evaluate(() => window.__MOSS__.performSettlement(false));
   await page.waitForTimeout(300);
   eq('结算窗标题写着第几天结束', /天结束/.test(await winTitle(page)), true);
-  eq('第一页标出出货收入', new RegExp(income + ' 金').test(await winText(page)), true);
-  await clickWin(page, '开始新的一天');
-  eq('点继续进入第二页', /田里的变化/.test(await winText(page)), true);
-  eq('第二页记下成熟了几株', /萝卜 今天长熟了/.test(await winText(page)), true);
-  eq('第二页不残留对象字面量', /\[object Object\]/.test(await winText(page)), false);
-  await clickWin(page, '开始新的一天');
-  eq('第三页报告果酱加工', /果酱罐/.test(await winText(page)), true);
-  await clickWin(page, '开始新的一天');
-  eq('最后一页讲天气与明天', /天气与明天/.test(await winText(page)), true);
-  await clickWin(page, '开始新的一天');
+  /* 顶部的分页网格会把每一页的标题都印进 win-body，所以逐页断言只能读当前页的 section-title 与正文；
+     真实结算页数随当天发生的系统事件变化（肥力、草甸、边境…），这里按窗内实际页数走，不写死 4 页。 */
+  const curTitle = () => page.locator('.win-body .section-title').innerText();
+  const curText = () => page.locator('.win-body .panel-box').innerText();
+  const totalPages = Number((await winTitle(page)).match(/\/\s*(\d+)$/)[1]);
+  eq('结算页数可数且至少四页', totalPages >= 4, true);
+  eq('第一页标出出货收入', new RegExp(income + ' 金').test(await curText()), true);
+  const seen = [];
+  for (let i = 0; i < totalPages; i++) {
+    seen.push(await curTitle());
+    if (i === 1) {
+      eq('第二页记下成熟了几株', /萝卜 今天长熟了/.test(await curText()), true);
+      eq('第二页不残留对象字面量', /\[object Object\]/.test(await curText()), false);
+    }
+    /* 每一页（含最后一页）都点一次「开始新的一天」：最后一页这一下负责关窗。 */
+    await clickWin(page, '开始新的一天');
+  }
+  eq('点继续进入第二页', seen[1], '田里的变化');
+  eq('果酱加工单独成页', seen.includes('果酱罐'), true);
+  eq('肥力页排在果酱页之前', !seen.includes('土壤肥力') || seen.indexOf('土壤肥力') < seen.indexOf('果酱罐'), true);
+  eq('最后一页讲天气与明天', seen[seen.length - 1], '天气与明天');
   eq('看完最后一页窗口关闭', await winOpen(page), false);
   s = await snap(page);
   eq('结算包含出货收入和每日五十金补助', [s.shipping, s.coins, s.day], [{}, preSettle.coins + income + 50, today + 1]);
@@ -227,5 +241,5 @@ try {
   await closeWin(page);
 
   eq('回归全过程无控制台错误', errors, []);
-  console.log(`\n修复回归 ${passed}/${passed} 通过。`);
+  console.log(`\n修复回归 ${passed}/${passed} 通过${single ? '（单文件版）' : ''}。`);
 } finally { await browser.close(); }

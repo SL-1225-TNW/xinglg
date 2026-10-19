@@ -1,4 +1,6 @@
-import assert from 'node:assert/strict';import{launch,boot}from'./harness.mjs';
+import assert from 'node:assert/strict';import path from 'node:path';import{fileURLToPath}from'node:url';import{launch,boot}from'./harness.mjs';
+/* 截图目录按本文件定位：run-ci 用 tests/ 作 cwd，相对路径会在 tests/ 下生成副本 */
+const SHOT=(name)=>path.join(path.dirname(fileURLToPath(import.meta.url)),'..','output','playwright',name);
 const{browser,page,errors}=await launch({viewport:{width:390,height:844},touch:true});
 try{
  await boot(page);await page.locator('#tutorialSkip').click();
@@ -6,8 +8,8 @@ try{
  await page.locator('#touchAct').tap();
  await page.getByRole('button',{name:'确认修复 / 升级',exact:true}).click();assert.equal(await page.evaluate(()=>__MOSS__.exploreState().forest),true);
  await page.evaluate(()=>__MOSS__.openExploreSite('forest'));await page.waitForFunction(()=>__MOSS__.state.sceneId==='forest');await page.waitForTimeout(300);
- await page.screenshot({path:'/tmp/explore-mobile.png'});
+ await page.screenshot({path:SHOT('explore-mobile.png')});
  await page.evaluate(()=>{let m=__MOSS__;m.state.player={x:30,y:5,face:'up'};m.startGame(m.state);});await page.locator('#touchAct').tap();await page.getByRole('button',{name:'确认修复 / 升级',exact:true}).click();assert.equal(await page.evaluate(()=>__MOSS__.exploreState().mine),true);
- await page.evaluate(()=>__MOSS__.openExploreSite('mine'));await page.waitForFunction(()=>__MOSS__.state.sceneId==='mine1');await page.waitForTimeout(300);await page.screenshot({path:'/tmp/explore-mobile-mine.png'});
+ await page.evaluate(()=>__MOSS__.openExploreSite('mine'));await page.waitForFunction(()=>__MOSS__.state.sceneId==='mine1');await page.waitForTimeout(300);await page.screenshot({path:SHOT('explore-mobile-mine.png')});
  assert.equal(errors.length,0,errors.join('\n'));console.log('PASS phone portrait-lock layout, touch forest gate, touch mine gate, mining scene rendering');
 }finally{await browser.close();}

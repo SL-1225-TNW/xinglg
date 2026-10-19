@@ -1456,7 +1456,7 @@ function creditFileReview() {
     tx: 'review:seize:d' + state.totalDay + ':#' + (c.tx.length + 1),
     day: state.totalDay, seizeDay: s.day, dueDay: state.totalDay + REVIEW_DELAY,
     value: (ITEMS[s.id] ? (ITEMS[s.id].sell || 0) : 0) * s.qty,
-    debtAt: creditDebt(c), status: 'filed', decidedDay: 0, relief: 0, reason: ''
+    debtAt: isInt(s.debtAt) ? s.debtAt : creditDebt(c), status: 'filed', decidedDay: 0, relief: 0, reason: ''
   };
   creditTx('review', 0, '申请复核第 ' + s.day + ' 天的违约扣押');
   toast('复核已受理，第 ' + c.review.dueDay + ' 天出结果。');
@@ -1501,7 +1501,7 @@ function creditReviewPanel(b) {
     box.appendChild(el('p', 'muted', '你对第 ' + s.day + ' 天的扣押有异议，可以在 ' + REVIEW_WINDOW +
       ' 天内申请一次复核。复核只看一件事：扣押当日取走的东西是不是超过了当时的欠款。'));
     box.appendChild(el('p', 'req-chip', '证据：第 ' + s.day + ' 天扣押 ' + itemName(s.id) + ' ×' + s.qty +
-      '，当时欠款 ' + creditDebt(c) + ' 金。'));
+      '，当时欠款 ' + (isInt(s.debtAt) ? s.debtAt : creditDebt(c)) + ' 金。'));
     box.appendChild(mkBtn('申请复核 · 30分钟', '', function () { creditFileReview(); refreshWindow(); }));
     b.appendChild(box);
     return;
@@ -1535,7 +1535,7 @@ var CREDIT_RENEGOTIATE_DAYS = 7;
 var CREDIT_SEIZABLE = ['gem', 'stone_block', 'iron_ingot', 'copper_ingot', 'limestone', 'hardwood', 'plank', 'timber'];
 function newCredit() {
   return { status: 'none', principal: 0, rate: CREDIT_RATE, startDay: 0, dueDay: 0, dueTotal: 0,
-    paid: 0, lateDays: 0, lateFee: 0, lastCheckDay: 0, renegotiated: false, seized: [], review: null, tx: [] };
+    paid: 0, lateDays: 0, lateFee: 0, lastCheckDay: 0, renegotiated: false, seizedOnce: false, seized: [], review: null, tx: [] };
 }
 function normalizeCredit(raw) {
   var c = newCredit();
@@ -1554,10 +1554,13 @@ function normalizeCredit(raw) {
   c.seized = Array.isArray(raw.seized) ? raw.seized.filter(function (s) {
     return s && ITEMS[s.id] && isInt(s.qty) && s.qty > 0;
   }).slice(0, 12).map(function (s) {
-    return { id: s.id, qty: Math.min(999, s.qty), day: isInt(s.day) ? clamp(s.day, 0, 1000000) : 0 };
+    var entry = { id: s.id, qty: Math.min(999, s.qty), day: isInt(s.day) ? clamp(s.day, 0, 1000000) : 0 };
+    if (isInt(s.debtAt) && s.debtAt >= 0) entry.debtAt = s.debtAt;
+    return entry;
   }) : [];
   /* R5-B：复核只对已落地的那次扣押有效，缺字段或整条坏掉都退回「没有复核」 */
   c.review = normalizeCreditReview(raw.review);
+  c.seizedOnce = raw.seizedOnce === true || c.seized.length > 0 || !!c.review;
   c.tx = Array.isArray(raw.tx) ? raw.tx.filter(function (t) { return t && typeof t === 'object' && isInt(t.amt); })
     .slice(-40).map(function (t) {
       return { tx: String(t.tx || '').slice(0, 48), kind: String(t.kind || '').slice(0, 16), amt: t.amt, day: isInt(t.day) ? clamp(t.day, 0, 1000000) : 0, note: String(t.note || '').slice(0, 60) };
@@ -1584,17 +1587,19 @@ function creditTick() {
   if (c.status === 'none' || !c.dueDay) return c;
   if (state.totalDay > c.lastCheckDay) {
     c.lateDays = Math.max(0, state.totalDay - c.dueDay);
-    c.lateFee = Math.min(CREDIT_LATE_CAP, c.lateDays * CREDIT_LATE_PER_DAY);
+    var relief = c.review && c.review.status === 'granted' ? c.review.relief : 0;
+    c.lateFee = Math.max(0, Math.min(CREDIT_LATE_CAP, c.lateDays * CREDIT_LATE_PER_DAY) - relief);
     if (c.lateDays >= CREDIT_DEFAULT_DAYS && c.status === 'active') c.status = 'default';
     c.lastCheckDay = state.totalDay;
   }
   /* 违约扣押一次就够：按欠款从可抵债清单里取最贵的一件，不清空玩家整包。
      已经扣过就不再扣 —— 反复开银行不能变成连续抄家。 */
-  if (c.status === 'default' && c.lateDays >= CREDIT_DEFAULT_DAYS && !c.seized.length) creditSeizeOnce();
+  if (c.status === 'default' && c.lateDays >= CREDIT_DEFAULT_DAYS && !c.seizedOnce && !c.seized.length) creditSeizeOnce();
   return c;
 }
 function creditSeizeOnce() {
   var c = creditState();
+  if (c.seizedOnce) return false;
   var debt = creditDebt(c);
   for (var i = 0; i < CREDIT_SEIZABLE.length; i++) {
     var id = CREDIT_SEIZABLE[i], n = invCount(id);
@@ -1603,7 +1608,8 @@ function creditSeizeOnce() {
     if (value <= 0) continue;
     var take = Math.min(n, Math.max(1, Math.ceil(debt / value)));
     invRemove(id, take);
-    c.seized.push({ id: id, qty: take, day: state.totalDay });
+    c.seized.push({ id: id, qty: take, day: state.totalDay, debtAt: debt });
+    c.seizedOnce = true;
     creditTx('seize', -value * take, '违约扣押 ' + itemName(id) + ' ×' + take);
     return true;
   }
@@ -1618,6 +1624,7 @@ function creditTake() {
   c.startDay = state.totalDay; c.dueDay = state.totalDay + CREDIT_DAYS;
   c.dueTotal = due; c.paid = 0; c.lateDays = 0; c.lateFee = 0;
   c.lastCheckDay = state.totalDay; c.renegotiated = false;
+  c.seizedOnce = false; c.seized = []; c.review = null;
   state.coins += CREDIT_PRINCIPAL;
   creditTx('draw', CREDIT_PRINCIPAL, '市立小额周转贷放款');
   toast('放款 ' + CREDIT_PRINCIPAL + ' 金，第 ' + c.dueDay + ' 天前归还 ' + due + ' 金。放款不算收入。');
@@ -3432,7 +3439,9 @@ function normalizeExploration(raw){
    training:Math.floor(num(ml.training,0,0,1e4)),
    drills:Math.floor(num(ml.drills,0,0,1e4)),
    commission:(ml.commission&&typeof ml.commission==='object')
-     ? {role:String(ml.commission.role||'委任'),sinceDay:Math.floor(num(ml.commission.sinceDay,1,1,1e6)),expiresDay:Math.floor(num(ml.commission.expiresDay,1e6,1,1e6))}
+     ? {role:String(ml.commission.role||'委任'),sinceDay:Math.floor(num(ml.commission.sinceDay,1,1,1e6)),expiresDay:Math.floor(num(ml.commission.expiresDay,1e6,1,1e6)),
+        // 旧档没有来源字段，留空即可；milCommissionSource 会按角色名回推。
+        source:(ml.commission.source==='career'||ml.commission.source==='drill')?ml.commission.source:undefined}
      : null,
    units:Array.isArray(ml.units)?ml.units.slice(0,64).map(function(u){
      return {id:String(u.id||''),name:String(u.name||''),type:String(u.type||'infantry'),owner:u.owner==='player'?'player':'npc',
@@ -14506,10 +14515,38 @@ function milCanCommand(m) {
   return milRankIndex(m.rank) >= milRankIndex('squad') && !!m.commission;
 }
 /* 参战权限采用三项检查，不强行再加一个无关的角色等级门槛 */
+/* §26.7 委任是有期限的证件。旧链签的「巡防联络官（临时委任）」与职业链签的
+   「驻地正式委任」写进同一份账本，所以到期判断只能有一份实现。过期不是终局：
+   到期后两处都能重新申请，玩家不会被一把过期的委任永久锁在军事门外。
+   旧档没有 source 字段，按角色名回推：驻地正式委任才是长期岗位委任。 */
+function milCommissionLive(m, day) {
+  var c = m && m.commission;
+  if (!c) return null;
+  return Number.isFinite(c.expiresDay) && c.expiresDay < day ? null : c;
+}
+function milCommissionSource(c) {
+  if (!c) return '';
+  if (c.source === 'career' || c.source === 'drill') return c.source;
+  return c.role === '驻地正式委任' ? 'career' : 'drill';
+}
+function milCommissionLabel(m, day) {
+  var c = milCommissionLive(m, day);
+  if (c) return c.role + '（第 ' + c.sinceDay + ' 天起）';
+  var old = m && m.commission;
+  if (!old) return '无';
+  return old.role + '已到期' + (Number.isFinite(old.expiresDay) ? '（第 ' + old.expiresDay + ' 天）' : '') + '，需重新申请受命';
+}
+/* 伤员至少休息一夜。没有战斗记录的旧档里，伤员按「已经休养过」处理，
+   否则一个 0 战斗记录的满额伤员小队既治不好也出不了兵。 */
+function milLastHurtDay(m) {
+  var r = m && m.battleRecords && m.battleRecords.length ? m.battleRecords[m.battleRecords.length - 1].day : -1;
+  return Number.isFinite(r) ? r : -1;
+}
 function milDeployGate(m) {
   if (!milCanDeploy(m)) return { ok: false, reason: '尚未取得军事资格。普通居民不能进入正式军事战斗；先去山口报名受训。' };
   if (m.training < 1) return { ok: false, reason: '缺少训练记录。受训见习者可以演练，实战还需要完成基础训练。' };
   if (!m.commission) return { ok: false, reason: '本次任务还没有正式委任。资格、训练和委任三者都齐了才能受命。' };
+  if (!milCommissionLive(m, state.totalDay)) return { ok: false, reason: '委任已到期，需重新申请受命后才能行动。' };
   return { ok: true };
 }
 /* §26.1：玩家个人野外武器训练与军事登记分开 */
@@ -14625,10 +14662,10 @@ function openSupplyDepot(it) {
         if (!cloudAt(it)) { toast('请在军需库旁操作。'); return; }
         if (milRankIndex(m.rank) < milRankIndex('member')) { toast('还没有登记队员资格，先去演练场训练。'); return; }
         if (m.training < 1) { toast('缺少训练记录。'); return; }
-        if (m.commission) { toast('你已经有委任了。'); return; }
+        if (milCommissionLive(m, state.totalDay)) { toast('你已经有委任了。'); return; }
         if (!canSpendGameMinutes(60)) return;
         spendGameMinutes(60);
-        m.commission = { role: '巡防联络官（临时委任）', sinceDay: state.totalDay, expiresDay: state.totalDay + 112 };
+        m.commission = { role: '巡防联络官（临时委任）', sinceDay: state.totalDay, expiresDay: state.totalDay + 112, source: 'drill' };
         markDirty(); refreshHud(); saveNow(); refreshWindow();
         toast('取得临时委任：巡防联络官。任期一年（游戏内 112 天）。');
       } },
@@ -20000,7 +20037,7 @@ function normalizeProfessionalLife(raw){var d=newProfessionalLife(),r=raw&&typeo
   d.port.riverContract=rc;
   return d;
 }
-function newMilitaryLife(){return {registered:false,trainingDays:[],qualification:0,rank:'resident',commandLimit:0,appointmentDay:0,unit:{id:'frontier_detail',count:0,wounded:0,training:0,equipment:0,morale:0,supply:0,discipline:0,scene:'camp'},campaign:{active:false,startedDay:0,deadlineDay:0,stage:0,scouted:null,scoutedDay:0,prepared:null,preparedDay:0,battle:null,battleDay:0,reported:false,result:null},battleRecords:[],neighbor:{opened:false,oldroadVerified:false,caseFound:false,evidence:0,choice:null,settled:false,signedDay:0,tradeReceived:false,localContract:false},institutionFund:0,followUpDay:0};}
+function newMilitaryLife(){return {registered:false,trainingDays:[],qualification:0,rank:'resident',commandLimit:0,appointmentDay:0,unit:{id:'frontier_detail',count:0,wounded:0,training:0,equipment:0,morale:0,supply:0,discipline:0,scene:'camp'},campaign:{active:false,startedDay:0,deadlineDay:0,stage:0,scouted:null,scoutedDay:0,prepared:null,preparedDay:0,musterDay:0,mustered:0,battle:null,battleDay:0,reported:false,result:null},battleRecords:[],neighbor:{opened:false,oldroadVerified:false,caseFound:false,evidence:0,choice:null,settled:false,signedDay:0,tradeReceived:false,localContract:false},institutionFund:0,followUpDay:0};}
 function normalizeMilitaryLife(raw){var r=raw&&typeof raw==='object'?raw:{},m=newMilitaryLife();m.registered=!!r.registered;
   m.trainingDays=Array.isArray(r.trainingDays)?r.trainingDays.filter(function(d){return Number.isInteger(d)&&d>0&&d<=100000;}).filter(function(d,i,a){return a.indexOf(d)===i;}).sort(function(a,b){return a-b;}).slice(-12):[];
   m.qualification=clamp(m.trainingDays.length,0,12);
@@ -20008,7 +20045,9 @@ function normalizeMilitaryLife(raw){var r=raw&&typeof raw==='object'?raw:{},m=ne
   var caps={resident:0,patrol:1,squad_leader:12,captain:40,field_commander:150};m.commandLimit=m.registered?Math.min(caps[m.rank],Number.isFinite(r.commandLimit)?Math.max(0,Math.floor(r.commandLimit)):caps[m.rank]):0;
   m.appointmentDay=Number.isFinite(r.appointmentDay)?clamp(Math.floor(r.appointmentDay),0,100000):0;
   var u=r.unit||{},wounded=m.commandLimit?Math.min(m.commandLimit,clamp(Math.floor(u.wounded||0),0,150)):0;m.unit={id:'frontier_detail',count:m.commandLimit?Math.min(Math.max(0,m.commandLimit-wounded),Number.isFinite(u.count)?Math.max(0,Math.floor(u.count)):8):0,wounded:wounded,training:clamp(Math.floor(Number.isFinite(u.training)?u.training:1),0,5),equipment:clamp(Math.floor(Number.isFinite(u.equipment)?u.equipment:1),0,5),morale:clamp(Math.floor(Number.isFinite(u.morale)?u.morale:70),0,100),supply:clamp(Math.floor(Number.isFinite(u.supply)?u.supply:70),0,100),discipline:clamp(Math.floor(Number.isFinite(u.discipline)?u.discipline:75),0,100),scene:['camp','pass','town'].indexOf(u.scene)>=0?u.scene:'camp'};
-  var c=r.campaign||{};m.campaign={active:!!c.active&&!c.reported,startedDay:Math.max(0,Math.floor(c.startedDay||0)),deadlineDay:Math.max(0,Math.floor(c.deadlineDay||0)),stage:clamp(Math.floor(c.stage||0),0,3),scouted:['ridge','river'].indexOf(c.scouted)>=0?c.scouted:null,scoutedDay:Math.max(0,Math.floor(c.scoutedDay||0)),prepared:['escort','bridge'].indexOf(c.prepared)>=0?c.prepared:null,preparedDay:Math.max(0,Math.floor(c.preparedDay||0)),battle:c.battle&&typeof c.battle==='object'&&c.battle.input?(function(){try{return replayMilitaryBattle(c.battle.input);}catch(e){return null;}})():null,battleDay:Math.max(0,Math.floor(c.battleDay||0)),reported:!!c.reported,result:['success','partial','withdrawn'].indexOf(c.result)>=0?c.result:null};
+  var c=r.campaign||{};m.campaign={active:!!c.active&&!c.reported,startedDay:Math.max(0,Math.floor(c.startedDay||0)),deadlineDay:Math.max(0,Math.floor(c.deadlineDay||0)),stage:clamp(Math.floor(c.stage||0),0,3),scouted:['ridge','river'].indexOf(c.scouted)>=0?c.scouted:null,scoutedDay:Math.max(0,Math.floor(c.scoutedDay||0)),prepared:['escort','bridge'].indexOf(c.prepared)>=0?c.prepared:null,preparedDay:Math.max(0,Math.floor(c.preparedDay||0)),
+    /* 旧档没有点名事实，一律按「尚未点名」处理：不追溯部署，也不凭空发部队。 */
+    musterDay:Math.max(0,Math.floor(c.musterDay||0)),mustered:clamp(Math.floor(c.mustered||0),0,150),battle:c.battle&&typeof c.battle==='object'&&c.battle.input?(function(){try{return replayMilitaryBattle(c.battle.input);}catch(e){return null;}})():null,battleDay:Math.max(0,Math.floor(c.battleDay||0)),reported:!!c.reported,result:['success','partial','withdrawn'].indexOf(c.result)>=0?c.result:null};
   m.battleRecords=Array.isArray(r.battleRecords)?r.battleRecords.filter(function(x){return x&&typeof x.id==='string'&&Number.isFinite(x.seed);}).slice(-20).map(function(x){var rec={id:x.id.slice(0,80),seed:x.seed>>>0,result:['success','partial','withdrawn'].indexOf(x.result)>=0?x.result:'partial',day:clamp(Math.floor(x.day||0),0,100000),wounded:clamp(Math.floor(x.wounded||0),0,150)};if(x.audit&&x.audit.input){try{var replay=replayMilitaryBattle(x.audit.input);if(replay.seed===rec.seed)rec.audit=replay;}catch(e){}}return rec;}):[];
   var n=r.neighbor||{};m.neighbor={opened:!!n.opened,oldroadVerified:!!n.oldroadVerified,caseFound:!!n.caseFound,evidence:clamp(Math.floor(n.evidence||0),0,3),choice:['trade','demarcate'].indexOf(n.choice)>=0?n.choice:null,settled:!!n.settled,signedDay:Math.max(0,Math.floor(n.signedDay||0)),tradeReceived:!!n.tradeReceived,localContract:!!n.localContract};
   m.institutionFund=m.registered&&Number.isFinite(r.institutionFund)?clamp(Math.floor(r.institutionFund),0,1000000):0;m.followUpDay=Number.isFinite(r.followUpDay)?clamp(Math.floor(r.followUpDay),0,100000):0;return m;
@@ -20700,6 +20739,11 @@ function openMilitarySite(site){
   openWindow({id:'militarylife',kind:'custom',wide:true,title:'云峰边境 · '+site,build:function(b){b.classList.add('mill-life-panel');
     b.appendChild(el('p','work-summary','身份：'+militaryRankLabel()+' · 指挥上限 '+m.commandLimit+' 人 · 机构军费 '+m.institutionFund+' 金'));
     b.appendChild(el('p','muted','人物快速传送不会移动部队。只有到营地点名、接令且单位在岗，才可参与战斗裁判。当前小队 '+m.unit.count+' 人（伤员 '+m.unit.wounded+'，驻地 '+(m.unit.scene==='pass'?'云峰关口':m.unit.scene==='camp'?'边境营地':'其他驻地')+'）；训练 '+m.unit.training+'；装备 '+m.unit.equipment+'；士气 '+m.unit.morale+'；补给 '+m.unit.supply+'。'));
+    /* 授权链只显示一次事实。越权在这里就被说清楚，玩家不必点出一个报错。 */
+    var chain=milChainStatus();
+    b.appendChild(el('p',chain.ok?'req-chip ok':'req-chip no','授权链：'+(chain.ok?'资格、训练、委任与实际编队齐备':'未就绪')+' · 委任 '+chain.commissionText));
+    if(!chain.ok)b.appendChild(el('p','muted','当前不能受命行动：'+chain.reason));
+    if(chain.over>0)militarySiteButton(b,site,'移交超编人员至驻地后备 · '+chain.over+' 人',{minutes:10,guard:function(){return milChainStatus().over>0;},reason:'编队已回到委任上限以内。'},function(){toast(standDownOverstrength().reason);});
     if(site==='registration'){
       b.appendChild(el('p',null,m.registered?'登记状态有效，军事资格不等于爵位或职业等级。':'诺亚：这里欢迎完成水系公共工程的居民登记巡路资格。公开局势与物资协作不需要参战权限。'));
       if(!m.registered)militarySiteButton(b,site,'办理巡路登记 · 15分钟',{minutes:15,guard:function(){return !m.registered&&p.trust>0;} ,reason:'先在湿地或水利工程中取得一项可核验的公共项目记录。'},function(){m.registered=true;m.rank='patrol';m.commandLimit=1;m.unit.count=0;m.unit.scene='camp';m.institutionFund=100;});
@@ -20718,7 +20762,7 @@ function openMilitarySite(site){
     }
     if(site==='medical'){
       b.appendChild(el('p',null,'伤员不从部队名册删除。每次战斗后等待一夜，再由医帐消耗草药包治疗；恢复人数不会超过现有委任上限。当前伤员 '+m.unit.wounded+' 人。'));
-      if(m.unit.wounded>0)militarySiteButton(b,site,'过夜后治疗伤员 · 草药包 ×1',{need:{medicine:1},minutes:25,energy:1,guard:function(){return m.unit.wounded>0&&m.battleRecords.length>0&&state.totalDay>m.battleRecords[m.battleRecords.length-1].day;} ,reason:'伤员需要先度过一夜，并且医帐有草药包。'},function(){var n=m.unit.wounded;m.unit.count=Math.min(m.commandLimit,m.unit.count+n);m.unit.wounded=0;m.unit.morale=Math.min(100,m.unit.morale+12);});
+      if(m.unit.wounded>0)militarySiteButton(b,site,'过夜后治疗伤员 · 草药包 ×1',{need:{medicine:1},minutes:25,energy:1,guard:function(){return m.unit.wounded>0&&state.totalDay>milLastHurtDay(m);} ,reason:'伤员需要先度过一夜，并且医帐有草药包。'},function(){var n=m.unit.wounded;m.unit.count=Math.min(m.commandLimit,m.unit.count+n);m.unit.wounded=0;m.unit.morale=Math.min(100,m.unit.morale+12);});
     }
     if(site==='supply'){
       b.appendChild(el('p',null,'军需官：军费是机构账，不进入玩家金币。装备与口粮按合同登记，缺料时行动计划须减配或延期。'));
@@ -20727,28 +20771,50 @@ function openMilitarySite(site){
     }
     if(site==='pass_route'){
       b.appendChild(el('p',null,'关门没有收到对邻领居民或商队动武的命令。巡路记录应先说明桥面、路线与人员安全，再由本次任务授权决定是否部署。'));
-      if(c.active&&c.stage===0&&!c.scouted) [['ridge','沿山脊巡查 · 记录高处桥面'],['river','沿河道巡查 · 记录浅滩绕行']].forEach(function(o){militarySiteButton(b,site,o[1]+' · 20分钟',{minutes:20,energy:2,guard:function(){return c.active&&c.stage===0&&!c.scouted&&state.totalDay<=c.deadlineDay;}},function(){c.scouted=o[0];c.scoutedDay=state.totalDay;c.stage=1;m.unit.scene='pass';invAdd('route_evidence',2);bumpRoute('patrol');});});
+      if(c.active&&c.stage===0&&!c.scouted) [['ridge','沿山脊巡查 · 记录高处桥面'],['river','沿河道巡查 · 记录浅滩绕行']].forEach(function(o){militarySiteButton(b,site,o[1]+' · 20分钟',{minutes:20,energy:2,guard:function(){return c.active&&c.stage===0&&!c.scouted&&state.totalDay<=c.deadlineDay;}},function(){c.scouted=o[0];c.scoutedDay=state.totalDay;c.stage=1;invAdd('route_evidence',2);bumpRoute('patrol');});});
       if(c.scouted)b.appendChild(el('p','req-chip ok','已记录路线：'+(c.scouted==='ridge'?'山脊桥面':'河道浅滩')+'；未对邻领平民作敌我推定。'));
+      /* 巡路只留证据，不顺带把部队调上前线；调动归点名。 */
+      if(c.scouted&&!c.musterDay)b.appendChild(el('p','muted','路况已记录，但部队仍按名册留在'+(m.unit.scene==='pass'?'云峰关口':'边境营地')+'。在营房的七日任务简报中点名，才会重新编成并部署。'));
     }
     if(site==='campaign'){
       if(c.active&&m.unit.count===0&&m.core.frontier&&m.core.frontier.started)militarySiteButton(b,site,'移交旧巡防任务 · 不凭空补充部队',{minutes:10,guard:function(){return c.active&&m.unit.count===0&&m.core.frontier.started;}},function(){c.active=false;c.reported=true;c.result='partial';});
       b.appendChild(el('p',null,'云峰关口七日：先巡路，再安排补给与撤离，最后由固定规则裁判完成至多三阶段的护送任务。期限第 '+c.deadlineDay+' 天；巡路后部队驻扎关口，战后撤回营地。'));
-      if(!c.active&&!c.reported)militarySiteButton(b,site,'签收七日巡防委任 · 开始任务',{minutes:15,guard:function(){return m.rank==='squad_leader'&&m.unit.count>0&&!c.active&&!c.reported&&m.unit.scene==='camp';},reason:'需要受委任的小队长、一支在营地待命的小队和未开始的任务。'},function(){c.active=true;c.startedDay=state.totalDay;c.deadlineDay=state.totalDay+6;c.stage=0;c.scouted=null;c.prepared=null;c.battle=null;c.reported=false;c.result=null;});
+      if(!c.active&&!c.reported)militarySiteButton(b,site,'签收七日巡防委任 · 开始任务',{minutes:15,guard:function(){return m.rank==='squad_leader'&&m.unit.count>0&&!c.active&&!c.reported&&m.unit.scene==='camp'&&milChainStatus().ok;},reason:'需要受委任的小队长、一支在营地待命的小队、有效且未过期的委任，以及未开始的任务。'},function(){c.active=true;c.startedDay=state.totalDay;c.deadlineDay=state.totalDay+6;c.stage=0;c.scouted=null;c.scoutedDay=0;c.prepared=null;c.preparedDay=0;c.musterDay=0;c.mustered=0;c.battle=null;c.battleDay=0;c.reported=false;c.result=null;});
+      /* 点名是真实的一步：核对名册、锁定本任务投入的人数，再把部队部署到关口。
+         没有它，巡路一结束部队就自动上前线，等于跳过了一次授权。 */
+      if(c.active&&c.scouted&&!c.musterDay){
+        b.appendChild(el('p',null,'点名核对名册：应到 '+m.unit.count+' 人（伤员 '+m.unit.wounded+' 人不在编成内），训练 '+m.unit.training+'；装备 '+m.unit.equipment+'；士气 '+m.unit.morale+'；补给 '+m.unit.supply+'。点名后部队才由营地部署到云峰关口。'));
+        militarySiteButton(b,site,'点名并部署到云峰关口 · 20分钟',{minutes:20,energy:1,guard:function(){return c.active&&!!c.scouted&&!c.musterDay&&m.unit.count>0&&m.unit.scene==='camp'&&milChainStatus().ok;},reason:'需要受委任的小队长、在营地的可执行人员和未过期的授权。'},function(){c.musterDay=state.totalDay;c.mustered=m.unit.count;m.unit.scene='pass';});
+      }
+      if(c.musterDay)b.appendChild(el('p','req-chip ok','第 '+c.musterDay+' 天点名：投入 '+c.mustered+' 人，部署在云峰关口。伤员留在营地医帐，不随队。'));
       if(c.active&&c.stage===1&&!c.prepared){
         b.appendChild(el('p',null,'行动方案：护送医舍人员需要草药包与口粮；固守桥头需要验收石料与口粮。选择会改变任务权重。'));
-        militarySiteButton(b,site,'准备医疗护送 · 草药包 ×1／口粮 ×2',{need:{medicine:1,military_rations:2},minutes:30,energy:2,guard:function(){return c.active&&c.stage===1&&!c.prepared&&state.totalDay>=c.scoutedDay+1&&state.totalDay<=c.deadlineDay;} ,reason:'先完成巡路，至少隔一天再准备；请补足医药与口粮。'},function(){c.prepared='escort';c.preparedDay=state.totalDay;});
-        militarySiteButton(b,site,'准备桥头守护 · 石料 ×2／口粮 ×2',{need:{stone_block:2,military_rations:2},minutes:30,energy:2,guard:function(){return c.active&&c.stage===1&&!c.prepared&&state.totalDay>=c.scoutedDay+1&&state.totalDay<=c.deadlineDay;} ,reason:'先完成巡路，至少隔一天再准备；请补足石料与口粮。'},function(){c.prepared='bridge';c.preparedDay=state.totalDay;});
+        militarySiteButton(b,site,'准备医疗护送 · 草药包 ×1／口粮 ×2',{need:{medicine:1,military_rations:2},minutes:30,energy:2,guard:function(){return c.active&&c.stage===1&&!c.prepared&&c.musterDay>0&&state.totalDay>=c.scoutedDay+1&&state.totalDay<=c.deadlineDay;} ,reason:'先巡路并点名，至少隔一天再准备；请补足医药与口粮。'},function(){c.prepared='escort';c.preparedDay=state.totalDay;});
+        militarySiteButton(b,site,'准备桥头守护 · 石料 ×2／口粮 ×2',{need:{stone_block:2,military_rations:2},minutes:30,energy:2,guard:function(){return c.active&&c.stage===1&&!c.prepared&&c.musterDay>0&&state.totalDay>=c.scoutedDay+1&&state.totalDay<=c.deadlineDay;} ,reason:'先巡路并点名，至少隔一天再准备；请补足石料与口粮。'},function(){c.prepared='bridge';c.preparedDay=state.totalDay;});
       }
       if(c.active&&!c.battle&&state.totalDay>c.deadlineDay)militarySiteButton(b,site,'七日期限已过 · 安全撤回并提交部分报告',{minutes:10,guard:function(){return c.active&&!c.battle&&state.totalDay>c.deadlineDay;}},function(){c.active=false;c.reported=true;c.result='partial';m.unit.scene='camp';});
       if(c.active&&c.prepared&&!c.battle){
+        var live=milChainStatus();
         b.appendChild(el('p',null,'小队待命于营地，路况证据 '+(c.scouted==='ridge'?'山脊':'浅滩')+'；关口部署 '+m.unit.count+' 人，另有地方守备 '+18+' 人（独立指挥）。'));
-        [['protect_civilians','掩护居民与医帐撤离'],['hold_bridge','守住补给桥并维持通路']].forEach(function(o){militarySiteButton(b,site,o[1]+' · 规则裁判',{minutes:30,energy:3,guard:function(){return c.active&&c.prepared&&!c.battle&&state.totalDay>=c.preparedDay+1&&state.totalDay<=c.deadlineDay&&m.unit.scene==='pass'&&m.unit.count<=m.commandLimit;} ,reason:'先沿选定路线完成巡查并将部队部署到云峰关口，准备至少过一夜后结算；人数不能超过委任上限。'},function(){var result=resolveFrontierBattle({seed:((state.totalDay*2654435761)>>>0),terrain:c.scouted==='river'?'marsh':'ridge',objective:o[0],preparation:c.prepared==='escort'?4:2,intel:c.scouted==='ridge'?3:1,alliedSupport:18});c.battle=result;c.stage=3;c.objective=o[0];c.battleDay=state.totalDay;m.unit.count=result.final.own;m.unit.morale=Math.max(10,m.unit.morale-result.wounded.own*4);m.unit.supply=Math.max(0,m.unit.supply-20);m.unit.wounded=(m.unit.wounded||0)+result.wounded.own;m.unit.scene='camp';m.battleRecords.push({id:'cloud-seven-days-'+state.totalDay,seed:result.seed,result:result.result,day:state.totalDay,wounded:result.wounded.own,audit:result});m.battleRecords=m.battleRecords.slice(-20);});});
+        /* 风险预览：把这一场真正会投进去的东西先摊开，伤亡按人数守恒、伤员留档。 */
+        b.appendChild(el('p','muted','风险预览：投入 '+m.unit.count+' 人 · 训练 '+m.unit.training+' × 装备 '+m.unit.equipment+' · 士气 '+m.unit.morale+' · 补给 '+m.unit.supply+' · 地形 '+(c.scouted==='river'?'浅滩':'山脊')+' · 准备 '+(c.prepared==='escort'?'医疗护送':'桥头守护')+' · 友军支援 18 人（独立指挥，不受你的委任约束）。裁判按固定规则与当日种子计算，同一份输入可以复算；伤亡按人数守恒结算，伤员进医帐、不从名册删除。'));
+        if(!live.ok)b.appendChild(el('p','req-chip no','此刻不能受命：'+live.reason));
+        [['protect_civilians','掩护居民与医帐撤离'],['hold_bridge','守住补给桥并维持通路']].forEach(function(o){militarySiteButton(b,site,o[1]+' · 规则裁判',{minutes:30,energy:3,guard:function(){return c.active&&c.prepared&&!c.battle&&c.musterDay>0&&state.totalDay>=c.preparedDay+1&&state.totalDay<=c.deadlineDay&&m.unit.scene==='pass'&&m.unit.count<=m.commandLimit&&milChainStatus().ok;} ,reason:'先巡路、点名并把部队部署到云峰关口，准备至少过一夜后结算；'+(milChainStatus().ok?'人数不能超过委任上限。':milChainStatus().reason)},function(){
+          /* 裁判器仍会再查一次授权；这里再兜一层，避免任何路径点出未捕获异常。 */
+          var result;
+          try{result=resolveFrontierBattle({seed:((state.totalDay*2654435761)>>>0),terrain:c.scouted==='river'?'marsh':'ridge',objective:o[0],preparation:c.prepared==='escort'?4:2,intel:c.scouted==='ridge'?3:1,alliedSupport:18});}
+          catch(err){toast(err&&err.message?err.message:'本次行动未获授权，未结算。');return;}
+          c.battle=result;c.stage=3;c.objective=o[0];c.battleDay=state.totalDay;m.unit.count=result.final.own;m.unit.morale=Math.max(10,m.unit.morale-result.wounded.own*4);m.unit.supply=Math.max(0,m.unit.supply-20);m.unit.wounded=(m.unit.wounded||0)+result.wounded.own;m.unit.scene='camp';m.battleRecords.push({id:'cloud-seven-days-'+state.totalDay,seed:result.seed,result:result.result,day:state.totalDay,wounded:result.wounded.own,audit:result});m.battleRecords=m.battleRecords.slice(-20);});});
       }
       if(c.battle&&!c.reported){b.appendChild(el('p','req-chip ok','裁判版本 '+c.battle.version+' · 种子 '+c.battle.seed+' · 目标 '+c.battle.objectiveProgress+'/3 · 我方伤员 '+c.battle.wounded.own+' · 对方伤员 '+c.battle.wounded.enemy+'。'));c.battle.phases.forEach(function(ph){b.appendChild(el('p','muted','阶段 '+ph.phase+'：'+ph.explanation+'（我方 '+ph.ownRemaining+' 人可执行；对方 '+ph.enemyRemaining+' 人可执行）'));});
         if(state.totalDay>c.deadlineDay)militarySiteButton(b,site,'超过七日 · 撤回并报告部分完成',{minutes:10,guard:function(){return c.battle&&!c.reported&&state.totalDay>c.deadlineDay;}},function(){c.reported=true;c.active=false;c.result='partial';});
         else militarySiteButton(b,site,'向驻地指挥部提交复盘 · 完成章节',{minutes:10,guard:function(){return c.battle&&!c.reported&&state.totalDay<=c.deadlineDay;}},function(){c.reported=true;c.active=false;c.result=c.battle.result;});
       }
-      if(c.reported&&n.settled&&m.battleRecords.length===1&&m.unit.count>0&&m.unit.scene==='camp')militarySiteButton(b,site,'复核互市道路护送 · 固定裁判复盘',{minutes:30,energy:2,guard:function(){return c.reported&&n.settled&&m.battleRecords.length===1&&m.unit.count>0&&m.unit.scene==='camp'&&state.totalDay>c.battleDay+1&&m.followUpDay!==state.totalDay;} ,reason:'协定签署后隔一天再执行护送；单位需仍有可执行人员。'},function(){var r=resolveFrontierBattle({seed:((state.totalDay*2246822519)>>>0),terrain:'road',objective:'escort',preparation:4,intel:2,alliedSupport:12,enemy:[{id:'road_robbers',type:'scout',count:8,training:1,equipment:1,morale:60,supply:55,discipline:60}]});m.followUpDay=state.totalDay;m.unit.count=r.final.own;m.unit.wounded=(m.unit.wounded||0)+r.wounded.own;m.unit.morale=Math.max(10,m.unit.morale-r.wounded.own*3);m.unit.supply=Math.max(0,m.unit.supply-10);m.unit.scene='camp';m.battleRecords.push({id:'neighbor-road-escort-'+state.totalDay,seed:r.seed,result:r.result,day:state.totalDay,wounded:r.wounded.own,audit:r});m.battleRecords=m.battleRecords.slice(-20);});
+      if(c.reported&&n.settled&&m.battleRecords.length===1&&m.unit.count>0&&m.unit.scene==='camp')militarySiteButton(b,site,'复核互市道路护送 · 固定裁判复盘',{minutes:30,energy:2,guard:function(){return c.reported&&n.settled&&m.battleRecords.length===1&&m.unit.count>0&&m.unit.scene==='camp'&&state.totalDay>c.battleDay+1&&m.followUpDay!==state.totalDay&&milChainStatus().ok;},reason:'协定签署后隔一天再执行护送；单位需仍有可执行人员，且委任未过期、编队不超上限。'},function(){
+        var r;
+        try{r=resolveFrontierBattle({seed:((state.totalDay*2246822519)>>>0),terrain:'road',objective:'escort',preparation:4,intel:2,alliedSupport:12,enemy:[{id:'road_robbers',type:'scout',count:8,training:1,equipment:1,morale:60,supply:55,discipline:60}]});}
+        catch(err){toast(err&&err.message?err.message:'本次护送未获授权，未结算。');return;}
+        m.followUpDay=state.totalDay;m.unit.count=r.final.own;m.unit.wounded=(m.unit.wounded||0)+r.wounded.own;m.unit.morale=Math.max(10,m.unit.morale-r.wounded.own*3);m.unit.supply=Math.max(0,m.unit.supply-10);m.unit.scene='camp';m.battleRecords.push({id:'neighbor-road-escort-'+state.totalDay,seed:r.seed,result:r.result,day:state.totalDay,wounded:r.wounded.own,audit:r});m.battleRecords=m.battleRecords.slice(-20);});
       if(c.reported)b.appendChild(el('p','req-chip ok','任务已归档：'+(c.result==='success'?'完成主要护送目标': '部分目标完成，已安全撤回')+'；伤员进入医帐恢复，不从存档中删除。'));
     }
   },actions:[{label:'返回游戏',close:true}]});
@@ -20963,7 +21029,7 @@ function bindMilitaryLedger(s){
   var remoteRank=rankToCore[m.rank]||'civilian';
   if(milRankIndex(remoteRank)>milRankIndex(core.rank))core.rank=remoteRank;
   core.training=Math.max(core.training||0,m.qualification||0);
-  if(m.appointmentDay&&!core.commission)core.commission={role:'驻地正式委任',sinceDay:m.appointmentDay,expiresDay:1000000};
+  if(m.appointmentDay&&milCommissionSource(core.commission)!=='career')core.commission={role:'驻地正式委任',sinceDay:m.appointmentDay,expiresDay:1000000,source:'career'};
   // Both old budgets are kept for audit, but never added together as cash.
   if(!m.core&&m.registered)inst.budget=m.institutionFund;
   m.core=core;m.institution=inst;e.military=core;e.institution=inst;
@@ -21024,6 +21090,9 @@ function migrateUnifiedSave(raw,s){
   m.legacyAccess=!!(raw.militaryLife&&raw.militaryLife.legacyAccess)||!!(raw.travel&&raw.travel.discovered&&raw.travel.discovered['cloud.pass']&&e.mine);
   bindMilitaryLedger(s);
   if(m.campaign.active&&e.military&&e.military.frontier&&e.military.frontier.started)m.unit.scene=m.campaign.scouted?'pass':'camp';
+  // R5 以前巡路会自动部署；没有点名记录的在途旧档先回营核对，
+  // 保留路况和准备结果，避免「驻关口却只能在营地开始点名」的死锁。
+  if(m.campaign.active&&m.campaign.scouted&&!m.campaign.musterDay&&!m.campaign.battle&&m.unit.scene==='pass')m.unit.scene='camp';
   if(s.travel){Object.keys(LEGACY_NODES).forEach(function(id){if(s.travel.discovered[id])s.travel.discovered[LEGACY_NODES[id]]=true;delete s.travel.discovered[id];});s.travel.home=LEGACY_NODES[s.travel.home]||s.travel.home;}
   return s;
 }
@@ -21047,11 +21116,23 @@ var gateUnifiedBase=extendedGateAllowed;
 extendedGateAllowed=function(key){if(militaryLifeState().legacyAccess&&['cloud_pass','border_camp','old_road'].indexOf(key)>=0)return true;return gateUnifiedBase(key);};
 var newUnifiedBase=newGameState;
 newGameState=function(){var s=newUnifiedBase();bindMilitaryLedger(s);return s;};
-var deployUnifiedBase=milDeployGate;
-milDeployGate=function(m){var gate=deployUnifiedBase(m);if(gate.ok&&m.commission.expiresDay<state.totalDay)return {ok:false,reason:'委任已到期，需重新取得授权。'};return gate;};
+// 委任到期已由 milDeployGate 统一判断，这里不再重复包一层。
 // A named assignment and its ledger prevent double deployment across raids
 // and the seven-day campaign. Recruitment counts wounded as occupied posts.
 milUnderCommand=function(units,rankId){var used=0,occupied=0;units.forEach(function(u){if(u.owner==='player'){used+=milUnitAvailable(u);occupied+=(u.personnel.healthy||0)+(u.personnel.wounded||0)+(u.personnel.missing||0)+(u.personnel.captive||0);}});var limit=milCommandLimit(rankId);return {used:used,occupied:occupied,limit:limit,ok:occupied<=limit};};
+
+/* §26.8 首轮军事路线的授权链：登记 → 训练 → 委任 → 点名 → 行动 → 复盘。
+   界面只读这一份判断：越权在按钮上就写清楚原因，不让玩家点出一个未捕获异常。
+   裁判器里的 throw 仍然保留，作为最后一道防线。 */
+function milChainStatus(){
+  var m=militaryLifeState(),core=m.core;
+  var gate=milDeployGate(core),under=milUnderCommand(core.units,core.rank);
+  var over=Math.max(0,under.occupied-under.limit);
+  var reason=gate.ok?(under.ok?'':'实际编队 '+under.occupied+' 人超过委任上限 '+under.limit+' 人，请先移交超编人员。'):gate.reason;
+  return {ok:gate.ok&&under.ok,reason:reason,gate:gate,under:under,over:over,
+    commission:milCommissionLive(core,state.totalDay),commissionText:milCommissionLabel(core,state.totalDay),
+    rank:m.rank,limit:m.commandLimit};
+}
 
 // v1 remains available only for replaying historical published reports.
 // New campaigns and raids use the same Q/K engine and casualty rules.
@@ -21081,7 +21162,11 @@ var resolveUnifiedBase=resolveFrontierBattle;
 resolveFrontierBattle=function(spec){var m=militaryLifeState(),gate=milDeployGate(m.core);if(!gate.ok)throw new Error(gate.reason);if(!milUnderCommand(m.core.units,m.core.rank).ok)throw new Error('实际编队超过委任上限');return resolveUnifiedBase(spec);};
 var militaryButtonUnifiedBase=militarySiteButton;
 militarySiteButton=function(b,site,label,opts,apply){return militaryButtonUnifiedBase(b,site,label,opts,function(){apply();var m=militaryLifeState(),core=m.core;
-  if(site==='appointment'&&m.appointmentDay&&!core.commission)core.commission={role:'驻地正式委任',sinceDay:state.totalDay,expiresDay:1000000};
+  /* 驻地正式委任是长期岗位委任：它取代同一份账本上的巡防联络官临时委任，
+     也重发已经到期的旧委任。旧代码只在「完全没有委任」时补一份，于是先拿临时委任
+     再受小队长委任的玩家，会在临时委任到期后两边都拿不到新委任。 */
+  if(site==='appointment'&&m.appointmentDay&&milCommissionSource(core.commission)!=='career')
+    core.commission={role:'驻地正式委任',sinceDay:state.totalDay,expiresDay:1000000,source:'career'};
   m.battleRecords.forEach(function(rec){var key='published:'+rec.id,a=rec.audit;if(a&&a.version===2&&!core.appliedEffectIds[key]){m.unit.dead+=a.casualties.own.dead;m.unit.missing+=a.casualties.own.missing;core.battles[key]=a.rules;core.appliedEffectIds[key]=true;}});
 });};
 
@@ -22766,6 +22851,9 @@ window.__MOSS__ = {
   doorTiles: doorTiles, installIndoorDoors: installIndoorDoors, drawIndoorDoors: drawIndoorDoors,
   questExitTile: questExitTile,
   wetlandLifeState:wetlandLifeState, professionalLifeState:professionalLifeState, militaryLifeState:militaryLifeState,
+  /* R5-D 军事权限链：界面与测试读同一份判断 */
+  milChainStatus:milChainStatus, milDeployGate:milDeployGate, milUnderCommand:milUnderCommand,
+  milCommissionLive:milCommissionLive, milCommissionLabel:milCommissionLabel, standDownOverstrength:standDownOverstrength,
   openWetlandSite:openWetlandSite, openProfessionSite:openProfessionSite, openMilitarySite:openMilitarySite,
   openOldRoadSite:openOldRoadSite, openNeighborSite:openNeighborSite, openExtendedJournal:openExtendedJournal,
   extendedGateAllowed:extendedGateAllowed, extendedGateReason:extendedGateReason, battleJudge:battleJudge, resolveFrontierBattle:resolveFrontierBattle,

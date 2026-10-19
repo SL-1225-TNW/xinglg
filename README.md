@@ -1,5 +1,7 @@
 # 苔芽农场 · 星露谷
 
+2026-10-19 R5 收口交付：制度闭环六个切片全部完成——经济止血、岗位试任期、有限信用合同、有限复核、军事权限整理与发布收口。接手又修掉四处接续缺陷（军事旧档点名死锁、复核退还后再次扣押、罚息减免跨日失效、扣押证据用申请日欠款）；完整两层 CI 一次通过（快速层 5 步＋浏览器层 94 条，其中 18 条在打包产物上复跑），源码与单文件版同一事实，自然入口与 390×844 触屏各两轮通过。实体手机触控手感与陌生玩家理解度仍是单列的人工验收，不由自动化替代。见[接手审查记录](docs/r5-takeover-review-2026-10-19.md)。
+
 2026-10-16 R3 自然新档验收：从开局种植、工程入门、修桥和磨坊实践，一直走到公共工程施工、跨夜验收、河港复检合同、周期养护与正常读档，426 项检查通过。修复了三方现场意见没有写入项目台账、导致无法定案的问题，并加入独立 CI 作业。自动化、夹具、真人理解度及实体手机的范围见[验收记录](docs/r3-natural-route.md)，后续见[待办清单](docs/下一步待办清单.md)。
 
 2026-10-15 R3-C2本地更新：岗位评价有两条来源——汛期前预防性加固或旧事故处置，读档不再强制先出事；验收后的养护改成 3 天周期的岗位责任，显示下次检视日、工作范围与联系人，评价按周期结算，支持延期（封顶 3 次）、交接与退出，交班不清掉未处理的安全事件。见[本轮记录](docs/r3-duty-review.md)。同日 R3-C1 的高风险闸门试运行预警、现场预防与漏检补修复查见[上一轮记录](docs/r3-safety-review.md)，下一步见[待办清单](docs/下一步待办清单.md)。
@@ -195,7 +197,9 @@ cd ..
 node tests/run-v3.mjs              # 第三版功能，112 项
 node tests/run-guide.mjs           # 新手引导 / 今日待办，59 项
 node tests/run-ui.mjs              # 桌面 / 竖屏 / 横屏 / 大屏布局，93 项
-node tests/run-fixes.mjs           # 修复回归（含铲除 / 委托方向 / 分页结算），48 项
+node tests/run-fixes.mjs           # 修复回归（含铲除 / 委托方向 / 按页结算），50 项；加 --single-file 跑打包产物
+node tests/run-exploration.mjs     # 探索线：森林／矿山三道闸门、三层矿洞、采集再生、存档重载与钢制工具（内部自带源码＋单文件两轮）
+node tests/run-exploration-mobile.mjs # 探索线手机端：390×844 竖屏触摸闸门与矿洞渲染
 node tests/run-edge.mjs            # 边界与存档，137 项
 node tests/run-main.mjs            # 正常主线跑到第 14 天，120 项
 node tests/run-fast-travel.mjs     # 第七版快速传送（登记 / 耗时 / 落点 / 事务 / 旧档迁移），56 项
@@ -210,6 +214,14 @@ node tests/run-palace-layout.mjs  # 白蔷薇宫城 P1 布局契约（洪水填�
 node tests/run-palace-save.mjs     # 白蔷薇宫城 P1 旧档迁移与存档往返，25 项
 node tests/run-palace-floors.mjs   # 白蔷薇宫城 P1 三层真实按键通行（含单文件版），82 项
 node tests/run-palace-mobile.mjs   # 白蔷薇宫城 P1 手机横竖屏楼层牌与楼梯，32 项
+node tests/run-r5-finance-safety.mjs # R5-0 经济止血（票据报价 / 期限 / 典当 / 旧档），86 项
+node tests/run-r5-post-term.mjs    # R5-A 岗位试任期（28 天任期 / 预算 / 期末三去向），105 项
+node tests/run-r5-credit.mjs       # R5-C 市立小额周转贷（放款不计收入 / 罚息 / 违约扣押 / 一次协商），78 项
+node tests/run-r5-review.mjs       # R5-B 有限复核（证据 / 时限 / 一次复核 / 有限结果），57 项
+node tests/run-r5-military.mjs     # R5-D 军事权限整理（授权链 / 越权拒绝 / 点名与风险预览 / 旧档不提权），54 项
+node tests/run-r5-natural-entry.mjs # R5 自然入口：地图 → 走路 → 按 E → 点按钮走到银行柜台 / 水利控制台 / 营地登记点，49 项
+node tests/run-r5-mobile-touch.mjs # R5 触屏：390×844 竖屏只靠触摸走完同三条路径，60 项
+node tests/run-ci.mjs              # 统一入口：快速层 + 浏览器层，并把关键专项在单文件版上复跑
 node tests/canvas-size.mjs         # 七种分辨率的画布尺寸测量
 node tests/landscape-shot.mjs      # 横屏手机布局取证
 node tests/shots-fixes.mjs         # 铲除 / 委托方向 / 结算演出的画面取证（只截图，不计入断言）
