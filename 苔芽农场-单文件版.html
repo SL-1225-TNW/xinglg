@@ -12061,7 +12061,10 @@ function newEngDuty() {
   return {
     status: 'none', cycle: ENG_DUTY_CYCLE, startDay: 0, nextDay: 0, lastDay: 0, endDay: 0,
     done: 0, sinceEval: 0, evalCount: 0, overdue: 0, deferCount: 0, defers: [],
-    successor: '', reason: ''
+    successor: '', reason: '',
+    /* R5-A：termId 指向当前在办任期，handover 是交接申请意向。
+       两者都只是引用，不复制任何养护事实；旧档缺这两个键就是没有。 */
+    termId: '', handover: null
   };
 }
 function normalizeEngDuty(raw) {
@@ -12077,6 +12080,12 @@ function normalizeEngDuty(raw) {
   d.deferCount = isInt(raw.deferCount) ? clamp(raw.deferCount, 0, 999) : 0;
   d.successor = typeof raw.successor === 'string' ? raw.successor.slice(0, 40) : '';
   d.reason = typeof raw.reason === 'string' ? raw.reason.slice(0, 80) : '';
+  /* R5-A：termId 只在引用存在且格式合法时保留；坏引用降级为「没有在办任期」，
+     绝不因为引用丢了就自动补发钱或凭空开一份任期。 */
+  d.termId = typeof raw.termId === 'string' ? raw.termId.slice(0, 40) : '';
+  if (raw.handover && typeof raw.handover === 'object' && typeof raw.handover.termId === 'string' && raw.handover.termId) {
+    d.handover = { termId: raw.handover.termId.slice(0, 40), day: isInt(raw.handover.day) ? clamp(raw.handover.day, 0, 100000) : 0 };
+  } else d.handover = null;
   d.defers = Array.isArray(raw.defers) ? raw.defers.filter(function (x) {
     return x && typeof x === 'object' && isInt(x.day);
   }).slice(-12).map(function (x) {
@@ -12123,7 +12132,14 @@ function engDutyInspect(pj) {
   var d = engDuty(pj), p = professionalLifeState();
   if (pj.phase !== 'accepted' || d.status !== 'active') return false;
   if (state.totalDay < d.nextDay) return false;
+  /* R5-A：到期进入待评后不再产生新周期和新津贴，期末三个去向才轮得到玩家 */
+  var live = currentPostTerm(POST_GATEKEEPER);
+  if (live && postTermPhase(live) !== 'active') return false;
+  var due = d.nextDay;                 // 本周期原本的到期日，津贴事务按它记账
   var over = engDutyOverdue(pj);
+  /* 「合格」＝这次按期走完本周期（没逾期）。R3 的岗位评价另有自己的累计节奏，
+     津贴跟着检视周期走：28 天任期里大约 9—10 次，正好对应 120 金预算。 */
+  var qualified = over === 0;
   d.lastDay = state.totalDay;
   d.done++; d.sinceEval++;
   d.nextDay = state.totalDay + d.cycle;
@@ -12133,11 +12149,13 @@ function engDutyInspect(pj) {
     d.overdue++; d.sinceEval = 0;
     rememberChoice('noya', '闸门养护逾期后才补做');
   } else if (d.sinceEval >= d.cycle) {
-    d.sinceEval = 0; d.evalCount++;
+    d.sinceEval = 0; d.evalCount++; qualified = true;
     bumpCareer('engineering');
     p.trust = Math.min(100, (p.trust || 0) + 1);
     rememberChoice('noya', '按期走完一个闸门养护周期');
   }
+  /* 按期走完周期才有资格领本期津贴；发不发、够不够、是不是已经发过，由任期账本自己判断 */
+  if (live && due < live.reviewDay) { live.dueCount++; if (qualified) postTermPay(live, due); }
   markDirty();
   return true;
 }
@@ -12178,6 +12196,346 @@ function engDutyClose(pj, status) {
 }
 function engDutyHandover(pj) { return engDutyClose(pj, 'handed'); }
 function engDutyRelease(pj) { return engDutyClose(pj, 'released'); }
+/* ===================== R5-A 岗位试任期 =====================
+   闸门养护岗的一次正式任期：28 天、120 金机构预算、按期走完一个周期发 12 金津贴，
+   到期出报告，续任／交接／辞职三条都真的存在。
+   事实归属不变：是否在岗、下次检视日、延期与逾期仍由 pj.duty 说了算。
+   任期只回答三件事——现在处于哪一段、预算用了多少、期末怎么结束，
+   不复制「今天是否该检视」这条事实，统计一律用 duty 当前累计减 baseline 算增量。
+   ============================================================ */
+var POST_GATEKEEPER = 'gatekeeper';
+var POST_TERM_DAYS = 28;
+var POST_BUDGET = 120;
+var POST_ALLOWANCE = 12;
+var POST_MAX_PAYOUTS = Math.floor(POST_BUDGET / POST_ALLOWANCE);
+var POST_SCOPE = ['销钉渗水', '闸缝间隙', '岸坡淤积'];
+function pit(v, d) { return isInt(v) ? clamp(v, 0, 1000000) : d; }
+function newPostTerm(post, day) {
+  return {
+    id: 'post:' + post + ':1', post: post, phase: 'active',
+    startDay: day, reviewDay: day + POST_TERM_DAYS, scope: POST_SCOPE.slice(),
+    baseline: { done: 0, evalCount: 0, deferCount: 0, overdue: 0 },
+    budget: { appropriated: POST_BUDGET, spent: 0, tx: {} },
+    dueCount: 0, close: null
+  };
+}
+/* 坏档只做安全归一化：字段不对就退回默认值，绝不因为读档重开已封存的任期。 */
+function normalizePostTerms(raw) {
+  var out = [];
+  if (!Array.isArray(raw)) return out;
+  raw.slice(-12).forEach(function (t) {
+    if (!t || typeof t !== 'object' || t.post !== POST_GATEKEEPER) return;
+    var startDay = pit(t.startDay, 0);
+    var term = newPostTerm(POST_GATEKEEPER, startDay);
+    /* 到期日缺失或不晚于起始日都算坏值，按规则重算成一个完整任期，
+       而不是留一段三天就到期、可以立刻领津贴的假任期。 */
+    term.reviewDay = (isInt(t.reviewDay) && t.reviewDay > startDay)
+      ? clamp(t.reviewDay, 0, 1000000) : startDay + POST_TERM_DAYS;
+    if (typeof t.id === 'string' && t.id) term.id = t.id.slice(0, 40);
+    term.phase = ['active', 'review_due', 'closed'].indexOf(t.phase) >= 0 ? t.phase : 'active';
+    var bl = t.baseline && typeof t.baseline === 'object' ? t.baseline : {};
+    term.baseline = { done: pit(bl.done, 0), evalCount: pit(bl.evalCount, 0), deferCount: pit(bl.deferCount, 0), overdue: pit(bl.overdue, 0) };
+    var bg = t.budget && typeof t.budget === 'object' ? t.budget : {};
+    var spent = Math.min(POST_BUDGET, pit(bg.spent, 0));
+    term.budget = { appropriated: POST_BUDGET, spent: spent, tx: {} };
+    if (bg.tx && typeof bg.tx === 'object') Object.keys(bg.tx).forEach(function (k) {
+      var v = pit(bg.tx[k], 0);
+      if (k.length <= 40 && v > 0) term.budget.tx[k] = Math.min(POST_ALLOWANCE, v);
+    });
+    term.dueCount = pit(t.dueCount, 0);
+    var c = t.close;
+    if (c && typeof c === 'object') {
+      term.phase = 'closed';
+      var cs = c.stats && typeof c.stats === 'object' ? c.stats : {};
+      term.close = {
+        day: pit(c.day, startDay),
+        reason: typeof c.reason === 'string' ? c.reason.slice(0, 80) : '',
+        successor: typeof c.successor === 'string' ? c.successor.slice(0, 40) : '',
+        stats: { done: pit(cs.done, 0), evalCount: pit(cs.evalCount, 0), deferCount: pit(cs.deferCount, 0), overdue: pit(cs.overdue, 0) },
+        rating: ['steady', 'conditional', 'incomplete'].indexOf(c.rating) >= 0 ? c.rating : 'incomplete'
+      };
+    }
+    out.push(term);
+  });
+  return out;
+}
+function postTerms() { var p = professionalLifeState(); if (!Array.isArray(p.postTerms)) p.postTerms = []; return p.postTerms; }
+/* 到期日一到，active 自动转 review_due；结案后不再变化。相位按日期派生，存档不会停在过期状态。 */
+function postTermPhase(term) {
+  if (!term) return 'none';
+  if (term.phase === 'closed') return 'closed';
+  return state.totalDay >= term.reviewDay ? 'review_due' : 'active';
+}
+function currentPostTerm(post) {
+  var list = postTerms();
+  for (var i = list.length - 1; i >= 0; i--) {
+    var t = list[i];
+    if (t.post !== post) continue;
+    var ph = postTermPhase(t);
+    if (ph === 'closed') continue;
+    if (t.phase !== ph) t.phase = ph;
+    return t;
+  }
+  return null;
+}
+function postTermStats(pj, term) {
+  var d = engDuty(pj), b = term.baseline;
+  return {
+    done: Math.max(0, d.done - b.done), evalCount: Math.max(0, d.evalCount - b.evalCount),
+    deferCount: Math.max(0, d.deferCount - b.deferCount), overdue: Math.max(0, d.overdue - b.overdue)
+  };
+}
+function postTermBudgetLeft(term) { return Math.max(0, term.budget.appropriated - term.budget.spent); }
+/* 考核只用本任期增量，不读历史任期，也不因为差就禁止续任。 */
+function postTermRating(stats, dueCount) {
+  if (stats.overdue === 0 && stats.deferCount <= 1 && stats.done >= dueCount) return 'steady';
+  if (stats.overdue <= 1 && stats.deferCount <= 2) return 'conditional';
+  return 'incomplete';
+}
+var POST_RATING_NAME = { steady: '稳任', conditional: '有条件', incomplete: '未完成' };
+function postTermOpenItems(pj, term) {
+  var items = [], st = postTermStats(pj, term);
+  if (pj && !engSafetyClear(pj)) items.push('闸门有未处理的安全事件');
+  if (st.overdue > 0) items.push('逾期检视 ' + st.overdue + ' 次');
+  if (st.deferCount > 0) items.push('申请延期 ' + st.deferCount + ' 次');
+  return items;
+}
+/* 登记：只在养护在岗、且当前没有任期时成立。
+   登记不重置 duty.nextDay，所以没法靠反复登记刷新检视期限；也不追溯补发津贴。 */
+function postTermRegister(post) {
+  var pj = engProject();
+  if (!pj || pj.phase !== 'accepted') return false;
+  var d = engDuty(pj);
+  if (d.status !== 'active') return false;
+  if (currentPostTerm(post)) return false;
+  var list = postTerms();
+  var term = newPostTerm(post, state.totalDay);
+  term.id = 'post:' + post + ':' + (list.length + 1);
+  term.baseline = { done: d.done, evalCount: d.evalCount, deferCount: d.deferCount, overdue: d.overdue };
+  list.push(term);
+  d.termId = term.id;
+  rememberChoice('council', '登记了闸门养护岗的正式试任期');
+  markDirty();
+  return true;
+}
+/* 津贴：任期 active、到期日在 reviewDay 前、评价合格、事务没发过、余额够 12 —— 五条同时成立才发。
+   事务 ID 用「任期 ID + 到期日」而不是点击次数，所以连点、重载、读档都只会发一次。 */
+function postTermPay(term, dueDay) {
+  if (!term || postTermPhase(term) !== 'active') return false;
+  if (!(dueDay < term.reviewDay)) return false;
+  var key = term.id + ':due:' + dueDay;
+  if (Object.prototype.hasOwnProperty.call(term.budget.tx, key)) return false;
+  if (postTermBudgetLeft(term) < POST_ALLOWANCE) return false;
+  term.budget.tx[key] = POST_ALLOWANCE;
+  term.budget.spent += POST_ALLOWANCE;
+  state.coins += POST_ALLOWANCE;
+  rememberChoice('noya', '按期领到一次闸门养护岗津贴');
+  markDirty();
+  return true;
+}
+/* 结案：封存当前条目并写结案记录。结案后这条记录不再变化。 */
+function postTermClose(term, reason, successor) {
+  var pj = engProject();
+  var stats = postTermStats(pj, term);
+  term.phase = 'closed';
+  term.close = {
+    day: state.totalDay, reason: reason, successor: successor || '',
+    stats: stats, rating: postTermRating(stats, term.dueCount)
+  };
+  var d = engDuty(pj);
+  if (d.termId === term.id) d.termId = '';
+  return term.close;
+}
+/* 续任：先封存旧记录再追加新的，不追溯补发，也不修改旧条目。 */
+function postTermRenew(post) {
+  var term = currentPostTerm(post);
+  if (!term || postTermPhase(term) !== 'review_due') return false;
+  var pj = engProject(), d = engDuty(pj);
+  postTermClose(term, '任期届满后续任', '');
+  var list = postTerms();
+  var next = newPostTerm(post, state.totalDay);
+  next.id = 'post:' + post + ':' + (list.length + 1);
+  next.baseline = { done: d.done, evalCount: d.evalCount, deferCount: d.deferCount, overdue: d.overdue };
+  list.push(next);
+  d.termId = next.id;
+  d.handover = null;
+  markDirty();
+  return next;
+}
+/* 申请交接只登记意向并指向玛尔；真正封存要等继任者在采场确认。 */
+function postTermRequestHandover(post) {
+  var pj = engProject();
+  var term = currentPostTerm(post);
+  if (!term || pj.phase !== 'accepted') return false;
+  var d = engDuty(pj);
+  if (d.status !== 'active') return false;
+  if (d.handover && d.handover.termId === term.id) return false;
+  d.handover = { termId: term.id, day: state.totalDay };
+  markDirty();
+  return true;
+}
+function postTermHandoverPending() {
+  var pj = engProject();
+  if (!pj || pj.phase !== 'accepted') return null;
+  var d = engDuty(pj);
+  if (!d || !d.handover || !d.handover.termId) return null;
+  var term = currentPostTerm(POST_GATEKEEPER);
+  return term && term.id === d.handover.termId ? term : null;
+}
+/* 玛尔确认即完成交接：事务 ID 就是任期 ID，重复点击和读档不会封存两次。
+   闸门还有未处理安全事件时不放行——责任要交得干净，这是 R3 沿用的口径。 */
+function postTermConfirmHandover(post) {
+  var pj = engProject();
+  var term = postTermHandoverPending();
+  if (!term || term.post !== post) return false;
+  if (!engSafetyClear(pj)) return false;
+  postTermClose(term, '交接给' + ENG_DUTY_SUCCESSOR, ENG_DUTY_SUCCESSOR);
+  engDutyHandover(pj);
+  markDirty();
+  return true;
+}
+/* 辞职始终是退出权：一次确认就完成，不等继任者同意。
+   未清事项写进结案、留在世界账本里，但不把人锁在岗位上。 */
+function postTermResign(post) {
+  var pj = engProject();
+  var term = currentPostTerm(post);
+  if (!term) return false;
+  var d = engDuty(pj);
+  var open = postTermOpenItems(pj, term);
+  postTermClose(term, '任期内辞去岗位' + (open.length ? '（' + open.join('、') + '，已留档）' : ''), '');
+  d.handover = null;
+  if (d.status === 'active') {
+    d.status = 'released'; d.successor = ''; d.endDay = state.totalDay;
+    d.reason = '辞去闸门养护岗；未清事项留在世界账本' + (open.length ? '（' + open.join('、') + '）' : '');
+    rememberChoice('noya', '辞去闸门养护岗位');
+  }
+  markDirty();
+  return true;
+}
+/* ---------- R5-A 任期面板：控制室与磨坊同源，河港与船闸只读 ---------- */
+function postTermPanel(b, pj, isMill) {
+  var d = engDuty(pj);
+  if (!pj || pj.phase !== 'accepted') return;
+  var at = isMill ? 'mill_duty' : 'water';
+  var term = currentPostTerm(POST_GATEKEEPER);
+  var box = el('div', 'panel-box');
+  box.appendChild(el('div', 'section-title', '岗位试任期 · 河湾闸门养护'));
+  box.appendChild(el('p', 'muted', '任期 ' + POST_TERM_DAYS + ' 天，工作范围：' + POST_SCOPE.join('、') +
+    '。机构核定预算 ' + POST_BUDGET + ' 金，按期走完一个养护周期发 ' + POST_ALLOWANCE +
+    ' 金津贴，一期最多 ' + POST_MAX_PAYOUTS + ' 次；结余只归档，不自动发给你。'));
+  if (!term) {
+    if (d.status !== 'active') {
+      box.appendChild(el('p', 'muted', '闸门养护责任不在你名下，没有可登记的任期。'));
+    } else {
+      box.appendChild(el('p', 'req-chip', '尚未登记正式试任期。既有三日养护照常运行，但不结算津贴，也不产生考核。'));
+      extendedWorkButton(box, at, '登记 28 天岗位试任期 · 30分钟', {
+        minutes: 30, energy: 1,
+        guard: function () { return !!currentPostTerm(POST_GATEKEEPER) === false && engProject().phase === 'accepted' && engDuty(engProject()).status === 'active'; },
+        reason: '已经有一份在办任期，或养护责任不在你名下。'
+      }, function () { postTermRegister(POST_GATEKEEPER); });
+    }
+    b.appendChild(box);
+    return;
+  }
+  var ph = postTermPhase(term), st = postTermStats(pj, term), open = postTermOpenItems(pj, term);
+  if (ph === 'review_due') {
+    var rated = postTermRating(st, term.dueCount);
+    box.appendChild(el('p', 'req-chip', '期末报告 · 第 ' + term.startDay + ' 至 ' + term.reviewDay +
+      ' 天 · 评级「' + POST_RATING_NAME[rated] + '」'));
+    box.appendChild(el('p', null, '本期检视 ' + st.done + ' 次、评价 ' + st.evalCount + ' 次、延期 ' + st.deferCount +
+      ' 次、逾期 ' + st.overdue + ' 次；应完成 ' + term.dueCount + ' 个周期。'));
+    box.appendChild(el('p', null, '机构预算：核定 ' + POST_BUDGET + ' ／已用 ' + term.budget.spent +
+      ' ／结余 ' + postTermBudgetLeft(term) + '（结余归档，不并入工程专款，也不发给你）。'));
+    box.appendChild(el('p', 'muted', rated === 'steady' ? '本期无逾期、延期不超过 1 次且走完全部到期周期，可续任，记录写入档案。'
+      : rated === 'conditional' ? '本期有缺口，报告标出来了；仍可续任。' : '本期完成度不足，记录在案；续任、交接、辞职都仍然可选。'));
+    box.appendChild(el('p', 'muted', '本期不再产生新周期和新津贴。结案记录只读，不会再变化。'));
+    extendedWorkButton(box, at, '续任下一期 28 天 · 30分钟', {
+      minutes: 30, energy: 1,
+      guard: function () { var t = currentPostTerm(POST_GATEKEEPER); return !!t && postTermPhase(t) === 'review_due'; },
+      reason: '当前没有待评的任期。'
+    }, function () { postTermRenew(POST_GATEKEEPER); });
+  } else {
+    box.appendChild(el('p', 'req-chip', '在任 · 第 ' + term.startDay + ' 天起 · 第 ' + term.reviewDay +
+      ' 天到期（还剩 ' + Math.max(0, term.reviewDay - state.totalDay) + ' 天）'));
+    box.appendChild(el('p', null, '本期检视 ' + st.done + ' 次、评价 ' + st.evalCount + ' 次、延期 ' + st.deferCount +
+      ' 次、逾期 ' + st.overdue + ' 次；应完成 ' + term.dueCount + ' 个周期。'));
+    box.appendChild(el('p', null, '机构预算：核定 ' + POST_BUDGET + ' ／已用 ' + term.budget.spent +
+      ' ／结余 ' + postTermBudgetLeft(term) + '（结余归档，不并入工程专款，也不发给你）。'));
+    box.appendChild(el('p', 'muted', '照目前记录，期末评级预计「' + POST_RATING_NAME[postTermRating(st, term.dueCount)] + '」。'));
+  }
+  if (d.handover && d.handover.termId === term.id) {
+    box.appendChild(el('p', 'req-chip ok', '已向 ' + ENG_DUTY_SUCCESSOR + ' 申请交接，等他到石灰采场确认后一次完成。'));
+  } else {
+    extendedWorkButton(box, at, '申请交接给 ' + ENG_DUTY_SUCCESSOR + ' · 20分钟', {
+      minutes: 20,
+      guard: function () { var q = engProject(), t = currentPostTerm(POST_GATEKEEPER); return !!t && engDuty(q).status === 'active' && !(engDuty(q).handover && engDuty(q).handover.termId === t.id); },
+      reason: '已经申请过了，等继任者确认。'
+    }, function () { postTermRequestHandover(POST_GATEKEEPER); });
+  }
+  if (open.length) box.appendChild(el('p', 'muted', '离岗时会留在册上的事项：' + open.join('、') + '。这些不会因为交班或辞职而消失。'));
+  extendedWorkButton(box, at, '辞去这份岗位（一次确认） · 10分钟', {
+    minutes: 10,
+    guard: function () { return !!currentPostTerm(POST_GATEKEEPER); },
+    reason: '没有在办任期。'
+  }, function () { postTermResign(POST_GATEKEEPER); });
+  b.appendChild(box);
+}
+/* 河港船务屋与船闸值守室：只读阶段、期限与预算，不挂会改钱的按钮 */
+function postTermReadout(b, pj) {
+  if (!pj || pj.phase !== 'accepted') return;
+  var list = postTerms().filter(function (t) { return t.post === POST_GATEKEEPER; });
+  if (!list.length) return;
+  var term = currentPostTerm(POST_GATEKEEPER) || list[list.length - 1];
+  var box = el('div', 'panel-box');
+  box.appendChild(el('div', 'section-title', '闸门养护岗 · 任期进度（只读）'));
+  var ph = postTermPhase(term);
+  box.appendChild(el('p', 'muted', '此处只显示阶段、期限与预算；登记、续任、申请交接与辞职都在水利控制室或风铃磨坊。'));
+  if (ph === 'closed' && term.close) {
+    box.appendChild(el('p', 'req-chip', '第 ' + term.close.day + ' 天结案 · 评级「' + POST_RATING_NAME[term.close.rating] + '」'));
+    box.appendChild(el('p', null, '结案原因：' + (term.close.reason || '—') + (term.close.successor ? '（' + term.close.successor + '）' : '')));
+    box.appendChild(el('p', null, '本期检视 ' + term.close.stats.done + ' 次、评价 ' + term.close.stats.evalCount +
+      ' 次、延期 ' + term.close.stats.deferCount + ' 次、逾期 ' + term.close.stats.overdue + ' 次。'));
+    box.appendChild(el('p', null, '机构预算：核定 ' + POST_BUDGET + ' ／已用 ' + term.budget.spent +
+      ' ／结余 ' + postTermBudgetLeft(term) + '（结余归档，不并入工程专款）。'));
+  } else if (ph === 'review_due') {
+    var st = postTermStats(pj, term);
+    box.appendChild(el('p', 'req-chip', '待期末处理 · 第 ' + term.reviewDay + ' 天已到 · 评级「' +
+      POST_RATING_NAME[postTermRating(st, term.dueCount)] + '」'));
+    box.appendChild(el('p', null, '机构预算：核定 ' + POST_BUDGET + ' ／已用 ' + term.budget.spent +
+      ' ／结余 ' + postTermBudgetLeft(term) + '。'));
+    box.appendChild(el('p', 'muted', '续任、交接或辞职请到水利控制室或风铃磨坊的岗位任期面板。'));
+  } else {
+    box.appendChild(el('p', 'req-chip', '在任 · 第 ' + term.reviewDay + ' 天到期（还剩 ' +
+      Math.max(0, term.reviewDay - state.totalDay) + ' 天）'));
+    box.appendChild(el('p', null, '机构预算：核定 ' + POST_BUDGET + ' ／已用 ' + term.budget.spent +
+      ' ／结余 ' + postTermBudgetLeft(term) + '。'));
+  }
+  b.appendChild(box);
+}
+/* 石灰采场：只有已经申请过交接才出现确认入口 */
+function postTermHandoverBox(b) {
+  var pj = engProject();
+  if (!pj || pj.phase !== 'accepted') return;
+  var term = postTermHandoverPending();
+  if (!term) return;
+  var open = postTermOpenItems(pj, term);
+  var box = el('div', 'panel-box');
+  box.appendChild(el('div', 'section-title', '闸门养护岗 · 交接确认'));
+  box.appendChild(el('p', 'muted', '玛尔：控制室说你要把河湾闸门的养护岗交出来。确认一次就算交接，不用再跑回去按第三个按钮。'));
+  box.appendChild(el('p', 'req-chip', '任期 ' + term.startDay + ' 至 ' + term.reviewDay + ' 天 · 当前相位：' +
+    (postTermPhase(term) === 'review_due' ? '待期末处理' : '在任') + '；本期检视 ' + postTermStats(pj, term).done + ' 次。'));
+  if (open.length) box.appendChild(el('p', 'muted', '会留在册上的事项：' + open.join('、') + '。交班不清账，这些仍然记在你名下。'));
+  if (!engSafetyClear(pj)) {
+    box.appendChild(el('p', 'req-chip', '闸门还有未处理的安全事件，责任交不干净，先回控制室把它处理完；也可以在任期面板直接辞职。'));
+  } else {
+    extendedWorkButton(box, 'quarry', '确认接手养护责任 · 30分钟', {
+      minutes: 30, energy: 1,
+      guard: function () { var q = engProject(); return !!postTermHandoverPending() && engSafetyClear(q); },
+      reason: '没有待确认的交接申请。'
+    }, function () { postTermConfirmHandover(POST_GATEKEEPER); });
+  }
+  b.appendChild(box);
+}
 function engDutyPanel(b, pj, site, atOverride) {
   /* R3-D/P0-2：磨坊、河港、控制室三处面板读同一份事实。
      atOverride 让闸门养护责任既能落在 water/gauge，也能落在 mill_duty 上；
@@ -12203,20 +12561,26 @@ function engDutyPanel(b, pj, site, atOverride) {
     }).join('；')));
   }
   if (d.status === 'active') {
-    if (state.totalDay >= d.nextDay) {
+    /* R5-A：任期到期进入待评后，先给期末去向，不再追加新的检视周期与延期。 */
+    var liveTerm = currentPostTerm(POST_GATEKEEPER);
+    var inReview = !!liveTerm && postTermPhase(liveTerm) === 'review_due';
+    if (inReview) {
+      box.appendChild(el('p', 'req-chip', '岗位任期已到期，本期不再产生新检视周期和津贴；请在下方任期面板选续任、交接或辞职。'));
+    }
+    if (!inReview && state.totalDay >= d.nextDay) {
       extendedWorkButton(box, at, (isMill ? '磨坊工程养护检视 · 45分钟' : '闸门养护检视 · 45分钟'), {
         minutes: 45, energy: 3,
         guard: function () { var q = engProject(); return q.phase === 'accepted' && engDuty(q).status === 'active' && state.totalDay >= engDuty(q).nextDay; },
         reason: '刚检视过；下一个检视日还没到。'
       }, function () { engDutyInspect(engProject()); });
-    } else box.appendChild(el('p', 'muted', '本周期检视已完成，不必每天来。'));
-    if (d.deferCount < ENG_DUTY_MAX_DEFER) {
+    } else if (!inReview) box.appendChild(el('p', 'muted', '本周期检视已完成，不必每天来。'));
+    if (!inReview && d.deferCount < ENG_DUTY_MAX_DEFER) {
       extendedWorkButton(box, at, '申请延期一个周期 · 20分钟', {
         minutes: 20,
         guard: function () { var q = engProject(); return q.phase === 'accepted' && engDuty(q).status === 'active' && engDuty(q).deferCount < ENG_DUTY_MAX_DEFER; },
         reason: '延期已达上限（' + ENG_DUTY_MAX_DEFER + ' 次），只能交接或退出。'
       }, function () { engDutyDefer(engProject(), isMill ? '人手不足' : '人手不足'); });
-    } else box.appendChild(el('p', 'req-chip', '延期已用满 ' + ENG_DUTY_MAX_DEFER + ' 次：要交接或退出，责任才算说清楚。'));
+    } else if (!inReview) box.appendChild(el('p', 'req-chip', '延期已用满 ' + ENG_DUTY_MAX_DEFER + ' 次：要交接或退出，责任才算说清楚。'));
     /* 交接与退出的前置是安全记录已处理完 —— 交班不清掉未处理的闸门事件 */
     var blocked = !engSafetyClear(pj);
     if (blocked) box.appendChild(el('p', 'req-chip', '闸门还有未处理的安全事件，交接与退出都要先把它处理完。'));
@@ -12237,6 +12601,8 @@ function engDutyPanel(b, pj, site, atOverride) {
     box.appendChild(el('p', 'muted', '责任已经' + (d.status === 'handed' ? '交出' : '结束') + '。你名下的检视、延期与逾期记录都保留在册，随时可查。'));
   }
   b.appendChild(box);
+  /* R5-A：任期面板跟着养护面板同源出现，控制室与磨坊读到的是同一份任职期账本。 */
+  postTermPanel(b, pj, isMill);
 }
 /* 河港与船闸值守室只读地呈现同一份事实。
    不挂按钮，避免从远处重复扣料或重复结算；玩家要看按钮得回到工程现场（控制室或磨坊）。 */
@@ -12259,6 +12625,8 @@ function engDutyReadout(b, pj, scopeLabel) {
   }
   box.appendChild(el('p', 'muted', '累计检视 ' + d.done + ' 次 · 评价 ' + d.evalCount + ' 次 · 延期 ' + d.deferCount + ' 次 · 逾期 ' + d.overdue + ' 次。'));
   b.appendChild(box);
+  /* R5-A：任期进度同源只读，不在这里挂会改钱的按钮。 */
+  postTermReadout(b, pj);
 }
 
 function engAcceptPanel(b, pj, site) {
@@ -12691,6 +13059,18 @@ function engNextStepText() {
   if (pj.phase === 'build') return '闸基工作面封闸并启动跨日试运行';
   if (pj.phase === 'trial') return state.totalDay > pj.trialDay ? '水利控制室复核试运行并签署验收' : '睡过一个游戏夜晚再回来验收';
   var dty = engDuty(pj);
+  /* R5-A：任期到期后，期末去向优先于普通检视提示，三处共用这一句。 */
+  var liveTerm = currentPostTerm(POST_GATEKEEPER);
+  if (liveTerm && postTermPhase(liveTerm) === 'review_due') {
+    return '闸门养护岗第 ' + liveTerm.reviewDay + ' 天到期，期末报告已出：到水利控制室或风铃磨坊的岗位任期面板选续任、交接或辞职';
+  }
+  if (liveTerm && dty.status === 'active' && dty.handover && dty.handover.termId === liveTerm.id) {
+    return '已向' + ENG_DUTY_SUCCESSOR + '申请交接闸门养护岗，到石灰采场找他确认一次就完成';
+  }
+  if (liveTerm && dty.status === 'active') {
+    return '闸门养护岗试任期至第 ' + liveTerm.reviewDay + ' 天（还剩 ' + Math.max(0, liveTerm.reviewDay - state.totalDay) +
+      ' 天），本期预算已用 ' + liveTerm.budget.spent + ' / ' + POST_BUDGET + ' 金；按期做养护检视才能领津贴';
+  }
   if (dty.status === 'handed') return '闸门养护责任已于第 ' + dty.endDay + ' 天交接给' + dty.successor + '，记录仍在你名下';
   if (dty.status === 'released') return '闸门养护岗位已于第 ' + dty.endDay + ' 天结束，检视与延期记录仍可查';
   if (dty.status === 'active' && state.totalDay >= dty.nextDay) return '闸门养护检视已到期（第 ' + dty.nextDay + ' 天' + (engDutyOverdue(pj) > 0 ? '，逾期 ' + engDutyOverdue(pj) + ' 天' : '') + '），到水利控制室、坝顶水尺或风铃磨坊做一次；三处都走同一份事实';
@@ -19287,6 +19667,8 @@ function normalizeProfessionalLife(raw){var d=newProfessionalLife(),r=raw&&typeo
      choice:legacyEng.choice,budget:Number.isFinite(legacyEng.budget)?legacyEng.budget:0});
   a=r.careers||{};['horticulture','medicine','trade','engineering'].forEach(function(k){d.careers[k]=n(a[k],5);});
   d.trust=n(r.trust,100);
+  /* R5-A：岗位试任期账本。旧档没有这个键就补空数组，不伪造历史任期。 */
+  d.postTerms=normalizePostTerms(r.postTerms);
   a=r.access||{};Object.keys(d.access).forEach(function(k){d.access[k]=!!a[k];});
   if(d.careers.horticulture)d.access.vineyard=true;if(d.clinic.diagnosed)d.access.clinic=true;
   if(d.port.manifestChecked)d.access.port=true;if(d.quarry.surveyed)d.access.quarry=true;
@@ -19832,6 +20214,8 @@ function openProfessionSite(site){
       if(q.face&&!q.props)extendedWorkButton(b,'quarry','支护采区 · 木材 ×4',{need:{wood:4},minutes:25,energy:3,guard:function(){return q.face&&!q.props;}},function(){q.props=true;bumpRoute('engineering');bumpCareer('engineering');});
       if(q.props)extendedWorkButton(b,'quarry',q.face==='carbonate'?'采掘石灰岩料 ×8 · 25分钟':'采掘稳定石灰岩料 ×6 · 20分钟',{out:'limestone',qty:q.face==='carbonate'?8:6,minutes:q.face==='carbonate'?25:20,energy:5,guard:function(){return q.props&&q.lastExtractDay!==state.totalDay;},reason:'支护未完成或今天已采过；先加固裂隙。'},function(){q.extracted+=q.face==='carbonate'?8:6;q.lastExtractDay=state.totalDay;});
       b.appendChild(el('p',null,'采区：'+(q.face==='stable'?'稳定东侧':'石灰层')+'；支护 '+(q.props?'已完成':'未完成')+'；累计采出 '+q.extracted+'；切割验收 '+q.cut+'。'));
+      /* R5-A：玛尔只在玩家申请过交接时才出现确认入口，不常驻一个交接按钮。 */
+      postTermHandoverBox(b);
     }
     if(site==='shed'){b.appendChild(el('p',null,'石料编号要和采区测量单一致。合格石料可经河港转运到水利站，不接受背包里未切割的原石。'));if(q.extracted>=4)extendedWorkButton(b,'shed','切割工程石料 ×3 · 石灰岩 ×4',{need:{limestone:4},out:'stone_block',qty:3,minutes:35,energy:4,guard:function(){return q.extracted>=(q.cut/3+1)*4;}},function(){q.cut+=3;p.careers.engineering=Math.max(p.careers.engineering,1);});}
     if(site==='gauge'||site==='water'||site==='riverbay_east'||site==='riverbay_silt'||site==='riverbay_pit'){
@@ -22723,6 +23107,19 @@ window.__MOSS__ = {
   engDutyHandover: engDutyHandover,
   engDutyRelease: engDutyRelease,
   engDutyOverdue: engDutyOverdue,
+  /* 一份「下一步」文案，三个地方共用；用例读它确认三处不会各说各话 */
+  engNextStepText: engNextStepText,
+  /* R5-A 岗位试任期：用例从真实界面点按钮，接口层只用于读同一份事实 */
+  POST_TERM_DAYS: POST_TERM_DAYS,
+  POST_BUDGET: POST_BUDGET,
+  POST_ALLOWANCE: POST_ALLOWANCE,
+  postTerms: postTerms,
+  currentPostTerm: currentPostTerm,
+  postTermPhase: postTermPhase,
+  postTermStats: postTermStats,
+  postTermBudgetLeft: postTermBudgetLeft,
+  postTermRating: postTermRating,
+  postTermHandoverPending: postTermHandoverPending,
   ENG_DUTY_CYCLE: ENG_DUTY_CYCLE,
   ENG_DUTY_MAX_DEFER: ENG_DUTY_MAX_DEFER,
   ENG_DUTY_SUCCESSOR: ENG_DUTY_SUCCESSOR,

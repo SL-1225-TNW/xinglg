@@ -48,6 +48,8 @@ const BROWSER = [
   'run-university.mjs',
   /* R5-0 经济止血：票据报价、兑付期限、典当与旧档兼容，源码与单文件版各一轮 */
   'run-r5-finance-safety.mjs',
+  /* R5-A 岗位试任期：28 天任期、120 金预算、期末三去向与四处面板同源 */
+  'run-r5-post-term.mjs',
   'run-south-gate.mjs',
   'run-industry.mjs',
   'run-clinic-construction.mjs',
@@ -98,6 +100,7 @@ run('run-r4-season-single-file', path.join(here, 'run-r4-season.mjs'), ['--singl
 run('run-r4-settlement-aid-single-file', path.join(here, 'run-r4-settlement-aid.mjs'), ['--single-file']);
 run('run-r4-legacy-save-single-file', path.join(here, 'run-r4-legacy-save.mjs'), ['--single-file']);
 run('run-r5-finance-safety-single-file', path.join(here, 'run-r5-finance-safety.mjs'), ['--single-file']);
+run('run-r5-post-term-single-file', path.join(here, 'run-r5-post-term.mjs'), ['--single-file']);
 
 console.log(failed ? `\n共 ${failed} 项失败。` : '\n两层全部通过。');
 process.exit(failed ? 1 : 0);
