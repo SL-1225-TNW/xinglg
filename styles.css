@@ -1128,3 +1128,58 @@ html.personal-encounter #farmAssist{display:none!important}
 .personal-controls:not(.active){left:auto;right:6px;transform:none;width:auto}
 .personal-controls:not(.active) #personalAttack,.personal-controls:not(.active) #personalDodge{display:none}
 html.immersive .personal-controls{top:56px}
+
+/* ---------------- 第九版第一部主线《长风有归处》· 场次演出 ---------------- */
+.story-head{
+  display:flex;flex-direction:column;gap:2px;
+  padding:8px 10px;border-left:3px solid var(--hint);
+  background:rgba(10,20,16,.35);border-radius:0 8px 8px 0;
+}
+.story-task-id{font-size:11px;letter-spacing:1px;color:var(--hint)}
+.story-task-title{font-size:15px;color:var(--paper)}
+.story-task-goal{font-size:12px;color:var(--text-dim);line-height:1.55}
+.story-scene{display:flex;flex-direction:column;gap:9px}
+.story-line{font-size:13px;line-height:1.7;color:var(--text)}
+.story-narr{color:var(--text-dim);font-size:12.5px;padding-left:2px}
+.story-said{display:flex;gap:8px;align-items:baseline}
+.story-who{
+  flex:0 0 auto;font-size:12px;color:var(--hint);
+  border:1px solid rgba(239,209,139,.45);border-radius:6px;
+  padding:1px 7px;background:rgba(239,209,139,.10);
+}
+.story-text{flex:1 1 auto}
+.story-choice,.story-step{
+  display:flex;flex-direction:column;gap:8px;
+  padding:10px;border:1px solid var(--line-hi);border-radius:9px;
+  background:rgba(122,106,52,.14);
+}
+.story-prompt{font-size:13px;color:var(--paper);line-height:1.6}
+.story-options,.story-picks,.story-ref-opts{display:flex;flex-wrap:wrap;gap:8px}
+.story-opt,.story-pick{flex:1 1 220px;text-align:left;line-height:1.55}
+.story-pick.on{border-color:var(--good);color:var(--good)}
+.story-step-done,.story-choice-done{font-size:12px;color:var(--text-dim)}
+.story-items,.story-overlay,.story-reception{display:flex;flex-direction:column;gap:9px}
+.story-ref{
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+  padding:7px 9px;border:1px solid rgba(120,150,110,.30);border-radius:8px;
+}
+.story-ref-name{flex:0 0 auto;font-size:13px;color:var(--paper)}
+.story-ref-ok{flex:1 1 200px;font-size:12px;color:var(--good);line-height:1.55}
+.story-guest{
+  display:flex;flex-direction:column;gap:4px;
+  padding:9px 10px;border:1px solid rgba(120,150,110,.30);border-radius:8px;
+  background:rgba(10,20,16,.28);
+}
+.story-guest-name{font-size:13px;color:var(--hint)}
+.story-guest-hint{font-size:12px;color:var(--text-dim)}
+.story-guest-ok{font-size:12px;color:var(--text);line-height:1.6}
+.story-end{
+  text-align:center;font-size:12px;color:var(--hint);letter-spacing:2px;
+  padding:6px 0;border-top:1px dashed rgba(120,150,110,.30);
+}
+.story-evidence{font-size:12px;color:var(--text-dim);line-height:1.65;padding:2px 0}
+@media(max-width:600px){
+  .story-said{flex-direction:column;gap:3px}
+  .story-opt,.story-pick{flex:1 1 100%}
+  .story-who{align-self:flex-start}
+}

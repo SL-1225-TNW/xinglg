@@ -1137,6 +1137,60 @@ html.personal-encounter #farmAssist{display:none!important}
 .personal-controls:not(.active) #personalAttack,.personal-controls:not(.active) #personalDodge{display:none}
 html.immersive .personal-controls{top:56px}
 
+/* ---------------- 第九版第一部主线《长风有归处》· 场次演出 ---------------- */
+.story-head{
+  display:flex;flex-direction:column;gap:2px;
+  padding:8px 10px;border-left:3px solid var(--hint);
+  background:rgba(10,20,16,.35);border-radius:0 8px 8px 0;
+}
+.story-task-id{font-size:11px;letter-spacing:1px;color:var(--hint)}
+.story-task-title{font-size:15px;color:var(--paper)}
+.story-task-goal{font-size:12px;color:var(--text-dim);line-height:1.55}
+.story-scene{display:flex;flex-direction:column;gap:9px}
+.story-line{font-size:13px;line-height:1.7;color:var(--text)}
+.story-narr{color:var(--text-dim);font-size:12.5px;padding-left:2px}
+.story-said{display:flex;gap:8px;align-items:baseline}
+.story-who{
+  flex:0 0 auto;font-size:12px;color:var(--hint);
+  border:1px solid rgba(239,209,139,.45);border-radius:6px;
+  padding:1px 7px;background:rgba(239,209,139,.10);
+}
+.story-text{flex:1 1 auto}
+.story-choice,.story-step{
+  display:flex;flex-direction:column;gap:8px;
+  padding:10px;border:1px solid var(--line-hi);border-radius:9px;
+  background:rgba(122,106,52,.14);
+}
+.story-prompt{font-size:13px;color:var(--paper);line-height:1.6}
+.story-options,.story-picks,.story-ref-opts{display:flex;flex-wrap:wrap;gap:8px}
+.story-opt,.story-pick{flex:1 1 220px;text-align:left;line-height:1.55}
+.story-pick.on{border-color:var(--good);color:var(--good)}
+.story-step-done,.story-choice-done{font-size:12px;color:var(--text-dim)}
+.story-items,.story-overlay,.story-reception{display:flex;flex-direction:column;gap:9px}
+.story-ref{
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+  padding:7px 9px;border:1px solid rgba(120,150,110,.30);border-radius:8px;
+}
+.story-ref-name{flex:0 0 auto;font-size:13px;color:var(--paper)}
+.story-ref-ok{flex:1 1 200px;font-size:12px;color:var(--good);line-height:1.55}
+.story-guest{
+  display:flex;flex-direction:column;gap:4px;
+  padding:9px 10px;border:1px solid rgba(120,150,110,.30);border-radius:8px;
+  background:rgba(10,20,16,.28);
+}
+.story-guest-name{font-size:13px;color:var(--hint)}
+.story-guest-hint{font-size:12px;color:var(--text-dim)}
+.story-guest-ok{font-size:12px;color:var(--text);line-height:1.6}
+.story-end{
+  text-align:center;font-size:12px;color:var(--hint);letter-spacing:2px;
+  padding:6px 0;border-top:1px dashed rgba(120,150,110,.30);
+}
+.story-evidence{font-size:12px;color:var(--text-dim);line-height:1.65;padding:2px 0}
+@media(max-width:600px){
+  .story-said{flex-direction:column;gap:3px}
+  .story-opt,.story-pick{flex:1 1 100%}
+  .story-who{align-self:flex-start}
+}
 </style>
 </head>
 <body>
@@ -1917,6 +1971,1334 @@ var QUEST_SITES = {
   bridge: { scene: 'town', x: 26, y: 9,  label: '小桥施工点' }
 };
 
+/* ============================================================
+   第九版第一部主线《长风有归处》· M0 切片
+   ------------------------------------------------------------
+   剧本来源：《游戏总体规划》第九版 §27.1（序章 P01—P04）与 §27.2（第一幕 A01—A05）。
+   场号 S000A—S018 保持稳定；未修桥时的镇内替代演出用 S005-T / S006-T / S007-T。
+   本切片只实装 9 个任务；B01 及以后属于 M1—M3，面板里如实写「后续章节」，
+   不放空按钮，也不预告不存在的入口（总规 §26.1、§28.1）。
+   场次正文不另写一份剧情：台词、旁白与选择全部取自总规分场稿。
+   ============================================================ */
+
+/* --- 任务：9 个现定任务 ID，编号与总规 §26.1 一致 --- */
+var STORY_TASKS = [
+  { id: 'MQ1-P01', act: 1, actName: '序章 · 风从旧信来', title: '一封信，一处屋檐',
+    goal: '读伊文的旧信，确认白蔷薇那处空着的农场。',
+    scenes: ['S001', 'S002'], memory: ['S000A', 'S000B'], next: 'MQ1-P02', exp: 60 },
+  { id: 'MQ1-P02', act: 1, actName: '序章 · 风从旧信来', title: '泥土记得来时雨',
+    goal: '在白蔷薇开始生活：照料一格田，或完成一份小镇工作。',
+    scenes: ['S003', 'S004'], next: 'MQ1-P03', exp: 60 },
+  { id: 'MQ1-P03', act: 1, actName: '序章 · 风从旧信来', title: '水轮边的未竟之言',
+    goal: '核对伊文留下的测量板，取得图册索引。',
+    scenes: ['S005', 'S006'], altScenes: ['S005-T', 'S006-T'], next: 'MQ1-P04', exp: 60 },
+  { id: 'MQ1-P04', act: 1, actName: '序章 · 风从旧信来', title: '信末没有归期',
+    goal: '取回图册，登记索引与未兑现的归期。',
+    scenes: ['S007', 'S008'], altScenes: ['S007-T', 'S008'], next: 'MQ1-A01', exp: 60 },
+  { id: 'MQ1-A01', act: 2, actName: '第一幕 · 满城蔷薇，谁记归人', title: '城门内外，各有晨昏',
+    goal: '进城，找到艾琳和可联系的邮务员。',
+    scenes: ['S009', 'S010'], next: 'MQ1-A02', exp: 60 },
+  { id: 'MQ1-A02', act: 2, actName: '第一幕 · 满城蔷薇，谁记归人', title: '借一盏灯，读一页往事',
+    goal: '在图书馆与学院叠合旧图，取得改版年份与记录出处。',
+    scenes: ['S011', 'S012'], next: 'MQ1-A03', exp: 60 },
+  { id: 'MQ1-A03', act: 2, actName: '第一幕 · 满城蔷薇，谁记归人', title: '花影不替人作答',
+    goal: '在花园接待中弄清伊文最近的行踪，并决定公开问还是私谈。',
+    scenes: ['S013', 'S014'], next: 'MQ1-A04', exp: 60 },
+  { id: 'MQ1-A04', act: 2, actName: '第一幕 · 满城蔷薇，谁记归人', title: '那年未落的签名',
+    goal: '在议事厅抄下逐户复核页，并决定怎么开口。',
+    scenes: ['S015', 'S016'], next: 'MQ1-A05', exp: 60 },
+  { id: 'MQ1-A05', act: 2, actName: '第一幕 · 满城蔷薇，谁记归人', title: '蔷薇以北，长路初开',
+    goal: '取得民用资料核验函，与莱娜约好北行。',
+    scenes: ['S017', 'S018'], next: 'MQ1-B01', exp: 60 }
+];
+
+/* --- 证据：出处与取得场次分开记，来源可回看 --- */
+var STORY_EVIDENCE = {
+  letter:        { title: '伊文的旧信', source: 'S002 · 农舍桌旁' },
+  index:         { title: '测量板背的路线批注', source: 'S006 / S006-T · 磨坊进水渠或木作量架' },
+  atlas:         { title: '寄存图册（油布包）', source: 'S007 / S007-T · 议事屋寄存柜或木作寄存台' },
+  index_note:    { title: '抄下来的索引便笺', source: 'S008 · 农舍桌旁' },
+  promise:       { title: '被划掉两次的返程日期', source: 'S007 / S007-T · 让娜与阿栎' },
+  map_revision:  { title: '改版年份与记录出处', source: 'S012 · 学院阅览桌' },
+  bell_testimony:{ title: '贝尔的亲见：两个月前在旅馆见过伊文', source: 'S013 · 花园接待' },
+  noel_map:      { title: '诺尔的旧图说明：按迁居记录撤下', source: 'S013 · 花园接待' },
+  inquiry_letter:{ title: '塞琳的承诺：宫城收过一份问路函', source: 'S013 · 花园接待' },
+  household_page:{ title: '逐户复核页副本', source: 'S015 · 议事厅档案角' },
+  lena_receipt:  { title: '母亲保留的查询回单', source: 'S015 · 议事厅档案角' },
+  civil_check:   { title: '民用资料核验函', source: 'S017 · 宫城一层门厅' }
+};
+
+/* --- 场次：台词、旁白、选择与互动步骤 --- */
+var STORY_SCENES = {
+  /* ============ 回忆：来信之前（可跳过，可回看） ============ */
+  S000A: { task: 'MQ1-P01', chain: 'memory', place: '旅途棚檐', time: '雨后', tag: '回忆',
+    where: '回忆 · 旅途棚檐',
+    lines: [
+      { who: '', text: '主角背包的扣带松脱，物件停在湿地边。伊文把自己的干布铺开，先帮主角拦住滚动的物件。' },
+      { who: '伊文', text: '先放这里，别急着追进泥里。少了什么？你来数，我帮你找。' },
+      { who: '主角', text: '扣带断了。' },
+      { who: '', text: '伊文取出短绳，手已经伸到扣边，主角拦住他。' },
+      { who: '主角', text: '我想自己试试。你告诉我怎么打结就好。' },
+      { who: '伊文', text: '好。先绕这一圈，别把开口也绑住。' },
+      { step: 'sort', text: '把散落的三件演出物件摆开，找出干补片。', mode: 'items',
+        picks: ['松脱的铜扣', '伊文的短绳', '一块干补片'], order: ['松脱的铜扣', '伊文的短绳', '一块干补片'],
+        hint: '先找出松脱的那一样，再找能固定它的两样。', confirm: '三件都摆好了' },
+      { step: 'fasten', text: '按伊文示范固定扣带。', mode: 'items',
+        picks: ['先绕这一圈', '把开口也绑住', '拉紧打死结'], order: ['先绕这一圈'],
+        hint: '伊文说过：先绕这一圈，别把开口也绑住。', confirm: '扣带固定好了' }
+    ] },
+  S000B: { task: 'MQ1-P01', chain: 'memory', place: '同一棚檐路口', time: '傍晚', tag: '回忆',
+    where: '回忆 · 棚檐路口',
+    lines: [
+      { who: '伊文', text: '两边都能走。石路绕一点，林边得踩过浅水。你想走哪边？' },
+      { choice: 'memory_route', prompt: '两段路都走得通。你想走哪一边？', options: [
+        { id: 'A', text: '石路。今天不想再弄湿东西。' },
+        { id: 'B', text: '林边。到浅水处再看看。' } ] },
+      { who: '', text: '主角选了石路。碎石好走，路却多绕了半个时辰。', when: function (c) { return c.memory_route === 'A'; } },
+      { who: '', text: '主角选了林边。浅水处的石头平，裤脚还是湿了一截。', when: function (c) { return c.memory_route === 'B'; } },
+      { who: '伊文', text: '行。先吃一点，照你选的走。' },
+      { who: '', text: '主角把面包较大的一块递回去。伊文笑着接下，没有再推让。' }
+    ] },
+
+  /* ============ 序章 ============ */
+  S001: { task: 'MQ1-P01', place: '苔芽农场门前', time: '日', where: '苔芽农场 · 农舍门前',
+    lines: [
+      { who: '', text: '芽芽拨开门牌旁的藤。主角拿着折旧的信，核对门牌。' },
+      { who: '芽芽', text: '是这里。门得往上提一下，别跟它较劲。' },
+      { who: '主角', text: '伊文说，他会在这里等我。' },
+      { who: '芽芽', text: '他把钥匙留了下来。人还没回来。' },
+      { who: '芽芽', text: '先进去吧，路上的灰总得有个地方放。' },
+      { choice: 'p01_reply', prompt: '芽芽在等你的回答。', options: [
+        { id: 'A', text: '他大概又忘了看日历。' },
+        { id: 'B', text: '我想先找到他。' } ] },
+      { who: '芽芽', text: '那你可别学他。种子不认口头约定。', when: function (c) { return c.p01_reply === 'A'; } },
+      { who: '芽芽', text: '可以。可今晚你也得有地方睡。', when: function (c) { return c.p01_reply === 'B'; } }
+    ] },
+  S002: { task: 'MQ1-P01', place: '农舍', time: '日', where: '苔芽农场 · 农舍桌旁',
+    evidence: ['letter'],
+    lines: [
+      { who: '', text: '主角将信放在桌上。窗可以打开，床旁留着一处空位。' },
+      { who: '伊文（信）', text: '白蔷薇有一处空着的农场。你若愿意，可以在那里住下来。' },
+      { who: '伊文（信）', text: '等最后一条路画完，我就回来。' },
+      { who: '芽芽', text: '屋里缺什么，慢慢添。种子铺就在镇上。', when: function () { return !storyIsOldSave(); } },
+      { who: '芽芽', text: '我来看看你缺不缺远行的东西。种子铺就在镇上。', when: function () { return storyIsOldSave(); } },
+      { who: '主角', text: '你见过他最后一次，是哪天？' },
+      { who: '芽芽', text: '他去了磨坊。马丁也许记得。' }
+    ] },
+  S003: { task: 'MQ1-P02', place: '农场田边', time: '日', where: '苔芽农场 · 田边',
+    lines: [
+      { who: '', text: '芽芽蹲下，捏起田边的一小撮土，搓开。' },
+      { who: '芽芽', text: '上面干，下面还有潮气。别只看颜色。' },
+      { who: '主角', text: '伊文教我看路，也是这么说的。' },
+      { who: '芽芽', text: '那他至少教对了一件事。' },
+      { who: '芽芽', text: '你今天想先照料田，还是去镇上找份小工作？' }
+    ] },
+  S004: { task: 'MQ1-P02', place: '小镇种子铺前', time: '日', where: '小镇 · 种子铺前',
+    lines: [
+      { who: '', text: '主角带回劳动所得，或展示已有收获记录。芽芽把账册翻到新的一行。' },
+      { who: '芽芽', text: '这是你自己挣来的。以后走到哪里，都不算空着手。' },
+      { who: '主角', text: '伊文留过别的东西吗？' },
+      { who: '芽芽', text: '他不擅长收拾。去问马丁的时候，替我催他把旧纸搬走。' },
+      { who: '主角', text: '我会先问他人在哪。' },
+      { who: '芽芽', text: '对。纸可以再等一等。' }
+    ] },
+  S005: { task: 'MQ1-P03', place: '风铃磨坊机房', time: '日', where: '风铃磨坊 · 机房（桥已修）',
+    lines: [
+      { who: '', text: '马丁停下手中锉刀，将一块刻着三道线的木板转向主角。' },
+      { who: '马丁', text: '他拿这块记水位。走的时候说，很快就取。' },
+      { who: '主角', text: '这些线怎么不一样高？' },
+      { who: '马丁', text: '水不会只停在你量它的那一天。' },
+      { who: '马丁', text: '先把板放回槽边，你自己看。' }
+    ] },
+  S006: { task: 'MQ1-P03', place: '磨坊进水渠', time: '日', where: '风铃磨坊 · 进水渠（桥已修）',
+    evidence: ['index'],
+    lines: [
+      { step: 'align', text: '辨认三个固定参照，按钉孔把木板对齐。', mode: 'items',
+        picks: ['钉孔', '固定石', '水痕'], order: ['钉孔', '固定石', '水痕'],
+        hint: '板上有三处对得上的记号。伊文说，看背板之前先把钉孔对好。', confirm: '三处参照都对上了' },
+      { who: '', text: '板背露出一个藏在夹层里的纸角。' },
+      { who: '马丁', text: '找到了？那不是暗号，是他怕纸弄湿。' },
+      { who: '主角', text: '上面写着图书馆，还有一个北边的地名。' },
+      { who: '马丁', text: '纸包拿走。他离开前睡过议事屋，图册还在那里。' }
+    ] },
+  'S005-T': { task: 'MQ1-P03', place: '小镇任务板旁', time: '日', where: '小镇 · 任务板旁（未修桥）',
+    lines: [
+      { who: '', text: '马丁将赶集带来的木箱放稳，先核对主角信上的寄存人姓名。' },
+      { who: '马丁', text: '桥那边还没通。我照让娜的移交单，把图册和测量板一起带来了。' },
+      { who: '主角', text: '这块板也是伊文的？' },
+      { who: '马丁', text: '原来就在水轮边。他说看背板之前，先把钉孔对好。' }
+    ] },
+  'S006-T': { task: 'MQ1-P03', place: '阿栎木工作坊量架旁', time: '日', where: '小镇 · 阿栎木工作坊（未修桥）',
+    evidence: ['index'],
+    lines: [
+      { who: '', text: '主角按钉孔、板边和旧刻痕把板固定在量架上，打开不承重的夹层。阿栎把工具收回架上。' },
+      { who: '阿栎', text: '这是旧板，别拿眼前的井水给它编一个磨坊水位。' },
+      { who: '主角', text: '我核的是板背批注。图书馆，还有一个北边的地名。' },
+      { who: '马丁', text: '对。封着的图册也给你，寄存单还得再核一次。' },
+      { step: 'align', text: '按钉孔、固定石、水痕三处参照对齐木板。', mode: 'items',
+        picks: ['钉孔', '固定石', '水痕'], order: ['钉孔', '固定石', '水痕'],
+        hint: '板上有三处对得上的记号。伊文说，看背板之前先把钉孔对好。', confirm: '三处参照都对上了' }
+    ] },
+  S007: { task: 'MQ1-P04', place: '麦田村议事屋', time: '日', where: '麦田村 · 议事屋（桥已修）',
+    evidence: ['atlas', 'promise'],
+    lines: [
+      { who: '', text: '让娜打开寄存柜，先让主角核对信上的署名，再交出用油布包住的图册。' },
+      { who: '让娜', text: '寄存单写的是你的名字。我们没拆过。' },
+      { who: '主角', text: '他准备好了让我来，自己却去了别处。' },
+      { who: '让娜', text: '他也给自己留过返程日期。划掉了两次。' }
+    ] },
+  'S007-T': { task: 'MQ1-P04', place: '小镇木工作坊寄存台', time: '日', where: '小镇 · 阿栎木工作坊（未修桥）',
+    evidence: ['atlas', 'promise'],
+    lines: [
+      { who: '', text: '阿栎与马丁核对让娜的移交单。油布包的封条完好，写着主角信上的收件姓名。' },
+      { who: '阿栎', text: '让娜签了代交，马丁签了运到。现在由你核收。' },
+      { who: '主角', text: '他连我来拿这件东西都想好了。' },
+      { who: '马丁', text: '却没想好怎样准时回来。图里有他划过的归期，你自己看。' }
+    ] },
+  S008: { task: 'MQ1-P04', place: '农舍桌旁', time: '暮', where: '苔芽农场 · 农舍桌旁',
+    evidence: ['index_note'],
+    lines: [
+      { who: '', text: '主角摊开图册。白蔷薇以北的一片地名被铅线划去；页角留着「艾琳馆藏旧图」的索引。' },
+      { who: '伊文（书面文字）', text: '山脊不是从这里结束的。还有人——' },
+      { choice: 'p04_choice', prompt: '图册上有一片被铅线划掉的地名。', options: [
+        { id: 'A', text: '去看看他没画完的地方。' },
+        { id: 'B', text: '先把家里安顿好，再去问艾琳。' } ] },
+      { who: '', text: '主角把索引抄到便笺上，图册没有自动消失。' }
+    ] },
+
+  /* ============ 第一幕 ============ */
+  S009: { task: 'MQ1-A01', place: '白蔷薇城南门', time: '日', where: '白蔷薇城 · 南门',
+    lines: [
+      { who: '', text: '阿诺检查通行证，指向街口的方向牌。车夫让开一辆进城的菜车。' },
+      { who: '阿诺', text: '又进城办事？这次找谁。', when: function () { return storyCityVisited(); } },
+      { who: '阿诺', text: '图书馆往学院区走。人多，别在门洞里翻地图。', when: function () { return !storyCityVisited(); } },
+      { who: '主角', text: '我找一个测绘师。伊文。' },
+      { who: '阿诺', text: '我记不得每个过门的人。邮局记信，旅馆记住客。' }
+    ] },
+  S010: { task: 'MQ1-A01', place: '驿站邮局', time: '日', where: '白蔷薇城 · 驿站邮局',
+    lines: [
+      { who: '', text: '小翎把一捆退信压在桌角。旁边的莱娜正在重新写一张破损地址签。' },
+      { who: '小翎', text: '这是莱娜，来帮忙核旧邮路。她认得北边的地名。' },
+      { who: '莱娜', text: '先别把图折起来。这个村名，你从哪里抄来的？' },
+      { who: '主角', text: '伊文的地图。你认识？' },
+      { who: '莱娜', text: '我以前住在那里。' }
+    ] },
+  S011: { task: 'MQ1-A02', place: '蔷薇图书馆', time: '日', where: '白蔷薇城 · 蔷薇图书馆',
+    lines: [
+      { who: '', text: '艾琳垫好软布，让主角把自带图册放在馆藏旧图旁。' },
+      { who: '艾琳', text: '一册借阅，一册你的。不要在馆藏上画。' },
+      { who: '莱娜', text: '这里原来有个渡口。我记得等过船。' },
+      { who: '主角', text: '新版只画了山坡。' },
+      { who: '艾琳', text: '改版不等于山坡上发生过什么。去查更改说明。' }
+    ] },
+  S012: { task: 'MQ1-A02', place: '学院阅览桌', time: '日', where: '白蔷薇城 · 河岸学院',
+    evidence: ['map_revision'],
+    lines: [
+      { who: '', text: '诺尔将地形薄片压在两张图上。河道与山脊相合，居民点的标注不同。' },
+      { step: 'overlay', text: '把河弯、双峰、渡口三处参照在两张图之间对起来，再判断改的是哪一样。', mode: 'overlay',
+        refs: [
+          { id: 'river', name: '河弯', answer: 'both', note: '两张图都有，河道走向一致。' },
+          { id: 'peak', name: '双峰', answer: 'both', note: '两张图都有，只是新版画得更细。' },
+          { id: 'ferry', name: '渡口', answer: 'old', note: '只有旧图有渡口。新版那一段只画了山坡。' }
+        ],
+        question: '地图改的是哪一样？',
+        options: [
+          { id: 'terrain', text: '地形改变' },
+          { id: 'mark', text: '居民标注改变' },
+          { id: 'unknown', text: '无法判断' }
+        ],
+        answer: 'mark',
+        answerNote: '诺尔说得对：这里不是画错比例，是按迁居记录撤下的。改的是标注，不是山河。' },
+      { who: '诺尔', text: '不是画错比例。这里是按迁居记录撤下的。' },
+      { who: '莱娜', text: '记录说他们都走了？' },
+      { who: '诺尔', text: '我只有摘要。能确认它写了什么，不能替它证明什么。' }
+    ] },
+  S013: { task: 'MQ1-A03', place: '白蔷薇城花园', time: '日', where: '白蔷薇城 · 花园接待桌',
+    lines: [
+      { who: '', text: '塞琳在既有接待桌旁核名单。贝尔放下茶壶，认出主角画册的包布。' },
+      { step: 'reception', text: '接待桌前有三个人。先看清谁站在哪儿，再决定先请谁开口。', mode: 'reception',
+        guests: [
+          { id: 'bell', name: '贝尔', hint: '旅馆老板 · 见过伊文住店', evidence: 'bell_testimony',
+            reveals: '他亲眼见过伊文，是两个月前，在南门旅馆。晚近的事他只肯转述，不肯签字。' },
+          { id: 'noel', name: '诺尔', hint: '学院教师 · 看过索引才谈图', evidence: 'noel_map', needEvidence: 'index',
+            reveals: '认得旧图册的编号，说得清改版年份和记录出处。' },
+          { id: 'serein', name: '塞琳', hint: '城堡管家 · 只承诺登记来件', evidence: 'inquiry_letter',
+            reveals: '宫城收过一份问路函。她可以约书记员核对来件，但不为街上的话背书。' }
+        ],
+        minApproach: 2 },
+      { who: '贝尔', text: '他住过南门旅馆，桌上总有沙子。说是从鞋里倒出来的。' },
+      { who: '主角', text: '他最近还回来过吗？' },
+      { who: '贝尔', text: '我亲眼见他，是两个月前。再晚的事，我只听别人说。' }
+    ] },
+  S014: { task: 'MQ1-A03', place: '同一花园 · 步道', time: '日', where: '白蔷薇城 · 花园步道',
+    lines: [
+      { who: '', text: '诺尔说完自己的见闻。莱娜把「伯兰署下结项」抄到纸上。' },
+      { who: '塞琳', text: '宫城收过一份问路函。我可以约书记员核对来件。' },
+      { who: '塞琳', text: '明确的事写明确。街上的话，不要都算在同一个人头上。' },
+      { who: '莱娜', text: '有人说他逃了责。' },
+      { choice: 'a03_question', prompt: '莱娜在等你的问题。', options: [
+        { id: 'A', text: '先问那个人亲眼见过什么。' },
+        { id: 'B', text: '我也想知道他为什么离开。' } ] },
+      { who: '塞琳', text: '这两个问题，都可以继续问。' }
+    ] },
+  S015: { task: 'MQ1-A04', place: '居民议事厅档案角', time: '日', where: '白蔷薇城 · 居民议事厅',
+    evidence: ['household_page', 'lena_receipt'],
+    lines: [
+      { who: '', text: '榆安将获准抄录的来件展开，盖住无关住户的个人信息。' },
+      { who: '', text: '莱娜在自己的通知旁放下母亲保留的查询回单。两份文件的接收地点不同。' },
+      { who: '榆安', text: '这份只转过来一页。「后续仍需逐户复核」。下面没有结案签名。' },
+      { who: '莱娜', text: '我母亲拿到的通知，却说已经办完了。' },
+      { who: '莱娜', text: '她去边城问过，答复只有「另行登记」，没有父亲能收到信的地址。' },
+      { who: '主角', text: '你父亲也在这份名单里？' },
+      { who: '莱娜', text: '鲁恩。修车的。通知说他在另一处安置点，我等到地址撤了。' }
+    ] },
+  S016: { task: 'MQ1-A04', place: '居民议事厅门廊', time: '暮', where: '白蔷薇城 · 议事厅门廊',
+    lines: [
+      { who: '', text: '莱娜把纸折了又展开，指尖停在伊文的名字上。' },
+      { who: '莱娜', text: '他知道有人没走。为什么不说清楚？' },
+      { choice: 'a04_stance', prompt: '这一步的分量比看起来重。', options: [
+        { id: 'A', text: '把疑问先写进申请，核对原件。（谨慎）' },
+        { id: 'B', text: '让受影响的人也知道我们在查。（公开）' } ] },
+      { who: '莱娜', text: '好。但找到他的时候，我要自己问。', when: function (c) { return c.a04_stance === 'A'; } },
+      { who: '莱娜', text: '我只说我们看见的，不替它加一个结论。', when: function (c) { return c.a04_stance === 'B'; } }
+    ] },
+  S017: { task: 'MQ1-A05', place: '宫城一层门厅', time: '日', where: '白蔷薇宫城 · 一层门厅',
+    evidence: ['civil_check'],
+    lines: [
+      { who: '', text: '塞琳把书记员核好的文件交给主角。函上写着「民用资料核验」，不是军事委任。' },
+      { who: '塞琳', text: '来件能证实有人申请复查。边城能否入内，仍要对方登记。' },
+      { who: '主角', text: '我可以带莱娜一起去吗？' },
+      { who: '塞琳', text: '她是相关家属，也有邮务工作凭证。名字都写在这一页。' },
+      { who: '塞琳', text: '你们能证明什么，就负责说明什么。' }
+    ] },
+  S018: { task: 'MQ1-A05', place: '南门旅馆行李桌', time: '日', where: '白蔷薇城 · 南门旅馆',
+    lines: [
+      { who: '', text: '莱娜排出地图、函件和地址簿，给私人信件另留一格。' },
+      { who: '莱娜', text: '家里的事安排好了吗？我可以改下一班。' },
+      { choice: 'a05_depart', prompt: '北边的路在等一个答复。', options: [
+        { id: 'A', text: '准备好了，我们出发。' },
+        { id: 'B', text: '先等我回一趟农场。' } ] },
+      { who: '莱娜', text: '行。北边的路再长，也不差这一句说清楚。' }
+    ] }
+};
+
+/* --- 入口：既有场景里的真实交互点，不是调试钩子 ---
+   scene 指向本入口触发的那一场；loc 是该场所在的世界场景。
+   玩家必须真的走到那一格按 E，剧情才会往下走。 */
+var STORY_SCENE_LOC = {
+  S000A: 'memory', S000B: 'memory',
+  S001: 'farm', S002: 'house', S003: 'farm', S004: 'town',
+  S005: 'mill_workshop', S006: 'mill_village',
+  'S005-T': 'town', 'S006-T': 'town',
+  S007: 'mill_hall', 'S007-T': 'town', S008: 'house',
+  S009: 'city', S010: 'city_post', S011: 'city_library', S012: 'city_academy',
+  S013: 'city', S014: 'city', S015: 'city_hall', S016: 'city_hall',
+  S017: 'palace_f1', S018: 'city_inn'
+};
+function storySceneLoc(id) { return STORY_SCENE_LOC[id] || ''; }
+
+var STORY_ENTRIES = [
+  { id: 'ms1_p01', scene: 'farm', x: 5, y: 5, label: '农舍门前的旧信', task: 'MQ1-P01', storyScene: 'S001', supplement: 'MQ1-P01' },
+  { id: 'ms1_p01_house', scene: 'house', x: 6, y: 2, label: '农舍桌上的旧信', task: 'MQ1-P01', storyScene: 'S002', supplement: 'MQ1-P01' },
+  { id: 'ms1_p02_farm', scene: 'farm', x: 10, y: 10, label: '田边翻过的那捧土', task: 'MQ1-P02', storyScene: 'S003' },
+  { id: 'ms1_p02_town', scene: 'town', x: 6, y: 7, label: '种子铺前的账册', task: 'MQ1-P02', storyScene: 'S004' },
+  { id: 'ms1_p03_mill', scene: 'mill_workshop', x: 10, y: 5, label: '机房里那块测量板', task: 'MQ1-P03', storyScene: 'S005' },
+  { id: 'ms1_p03_mill_village', scene: 'mill_village', x: 30, y: 20, label: '进水渠边的旧木板', task: 'MQ1-P03', storyScene: 'S006' },
+  { id: 'ms1_p03_town', scene: 'town', x: 16, y: 9, label: '任务板旁的寄存木箱', task: 'MQ1-P03', storyScene: 'S005-T' },
+  { id: 'ms1_p03_town2', scene: 'town', x: 22, y: 7, label: '木工作坊的量架', task: 'MQ1-P03', storyScene: 'S006-T' },
+  { id: 'ms1_p04_hall', scene: 'mill_hall', x: 10, y: 7, label: '议事屋的寄存柜', task: 'MQ1-P04', storyScene: 'S007' },
+  { id: 'ms1_p04_town', scene: 'town', x: 18, y: 8, label: '木工作坊的寄存台', task: 'MQ1-P04', storyScene: 'S007-T' },
+  { id: 'ms1_p04_house', scene: 'house', x: 11, y: 3, label: '农舍桌上摊开的图册', task: 'MQ1-P04', storyScene: 'S008' },
+  { id: 'ms1_p01_city', scene: 'city_post', x: 10, y: 3, label: '分信柜旁的旧邮路', task: 'MQ1-A01', storyScene: 'S010', supplement: 'MQ1-P01' },
+  { id: 'ms1_a01_gate', scene: 'city', x: 318, y: 462, label: '南门的通行检查', task: 'MQ1-A01', storyScene: 'S009' },
+  { id: 'ms1_a02_library', scene: 'city_library', x: 5, y: 11, label: '馆藏旧图旁的阅览席', task: 'MQ1-A02', storyScene: 'S011' },
+  { id: 'ms1_a02_academy', scene: 'city_academy', x: 9, y: 3, label: '学院阅览桌的地图', task: 'MQ1-A02', storyScene: 'S012' },
+  { id: 'ms1_a03_garden', scene: 'city', x: 302, y: 62, label: '花园的接待桌', task: 'MQ1-A03', storyScene: 'S013' },
+  { id: 'ms1_a04_hall', scene: 'city_hall', x: 19, y: 7, label: '议事厅档案角', task: 'MQ1-A04', storyScene: 'S015' },
+  { id: 'ms1_a04_portico', scene: 'city_hall', x: 7, y: 14, label: '议事厅门廊', task: 'MQ1-A04', storyScene: 'S016' },
+  { id: 'ms1_a05_palace', scene: 'palace_f1', x: 35, y: 39, label: '门厅事务台', task: 'MQ1-A05', storyScene: 'S017' },
+  { id: 'ms1_a05_inn', scene: 'city_inn', x: 17, y: 5, label: '旅馆行李桌', task: 'MQ1-A05', storyScene: 'S018' }
+];
+
+function storyEntryForScene(sceneId) {
+  for (var i = 0; i < STORY_ENTRIES.length; i++) if (STORY_ENTRIES[i].storyScene === sceneId) return STORY_ENTRIES[i];
+  return null;
+}
+
+/* 一个站位是不是「工具目标附近」：
+   玩家站在这样的格子上时，最可能去点的是旁边那件工具（锄地、砍树、采石）。
+   入口的 stand 里如果含这种格子，点工具就会被入口抢走，锄地和采集都做不成。 */
+function storyToolTargetNear(sceneId, x, y) {
+  var map = MAPS[sceneId];
+  if (!map) return false;
+  var pa = map.plantArea;
+  var inPlot = function (px, py) { return !!pa && px >= pa.x0 && px <= pa.x1 && py >= pa.y0 && py <= pa.y1; };
+  if (inPlot(x, y)) return true;
+  if (inPlot(x - 1, y) || inPlot(x + 1, y) || inPlot(x, y - 1) || inPlot(x, y + 1)) return true;
+  var nodes = EXPLORE_NODES[sceneId] || {};
+  if (nodes[x + ',' + y]) return true;
+  var list = (map.trees || []).concat(map.rocks || []).concat(map.berries || []);
+  for (var i = 0; i < list.length; i++) {
+    var p = list[i];
+    if (Math.abs(p[0] - x) + Math.abs(p[1] - y) <= 1) return true;
+  }
+  return false;
+}
+
+/* 把入口登记成既有场景里的真实交互点。
+   stand 用「入口格四周真正可走的格子」算出来，不写死坐标：
+   家具、桥状态和资源节点都会改通行，写死的 stand 迟早会失效。
+   紧挨工具目标格的站位一律不算——那会把锄地和采集抢走。
+   每次换场景重算一次，登记本身不重复添加。 */
+function registerStoryEntries() {
+  STORY_ENTRIES.forEach(function (def) {
+    if (!MAPS[def.scene]) return;
+    var list = INTERACTABLES[def.scene] = INTERACTABLES[def.scene] || [];
+    var it = null, i;
+    for (i = 0; i < list.length; i++) if (list[i].id === def.id) { it = list[i]; break; }
+    if (!it) {
+      it = { id: def.id, x: def.x, y: def.y, kind: 'storyEntry', label: def.label, story: def };
+      list.push(it);
+    }
+    var stand = [];
+    [[def.x, def.y - 1], [def.x + 1, def.y], [def.x, def.y + 1], [def.x - 1, def.y]].forEach(function (c) {
+      if (isSolid(def.scene, c[0], c[1])) return;
+      if (storyToolTargetNear(def.scene, c[0], c[1])) return;
+      stand.push(c);
+    });
+    if (!isSolid(def.scene, def.x, def.y) && !storyToolTargetNear(def.scene, def.x, def.y)) stand.unshift([def.x, def.y]);
+    it.stand = stand;
+  });
+}
+
+/* ============================================================
+   剧情状态与引擎
+   ============================================================ */
+function newStoryState() {
+  return {
+    started: false,
+    act: 0,
+    tasks: {},
+    scenes: {},
+    evidence: {},
+    choices: {},
+    flags: {},
+    lenaStance: '',
+    routeMethod: '',
+    rescueMethod: '',
+    evacPriority: '',
+    householdChoices: {},
+    support: {},
+    outcome: ''
+  };
+}
+
+/* 旧档归一化：缺字段补默认，不凭空造出玩家没做过的事 */
+function normalizeStory(raw) {
+  var d = newStoryState();
+  if (!raw || typeof raw !== 'object') return d;
+  d.started = raw.started === true;
+  d.act = isInt(raw.act) && raw.act >= 0 ? raw.act : 0;
+  if (raw.tasks && typeof raw.tasks === 'object') {
+    for (var k in raw.tasks) {
+      var v = raw.tasks[k];
+      if (v === 'active' || v === 'done' || v === 'available') d.tasks[k] = v;
+    }
+  }
+  if (raw.scenes && typeof raw.scenes === 'object') {
+    for (var sk in raw.scenes) {
+      var sv = raw.scenes[sk];
+      if (!sv || typeof sv !== 'object') continue;
+      d.scenes[sk] = {
+        seen: sv.seen === true,
+        skipped: sv.skipped === true,
+        idx: isInt(sv.idx) && sv.idx >= 0 ? sv.idx : 0,
+        day: isInt(sv.day) ? sv.day : -1
+      };
+    }
+  }
+  if (raw.evidence && typeof raw.evidence === 'object') {
+    for (var ek in raw.evidence) {
+      var ev = raw.evidence[ek];
+      if (!ev || typeof ev !== 'object') continue;
+      d.evidence[ek] = {
+        id: ek,
+        title: typeof ev.title === 'string' ? ev.title : ek,
+        source: typeof ev.source === 'string' ? ev.source : '',
+        day: isInt(ev.day) ? ev.day : -1
+      };
+    }
+  }
+  if (raw.choices && typeof raw.choices === 'object') {
+    for (var ck in raw.choices) if (typeof raw.choices[ck] === 'string') d.choices[ck] = raw.choices[ck];
+  }
+  if (raw.flags && typeof raw.flags === 'object') {
+    for (var fk in raw.flags) {
+      var fv = raw.flags[fk];
+      if (typeof fv === 'boolean' || typeof fv === 'string') d.flags[fk] = fv;
+      else if (isInt(fv)) d.flags[fk] = fv;
+      else if (fv && typeof fv === 'object') {
+        if (Array.isArray(fv)) d.flags[fk] = fv.filter(function (x) { return typeof x === 'string' || isInt(x); });
+        else {
+          var o = {};
+          for (var ok in fv) if (typeof fv[ok] === 'boolean' || typeof fv[ok] === 'string' || isInt(fv[ok])) o[ok] = fv[ok];
+          d.flags[fk] = o;
+        }
+      }
+    }
+  }
+  d.lenaStance = (raw.lenaStance === 'cautious' || raw.lenaStance === 'public') ? raw.lenaStance : '';
+  d.routeMethod = typeof raw.routeMethod === 'string' ? raw.routeMethod : '';
+  d.rescueMethod = typeof raw.rescueMethod === 'string' ? raw.rescueMethod : '';
+  d.evacPriority = typeof raw.evacPriority === 'string' ? raw.evacPriority : '';
+  d.householdChoices = (raw.householdChoices && typeof raw.householdChoices === 'object') ? raw.householdChoices : {};
+  d.support = (raw.support && typeof raw.support === 'object') ? raw.support : {};
+  d.outcome = typeof raw.outcome === 'string' ? raw.outcome : '';
+  return d;
+}
+
+function storyTask(id) {
+  for (var i = 0; i < STORY_TASKS.length; i++) if (STORY_TASKS[i].id === id) return STORY_TASKS[i];
+  return null;
+}
+function storySceneDef(id) { return STORY_SCENES[id] || null; }
+function storyState() { if (!state.story) state.story = newStoryState(); return state.story; }
+
+function storySceneProgress(id) {
+  var st = storyState();
+  if (!st.scenes[id] || typeof st.scenes[id] !== 'object') st.scenes[id] = { seen: false, skipped: false, idx: 0, day: -1 };
+  var r = st.scenes[id];
+  if (!isInt(r.idx) || r.idx < 0) r.idx = 0;
+  return r;
+}
+function storySceneFinished(id) {
+  var def = storySceneDef(id);
+  if (!def) return false;
+  var rec = storyState().scenes[id];
+  /* 只读：判断一个场次演没演完，不该顺手在存档里留下一条场次记录。 */
+  if (!rec) return false;
+  return rec.idx >= (def.lines || []).length;
+}
+function storySceneSeen(id) { return !!storyState().scenes[id] && storyState().scenes[id].seen === true; }
+
+/* 任务状态：实时判定解锁条件，不把「当时解锁」冻结成事实 */
+function storyTaskStatus(id) {
+  var t = storyTask(id);
+  if (!t) return 'locked';
+  var st = storyState();
+  if (st.tasks[id] === 'done') return 'done';
+  if (st.tasks[id] === 'active') return 'active';
+  return storyTaskUnlocked(t) ? 'available' : 'locked';
+}
+function storyTaskUnlocked(t) {
+  if (t.id === 'MQ1-P01') return true;
+  if (t.id === 'MQ1-A01') {
+    if (storyState().tasks['MQ1-P04'] !== 'done') return false;
+    if (!storyEntryAchievement().ok) return false;
+    return !!exploreState().city;
+  }
+  var prev = storyPrevTask(t.id);
+  return !!prev && storyState().tasks[prev.id] === 'done';
+}
+function storyPrevTask(id) {
+  for (var i = 0; i < STORY_TASKS.length; i++) if (STORY_TASKS[i].next === id) return STORY_TASKS[i];
+  return null;
+}
+
+/* 入门成果：经营／工程／商旅／巡林任一，读既有真实账本，不新造事实 */
+function storyEntryAchievement() {
+  var routes = [];
+  var plots = state.plots || {};
+  var farmed = Object.keys(plots).some(function (k) {
+    var p = plots[k];
+    if (!p || typeof p !== 'object') return false;
+    return !!p.crop || p.harvested === true;
+  });
+  var shipped = Object.keys(state.shipping || {}).some(function (k) { return (state.shipping[k] || 0) > 0; });
+  if (farmed || shipped || (state.questProgress && state.questProgress[1] === 'done')) routes.push('经营');
+  try {
+    var rs = rookieState();
+    if (rs.engineering >= ROOKIE_JOBS.engineering.steps.length) routes.push('工程');
+    if (rs.trade >= ROOKIE_JOBS.trade.steps.length) routes.push('商旅');
+    if (rs.patrol >= ROOKIE_JOBS.patrol.steps.length) routes.push('巡林');
+  } catch (e) { /* 入门账本缺失时按没有成果算，不编造 */ }
+  return { ok: routes.length > 0, routes: routes };
+}
+
+/* 老档：主线还没开始，但存档已经有真实进度 → 走补送信，不重做家园教程 */
+function storyIsOldSave() {
+  var st = storyState();
+  if (st.started) return false;
+  if (state.totalDay > 1) return true;
+  if (state.bridgeRepaired) return true;
+  if (Object.keys(state.questProgress || {}).some(function (k) { return state.questProgress[k] === 'done'; })) return true;
+  if (Object.keys(state.plots || {}).length) return true;
+  if (Object.keys(state.shipping || {}).length) return true;
+  var e = exploreState();
+  if (e.city || e.forest || e.mine) return true;
+  return false;
+}
+function storyCityVisited() { return !!exploreState().city; }
+
+/* 路线：未修桥时走镇内替代演出，任务一开始就把路线定下来，之后不再改 */
+function storyRouteFor(t) {
+  var key = 'route_' + t.id;
+  var f = storyState().flags[key];
+  if (f === 'mill' || f === 'town') return f;
+  return (!state.bridgeRepaired && t.altScenes && t.altScenes.length) ? 'town' : 'mill';
+}
+function storyTaskScenes(t) {
+  if (storyRouteFor(t) === 'town' && t.altScenes && t.altScenes.length) return t.altScenes.slice();
+  return (t.scenes || []).slice();
+}
+function storyNextScene(t) {
+  var scenes = storyTaskScenes(t);
+  for (var i = 0; i < scenes.length; i++) if (!storySceneFinished(scenes[i])) return scenes[i];
+  return null;
+}
+
+function storyRecordEvidence(id, source) {
+  var st = storyState();
+  if (st.evidence[id]) return false;
+  var meta = STORY_EVIDENCE[id] || {};
+  st.evidence[id] = { id: id, title: meta.title || id, source: source || meta.source || '', day: state.totalDay };
+  markDirty();
+  return true;
+}
+function storyHasEvidence(id) { return !!storyState().evidence[id]; }
+
+function storyFlagObj(key) {
+  var st = storyState();
+  if (!st.flags[key] || typeof st.flags[key] !== 'object' || Array.isArray(st.flags[key])) st.flags[key] = {};
+  return st.flags[key];
+}
+function storyFlagArr(key) {
+  var st = storyState();
+  if (!Array.isArray(st.flags[key])) st.flags[key] = [];
+  return st.flags[key];
+}
+
+/* ============================================================
+   场次演出
+   ============================================================ */
+function storyChoices() { return storyState().choices; }
+
+function storyLineVisible(line) {
+  if (!line.when) return true;
+  try { return !!line.when(storyChoices()); } catch (e) { return true; }
+}
+
+function openStoryScene(sceneId) {
+  var def = storySceneDef(sceneId);
+  if (!def) { toast('这一段还没有实装。'); return; }
+  var st = storyState();
+  st.started = true;
+  var t = storyTask(def.task);
+  if (t && st.tasks[t.id] !== 'done') st.tasks[t.id] = 'active';
+  if (t && !st.flags['route_' + t.id]) st.flags['route_' + t.id] = storyRouteFor(t);
+  storySceneProgress(sceneId);
+  openWindow({
+    id: 'story_scene', kind: 'story', wide: true,
+    title: sceneId + ' · ' + def.place + (def.time ? ' · ' + def.time : '') + (def.tag ? ' · ' + def.tag : ''),
+    build: function (b) { buildStoryScene(b, sceneId); },
+    actions: function () { return storySceneActions(sceneId); }
+  });
+}
+
+function buildStoryScene(b, sceneId) {
+  var def = storySceneDef(sceneId);
+  if (!def) return;
+  var rec = storySceneProgress(sceneId);
+  var lines = def.lines || [];
+  var t = storyTask(def.task);
+  var head = el('div', 'story-head');
+  head.appendChild(el('div', 'story-task-id', t ? t.id : ''));
+  head.appendChild(el('div', 'story-task-title', t ? t.title : ''));
+  head.appendChild(el('div', 'story-task-goal', t ? t.goal : ''));
+  b.appendChild(head);
+  var box = el('div', 'story-scene');
+  for (var i = 0; i < lines.length && i <= rec.idx; i++) {
+    var line = lines[i];
+    if (!storyLineVisible(line)) continue;
+    if (line.step) {
+      if (i < rec.idx) { box.appendChild(storyStepDoneLine(line)); continue; }
+      box.appendChild(buildStoryStep(line, sceneId));
+      continue;
+    }
+    if (line.choice) {
+      if (i < rec.idx) {
+        var picked = storyChoices()[line.choice];
+        box.appendChild(el('div', 'story-line story-choice-done', '（已选：' + storyChoiceText(line, picked) + '）'));
+        continue;
+      }
+      box.appendChild(buildStoryChoice(line, sceneId));
+      continue;
+    }
+    var row = el('div', 'story-line' + (line.who ? ' story-said' : ' story-narr'));
+    if (line.who) row.appendChild(el('span', 'story-who', line.who));
+    row.appendChild(el('span', 'story-text', line.text));
+    box.appendChild(row);
+  }
+  b.appendChild(box);
+  if (rec.idx >= lines.length) {
+    b.appendChild(el('div', 'story-end', '—— 本场结束 ——'));
+    if (def.memory) b.appendChild(el('p', 'muted', '回忆不改写世界日期、天气、体力和钱包；跳过的部分之后可以回看。'));
+  }
+}
+
+function storyChoiceText(line, picked) {
+  for (var i = 0; i < (line.options || []).length; i++) if (line.options[i].id === picked) return line.options[i].text;
+  return picked || '';
+}
+
+function buildStoryChoice(line, sceneId) {
+  var wrap = el('div', 'story-choice');
+  wrap.appendChild(el('div', 'story-prompt', line.prompt || '请选择。'));
+  var opts = el('div', 'story-options');
+  (line.options || []).forEach(function (o) {
+    opts.appendChild(mkBtn(o.text, 'story-opt', function () {
+      storyState().choices[line.choice] = o.id;
+      /* 对莱娜的表态在选下去的那一刻就生效，不等整段演完 */
+      if (line.choice === 'a04_stance') storyState().lenaStance = o.id === 'A' ? 'cautious' : 'public';
+      markDirty();
+      storyAdvance(sceneId);
+    }));
+  });
+  wrap.appendChild(opts);
+  return wrap;
+}
+
+function storyStepDoneLine(line) {
+  return el('div', 'story-line story-step-done', '〔已做过：' + (line.text || '') + '〕');
+}
+
+/* 互动步骤：items（按顺序点选） / overlay（叠图对照） / reception（花园接待） */
+function buildStoryStep(line, sceneId) {
+  var wrap = el('div', 'story-step');
+  wrap.appendChild(el('div', 'story-prompt', line.text || ''));
+  if (line.mode === 'items') wrap.appendChild(buildStoryItemsStep(line, sceneId));
+  else if (line.mode === 'overlay') wrap.appendChild(buildStoryOverlayStep(line, sceneId));
+  else if (line.mode === 'reception') wrap.appendChild(buildStoryReceptionStep(line, sceneId));
+  else wrap.appendChild(el('p', 'muted', '这一步还没有实装。'));
+  return wrap;
+}
+
+function buildStoryItemsStep(line, sceneId) {
+  var key = 'step_' + line.step;
+  var prog = storyFlagObj(key);
+  var picked = Array.isArray(prog.picked) ? prog.picked : [];
+  var order = line.order || line.picks || [];
+  var wrap = el('div', 'story-items');
+  if (line.hint) wrap.appendChild(el('p', 'muted', line.hint));
+  var row = el('div', 'story-picks');
+  (line.picks || []).forEach(function (p) {
+    var done = picked.indexOf(p) >= 0;
+    var btn = mkBtn(p, 'story-pick' + (done ? ' on' : ''), function () {
+      var cur = storyFlagObj(key);
+      var list = Array.isArray(cur.picked) ? cur.picked : [];
+      if (list.indexOf(p) >= 0) return;
+      var next = order[list.length];
+      if (next !== p) {
+        cur.picked = [];
+        toast('对不上：' + p + '不是这一步要的那一样。');
+        refreshWindow();
+        return;
+      }
+      list.push(p);
+      cur.picked = list;
+      markDirty();
+      if (list.length >= order.length) toast('三处参照都对上了。');
+      refreshWindow();
+    });
+    row.appendChild(btn);
+  });
+  wrap.appendChild(row);
+  if (picked.length >= order.length) {
+    wrap.appendChild(mkBtn(line.confirm || '确认', 'primary', function () { storyAdvance(sceneId); }));
+  } else {
+    wrap.appendChild(el('p', 'muted', '已确认 ' + picked.length + ' / ' + order.length + '。'));
+  }
+  return wrap;
+}
+
+function buildStoryOverlayStep(line, sceneId) {
+  var key = 'step_' + line.step;
+  var prog = storyFlagObj(key);
+  var matched = prog.matched && typeof prog.matched === 'object' ? prog.matched : {};
+  var answered = prog.answered === 'done';
+  var wrap = el('div', 'story-overlay');
+  wrap.appendChild(el('p', 'muted', '艾琳把两册图并排摊开：旧图在左，新版在右。参照对上了，才谈得上改了什么。'));
+  (line.refs || []).forEach(function (ref) {
+    var row = el('div', 'story-ref');
+    row.appendChild(el('span', 'story-ref-name', ref.name));
+    if (matched[ref.id]) {
+      row.appendChild(el('span', 'story-ref-ok', ref.note));
+    } else {
+      var opts = el('div', 'story-ref-opts');
+      [['old', '只在旧图'], ['new', '只在新版'], ['both', '两张都有']].forEach(function (o) {
+        opts.appendChild(mkBtn(o[1], 'sm', function () {
+          if (o[0] !== ref.answer) { toast('再看看：' + ref.name + '在两张图上并不像你想的那样。'); return; }
+          var p = storyFlagObj(key);
+          p.matched = p.matched && typeof p.matched === 'object' ? p.matched : {};
+          p.matched[ref.id] = true;
+          markDirty();
+          refreshWindow();
+        }));
+      });
+      row.appendChild(opts);
+    }
+    wrap.appendChild(row);
+  });
+  var allMatched = (line.refs || []).every(function (r) { return matched[r.id]; });
+  if (allMatched && !answered) {
+    var q = el('div', 'story-choice');
+    q.appendChild(el('div', 'story-prompt', line.question || '请判断。'));
+    var opts2 = el('div', 'story-options');
+    (line.options || []).forEach(function (o) {
+      opts2.appendChild(mkBtn(o.text, 'story-opt', function () {
+        if (o.id !== line.answer) { toast(line.answerNote || '诺尔说得对：能确认它写了什么，不能替它证明什么。'); return; }
+        var p = storyFlagObj(key);
+        p.answered = 'done';
+        markDirty();
+        storyAdvance(sceneId);
+      }));
+    });
+    q.appendChild(opts2);
+    wrap.appendChild(q);
+  } else if (answered) {
+    wrap.appendChild(el('div', 'story-step-done', '〔已判断：' + (line.answerNote || '已得出结论') + '〕'));
+  }
+  return wrap;
+}
+
+function buildStoryReceptionStep(line, sceneId) {
+  var key = 'step_' + line.step;
+  var observed = storyFlagObj(key + '_observed');
+  var approached = storyFlagArr(key + '_approached');
+  var mode = storyState().flags[key + '_mode'];
+  var wrap = el('div', 'story-reception');
+  wrap.appendChild(el('p', 'muted', '花园里没有人在催你。塞琳只说：想问谁，先自己看。'));
+  (line.guests || []).forEach(function (g) {
+    var card = el('div', 'story-guest');
+    card.appendChild(el('div', 'story-guest-name', g.name));
+    card.appendChild(el('div', 'story-guest-hint', g.hint));
+    if (observed[g.id]) {
+      card.appendChild(el('div', 'story-guest-ok', g.reveals));
+      if (approached.indexOf(g.id) < 0) {
+        var need = g.needEvidence && !storyHasEvidence(g.needEvidence);
+        if (need) card.appendChild(el('p', 'muted', '他还不会开口：先让他看到你抄下来的索引。'));
+        else card.appendChild(mkBtn(approached.length ? '再问这一位' : '先请他开口', 'sm', function () {
+          var arr = storyFlagArr(key + '_approached');
+          if (arr.indexOf(g.id) < 0) arr.push(g.id);
+          storyRecordEvidence(g.evidence, 'S013 · 花园接待');
+          markDirty();
+          refreshWindow();
+        }));
+      } else {
+        card.appendChild(el('div', 'story-step-done', '〔已问过〕'));
+      }
+    } else {
+      card.appendChild(mkBtn('先看看他站哪儿', 'sm', function () {
+        var p = storyFlagObj(key + '_observed');
+        p[g.id] = true;
+        markDirty();
+        refreshWindow();
+      }));
+    }
+    wrap.appendChild(card);
+  });
+  var allObserved = (line.guests || []).every(function (g) { return observed[g.id]; });
+  if (allObserved && approached.length < (line.minApproach || 1)) {
+    wrap.appendChild(el('p', 'muted', '至少问过两个人，才算摸清谁愿意开口、谁只肯转述。'));
+  } else if (allObserved && approached.length >= (line.minApproach || 1) && !mode) {
+    var q = el('div', 'story-choice');
+    q.appendChild(el('div', 'story-prompt', '接下来，你打算当着众人问，还是把这一位单独请到步道？'));
+    var opts = el('div', 'story-options');
+    opts.appendChild(mkBtn('当着众人问 · 公开', 'story-opt', function () {
+      storyState().flags[key + '_mode'] = 'public';
+      markDirty(); refreshWindow();
+    }));
+    opts.appendChild(mkBtn('单独请到步道 · 私谈', 'story-opt', function () {
+      storyState().flags[key + '_mode'] = 'private';
+      markDirty(); refreshWindow();
+    }));
+    q.appendChild(opts);
+    wrap.appendChild(q);
+  } else if (mode) {
+    wrap.appendChild(el('div', 'story-step-done', '〔已定：' + (mode === 'public' ? '当众问' : '单独私谈') + '〕'));
+    wrap.appendChild(mkBtn('这一段到此为止', 'primary', function () { storyAdvance(sceneId); }));
+  }
+  return wrap;
+}
+
+function storyAdvance(sceneId) {
+  var rec = storySceneProgress(sceneId);
+  var def = storySceneDef(sceneId);
+  var lines = (def && def.lines) || [];
+  var next = (rec.idx || 0) + 1;
+  /* 跳过因分支而隐藏的台词：选择定了以后，另一句回复不占玩家的点击。 */
+  while (next < lines.length && !storyLineVisible(lines[next])) next++;
+  rec.idx = next > lines.length ? lines.length : next;
+  markDirty();
+  refreshWindow();
+}
+
+function storySceneActions(sceneId) {
+  var def = storySceneDef(sceneId);
+  if (!def) return [];
+  var rec = storySceneProgress(sceneId);
+  var lines = def.lines || [];
+  if (rec.idx < lines.length) {
+    var cur = lines[rec.idx];
+    if (cur && (cur.step || cur.choice)) return [];
+    return [{ label: '继续', kind: 'primary', close: false, onClick: function () { storyAdvance(sceneId); } }];
+  }
+  var chain = def.chain === 'memory';
+  return [
+    { label: chain ? '回到门前' : '继续', kind: 'primary', close: false, onClick: function () { storyFinishScene(sceneId); } },
+    { label: '先停在这里', kind: 'ghost', close: true }
+  ];
+}
+
+function storyFinishScene(sceneId) {
+  var def = storySceneDef(sceneId);
+  if (!def) return;
+  var rec = storySceneProgress(sceneId);
+  rec.seen = true;
+  rec.day = state.totalDay;
+  (def.evidence || []).forEach(function (evId) { storyRecordEvidence(evId, sceneId + ' · ' + def.where); });
+  markDirty();
+  if (def.chain === 'memory') {
+    var mem = ['S000A', 'S000B'];
+    var i = mem.indexOf(sceneId);
+    var nextMem = i >= 0 ? mem[i + 1] : null;
+    if (nextMem && !storySceneFinished(nextMem)) { openStoryScene(nextMem); return; }
+    storyState().flags.memoryDone = true;
+    saveNow();
+    openStoryMemoryDone();
+    return;
+  }
+  var t = storyTask(def.task);
+  if (!t) { closeWindow(); return; }
+  var scenes = storyTaskScenes(t);
+  var idx = scenes.indexOf(sceneId);
+  var next = idx >= 0 ? scenes[idx + 1] : null;
+  if (next) {
+    var nextDef = storySceneDef(next);
+    /* 下一场在别的场景：不替玩家瞬移，写清地点让玩家自己走过去 */
+    if (nextDef && storySceneLoc(next) !== storySceneLoc(sceneId) && storySceneLoc(next) !== 'memory') {
+      openStoryNextPlace(t, next, nextDef);
+      return;
+    }
+    openStoryScene(next);
+    return;
+  }
+  storyCompleteTask(t);
+}
+
+function storyCompleteTask(t) {
+  var st = storyState();
+  if (st.tasks[t.id] === 'done') return;
+  st.tasks[t.id] = 'done';
+  if (t.id === 'MQ1-A04') {
+    var stance = st.choices.a04_stance;
+    if (stance === 'A') st.lenaStance = 'cautious';
+    else if (stance === 'B') st.lenaStance = 'public';
+  }
+  grantCharExpOnce('story.task.' + t.id, t.exp || CHAR_EXP.quest, 'quest');
+  questLogPush('主线 ' + t.id + '《' + t.title + '》已完成。' + (t.next ? ' 下一段：' + storyTaskTitle(t.next) : ''));
+  saveNow();
+  openStoryTaskDone(t);
+}
+
+function storyTaskTitle(id) {
+  var t = storyTask(id);
+  return t ? (t.id + '《' + t.title + '》') : '后续章节';
+}
+
+function openStoryTaskDone(t) {
+  var next = t.next ? storyTask(t.next) : null;
+  var nextStatus = next ? storyTaskStatus(next.id) : null;
+  var lines = [];
+  lines.push('本段结束：' + t.id + '《' + t.title + '》');
+  if (next) {
+    lines.push('下一段：' + next.id + '《' + next.title + '》');
+    if (nextStatus === 'locked') lines.push('尚未解锁：' + storyLockReason(next));
+    else lines.push('可以去：' + storyNextStepText(next.id));
+  } else {
+    lines.push('第一部主线到此为止，后面的章节还在制作中。');
+  }
+  openWindow({
+    id: 'story_done', kind: 'story', title: '一段走完了',
+    build: function (b) {
+      b.appendChild(el('div', 'section-title', '本段完成'));
+      lines.forEach(function (l) { b.appendChild(el('p', null, l)); });
+      var ev = Object.keys(storyState().evidence);
+      if (ev.length) {
+        b.appendChild(el('div', 'section-title', '已登记的证据'));
+        ev.forEach(function (k) {
+          var e = storyState().evidence[k];
+          b.appendChild(el('div', 'story-evidence', '· ' + e.title + '（' + e.source + '）'));
+        });
+      }
+    },
+    actions: [
+      { label: '回到主线', kind: 'primary', close: false, onClick: function () { openStoryLog(); } },
+      { label: '关闭', kind: 'ghost', close: true }
+    ]
+  });
+}
+
+/* ============================================================
+   入口面板
+   ============================================================ */
+function openStoryEntry(it) {
+  var d = it.story || {};
+  var t = storyTask(d.task);
+  if (!t) { toast('这一段还没有实装。'); return; }
+  /* 老档补送信：主线还没开始，但玩家已经在这座农场生活过一段时间 */
+  if (d.supplement && !storyState().started && storyIsOldSave() && storyTaskStatus(d.supplement) !== 'done') {
+    openStorySupplement(d.supplement, it);
+    return;
+  }
+  var status = storyTaskStatus(d.task);
+  if (status === 'locked') { openStoryLocked(t); return; }
+  var sid = d.storyScene;
+  var chain = storyTaskScenes(t);
+  if (sid && chain.indexOf(sid) < 0) { openStoryRoutePanel(t, sid); return; }
+  if (sid) {
+    /* 场次有先后：前面的还没演，这里就只是把顺序说清楚，不跳过 */
+    var at = chain.indexOf(sid);
+    for (var i = 0; i < at; i++) {
+      if (!storySceneFinished(chain[i])) {
+        var prevDef = storySceneDef(chain[i]);
+        openStoryOrderPanel(t, chain[i], prevDef, sid);
+        return;
+      }
+    }
+  }
+  if (sid && storySceneFinished(sid)) { openStoryReview(t); return; }
+  if (t.id === 'MQ1-P01' && sid === 'S001' && !storyState().flags.memoryDone && !storyState().flags.memorySkipped) {
+    openStoryMemoryOffer(t);
+    return;
+  }
+  if (sid) { openStoryScene(sid); return; }
+  var next = storyNextScene(t);
+  if (!next) { storyCompleteTask(t); return; }
+  openStoryScene(next);
+}
+
+/* 这一场不属于当前路线（例如桥还没修，就没有磨坊那条线） */
+function openStoryRoutePanel(t, sid) {
+  var def = storySceneDef(sid);
+  openWindow({
+    id: 'story_route', kind: 'story', title: t.id + '《' + t.title + '》',
+    build: function (b) {
+      b.appendChild(el('p', null, '这一段属于另一条路线：' + sid + '（' + (def ? def.where : '') + '）。'));
+      b.appendChild(el('p', null, '你眼下走的是：' + storyRouteText(t) + '。'));
+      b.appendChild(el('p', 'muted', '两个入口拿到的是同一份索引与同一个奖励键，不会重复发放。'));
+    },
+    actions: [
+      { label: '看看当前这条线', kind: 'primary', close: false, onClick: function () { openStoryTaskPanel(t); } },
+      { label: '关闭', kind: 'ghost', close: true }
+    ]
+  });
+}
+function storyRouteText(t) {
+  var chain = storyTaskScenes(t);
+  var names = chain.map(function (sid) { var d = storySceneDef(sid); return d ? d.where : sid; });
+  return names.join(' → ');
+}
+
+/* 顺序不对：告诉玩家先演哪一场，不让玩家跳着来 */
+function openStoryOrderPanel(t, prevId, prevDef, wantId) {
+  var wantDef = storySceneDef(wantId);
+  var prevEntry = storyEntryForScene(prevId);
+  openWindow({
+    id: 'story_order', kind: 'story', title: t.id + '《' + t.title + '》',
+    build: function (b) {
+      b.appendChild(el('p', null, '这场要先走前一步。'));
+      b.appendChild(el('div', 'section-title', '先演这一场'));
+      b.appendChild(el('p', null, prevId + ' · ' + (prevDef ? prevDef.where : '')));
+      if (prevEntry) b.appendChild(el('p', 'muted', '到了那儿，按 E 打开「' + prevEntry.label + '」。'));
+      b.appendChild(el('p', 'muted', '之后才能演：' + wantId + (wantDef ? '（' + wantDef.where + '）' : '') + '。'));
+    },
+    actions: [
+      { label: '打开地图', kind: 'primary', close: false, onClick: function () { openWorldMap(); } },
+      { label: '关闭', kind: 'ghost', close: true }
+    ]
+  });
+}
+
+function openStoryTaskPanel(t) {
+  var next = storyNextScene(t);
+  var def = next ? storySceneDef(next) : null;
+  var entry = next ? storyEntryForScene(next) : null;
+  openWindow({
+    id: 'story_task', kind: 'story', title: t.id + '《' + t.title + '》',
+    build: function (b) {
+      b.appendChild(el('p', null, t.goal));
+      b.appendChild(el('div', 'section-title', '下一步'));
+      b.appendChild(el('p', null, next ? (next + ' · ' + (def ? def.where : '')) : '本段已演完。'));
+      if (entry) b.appendChild(el('p', 'muted', '走到「' + entry.label + '」按 E 就能继续。'));
+      b.appendChild(el('div', 'section-title', '本段的场次'));
+      storyTaskScenes(t).forEach(function (sid) {
+        var d = storySceneDef(sid);
+        if (!d) return;
+        b.appendChild(el('div', 'story-evidence', '· ' + sid + ' · ' + d.where + (storySceneSeen(sid) ? '（已演）' : '')));
+      });
+    },
+    actions: [
+      { label: '打开地图', kind: 'primary', close: false, onClick: function () { openWorldMap(); } },
+      { label: '关闭', kind: 'ghost', close: true }
+    ]
+  });
+}
+
+/* 下一场在别的场景：不替玩家瞬移，把地点写清楚，让玩家自己走过去 */
+function openStoryNextPlace(t, sid, def) {
+  var entry = storyEntryForScene(sid);
+  openWindow({
+    id: 'story_next_place', kind: 'story', title: '下一场在别处',
+    build: function (b) {
+      b.appendChild(el('p', null, '本场到此结束。下一场：' + sid + '《' + def.place + '》。'));
+      b.appendChild(el('div', 'section-title', '去哪儿'));
+      b.appendChild(el('p', null, def.where));
+      b.appendChild(el('p', 'muted', entry
+        ? ('到了那儿，按 E 打开「' + entry.label + '」。这段路不传送，慢慢走。')
+        : '按 M 打开地图找路。'));
+    },
+    actions: [
+      { label: '打开地图', kind: 'primary', close: false, onClick: function () { openWorldMap(); } },
+      { label: '先停在这里', kind: 'ghost', close: true }
+    ]
+  });
+}
+
+function openStoryLocked(t) {
+  openWindow({
+    id: 'story_locked', kind: 'story', title: t.id + '《' + t.title + '》',
+    build: function (b) {
+      b.appendChild(el('p', null, t.goal));
+      b.appendChild(el('div', 'section-title', '现在的门槛'));
+      b.appendChild(el('p', null, storyLockReason(t)));
+      b.appendChild(el('p', 'muted', '门槛满足后，这里会自己开。不需要重做已经完成的事。'));
+    },
+    actions: [{ label: '知道了', kind: 'ghost', close: true }]
+  });
+}
+
+function storyLockReason(t) {
+  if (t.id === 'MQ1-A01') {
+    if (storyState().tasks['MQ1-P04'] !== 'done') return '先完成序章：' + storyTaskTitle('MQ1-P04') + '。';
+    var ach = storyEntryAchievement();
+    if (!ach.ok) return '先在白蔷薇开始生活：照料一格田、完成一份小镇工作，或修好东侧小桥（经营／工程／商旅／巡林任一）。';
+    if (!exploreState().city) return '城市通行是明确的社会门槛：先修好东侧小桥，再办 150 金的白蔷薇城通行证。缺钱可以先做小镇工作。';
+    return '条件已满足。';
+  }
+  var prev = storyPrevTask(t.id);
+  if (prev) return '先完成' + storyTaskTitle(prev.id) + '。';
+  return '条件未满足。';
+}
+
+function openStoryMemoryOffer(t) {
+  openWindow({
+    id: 'story_memory_offer', kind: 'story', title: '一封信，一处屋檐',
+    build: function (b) {
+      b.appendChild(el('p', null, '芽芽把门牌旁的藤拨开。你手里的信折过很多次，边角已经起毛。'));
+      b.appendChild(el('p', null, '信到之前的事，你自己记得一部分：路上那座棚檐，那个替你想办法的测绘师。'));
+      b.appendChild(el('p', 'muted', '这段回忆约 3—5 分钟，可以跳过。跳过的部分之后仍能回看；世界日期、天气、体力和钱包都不会因此变化。'));
+    },
+    actions: [
+      { label: '先看那段路（回忆）', kind: 'primary', close: false, onClick: function () { openStoryScene('S000A'); } },
+      { label: '跳过回忆，直接看信', kind: 'sm', close: false, onClick: function () {
+        storyState().flags.memorySkipped = true;
+        storyState().scenes['S000A'] = { seen: false, skipped: true, idx: 0, day: state.totalDay };
+        storyState().scenes['S000B'] = { seen: false, skipped: true, idx: 0, day: state.totalDay };
+        markDirty();
+        openStoryScene('S001');
+      } },
+      { label: '先不开始', kind: 'ghost', close: true }
+    ]
+  });
+}
+
+function openStoryMemoryDone() {
+  openWindow({
+    id: 'story_memory_done', kind: 'story', title: '回到门前',
+    build: function (b) {
+      b.appendChild(el('p', null, '雨停了。扣带系得比你自己打的好看一点。'));
+      b.appendChild(el('p', 'muted', '这段回忆可以在主线日志里回看。'));
+    },
+    actions: [
+      { label: '继续 · 看那封信', kind: 'primary', close: false, onClick: function () { openStoryScene('S001'); } },
+      { label: '先停在这里', kind: 'ghost', close: true }
+    ]
+  });
+}
+
+function openStorySupplement(taskId, it) {
+  var t = storyTask(taskId);
+  openWindow({
+    id: 'story_supplement', kind: 'story', title: '补送的信',
+    build: function (b) {
+      b.appendChild(el('p', null, it && it.label === '分信柜旁的旧邮路'
+        ? '小翎从退信堆里抽出一封：「转来过两次，总算送到你手里。」'
+        : '芽芽把小翎托她补送的信递过来：「说是给你的，路上压了两回。」'));
+      b.appendChild(el('p', null, '信上署名是伊文。他介绍白蔷薇那处空着的农场，说等最后一条路画完就回来。'));
+      b.appendChild(el('p', 'muted', '你已经在这里住了一段时间，钥匙和住处不重发；家园教程也不会重做。'));
+    },
+    actions: [
+      { label: '拆开信', kind: 'primary', close: false, onClick: function () {
+        storyState().flags.memorySkipped = true;
+        markDirty();
+        openStoryScene('S001');
+      } },
+      { label: '先看那段路（回忆）', kind: 'sm', close: false, onClick: function () { openStoryScene('S000A'); } },
+      { label: '先收着', kind: 'ghost', close: true }
+    ]
+  });
+}
+
+function openStoryReview(t) {
+  var scenes = storyTaskScenes(t);
+  openWindow({
+    id: 'story_review', kind: 'story', wide: true, title: t.id + '《' + t.title + '》· 已完成',
+    build: function (b) {
+      b.appendChild(el('p', null, t.goal));
+      b.appendChild(el('div', 'section-title', '可以回看的场次'));
+      scenes.forEach(function (sid) {
+        var def = storySceneDef(sid);
+        if (!def) return;
+        b.appendChild(mkBtn('S ' + sid + ' · ' + def.place + (storySceneSeen(sid) ? '' : '（未演）'), 'sm', function () {
+          openStoryScene(sid);
+        }));
+      });
+      if (t.memory && t.memory.length) {
+        b.appendChild(el('div', 'section-title', '回忆'));
+        t.memory.forEach(function (sid) {
+          var def = storySceneDef(sid);
+          if (!def) return;
+          b.appendChild(mkBtn('S ' + sid + ' · ' + def.place, 'sm', function () { openStoryScene(sid); }));
+        });
+      }
+    },
+    actions: [{ label: '关闭', kind: 'ghost', close: true }]
+  });
+}
+
+/* ============================================================
+   主线日志
+   ============================================================ */
+function storyNextStepText(taskId) {
+  var t = storyTask(taskId);
+  if (!t) return '后续章节。';
+  var status = storyTaskStatus(taskId);
+  if (status === 'done') return '已完成 · ' + t.goal;
+  if (status === 'locked') return '未解锁 · ' + storyLockReason(t);
+  var next = storyNextScene(t);
+  if (!next) return '本段已演完，等结算。';
+  var def = storySceneDef(next);
+  var entry = storyEntryForScene(next);
+  return '下一场 ' + next + ' · ' + (def ? def.where : '') + (entry ? '（按 E 打开「' + entry.label + '」）' : '');
+}
+
+function openStoryLog() {
+  openWindow({
+    id: 'story_log', kind: 'story', wide: true, title: '主线 · 长风有归处（第一幕切片）',
+    build: function (b) {
+      b.appendChild(el('p', 'muted', '第九版第一部主线。M0 切片实装序章与第一幕共 9 个任务；后续章节仍在制作中，这里如实写「未实装」。'));
+      var st = storyState();
+      var curAct = 0;
+      STORY_TASKS.forEach(function (t) {
+        if (t.act !== curAct) {
+          curAct = t.act;
+          b.appendChild(el('div', 'section-title', t.actName));
+        }
+        var status = storyTaskStatus(t.id);
+        var box = el('div', 'panel-box quest' + (status === 'done' ? ' done' : status === 'locked' ? ' locked' : ''));
+        var head = el('div', 'row between');
+        head.appendChild(el('div', 'quest-name', t.id + '. ' + t.title));
+        head.appendChild(el('span', 'req-chip ' + (status === 'done' ? 'ok' : status === 'locked' ? 'no' : ''),
+          status === 'done' ? '已完成' : status === 'locked' ? '未解锁' : '进行中'));
+        box.appendChild(head);
+        box.appendChild(el('div', 'item-desc', t.goal));
+        box.appendChild(el('div', 'quest-next', '下一步：' + storyNextStepText(t.id)));
+        if (status !== 'locked' && status !== 'done') {
+          var acts = el('div', 'item-actions');
+          acts.appendChild(mkBtn('继续这一段', 'primary sm', function () {
+            var next = storyNextScene(t);
+            if (!next) { openStoryReview(t); return; }
+            var loc = storySceneLoc(next);
+            /* 下一场不在眼前就先把地点说清楚，不替玩家瞬移 */
+            if (loc && loc !== 'memory' && loc !== state.sceneId) { openStoryTaskPanel(t); return; }
+            openStoryScene(next);
+          }));
+          box.appendChild(acts);
+        }
+        if (status === 'done') {
+          var acts2 = el('div', 'item-actions');
+          acts2.appendChild(mkBtn('回看场次', 'sm', function () { openStoryReview(t); }));
+          box.appendChild(acts2);
+        }
+        b.appendChild(box);
+      });
+      var evs = Object.keys(st.evidence);
+      b.appendChild(el('div', 'section-title', '已登记的证据（' + evs.length + '）'));
+      if (!evs.length) b.appendChild(el('div', 'empty-note', '还没有登记任何证据。'));
+      evs.forEach(function (k) {
+        var e = st.evidence[k];
+        b.appendChild(el('div', 'story-evidence', '· ' + e.title + '（' + e.source + '）'));
+      });
+      if (st.lenaStance) {
+        b.appendChild(el('div', 'section-title', '记录'));
+        b.appendChild(el('div', 'story-evidence', '· 对莱娜的表态：' + (st.lenaStance === 'cautious' ? '谨慎 · 先写进申请，核对原件' : '公开 · 让受影响的人也知道在查')));
+      }
+      b.appendChild(el('div', 'section-title', '回忆'));
+      var p01 = storyTask('MQ1-P01');
+      (p01.memory || []).forEach(function (sid) {
+        var def = storySceneDef(sid);
+        if (!def) return;
+        b.appendChild(mkBtn('S ' + sid + ' · ' + def.place + (storySceneSeen(sid) ? ' · 已演' : ' · 未演'), 'sm', function () { openStoryScene(sid); }));
+      });
+    },
+    actions: [{ label: '关闭', kind: 'ghost', close: true }]
+  });
+}
+
+/* 今日安排与委托日志的接线 */
+function storyTodayLine() {
+  var i, t, s;
+  for (i = 0; i < STORY_TASKS.length; i++) {
+    t = STORY_TASKS[i];
+    s = storyTaskStatus(t.id);
+    if (s === 'active' || s === 'available') {
+      var scene = storyNextScene(t);
+      var where = scene ? (storySceneDef(scene) || {}).where : '';
+      return { tier: 'soon', tag: '主线', text: t.id + ' ' + t.title + (where ? ' · ' + where : ''), open: openStoryLog };
+    }
+  }
+  /* 一段都锁着：把最靠前的那道门槛说清楚，别让玩家对着空日志猜 */
+  for (i = 0; i < STORY_TASKS.length; i++) {
+    t = STORY_TASKS[i];
+    if (storyTaskStatus(t.id) === 'locked') {
+      return { tier: 'later', tag: '主线', text: '主线 ' + t.id + ' · ' + storyLockReason(t), open: openStoryLog };
+    }
+  }
+  return null;
+}
+
+function appendStoryQuestSection(b) {
+  var line = storyTodayLine();
+  b.appendChild(el('div', 'section-title', '第一部主线 · 长风有归处'));
+  if (!line) {
+    b.appendChild(el('div', 'empty-note', '主线尚未开始：去苔芽农场的农舍门牌旁，芽芽留给你的那封信就在那里。'));
+  } else {
+    b.appendChild(el('div', 'quest-next', line.text));
+    b.appendChild(mkBtn('打开主线日志', 'sm', openStoryLog));
+  }
+}
+
 /* --- 村民 --- */
 var NPCS = {
   yaya: {
@@ -2649,7 +4031,9 @@ function newGameState() {
     industry: newIndustryState(),
     construction: newConstructionState(),
     seasonStock: newSeasonStock(),
-    settlementAid: newSettlementAid()
+    settlementAid: newSettlementAid(),
+    /* 第九版第一部主线《长风有归处》：任务阶段、场次进度、证据出处与分支。 */
+    story: newStoryState()
   };
   s.inventory.seed_radish = 8;
   s.inventory.seed_potato = 2;
@@ -2746,6 +4130,8 @@ function serialize() {
     construction: state.construction || newConstructionState(),
     seasonStock: state.seasonStock || newSeasonStock(),
     settlementAid: state.settlementAid || newSettlementAid(),
+    /* 第九版第一部主线：旧档缺这一项时补默认，不凭空补出已看过的场次。 */
+    story: state.story || newStoryState(),
     savedAt: Date.now()
   };
 }
@@ -2853,6 +4239,8 @@ function normalizeSave(raw) {
   s.farmPlan = normalizeFarmPlan(raw.farmPlan);
   s.seasonStock = normalizeSeasonStock(raw.seasonStock);
   s.settlementAid = normalizeSettlementAid(raw.settlementAid);
+  /* 第九版第一部主线：旧档没有这一项时补默认，不补出已看过的场次或已取得的证据。 */
+  s.story = normalizeStory(raw.story);
   if (raw.sceneId && raw.sceneId.indexOf('mill_') === 0 && !raw.bridgeRepaired && !(raw.millLife&&raw.millLife.legacyAccess)) { s.sceneId='town'; s.player={x:22,y:21,face:'up'}; }
   if ((s.sceneId==='city'||s.sceneId.indexOf('city_')===0||s.sceneId.indexOf('palace_')===0)&&!s.exploration.city){s.sceneId='town';s.player={x:14,y:22,face:'up'};}
   if ((s.sceneId === 'forest' && !s.exploration.forest) || (s.sceneId.indexOf('mine') === 0 && (!s.exploration.mine || +s.sceneId.slice(4)>s.exploration.depth))) { s.sceneId='town';s.player={x:14,y:2,face:'down'}; }
@@ -4060,6 +5448,8 @@ function doSwitchScene(to, tx, ty, face) {
 }
 
 function onSceneChanged() {
+  /* 主线入口的站位随通行情况重算：桥修好、树被砍、家具挪动后都要跟上。 */
+  registerStoryEntries();
   if (personalCombat.active && state.sceneId !== personalCombat.scene) personalResetCombat();
   personalCombat.mode=false;
   cam.init = false; // 换场景立即按新地图重新取景，避免室内第一帧沿用室外镜头。
@@ -5538,6 +6928,15 @@ postResident('blacksmith','city_smith',13,6);
 postResident('tailor','city_tailor',13,5);
 postResident('innkeeper','city_inn',15,4);
 postResident('steward','city_castle',17,7);
+/* 第九版第一部主线：莱娜是白蔷薇邮局新来的邮务员，和小翎不是同一个人。
+   她在总规 §25 里另有身份与人物弧，M0 只让她出现在邮局柜台边，
+   不给她开额外的好感/赠礼经验入口，也不替小翎的岗位。 */
+addResident('ms1_lena','莱娜','邮务员','city_post',11,8,'postie',['#6B5B7A','#E7DFCE','#C6A88C'],[
+  '这张地址签又磨掉了两个字。你抄的时候慢一点。',
+  '我以前住在北边一个已经撤掉的村子里。现在的地图上找不到它。',
+  '信要是能到，就算路绕得再远。'
+]);
+postResident('ms1_lena','city_post',11,8);
 
 /* ── 新增 15 栋的驻场 NPC ────────────────────────────────────────────────
    此前 CITY_ROOMS.<room>.staff 只声明了名字，NPCS 表里没有对应条目、
@@ -9771,8 +11170,14 @@ function assistText(id, text) { var n = $(id); if (n && n.textContent !== text) 
 /* 第八版 §3.2：今日安排只保留三件事——一个当前追踪、一件今天
    有空可做的、一个未开放预告。磨坊、牧场、湿地和军队不会同时
    出现在新档的第一天；没接的长期合同不催办。 */
-function todayPlanItems() {
+function todayPlanItems(opts) {
   var out = [], e = exploreState();
+  /* 第九版第一部主线：当前追踪的那一段排在最前，玩家不用翻日志才知道该去哪儿。
+     委托日志的主线页另有主线段落，这里不重复列（同一条事只出现一次）。 */
+  if (!(opts && opts.skipStory)) {
+    var sline = storyTodayLine();
+    if (sline) out.push({ tier: 'soon', tag: sline.tag, text: sline.text, open: sline.open });
+  }
   /* 真有紧急才用"必办"：体力见底，或追踪目标已经可以直接交付。
      没有紧急时不硬凑一档红色，避免把普通的一天说成必须马上处理。 */
   if (state.energy <= 20) {
@@ -9849,6 +11254,10 @@ function todayPlanItems() {
     out.push({ tier: 'soon', tag: '季节', text: seasonOfDay() + '季还剩 ' + sLeft + ' 天 · 本季可下种 '
       + seasonSowableText() + ' · 地里已长的作物会跨季继续长', open: openShop });
   }
+  /* 「今日安排」永远不超过三行（§3.2）：一个追踪、一件可做、一个未开放预告。
+     超出时先舍「未开放预告」，再舍末尾的「可做」，必办与追踪永远留着。 */
+  for (var ci = out.length - 1; ci >= 0 && out.length > 3; ci--) if (out[ci].tier === 'later') out.splice(ci, 1);
+  for (var cj = out.length - 1; cj >= 0 && out.length > 3; cj--) if (out[cj].tier === 'soon') out.splice(cj, 1);
   return out;
 }
 var TODAY_PLAN_SIG = '';
@@ -9873,8 +11282,8 @@ function renderTodayPlan() {
     box.appendChild(b);
   });
 }
-function appendTodayPlan(parent, hint) {
-  var items = todayPlanItems();
+function appendTodayPlan(parent, hint, opts) {
+  var items = todayPlanItems(opts);
   if (!items.length) return;
   var box = el('div', 'today-plan in-window');
   items.forEach(function (it) {
@@ -10979,7 +12388,7 @@ function openQuestLog(site) {
       /* 手机横屏（矮屏）下农场助手会隐藏今日安排，这里内联同一份三行，
          保证"今天该做什么"在任何屏幕上都有可点入口（§3.2）。 */
       if(QUEST_TAB==='rookie'){renderRookieJobs(b);return;}
-      if(QUEST_TAB==='main')appendTodayPlan(b);
+      if(QUEST_TAB==='main'){appendStoryQuestSection(b);appendTodayPlan(b,null,{skipStory:true});}
       b.appendChild(mkBtn('长期安排 · 农场照料与 3／7 天计划','sm',openFarmSchedulePanel));
       b.appendChild(mkBtn('石楠草甸 · '+meadowTaskText(),'sm',function(){openMeadowLife('journal');}));
       b.appendChild(mkBtn('风铃磨坊 · '+millLifeTaskText(),'sm',function(){openMillLife('journal');}));
@@ -16335,6 +17744,8 @@ function openStructure(st) {
 }
 function activateInteractable(it) {
   if(it.kind==='constructionWork'){openConstructionWork(it);return;}
+  /* 第九版第一部主线：入口就是场景里的一处真实交互点，走近按 E 才会开。 */
+  if(it.kind==='storyEntry'){openStoryEntry(it);return;}
   if(it.kind==='constructionGuide'){openConstructionGuide(it);return;}
   if(it.kind==='industryWork'){openIndustryWork(it);return;}
   if(it.kind==='industryGuide'){openIndustryGuide();return;}
@@ -22850,6 +24261,14 @@ refreshHud=function(){personalHudBase();if(!state)return;personalControls();var 
 window.__MOSS__ = {
   doorTiles: doorTiles, installIndoorDoors: installIndoorDoors, drawIndoorDoors: drawIndoorDoors,
   questExitTile: questExitTile,
+  /* 第九版第一部主线《长风有归处》· M0 切片：任务阶段、场次进度、证据与分支 */
+  STORY_TASKS: STORY_TASKS, STORY_SCENES: STORY_SCENES, STORY_ENTRIES: STORY_ENTRIES,
+  storyState: storyState, newStoryState: newStoryState, normalizeStory: normalizeStory,
+  storyTask: storyTask, storyTaskStatus: storyTaskStatus, storyNextStepText: storyNextStepText,
+  storyEntryAchievement: storyEntryAchievement, storyIsOldSave: storyIsOldSave,
+  storyRouteFor: storyRouteFor, storyTaskScenes: storyTaskScenes,
+  openStoryScene: openStoryScene, openStoryLog: openStoryLog, openStoryEntry: openStoryEntry,
+  storySceneSeen: storySceneSeen, storySceneFinished: storySceneFinished,
   wetlandLifeState:wetlandLifeState, professionalLifeState:professionalLifeState, militaryLifeState:militaryLifeState,
   /* R5-D 军事权限链：界面与测试读同一份判断 */
   milChainStatus:milChainStatus, milDeployGate:milDeployGate, milUnderCommand:milUnderCommand,

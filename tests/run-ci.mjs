@@ -61,6 +61,12 @@ const BROWSER = [
   'run-r5-natural-entry.mjs',
   /* R5 触屏：390×844 竖屏 + 触摸输入走完同三条路径（审查报告第五节第 4 条） */
   'run-r5-mobile-touch.mjs',
+  /* 第九版第一部主线《长风有归处》· M0 切片：序章九任务、回忆可跳过可回看、
+     未修桥的镇内替代演出、证据与选择入库、老档补送信 */
+  'run-m0-story.mjs',
+  /* 第九版主线 M0 第一幕：城市通行这道门槛、叠图对照、花园接待三段、
+     公开/谨慎选择的后果、宫城与旅馆的出发准备 */
+  'run-m0-story-city.mjs',
   /* 探索线：森林/矿山三道闸门、三层矿洞、采集再生、存档重载与钢制工具，
      脚本内部自带 index.html + 单文件版两轮 */
   'run-exploration.mjs',
@@ -126,6 +132,8 @@ run('run-r5-review-single-file', path.join(here, 'run-r5-review.mjs'), ['--singl
 run('run-r5-military-single-file', path.join(here, 'run-r5-military.mjs'), ['--single-file']);
 run('run-r5-natural-entry-single-file', path.join(here, 'run-r5-natural-entry.mjs'), ['--single-file']);
 run('run-r5-mobile-touch-single-file', path.join(here, 'run-r5-mobile-touch.mjs'), ['--single-file']);
+run('run-m0-story-single-file', path.join(here, 'run-m0-story.mjs'), ['--single-file']);
+run('run-m0-story-city-single-file', path.join(here, 'run-m0-story-city.mjs'), ['--single-file']);
 run('run-fixes-single-file', path.join(here, 'run-fixes.mjs'), ['--single-file']);
 
 console.log(failed ? `\n共 ${failed} 项失败。` : '\n两层全部通过。');

@@ -46,6 +46,38 @@ try {
     JSON.stringify({ day: roundTrip.day, coins: roundTrip.coins, scene: roundTrip.scene }));
   ok('重载不改变天数与金币', roundTrip.day > 0 && roundTrip.coins >= 0, `第 ${roundTrip.day} 天 / ${roundTrip.coins} 金`);
 
+  // 2b. 第九版第一部主线的账本：任务、场次、证据、选择与分支要能原样往返
+  const story = await p.evaluate(() => {
+    const s = __MOSS__.state.story;
+    s.tasks['MQ1-P01'] = 'done';
+    s.scenes['S001'] = { seen: true, skipped: false, idx: 7, day: 2 };
+    s.evidence['letter'] = { id: 'letter', title: '伊文的旧信', source: 'S002 · 农舍桌旁', day: 2 };
+    s.choices['p01_reply'] = 'B';
+    s.lenaStance = 'public';
+    s.flags['step_reception_mode'] = 'private';
+    const raw = JSON.parse(JSON.stringify(__MOSS__.serialize()));
+    const n = __MOSS__.normalizeSaveForTest(raw);
+    return {
+      task: n.story.tasks['MQ1-P01'],
+      scene: n.story.scenes['S001'],
+      evidence: n.story.evidence['letter'],
+      choice: n.story.choices['p01_reply'],
+      stance: n.story.lenaStance,
+      flag: n.story.flags['step_reception_mode'],
+      legacy: (function () {
+        const old = JSON.parse(JSON.stringify(raw));
+        delete old.story;
+        const m = __MOSS__.normalizeSaveForTest(old);
+        return { has: !!m.story, scenes: Object.keys(m.story.scenes).length, evidence: Object.keys(m.story.evidence).length };
+      })()
+    };
+  });
+  ok('主线任务阶段往返不丢', story.task === 'done', JSON.stringify(story));
+  ok('主线场次进度往返不丢', story.scene && story.scene.seen === true && story.scene.idx === 7, JSON.stringify(story.scene));
+  ok('主线证据与出处往返不丢', story.evidence && story.evidence.source === 'S002 · 农舍桌旁', JSON.stringify(story.evidence));
+  ok('主线选择与分支往返不丢', story.choice === 'B' && story.stance === 'public' && story.flag === 'private');
+  ok('没有主线的旧档补出空账本而不是编造事实', story.legacy.has && story.legacy.scenes === 0 && story.legacy.evidence === 0, JSON.stringify(story.legacy));
+
   // 3. 军事账本经属性存取器往返后不丢（这是隐式写入最容易坏的地方）
   const mil = await p.evaluate(() => {
     const m = __MOSS__.state.militaryLife;
