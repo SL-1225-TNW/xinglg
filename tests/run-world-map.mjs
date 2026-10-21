@@ -8,8 +8,11 @@ const desktop=await launch();
 try{
  const p=desktop.page;await boot(p);await p.keyboard.press('m');
  check('M 打开地图',await p.evaluate(()=>__MOSS__.ui.window.id),'worldmap');
- /* 合并：本地 12 个区域 + 远端对石楠草甸的开放状态断言 */
- check('十八个唯一地点均可查看',await p.locator('.atlas-place').count(),18);
+ /* 合并：本地 12 个区域 + 远端对石楠草甸的开放状态断言。
+    地点数从 18 变成 22：第九版第一部新增白松旧驿村、潮汐港、王都与回声谷
+    四个地区（总规 §24.2）。这是有意的扩充，不是内容漂移。 */
+ check('二十二个唯一地点均可查看',await p.locator('.atlas-place').count(),22);
+ check('四个新地区都在地图上',await p.evaluate(()=>['白松旧驿村','潮汐港','王都','回声谷'].every(n=>Array.from(document.querySelectorAll('.atlas-place')).some(b=>b.textContent.indexOf(n)===0))),true);
  check('石楠草甸已列入地图',await p.getByRole('button',{name:/^石楠草甸/}).count(),1);
  check('农场显示当前位置',await p.locator('.atlas-place.here').innerText(),'苔芽农场 · 你在这里');
  const time=await p.evaluate(()=>__MOSS__.state.timeMinutes);await p.waitForTimeout(350);

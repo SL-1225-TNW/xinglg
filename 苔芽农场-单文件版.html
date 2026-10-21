@@ -21504,7 +21504,7 @@ function extendedDoor(scene,room,x,y,label){INTERACTABLES[scene].push({kind:'ext
 function extendedGate(scene,x,y,key,label){INTERACTABLES[scene].push({kind:'extendedGate',gate:key,x:x,y:y,label:label,stand:[[x,y+1],[x-1,y],[x+1,y]]});}
 function addExtendedNode(id,locationId,scene,name,region,kind,safe,desc,unlock){var n={id:id,locationId:locationId,sceneId:scene,name:name,region:region,kind:kind,safe:safe,desc:desc,extendedUnlock:unlock};TRAVEL_NODES.push(n);NODE_BY_ID[id]=n;NODE_BY_SCENE[scene]=n;SCENE_TO_NODE[scene]=id;return n;}
 function appendTravelPairs(id,pairs){pairs.forEach(function(p){var ids=[p[0],id].sort();TRAVEL_PAIRS[ids.join('|')]=p[1];});}
-function drawExtendedBuilding(g,bx,by,bw,bh,kind){var palette={observatory:['#718C81','#D8D5BF'],press:['#8A6855','#D9BE99'],manor:['#795B70','#E3D8C8'],clinic:['#768A79','#E8E0CE'],warehouse:['#927451','#C7B58F'],office:['#647D89','#DDD0AE'],quarry:['#6F756C','#B6AC94'],station:['#557B80','#D7D1B8'],camp:['#686F78','#A99B7A'],ruin:['#777D68','#A89E83'],neighbor:['#866C5B','#D8C7A8']};var p=palette[kind]||palette.office,x=bx*TILE,y=by*TILE,w=bw*TILE,h=bh*TILE;
+function drawExtendedBuilding(g,bx,by,bw,bh,kind){var palette={observatory:['#718C81','#D8D5BF'],press:['#8A6855','#D9BE99'],manor:['#795B70','#E3D8C8'],clinic:['#768A79','#E8E0CE'],warehouse:['#927451','#C7B58F'],office:['#647D89','#DDD0AE'],quarry:['#6F756C','#B6AC94'],station:['#557B80','#D7D1B8'],camp:['#686F78','#A99B7A'],ruin:['#777D68','#A89E83'],neighbor:['#866C5B','#D8C7A8'],inn:['#7C5A45','#E0CFA6'],cottage:['#6E6455','#D6C7A3'],customs:['#5F6E75','#D9D3BC'],clocktower:['#8A8272','#EDE4C6'],survey:['#5E6B63','#DCD7BB'],meeting:['#6B5F4E','#D9CBA6']};var p=palette[kind]||palette.office,x=bx*TILE,y=by*TILE,w=bw*TILE,h=bh*TILE;
   px(g,x+1,y+14,w-2,h-14,p[1]);px(g,x-1,y,w+2,16,p[0]);px(g,x-2,y+14,w+4,3,'#494B45');
   for(var i=8;i<w-6;i+=18){px(g,x+i,y+22,9,11,'#58727A');px(g,x+i+4,y+22,1,11,'#E6DABC');px(g,x+i,y+27,9,1,'#E6DABC');}
   var dx=x+Math.floor(bw/2)*TILE;px(g,dx+3,y+h-18,10,18,'#684D3A');px(g,dx+10,y+h-10,1,1,'#E3C77D');
@@ -21514,6 +21514,11 @@ function drawExtendedBuilding(g,bx,by,bw,bh,kind){var palette={observatory:['#71
   if(kind==='clinic'){px(g,dx+6,y+h-30,4,12,'#F0EADD');px(g,dx+2,y+h-26,12,4,'#A65F65');}
   if(kind==='camp'){px(g,x+5,y+8,w-10,3,'#B7A57D');px(g,x+9,y+11,w-18,2,'#514E46');}
   if(kind==='ruin'){px(g,x+3,y+10,w-6,4,'#76745F');px(g,x+6,y+14,3,16,'#827F68');px(g,x+w-9,y+14,3,16,'#827F68');}
+  if(kind==='clocktower'){px(g,x+Math.floor(w/2)-8,y-18,16,20,p[0]);px(g,x+Math.floor(w/2)-10,y-22,20,6,'#6E6A5C');px(g,x+Math.floor(w/2)-5,y-16,10,10,p[1]);px(g,x+Math.floor(w/2)-1,y-13,2,4,'#4E4A40');}
+  if(kind==='customs'){px(g,x+w-14,y+16,12,10,'#6E7B80');px(g,x+w-11,y+19,3,3,'#E0D8BC');}
+  if(kind==='inn'){px(g,x+4,y+10,7,9,'#8A6A4E');px(g,x+5,y+13,5,6,'#E3C489');}
+  if(kind==='survey'){px(g,x+4,y+8,10,7,'#D8D2B8');px(g,x+6,y+10,3,2,'#5E6B63');px(g,x+11,y+10,3,2,'#5E6B63');}
+  if(kind==='meeting'){px(g,x+5,y+12,w-10,4,'#8A7A5C');px(g,x+7,y+13,w-14,2,'#C0B08C');}
 }
 function drawExtendedGround(g,R){var sc=state.sceneId,m=MAPS[sc];if(!m||!m.extStyle)return;
   if(sc==='wetland'){
@@ -21543,6 +21548,48 @@ function drawExtendedGround(g,R){var sc=state.sceneId,m=MAPS[sc];if(!m||!m.extSt
         for(var b=0;b<4;b++)px(g,21*TILE,14*TILE+b*TILE,1*TILE,2,bal?'#B9AE92':'#A9A48E');
       }
     }
+  }
+  /* 第九版新地点：白松的山与松林、潮汐港的海、王都的石街、回声谷的坡地 */
+  if(sc==='ms1_pine_village'||sc==='ms1_pine_path'){
+    for(var px2=0;px2<m.w;px2+=2)for(var py2=0;py2<m.h;py2+=2){
+      if(px2<R.x0||px2>R.x1||py2<R.y0||py2>R.y1)continue;
+      if(m.t[px2][py2]!==T_GRASS)continue;
+      if((px2*5+py2*7)%11!==0)continue;
+      px(g,px2*TILE+3,py2*TILE+8,2,7,'#3E5A43');px(g,px2*TILE+1,py2*TILE+5,6,3,'#5E7C55');
+    }
+  }
+  if(sc==='ms1_pine_path'){
+    for(var sx=2;sx<40;sx+=3){if(sx<R.x0||sx>R.x1)continue;
+      px(g,sx*TILE,2*TILE,3,2,'#E6E3D4');px(g,sx*TILE+1,3*TILE,2,1,'#C9C6B6');}
+  }
+  if(sc==='ms1_tide_docks'||sc==='ms1_tide_seawall'){
+    for(var wx=0;wx<m.w;wx++)for(var wy=0;wy<m.h;wy++){
+      if(wx<R.x0||wx>R.x1||wy<R.y0||wy>R.y1)continue;
+      if(m.t[wx][wy]===T_WATER){px(g,wx*TILE,wy*TILE,TILE,TILE,(wx+wy)%3?'#4E7C86':'#5A8892');px(g,wx*TILE+3,wy*TILE+6,8,1,'#93B4B6');}
+      else if(m.t[wx][wy]===T_PIER){px(g,wx*TILE,wy*TILE,TILE,TILE,'#8A6E4C');px(g,wx*TILE+2,wy*TILE+3,12,2,'#A8875E');}
+    }
+    if(sc==='ms1_tide_seawall')for(var by2=5;by2<23;by2+=4){if(12<R.x0||12>R.x1)continue;
+      px(g,12*TILE-4,by2*TILE,4,5,'#6E6A60');px(g,12*TILE-2,by2*TILE+1,2,3,'#4E4A44');}
+  }
+  if(sc==='ms1_capital_street'){
+    for(var cx=0;cx<m.w;cx++)for(var cy=0;cy<m.h;cy++){
+      if(cx<R.x0||cx>R.x1||cy<R.y0||cy>R.y1)continue;
+      if(m.t[cx][cy]===T_PATH)px(g,cx*TILE,cy*TILE,TILE,TILE,'#9C988C');
+    }
+    if(20>=R.x0&&20<=R.x1)for(var ck=9;ck<15;ck++){px(g,20*TILE,ck*TILE,TILE,TILE,'#B6B2A4');}
+  }
+  if(sc==='ms1_echo_village'||sc==='ms1_echo_fork'||sc==='ms1_echo_route'){
+    for(var gx=0;gx<m.w;gx++)for(var gy=0;gy<m.h;gy++){
+      if(gx<R.x0||gx>R.x1||gy<R.y0||gy>R.y1)continue;
+      if(m.t[gx][gy]!==T_GRASS)continue;
+      if((gx*3+gy*5)%7!==0)continue;
+      px(g,gx*TILE+2,gy*TILE+6,3,6,'#6E7A4E');px(g,gx*TILE+1,gy*TILE+4,5,2,'#8B9A5E');
+    }
+    if(sc==='ms1_echo_village'&&m.t[24][17]===T_SAND)px(g,24*TILE,17*TILE,10*TILE,6*TILE,'#B29A6E');
+  }
+  if(sc==='ms1_echo_route'){
+    for(var tx2=28;tx2<38;tx2+=2){if(tx2<R.x0||tx2>R.x1)continue;
+      px(g,tx2*TILE,10*TILE,2,9,'#8A7A5C');px(g,tx2*TILE+1,10*TILE,1,2,'#C0AC84');}
   }
 }
 function addExtendedEntities(g,ents,R){var sc=state.sceneId,m=MAPS[sc];if(!m||!m.extStyle)return;
@@ -22097,6 +22144,300 @@ travelLockReason=function(n){if(n&&n.extendedUnlock)return extendedGateAllowed(n
 var baseTravelNodeById=travelNodeById;
 travelNodeById=function(id){if(NODE_BY_ID[id])return NODE_BY_ID[id];return baseTravelNodeById(id);};
 
+/* ============================================================
+   第九版第一部新地点（总规 §24.2 的 17 个场景）
+   ------------------------------------------------------------
+   白松驿村 3 景、潮汐港 4 景、王都 5 景、回声谷 5 景。
+   这一轮先把地点本身建起来：地形、门洞、居民、通行与到访登记。
+   各幕的现场操作（山路判断、码头分工、质询、去留民意、接应窗口）
+   与合法跨封国／分段旅行的条件属于 M1—M3 的后续施工；
+   界面上不放空按钮，也不把尚未实现的通行条件写成已实现。
+   ============================================================ */
+
+/* --- 白松旧驿村：迁居居民的小院、旧驿舍与通向东边的山径 --- */
+var ms1Pine = extendedMap('ms1_pine_village', '白松旧驿村', 40, 28, 'ms1_pine', [
+  { x: 5, y: 5, w: 9, h: 4, kind: 'inn' },
+  { x: 22, y: 6, w: 6, h: 3, kind: 'cottage' },
+  { x: 26, y: 18, w: 6, h: 3, kind: 'cottage' },
+  { x: 6, y: 20, w: 5, h: 3, kind: 'cottage' }
+], [
+  [1, 14, 39, 15], [9, 9, 9, 14], [25, 9, 25, 14],
+  [8, 15, 8, 20], [29, 15, 29, 18], [25, 15, 29, 15], [0, 14, 1, 15]
+], [[31, 2, 39, 8]], [[3, 3], [12, 25], [35, 20], [20, 3]]);
+/* --- 白松山径：三处路况判断的折返山道 --- */
+var ms1Path = extendedMap('ms1_pine_path', '白松山径', 42, 30, 'ms1_path', [
+  { x: 16, y: 21, w: 5, h: 3, kind: 'ruin' }
+], [
+  [1, 14, 40, 15], [20, 10, 40, 11], [28, 6, 41, 7], [20, 11, 20, 14], [28, 7, 28, 10],
+  [0, 14, 1, 15], [14, 20, 19, 20], [16, 21, 19, 21]
+], [[14, 21, 19, 26]], [[4, 4], [6, 8], [3, 11], [9, 24], [12, 20], [24, 26], [33, 24], [38, 21], [36, 12], [31, 16]]);
+
+/* --- 回声谷：旧官道分岔、村落与北坡临时通道 --- */
+var ms1Fork = extendedMap('ms1_echo_fork', '回声谷 · 旧官道分岔', 40, 28, 'ms1_echo', [
+  { x: 7, y: 3, w: 6, h: 4, kind: 'ruin' },
+  { x: 26, y: 3, w: 6, h: 3, kind: 'cottage' }
+], [
+  [1, 12, 20, 13], [16, 1, 17, 12], [20, 12, 39, 13], [30, 20, 39, 21], [30, 13, 30, 20],
+  [0, 12, 1, 13], [16, 0, 17, 1]
+], [[22, 16, 26, 19]], [[3, 20], [6, 24], [12, 22], [35, 16], [38, 5], [24, 24]]);
+var ms1Valley = extendedMap('ms1_echo_village', '回声谷 · 村落', 38, 26, 'ms1_echo', [
+  { x: 5, y: 4, w: 8, h: 4, kind: 'meeting' },
+  { x: 23, y: 4, w: 7, h: 4, kind: 'survey' },
+  { x: 7, y: 18, w: 5, h: 3, kind: 'cottage' }
+], [
+  [1, 12, 37, 13], [8, 8, 9, 12], [26, 8, 27, 12], [9, 13, 9, 18],
+  [16, 0, 17, 1], [36, 12, 37, 13]
+], [], [[3, 3], [14, 21], [33, 19], [35, 5], [20, 20]]);
+var ms1Route = extendedMap('ms1_echo_route', '回声谷 · 北坡临时通道与接应坪', 38, 26, 'ms1_echo', [
+  { x: 28, y: 6, w: 4, h: 2, kind: 'camp' },
+  { x: 33, y: 6, w: 4, h: 2, kind: 'camp' }
+], [
+  [1, 12, 37, 13], [10, 13, 10, 25], [0, 12, 1, 13], [27, 8, 37, 8], [29, 8, 29, 12], [34, 8, 34, 12]
+], [], [[4, 4], [7, 9], [20, 5], [24, 20], [34, 21]]);
+
+/* --- 潮汐港：海关码头与工人街、外海堤 --- */
+var ms1Tide = extendedMap('ms1_tide_docks', '潮汐港 · 海关码头与工人街', 44, 30, 'ms1_tide', [
+  { x: 6, y: 4, w: 9, h: 4, kind: 'customs' },
+  { x: 20, y: 5, w: 8, h: 4, kind: 'warehouse' },
+  { x: 30, y: 4, w: 7, h: 4, kind: 'office' },
+  { x: 8, y: 17, w: 6, h: 3, kind: 'cottage' },
+  { x: 26, y: 16, w: 6, h: 3, kind: 'cottage' }
+], [
+  [1, 12, 43, 13], [10, 8, 11, 12], [23, 9, 24, 12], [33, 8, 34, 12],
+  [14, 13, 16, 24], [30, 13, 32, 24], [0, 12, 1, 13], [42, 16, 43, 16], [18, 0, 19, 1]
+], [[0, 25, 43, 29]], [[3, 3], [13, 3], [38, 9], [4, 22], [20, 21], [36, 22]]);
+var ms1Seawall = extendedMap('ms1_tide_seawall', '潮汐港 · 外海堤', 38, 26, 'ms1_tide', [
+  { x: 24, y: 4, w: 7, h: 4, kind: 'clinic' }
+], [
+  [13, 12, 37, 13], [12, 4, 13, 23], [27, 8, 27, 12], [37, 12, 37, 13]
+], [[0, 0, 11, 25]], [[16, 4], [20, 6], [33, 4], [35, 18], [22, 20]]);
+
+/* --- 王都：驿站街与钟楼前庭 --- */
+var ms1Capital = extendedMap('ms1_capital_street', '王都 · 驿站街与钟楼前庭', 44, 30, 'ms1_capital', [
+  { x: 4, y: 4, w: 7, h: 4, kind: 'inn' },
+  { x: 28, y: 4, w: 7, h: 4, kind: 'office' },
+  { x: 4, y: 21, w: 7, h: 4, kind: 'office' },
+  { x: 28, y: 20, w: 9, h: 5, kind: 'meeting' },
+  { x: 18, y: 2, w: 8, h: 5, kind: 'clocktower' }
+], [
+  [1, 14, 42, 15], [7, 8, 8, 14], [31, 8, 32, 14], [7, 15, 7, 21], [32, 15, 32, 20],
+  [18, 7, 19, 14], [17, 0, 18, 1], [18, 15, 19, 29]
+], [], [[3, 3], [36, 3], [36, 17], [14, 25], [2, 10]]);
+
+/* 潮汐港的海面要留出码头的栈桥；潮汐港码头在正南，王都的皇家驿路在正北。 */
+fillRect(ms1Tide, 14, 25, 16, 29, T_PIER, false);
+fillRect(ms1Tide, 30, 25, 32, 29, T_PIER, false);
+fillRect(ms1Valley, 24, 17, 33, 22, T_SAND, false);
+fillRect(ms1Valley, 24, 17, 33, 22, T_SAND, false);
+fillRect(ms1Route, 28, 9, 37, 11, T_SAND, false);
+
+/* --- 室内：驿舍、邮务所、医舍、行旅舍、公署、档案院、公议厅、公屋、测绘屋 --- */
+addExtendedRoom('ms1_pine_inn', '白松驿舍', 20, 13, 'ms1_pine_village', 9, 9, [
+  { x: 3, y: 2, w: 5, h: 2, type: 'counter' }, { x: 12, y: 2, w: 4, h: 3, type: 'shelf' },
+  { x: 3, y: 8, w: 8, h: 1, type: 'table' }, { x: 13, y: 8, w: 4, h: 2, type: 'prep' }
+], 'ms1_pine_inn');
+addExtendedRoom('ms1_tide_post', '潮汐港 · 邮务所', 18, 12, 'ms1_tide_docks', 33, 8, [
+  { x: 3, y: 2, w: 6, h: 2, type: 'counter' }, { x: 11, y: 2, w: 4, h: 4, type: 'shelf' },
+  { x: 3, y: 7, w: 5, h: 2, type: 'notice' }, { x: 10, y: 7, w: 5, h: 1, type: 'table' }
+], 'ms1_tide_post');
+addExtendedRoom('ms1_tide_clinic', '潮汐港 · 海员医舍', 18, 12, 'ms1_tide_seawall', 27, 8, [
+  { x: 3, y: 2, w: 6, h: 2, type: 'counter' }, { x: 11, y: 2, w: 4, h: 3, type: 'shelf' },
+  { x: 3, y: 7, w: 7, h: 1, type: 'table' }, { x: 12, y: 6, w: 3, h: 3, type: 'prep' }
+], 'ms1_tide_clinic');
+addExtendedRoom('ms1_capital_inn', '王都 · 行旅舍', 20, 13, 'ms1_capital_street', 7, 8, [
+  { x: 3, y: 2, w: 5, h: 2, type: 'counter' }, { x: 12, y: 2, w: 5, h: 3, type: 'shelf' },
+  { x: 3, y: 8, w: 8, h: 1, type: 'table' }, { x: 13, y: 8, w: 4, h: 2, type: 'prep' }
+], 'ms1_capital_inn');
+addExtendedRoom('ms1_capital_office', '王都 · 调查公署', 22, 14, 'ms1_capital_street', 31, 8, [
+  { x: 3, y: 2, w: 6, h: 2, type: 'desk' }, { x: 12, y: 2, w: 6, h: 3, type: 'shelf' },
+  { x: 3, y: 9, w: 9, h: 1, type: 'table' }, { x: 15, y: 9, w: 4, h: 2, type: 'notice' }
+], 'ms1_capital_office');
+addExtendedRoom('ms1_capital_archive', '王都 · 档案院', 22, 14, 'ms1_capital_street', 7, 25, [
+  { x: 3, y: 2, w: 5, h: 4, type: 'shelf' }, { x: 13, y: 2, w: 6, h: 4, type: 'shelf' },
+  { x: 3, y: 9, w: 8, h: 1, type: 'table' }, { x: 14, y: 9, w: 5, h: 2, type: 'desk' }
+], 'ms1_capital_archive');
+addExtendedRoom('ms1_capital_hearing', '王都 · 公议厅', 24, 16, 'ms1_capital_street', 32, 25, [
+  { x: 6, y: 5, w: 12, h: 2, type: 'table' }, { x: 3, y: 2, w: 4, h: 3, type: 'shelf' },
+  { x: 17, y: 2, w: 4, h: 3, type: 'shelf' }, { x: 3, y: 11, w: 7, h: 1, type: 'desk' },
+  { x: 15, y: 11, w: 6, h: 2, type: 'notice' }
+], 'ms1_capital_hearing');
+addExtendedRoom('ms1_echo_hall', '回声谷 · 公屋', 20, 13, 'ms1_echo_village', 8, 8, [
+  { x: 4, y: 4, w: 9, h: 2, type: 'table' }, { x: 3, y: 2, w: 3, h: 3, type: 'shelf' },
+  { x: 15, y: 2, w: 3, h: 3, type: 'notice' }, { x: 3, y: 9, w: 6, h: 1, type: 'counter' }
+], 'ms1_echo_hall');
+addExtendedRoom('ms1_echo_house', '回声谷 · 测绘屋', 18, 12, 'ms1_echo_village', 26, 8, [
+  { x: 3, y: 2, w: 5, h: 2, type: 'desk' }, { x: 10, y: 2, w: 5, h: 3, type: 'shelf' },
+  { x: 3, y: 7, w: 7, h: 1, type: 'table' }, { x: 12, y: 6, w: 3, h: 3, type: 'prep' }
+], 'ms1_echo_house');
+
+/* --- 门：室内与室外互开 --- */
+[['ms1_pine_village', 'ms1_pine_inn', 9, 9, '进入白松驿舍'],
+ ['ms1_tide_docks', 'ms1_tide_post', 33, 8, '进入潮汐港邮务所'],
+ ['ms1_tide_seawall', 'ms1_tide_clinic', 27, 8, '进入海员医舍'],
+ ['ms1_capital_street', 'ms1_capital_inn', 7, 8, '进入王都行旅舍'],
+ ['ms1_capital_street', 'ms1_capital_office', 31, 8, '进入调查公署'],
+ ['ms1_capital_street', 'ms1_capital_archive', 7, 25, '进入档案院'],
+ ['ms1_capital_street', 'ms1_capital_hearing', 32, 25, '进入公议厅'],
+ ['ms1_echo_village', 'ms1_echo_hall', 8, 8, '进入回声谷公屋'],
+ ['ms1_echo_village', 'ms1_echo_house', 26, 8, '进入测绘屋']
+].forEach(function (p) { extendedDoor(p[0], p[1], p[2], p[3], p[4]); });
+
+/* --- 通行：既有世界与新地区之间双向登记 --- */
+ms1Pine.exits = [{ x: 0, y: 14, to: 'neighbor_border', tx: 41, ty: 18 }, { x: 39, y: 14, to: 'ms1_pine_path', tx: 1, ty: 14 }];
+ms1Path.exits = [{ x: 0, y: 14, to: 'ms1_pine_village', tx: 38, ty: 14 }, { x: 41, y: 6, to: 'ms1_echo_fork', tx: 1, ty: 12 }];
+ms1Fork.exits = [{ x: 0, y: 12, to: 'ms1_pine_path', tx: 40, ty: 6 }, { x: 16, y: 0, to: 'ms1_echo_village', tx: 16, ty: 11 }, { x: 39, y: 20, to: 'ms1_echo_route', tx: 1, ty: 12 }];
+ms1Valley.exits = [{ x: 16, y: 0, to: 'ms1_echo_fork', tx: 16, ty: 11 }, { x: 37, y: 12, to: 'ms1_echo_route', tx: 36, ty: 12 }];
+ms1Route.exits = [{ x: 0, y: 12, to: 'ms1_echo_village', tx: 36, ty: 12 }, { x: 10, y: 25, to: 'ms1_echo_fork', tx: 36, ty: 20 }];
+ms1Tide.exits = [{ x: 0, y: 12, to: 'port', tx: 32, ty: 18 }, { x: 18, y: 0, to: 'ms1_capital_street', tx: 18, ty: 28 }, { x: 43, y: 16, to: 'ms1_tide_seawall', tx: 35, ty: 12 }];
+/* 海堤的出口不能和落点重合：落点正压在出口格上，玩家会被立刻弹回去。 */
+ms1Seawall.exits = [{ x: 36, y: 12, to: 'ms1_tide_docks', tx: 42, ty: 16 }];
+ms1Capital.exits = [{ x: 18, y: 29, to: 'ms1_tide_docks', tx: 18, ty: 1 }];
+/* 既有场景那一侧也要有出口，否则从新地点走不回去 */
+MAPS.neighbor_border.exits.push({ x: 43, y: 18, to: 'ms1_pine_village', tx: 1, ty: 14 });
+/* 河港东侧是水面，泊位在岸线那一格（32,18），不是水里 */
+MAPS.port.exits.push({ x: 32, y: 18, to: 'ms1_tide_docks', tx: 1, ty: 12 });
+
+/* --- 场景归属：地图、区域与旅行节点 --- */
+['ms1_pine_village', 'ms1_pine_path', 'ms1_echo_fork', 'ms1_echo_village', 'ms1_echo_route',
+  'ms1_tide_docks', 'ms1_tide_seawall', 'ms1_capital_street'].forEach(function (id) {
+    EXTENDED_REGION_BY_SCENE[id] = id;
+  });
+var PINE_NODE = addExtendedNode('pine.station_village', 'neighbor.north.pine_station_village', 'ms1_pine_village', '白松旧驿村', 'beyond', 'village', [[1, 14], [2, 14], [1, 15]], '旧驿舍、迁居居民的小院与通往山径的东道。驿站的停运与住客的去留都记在驿舍账上。', 'ms1_pine');
+var TIDE_NODE = addExtendedNode('tide.harbor', 'royal.coast.tide_harbor', 'ms1_tide_docks', '潮汐港 · 海关码头与工人街', 'coast', 'harbor', [[1, 12], [2, 12], [1, 13]], '海关棚、货栈、工人街与栈桥。报关、卸货与船上的事都按码头实际到货说话。', 'ms1_tide');
+var CAPITAL_NODE = addExtendedNode('capital.station_street', 'royal.centre.capital_station_street', 'ms1_capital_street', '王都 · 驿站街与钟楼前庭', 'royal', 'capital', [[1, 14], [2, 14], [1, 15]], '钟楼前庭、驿站街与四座公署。公文、质询与旧案补正都按出处办理。', 'ms1_capital');
+var ECHO_NODE = addExtendedNode('echo.valley', 'neighbor.highland.echo_valley', 'ms1_echo_village', '回声谷 · 村落', 'highland', 'valley', [[1, 12], [2, 12], [1, 13]], '公屋、测绘屋与仍然住着人的谷地。旧事故的说法要靠实物与当事人核对。', 'ms1_echo');
+appendTravelPairs(PINE_NODE.id, [['neighbor.market_town', 30], ['road.ancient', 60], ['pass.cloud_peak', 90], ['city.gate', 90]]);
+appendTravelPairs(TIDE_NODE.id, [['port.lower_lock', 90], ['city.gate', 90]]);
+appendTravelPairs(CAPITAL_NODE.id, [['tide.harbor', 60], ['city.gate', 90]]);
+appendTravelPairs(ECHO_NODE.id, [['pine.station_village', 30], ['neighbor.market_town', 60]]);
+SCENE_TO_NODE['ms1_pine_path'] = PINE_NODE.id;
+SCENE_TO_NODE['ms1_echo_fork'] = ECHO_NODE.id;
+SCENE_TO_NODE['ms1_echo_route'] = ECHO_NODE.id;
+SCENE_TO_NODE['ms1_tide_seawall'] = TIDE_NODE.id;
+
+/* 四个新地区进全境地图：条目、状态与传送节点一一对应 */
+[
+  { id: 'ms1_pine', name: '白松旧驿村', x: 90, y: 44, desc: '北境邻领的旧驿站村；驿舍、迁居居民与通向东边山径的东道。' },
+  { id: 'ms1_tide', name: '潮汐港', x: 22, y: 88, desc: '王直属的海港；海关码头、工人街、邮务所与外海堤。' },
+  { id: 'ms1_capital', name: '王都', x: 56, y: 20, desc: '王都的驿站街与钟楼前庭；调查公署、档案院与公议厅。' },
+  { id: 'ms1_echo', name: '回声谷', x: 86, y: 62, desc: '邻领上游的谷地；村落、公屋、测绘屋、旧官道分岔与北坡临时通道。' }
+].forEach(function (r) { WORLD_REGIONS.push(r); });
+var baseMs1RegionStatus = worldRegionStatus;
+worldRegionStatus = function (r) {
+  if (r && r.id === 'ms1_pine') return extendedGateAllowed('ms1_pine') ? '已开放' : '未解锁 · 取得邻领通行文书';
+  if (r && r.id === 'ms1_tide') return extendedGateAllowed('ms1_tide') ? '已开放' : '未解锁 · 完成河港调查与航路准备';
+  if (r && r.id === 'ms1_capital') return extendedGateAllowed('ms1_capital') ? '已开放' : '未解锁 · 沿皇家驿路抵达王都';
+  if (r && r.id === 'ms1_echo') return extendedGateAllowed('ms1_echo') ? '已开放' : '未解锁 · 取得现场核验许可并有向导带路';
+  return baseMs1RegionStatus(r);
+};
+var baseMs1RegionTravelNode = regionTravelNode;
+regionTravelNode = function (id) {
+  return { ms1_pine: PINE_NODE, ms1_tide: TIDE_NODE, ms1_capital: CAPITAL_NODE, ms1_echo: ECHO_NODE }[id] || baseMs1RegionTravelNode(id);
+};
+/* 新地点的通行条件：这一轮只接既有成果，不新造前提。 */
+var baseMs1GateAllowed = extendedGateAllowed;
+extendedGateAllowed = function (key) {
+  if (key === 'ms1_pine') return baseMs1GateAllowed('neighbor');
+  if (key === 'ms1_tide') return baseMs1GateAllowed('port');
+  if (key === 'ms1_capital') return baseMs1GateAllowed('port');
+  if (key === 'ms1_echo') return baseMs1GateAllowed('ms1_pine');
+  return baseMs1GateAllowed(key);
+};
+var baseMs1GateReason = extendedGateReason;
+extendedGateReason = function (key) {
+  if (key === 'ms1_pine') return '未解锁 · 取得邻领通行文书（完成边境任务并核对旧界碑）';
+  if (key === 'ms1_tide') return '未解锁 · 完成河港调查并安排好航路';
+  if (key === 'ms1_capital') return '未解锁 · 沿皇家驿路抵达王都';
+  if (key === 'ms1_echo') return '未解锁 · 取得现场核验许可，并有向导带路上山径';
+  return baseMs1GateReason(key);
+};
+
+/* --- 地点里住着的人（总规 §25.1 的十一名新增人物） --- */
+extendedAddResident('ms1_hessa', '赫莎', '驿舍经营者兼向导', 'ms1_pine_inn', 5, 6, 'baker', ['#6B4F3A', '#E8DCC0', '#A8674E'], [
+  '炉子一直热着。路不好走的时候，先坐下吃点东西再讲。',
+  '旧图上的路我不再带人走了。要走就现场看，塌方我会说。',
+  '住下来的人都有名字，别叫他们「迁来的那批」。'
+]);
+extendedAddResident('ms1_nadine', '娜汀', '海员医护', 'ms1_tide_clinic', 5, 6, 'scholar', ['#4E5F6B', '#E3E6DC', '#B26A62'], [
+  '先看人，再看记录。伤到什么程度我照实说。',
+  '有人上个月在码头摔过，手腕一直没力气。我记着。',
+  '药不够就说不够，账上写清楚比事后补一句强。'
+]);
+extendedAddResident('ms1_vik', '维克', '船户兼岸上救援熟手', 'ms1_tide_docks', 12, 16, 'engineer', ['#3F4E5A', '#C9BFA3', '#8A6B48'], [
+  '我不保证每次都成。风大的时候，船靠不上就是靠不上。',
+  '岸上的人比船上的人更该先动手。缆桩在堤上，绳在棚里。',
+  '要救人先说清楚谁下水，岸上的人比谁都重要。'
+]);
+extendedAddResident('ms1_iven', '伊文', '测绘师', 'ms1_echo_house', 6, 6, 'scholar', ['#5B6B63', '#E9E2CC', '#7C8A6E'], [
+  '等最后一条路画完，我就回来。这句话我说过很多次了。',
+  '我提过未完成名单的异议，后来也躲开了追问。这两件事都是真的。',
+  '别替我改口。写下来是什么样，就是什么样。'
+]);
+extendedAddResident('ms1_ruen', '鲁恩', '谷中修理人', 'ms1_echo_house', 10, 9, 'engineer', ['#6A5A4A', '#D9CDB2', '#6E7A55'], [
+  '我的腿是那年伤的。走不快，但路我认得。',
+  '信寄出去过，退回来过。这两样我也都记着。',
+  '别替我说话。她要问，就让她自己问我。'
+]);
+extendedAddResident('ms1_mira', '弥拉', '谷中居民', 'ms1_echo_village', 18, 16, 'gardener', ['#7A5B3F', '#DCCFAE', '#5F7A4E'], [
+  '菜地是我自己开出来的。走不走是我的事，不是谁替我定的。',
+  '孩子在这儿上学。我想让他在这儿长大，也想让他能出去看看。',
+  '别叫我们「留下的人」。留下是我们自己的选择。'
+]);
+extendedAddResident('ms1_aurelle', '奥蕾尔', '王国调查官', 'ms1_capital_office', 8, 6, 'scholar', ['#3F5160', '#E9E4D4', '#8E9BB0'], [
+  '事实和推断我会分开写。哪一句是推断，看得出来。',
+  '我按程序办，不替任何人省步骤，也不额外加一步。',
+  '你们能证明什么就写什么。我不会替你们补上缺的那部分。'
+]);
+extendedAddResident('ms1_beran', '伯兰', '道路署整备负责人', 'ms1_capital_street', 22, 16, 'merchant', ['#5A4B3C', '#C8B78F', '#7C5B45'], [
+  '当年多数人都撤出来了。工程按时结项，是有依据的。',
+  '名单上写「后续另行安置」，我按这句话办的。',
+  '这件事我愿意接受调查。安全上的问题，也得一并解决。'
+]);
+extendedAddResident('ms1_colin', '科林', '退休测绘员', 'ms1_capital_street', 16, 9, 'scholar', ['#6E6A5E', '#E4DCC6', '#8C93A0'], [
+  '当年我以为不说话最安全。这句话我用了十二年。',
+  '钟楼下面那张桌子，我坐过很多年。要证的事我愿意说。',
+  '你们要的是当年那张图，不是我记得的印象。'
+]);
+extendedAddResident('ms1_eno', '艾诺', '档案院保管员', 'ms1_capital_archive', 7, 6, 'scholar', ['#4E5A52', '#E6E1CF', '#9A8565'], [
+  '查阅要凭许可，我会登记。缺页我会写「此处缺页」，不替它补。',
+  '原始地图只在院里，出示要有出处。',
+  '我留在这里做普通研究服务，不只是给你们开门。'
+]);
+
+/* --- 地点里的可交互点：先给位置，幕里的现场操作在 M1—M3 接上 --- */
+/* --- 地点里的可交互点：先给位置，幕里的现场操作在 M1—M3 接上 ---
+   站位要按实际通行算：操作台常常紧挨着柜子或桌子，
+   固定四邻里有一格是实心的，站到那格就按不到 E。 */
+function ms1Site(scene, x, y, label, site) {
+  var stand = [[x, y + 1], [x - 1, y], [x + 1, y], [x, y - 1]].filter(function (c) {
+    return !isSolid(scene, c[0], c[1]);
+  });
+  if (!stand.length) stand.push([x, y + 1]);
+  INTERACTABLES[scene].push({ kind: 'extendedLife', work: site, x: x, y: y, label: label, stand: stand });
+}
+ms1Site('ms1_pine_village', 17, 12, '村口的旧路牌与驿车停运记录', 'ms1_pine_sign');
+ms1Site('ms1_pine_path', 12, 14, '第一处岔口 · 碎石坡', 'ms1_path_fork1');
+ms1Site('ms1_pine_path', 25, 10, '第二处岔口 · 浅溪', 'ms1_path_fork2');
+ms1Site('ms1_pine_path', 34, 6, '第三处岔口 · 风口', 'ms1_path_fork3');
+ms1Site('ms1_pine_inn', 4, 4, '赫莎的停运登记簿', 'ms1_pine_ledger');
+ms1Site('ms1_echo_fork', 13, 5, '封闭的旧隧道口', 'ms1_echo_tunnel');
+ms1Site('ms1_echo_fork', 24, 14, '当年的救援现场标记', 'ms1_echo_site');
+ms1Site('ms1_echo_village', 28, 19, '弥拉的菜地', 'ms1_echo_garden');
+ms1Site('ms1_echo_hall', 10, 9, '公屋的民意桌', 'ms1_echo_table');
+ms1Site('ms1_echo_house', 5, 5, '伊文的测绘桌', 'ms1_echo_desk');
+ms1Site('ms1_echo_route', 30, 10, '北坡接应坪', 'ms1_echo_staging');
+ms1Site('ms1_tide_docks', 20, 12, '海关报关棚', 'ms1_tide_customs');
+ms1Site('ms1_tide_docks', 34, 12, '工人街的货箱堆场', 'ms1_tide_cargo');
+ms1Site('ms1_tide_seawall', 16, 12, '海堤上的缆桩与绳', 'ms1_tide_bollard');
+ms1Site('ms1_tide_post', 9, 4, '留置材料与通信分拣台', 'ms1_tide_sort');
+ms1Site('ms1_tide_clinic', 7, 8, '娜汀的复诊记录', 'ms1_tide_chart');
+ms1Site('ms1_capital_street', 21, 12, '钟楼下的告示柱', 'ms1_capital_notice');
+ms1Site('ms1_capital_office', 8, 10, '奥蕾尔的受理台', 'ms1_capital_desk');
+ms1Site('ms1_capital_archive', 8, 10, '艾诺的查阅台', 'ms1_capital_archive');
+ms1Site('ms1_capital_hearing', 8, 12, '公议厅的质询席', 'ms1_capital_hearing');
+ms1Site('ms1_capital_inn', 8, 9, '行旅舍的寄存与家书', 'ms1_capital_letters');
+
+
 /* E：军事登记、指挥权限、机构预算与可复算的三阶段规则裁判。 */
 var MILITARY_RANKS={
   resident:{label:'普通居民',limit:0},
@@ -22272,7 +22613,47 @@ function openExtendedLife(site){
   if(site==='pass_route'){openMilitarySite(site);return;}
   if(site==='oldroad_marker'||site==='oldroad_station'){openOldRoadSite(site);return;}
   if(site==='neighbor_case'||site==='neighbor_exchange'||site==='neighbor_market'){openNeighborSite(site);return;}
+  if(site.indexOf('ms1_')===0){openMs1Site(site);return;}
   toast('这个工作台当前没有操作。');
+}
+
+/* 新地点的现场操作台：这一轮只把地点建起来，幕里的操作还没接。
+   面板要说清这是什么地方、之后会做什么，不放一个点了没反应的按钮。 */
+var MS1_SITE_INFO = {
+  ms1_pine_sign: ['村口的旧路牌与驿车停运记录', '驿车停运以后，迁居居民靠商队捎信。这里记的是哪一趟车、哪一天停的。', '第二幕会在这里核对通信去向。'],
+  ms1_path_fork1: ['第一处岔口 · 碎石坡', '往东是旧商道，往上是新修的绕行路。碎石坡走起来慢，但车能过。', '第二幕要在这里做一次路况判断。'],
+  ms1_path_fork2: ['第二处岔口 · 浅溪', '溪水不深，踩过去就行；雨后水涨，得看水痕再决定。', '第二幕要在这里做一次路况判断。'],
+  ms1_path_fork3: ['第三处岔口 · 风口', '风口常年刮风，冬天会结冰。老路在这里断掉，只能绕。', '第二幕要在这里做一次路况判断。'],
+  ms1_pine_ledger: ['赫莎的停运登记簿', '谁来过、谁住下、谁又走了，都记在这本簿子上。', '第二幕会在这里查到伊文留下的一笔。'],
+  ms1_echo_tunnel: ['封闭的旧隧道口', '旧官道穿山用的隧道已经封了。封条上的日期和署名牌子对不上。', '第五幕要在这里核对地质与封隧道的经过。'],
+  ms1_echo_site: ['当年的救援现场标记', '十二年前的重伤者是从这一侧抬出去的。石头上还留着刻痕。', '第五幕要在这里对照当年的救援选择。'],
+  ms1_echo_garden: ['弥拉的菜地', '有人打算迁出，也有人把菜地一直种到今天。去留是每户自己的事。', '第五幕要在这里逐户听取去留意见。'],
+  ms1_echo_table: ['公屋的民意桌', '村里开会的地方。桌上有各户的名单，也有人先写好的意见。', '第五幕要在这里听完每一户的说法。'],
+  ms1_echo_desk: ['伊文的测绘桌', '摊着没画完的图和几封没寄出的信。桌面很整齐，纸边却磨得起了毛。', '第五幕要在这里读出旧图与未寄出的信。'],
+  ms1_echo_staging: ['北坡接应坪', '临时通道尽头可以落脚的地方。帐篷、柴堆和几根量过坡度的木桩。', '终幕的接应与分工要在这里准备。'],
+  ms1_tide_customs: ['海关报关棚', '过关要报关、验货、盖章。棚里排着队的人一半是船上的，一半是工人街的。', '第三幕要在这里理清货与人的来路。'],
+  ms1_tide_cargo: ['工人街的货箱堆场', '货箱按船、按班次堆着。标签上的名字有时对不上箱子里的东西。', '第三幕要在这里看船与货真正到岸。'],
+  ms1_tide_bollard: ['海堤上的缆桩与绳', '缆桩是岸上接船的地方。绳还够用，风大的时候要提前收。', '第三幕的岸上接应会用到这里。'],
+  ms1_tide_sort: ['留置材料与通信分拣台', '待送的信、待领的包裹和退回件分三堆放。退回的那一堆最厚。', '第三幕要在这里核对通信链。'],
+  ms1_tide_chart: ['娜汀的复诊记录', '伤员按人分册，谁在恢复、谁还上不了船，都写着。', '第三幕要在这里确认伊文近期的见证。'],
+  ms1_capital_notice: ['钟楼下的告示柱', '王都的公告、任免和旧案补正都贴在这里。纸层叠得很厚。', '第四幕要在这里找到旧案的补正记录。'],
+  ms1_capital_desk: ['奥蕾尔的受理台', '调查官按程序受理。受理后会给你一张凭条，凭条上写清受理了什么、没受理什么。', '第四幕的许可与有限范围在这里办。'],
+  ms1_capital_archive: ['艾诺的查阅台', '原始地图与签核原件都在这里。查阅要登记，缺页会写「此处缺页」。', '第四幕要在这里调出原始地图与时间线。'],
+  ms1_capital_hearing: ['公议厅的质询席', '质询时先问谁、用什么事实回应，都由当场的人决定。', '第四幕要在这里完成一次质询。'],
+  ms1_capital_letters: ['行旅舍的寄存与家书', '寄存物和家书分两柜。写给收不到的人的信，柜里最多。', '第四幕与第五幕之间要把该寄的信寄出去。']
+};
+function openMs1Site(site) {
+  var info = MS1_SITE_INFO[site];
+  if (!info) { toast('这个工作台当前没有操作。'); return; }
+  openWindow({
+    id: 'ms1_site', kind: 'custom', title: info[0],
+    build: function (b) {
+      b.appendChild(el('p', null, info[1]));
+      b.appendChild(el('p', 'muted', info[2]));
+      b.appendChild(el('p', 'muted', '这一处属于第二幕到终幕的施工，现在只有地点，还不能操作。'));
+    },
+    actions: [{ label: '关闭', kind: 'ghost', close: true }]
+  });
 }
 function activateExtendedInteractable(it){
   if(it.kind==='extendedGate'){openExtendedGate(it.gate);return true;}
