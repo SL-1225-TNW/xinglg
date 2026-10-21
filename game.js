@@ -1951,6 +1951,8 @@ function openStoryLog() {
         var e = st.evidence[k];
         b.appendChild(el('div', 'story-evidence', '· ' + e.title + '（' + e.source + '）'));
       });
+      appendSegmentLedger(b, farmPlanState());
+      b.appendChild(mkBtn('分段旅行与照料安排', 'sm', openFarmSchedulePanel));
       if (st.lenaStance) {
         b.appendChild(el('div', 'section-title', '记录'));
         b.appendChild(el('div', 'story-evidence', '· 对莱娜的表态：' + (st.lenaStance === 'cautious' ? '谨慎 · 先写进申请，核对原件' : '公开 · 让受影响的人也知道在查')));
@@ -8885,6 +8887,8 @@ function performSettlement(auto, innRoom) {
     state.timeMinutes = CFG.dayStart;
     if (state.sceneId === 'house') {
       state.player.x = HOUSE_BED_WAKE.x; state.player.y = HOUSE_BED_WAKE.y; state.player.face = 'right';
+    } else if (farmPlanState().booked && farmPlanState().journey && farmPlanState().deliveredDays > 0) {
+      /* 在途住宿已经计入接应账，不把每次过夜改成回农场。 */
     } else if (innRoom) {
       state.sceneId='city_inn_upper';
       var bed=INN_BEDS[innRoom];state.player={x:bed.stand[0][0],y:bed.stand[0][1],face:'down'};
@@ -9001,6 +9005,16 @@ function stageLabel(g) {
    但天气那页一定留着，让玩家每次都看到"明天是什么天"。 */
 function settlementPages(s) {
   var pages = [];
+  var journey = farmPlanState().journey;
+  if (journey) {
+    var entry = journey.log.filter(function(x){return x.day === s.newDay;})[0];
+    if (entry) pages.push(settleStep('journey','分段旅行账目',[
+      SEGMENT_ROUTES[journey.route].name+' · 第 '+entry.day+' 天',
+      '路费 '+entry.fare+'／向导 '+entry.guide+'／接应 '+entry.reception+' 金',
+      journey.publicPaid?'公共核验任务直接支付，不计玩家收入。':'从私人预存费用核销，不重复扣款。',
+      journey.returned?'已安全返回农场。':'仍在行程中，可从主线日志打开旅行安排。'
+    ]));
+  }
   if (s.sold.length || s.income || s.allowanceEnd) {
     var lines = s.income ? ['总收入 ' + s.income + ' 金（现有 ' + state.coins + ' 金）'] : [];
     if (s.dailyAllowance) lines.push('安置援助 +' + s.dailyAllowance + ' 金（第 ' + s.allowanceDay + ' / ' + s.allowanceTotal + ' 个经营日）');
@@ -9946,7 +9960,7 @@ function todayPlanItems(opts) {
     var planPart = !fp.booked ? '未安排离农计划'
       : (fp.wagePerDay
         ? farmOutworkName(fp.kind) + ' · 剩余 ' + farmPlanDaysLeft(fp) + ' 天' + (fp.dueDay && state.totalDay > fp.dueDay ? ' · 已过合同期限' : '')
-        : '计划剩余 ' + farmPlanDaysLeft(fp) + ' 天');
+        : (fp.journey ? SEGMENT_ROUTES[fp.journey.route].name + ' · ' : '') + '计划剩余 ' + farmPlanDaysLeft(fp) + ' 天');
     out.push({ tier: 'soon', tag: '安排', text: '长期安排 · ' + planPart + ' · ' + (fc.booked ? ('照料覆盖至第 ' + fc.endDay + ' 天') : '没有照料委托'), open: openFarmSchedulePanel });
   }
   /* 季末提示：只在最后一周出现，平时不占「今日安排」的位置。 */
@@ -19365,7 +19379,7 @@ function openFarmSchedulePanel() {
           (plan.deliveryLog || []).slice(-5).forEach(function (x) {
             box.appendChild(el('p', 'muted', '第 ' + x.day + ' 天：' + x.pay + ' 金' + (x.reason ? '（' + x.reason + '）' : '（全额）')));
           });
-        } else {
+        } else if (!plan.journey) {
           box.appendChild(el('p', 'muted', '自理行程：这一段没有日薪，也没有职业与路线记录。'));
         }
         if (care.booked) box.appendChild(el('p', 'muted', '照料覆盖到第 ' + care.endDay + ' 天' + (care.endDay >= plan.endDay ? '，当前覆盖完整。' : '，短于离农计划，请补约或提前回来。')));
@@ -19374,11 +19388,12 @@ function openFarmSchedulePanel() {
           box.appendChild(el('p', 'req-chip', '计划今天因关键情况暂停：' + ((plan.pausedReasons[plan.pausedReasons.length - 1] || {}).reason || '需要处理') + '。'));
           box.appendChild(mkBtn('接受当前条件并恢复今天', 'primary', function () { if (resumePlanToday()) { toast('计划已恢复，今天计入进度。'); renderWindow(); } }));
         }
-        farmScheduleButton(box, '取消剩余计划 · 预计退 ' + (farmPlanDaysLeft(plan) * plan.feePerDay) + ' 金', {
+        farmScheduleButton(box, '取消剩余计划 · 预计退 ' + (plan.journey ? segmentRefund(plan.journey) : farmPlanDaysLeft(plan) * plan.feePerDay) + ' 金', {
           minutes: 10, guard: function () { return plan.booked; }
         }, function () { var refund = cancelFarmPlan(); toast('已取消剩余计划，退回 ' + refund + ' 金。'); });
       }
       b.appendChild(box);
+      appendSegmentJourneyPanel(b, plan);
     },
     actions: [{ label: '返回游戏', close: true }]
   });
@@ -19668,6 +19683,121 @@ function claimFarmCareProducts() {
    关键事件（雨、袭扰、主动暂停）到来时只增 pausedDays，不顺手推进；玩家可在 UI 主动恢复，
    恢复逻辑把暂停当天的 lastDeliveryDay 清掉，让它能被重新结算。
    跨周期跨玩家身份的接口只读状态；不直接改 state.farmCare 或 engineering。 */
+/* M1 前置：一段旅行沿用农场计划的日期和暂停规则。公款只付给承运人，
+   不经过玩家钱包；私人旅行预存费用，逐日核销，返程只退未使用部分。 */
+var SEGMENT_ROUTES = {
+  pine: { name: '白松驿村', node: 'pine.station_village', fare: 8, guide: 4, reception: 2 },
+  tide: { name: '潮汐港', node: 'tide.harbor', fare: 12, guide: 0, reception: 4 },
+  capital: { name: '王都', node: 'capital.station_street', fare: 16, guide: 0, reception: 4 },
+  echo: { name: '回声谷', node: 'echo.valley', fare: 8, guide: 8, reception: 4 }
+};
+function normalizeSegmentJourney(raw) {
+  if (!raw || !Object.prototype.hasOwnProperty.call(SEGMENT_ROUTES, raw.route)) return null;
+  var j = { route: raw.route, publicPaid: raw.publicPaid === true, deposit: 0, refunded: 0, returned: raw.returned === true, reason: '', log: [] };
+  ['deposit', 'refunded'].forEach(function(k){ j[k] = isInt(raw[k]) ? Math.max(0, Math.min(100000, raw[k])) : 0; });
+  j.reason = typeof raw.reason === 'string' ? raw.reason.slice(0,40) : '';
+  (Array.isArray(raw.log) ? raw.log : []).slice(-7).forEach(function(x){
+    if (!x || !isInt(x.day) || x.day < 1 || j.log.some(function(y){return y.day === x.day;})) return;
+    var e = { day: x.day, fare: 0, guide: 0, reception: 0 };
+    ['fare','guide','reception'].forEach(function(k){e[k]=isInt(x[k]) ? Math.max(0, Math.min(1000,x[k])) : 0;});
+    j.log.push(e);
+  });
+  return j;
+}
+function segmentJourneyPreview(key, days) {
+  var r = SEGMENT_ROUTES[key], n = days === 7 ? 7 : 3;
+  if (!r) return { ok:false, reason:'没有这段行程。' };
+  var node = travelNodeById(r.node), gap = farmPlanCareGap(n);
+  var publicPaid = storyHasEvidence('civil_check');
+  var total = n * (r.fare + r.guide + r.reception);
+  var reason = farmPlanState().booked ? '先完成或取消当前离农计划。' :
+    !node || !travelNodeUnlocked(node) ? (node ? travelLockReason(node) : '目的地尚未开放。') :
+    !gap.ok ? farmPlanCareGapText(gap) :
+    farmCareFeedNeed() && farmCareFeedCoverage(n).days < n ? '牲畜口粮不足：请补齐、缩短行程或延期。' :
+    !resolveSafeLanding(node) || !resolveSafeLanding(travelNodeById('farm.home')) ? '当前没有安全落点，请稍后安排。' :
+    !publicPaid && state.coins < total ? '私人旅行需预存 ' + total + ' 金，余额不足。' : '';
+  return {ok:!reason, reason:reason, total:total, publicPaid:publicPaid};
+}
+function bookSegmentJourney(key, days) {
+  var pv = segmentJourneyPreview(key, days);
+  if (!pv.ok) { toast(pv.reason); return false; }
+  var c = newFarmPlan(), n = days === 7 ? 7 : 3;
+  c.journeyArchive = segmentArchive(farmPlanState());
+  c.booked = true; c.days = n; c.startDay = state.totalDay + 1; c.endDay = state.totalDay + n; c.dueDay = c.endDay;
+  c.journey = normalizeSegmentJourney({route:key, publicPaid:pv.publicPaid, deposit:pv.publicPaid ? 0 : pv.total});
+  if (!pv.publicPaid) state.coins -= pv.total;
+  Object.assign(farmPlanState(), c); markDirty(); saveNow(); return true;
+}
+function prepareSegmentDay(c) {
+  var remaining = farmPlanDaysLeft(c), gap = farmPlanCareGap(remaining);
+  /* 当前日已由照料结算覆盖；最后一天 booked 会变 false，不能按预约状态误判。 */
+  var care = farmCareState(), needs = farmCareFeedNeed() || gap.crops;
+  if (needs && (care.lastDeliveryDay !== state.totalDay || care.lastShortageDay === state.totalDay || care.endDay < state.totalDay + remaining - 1)) {
+    pausePlanNow(c, '照料未覆盖或缺料，请补齐或提前返程'); return false;
+  }
+  var node = travelNodeById(remaining === 1 ? 'farm.home' : SEGMENT_ROUTES[c.journey.route].node);
+  if (!resolveSafeLanding(node)) { pausePlanNow(c, '没有安全落点'); return false; }
+  return true;
+}
+function settleSegmentDay(c) {
+  var j = c.journey, r = SEGMENT_ROUTES[j.route];
+  if (j.log.some(function(x){return x.day === state.totalDay;})) return;
+  j.log.push({day:state.totalDay, fare:r.fare, guide:r.guide, reception:r.reception});
+  if (c.deliveredDays >= c.days) finishSegmentJourney(c, '整段完成');
+  else if (c.deliveredDays === 1) {
+    var node = travelNodeById(r.node), p = resolveSafeLanding(node);
+    landSegmentJourney(node,p);
+  }
+}
+function finishSegmentJourney(c, reason) {
+  var j = c.journey;
+  if (j.returned) return true;
+  var node = travelNodeById('farm.home'), p = resolveSafeLanding(node);
+  if (!p) { toast('农场暂时没有安全落点，请稍后返程。'); return false; }
+  landSegmentJourney(node,p);
+  j.refunded = segmentRefund(j);
+  state.coins += j.refunded; j.returned = true; j.reason = reason;
+  return true;
+}
+function segmentRefund(j) {
+  return j.publicPaid || j.returned ? 0 : Math.max(0,j.deposit-j.log.reduce(function(sum,x){return sum+x.fare+x.guide+x.reception;},0));
+}
+function segmentArchive(c) {
+  return (c.journeyArchive || []).concat(c.journey ? [deepClone(c.journey)] : []).slice(-12);
+}
+function appendSegmentLedger(b,c) {
+  var entries=(c.journeyArchive || []).concat(c.journey ? [c.journey] : []);
+  if (!entries.length) return;
+  b.appendChild(el('div','section-title','旅行支付账（最近十二段与当前行程）'));
+  entries.forEach(function(j){
+    b.appendChild(el('p','work-summary',SEGMENT_ROUTES[j.route].name+' · '+(j.publicPaid?'公共核验任务直接支付':'私人预存 '+j.deposit+' 金')+(j.returned?' · '+j.reason+' · 退回 '+j.refunded+' 金':'')));
+    j.log.forEach(function(x){b.appendChild(el('p','muted','第 '+x.day+' 天 · 承运路费 '+x.fare+'／向导 '+x.guide+'／住宿接应 '+x.reception+' 金'));});
+  });
+}
+function landSegmentJourney(node,p) {
+  state.sceneId=node.sceneId; state.player.x=p.x; state.player.y=p.y;
+  syncPlayerPixel(); updateNpcPositions(true); onSceneChanged(); registerArrival(node.sceneId);
+}
+function appendSegmentJourneyPanel(b, c) {
+  var box = el('div','panel-box');
+  box.appendChild(el('div','section-title','分段旅行 · 白松／潮汐港／王都／回声谷'));
+  box.appendChild(el('p','muted','次日出发，逐日过夜推进，最后一天返回农场。雨天先暂停；照料缺料时须补齐或提前返程。民用核验函持有人由公共核验任务直接支付必要费用，不计玩家收入；其他旅行自费预存，取消退未使用部分。'));
+  if (c.journey) {
+    var j=c.journey;
+    box.appendChild(el('p','work-summary',SEGMENT_ROUTES[j.route].name+' · '+(j.publicPaid?'公共核验任务支付':'私人预存 '+j.deposit+' 金')+(j.returned?' · 已返程 · 退回 '+j.refunded+' 金':' · 在途')));
+    j.log.forEach(function(x){box.appendChild(el('p','muted','第 '+x.day+' 天 · 路费 '+x.fare+'／向导 '+x.guide+'／接应 '+x.reception+' 金'));});
+    if(c.booked) box.appendChild(mkBtn('在行程中休息至次日','primary',function(){requestSleep();}));
+  }
+  if (!c.booked) Object.keys(SEGMENT_ROUTES).forEach(function(key){
+    var r=SEGMENT_ROUTES[key];
+    [3,7].forEach(function(n){var pv=segmentJourneyPreview(key,n);
+      var btn=mkBtn(r.name+' · '+n+' 天 · '+pv.total+' 金'+(pv.publicPaid?'（公付）':'（自费）'),'',function(){if(bookSegmentJourney(key,n))renderWindow();});
+      btn.disabled=!pv.ok; box.appendChild(btn);
+      box.appendChild(el('p','muted',pv.reason || '每日路费 '+r.fare+'／向导 '+r.guide+'／接应 '+r.reception+' 金'));
+    });
+  });
+  b.appendChild(box);
+}
 function newFarmPlan() {
   return {
     booked: false,
@@ -19694,7 +19824,9 @@ function newFarmPlan() {
     careGapDays: 0,
     deliveryLog: [],
     /* 上一趟外出的成绩快照：取消或完成后写一次，新一趟开始时清空。 */
-    lastOutwork: null
+    lastOutwork: null,
+    journey: null,
+    journeyArchive: []
   };
 }
 function farmPlanState() { return state.farmPlan || (state.farmPlan = newFarmPlan()); }
@@ -19770,6 +19902,8 @@ function bookFarmPlan(days, kind) {
   c.completedDay = 0;
   c.feePerDay = 6;
   c.kind = job ? kind : '';
+  c.journeyArchive = segmentArchive(c);
+  c.journey = null;
   c.wagePerDay = job ? job.wage : 0;
   c.careerKey = job ? job.career : '';
   c.routeKey = job ? job.route : '';
@@ -19798,6 +19932,7 @@ function farmPlanCloseOutwork(c, endDay, reason) {
 function cancelFarmPlan() {
   var c = farmPlanState();
   if (!c.booked) return false;
+  if (c.journey && !finishSegmentJourney(c, '提前返程')) return false;
   var refund = farmPlanDaysLeft(c) * (c.feePerDay || 0);
   state.coins += refund;
   /* 先留快照再清账：取消剩余天数不抹掉这一趟已经挣到和缺勤过的记录。 */
@@ -19817,7 +19952,7 @@ function cancelFarmPlan() {
   c.routeKey = '';
   c.dueDay = 0;
   markDirty(); saveNow();
-  return refund;
+  return refund + (c.journey ? c.journey.refunded : 0);
 }
 /* 跨日结算。performSettlement 在 totalDay += 1 之后调用。
    只结算 startDay..endDay 范围内当天；同日重复调用会自己跳过。
@@ -19828,6 +19963,7 @@ function applyFarmPlanTick() {
   if (!c.booked) return;
   if (state.totalDay < c.startDay || state.totalDay > c.endDay) return;
   if (state.totalDay === c.lastDeliveryDay) return;
+  if (c.journey && !prepareSegmentDay(c)) return;
   if (isRaining() && c.resumeDay !== state.totalDay) {
     pausePlanNow(c, '雨天');
     return;
@@ -19836,6 +19972,7 @@ function applyFarmPlanTick() {
   c.lastDeliveryDay = state.totalDay;
   c.pauseDay = 0;
   c.resumeDay = 0;
+  if (c.journey) settleSegmentDay(c);
   var done = c.deliveredDays >= c.days;
   if (c.wagePerDay > 0) settleFarmOutworkDay(c);
   if (done) {
@@ -19935,6 +20072,8 @@ function normalizeFarmPlan(raw) {
   d.resumeDay = Math.max(0, Math.floor(isInt(raw.resumeDay) ? raw.resumeDay : 0));
   d.completedDay = Math.max(0, Math.floor(isInt(raw.completedDay) ? raw.completedDay : 0));
   d.feePerDay = Math.max(0, Math.floor(isInt(raw.feePerDay) ? raw.feePerDay : 6));
+  d.journey = normalizeSegmentJourney(raw.journey);
+  d.journeyArchive = (Array.isArray(raw.journeyArchive) ? raw.journeyArchive : []).slice(-12).map(normalizeSegmentJourney).filter(Boolean);
   /* 工作表里已经不存在的 kind 归一化成自理行程，不能带着死引用发工资。 */
   d.kind = farmOutwork(raw.kind) ? String(raw.kind) : '';
   d.wagePerDay = d.kind
@@ -21041,7 +21180,7 @@ extendedGateAllowed = function (key) {
   if (key === 'ms1_pine') return baseMs1GateAllowed('neighbor');
   if (key === 'ms1_tide') return baseMs1GateAllowed('port');
   if (key === 'ms1_capital') return baseMs1GateAllowed('port');
-  if (key === 'ms1_echo') return baseMs1GateAllowed('ms1_pine');
+  if (key === 'ms1_echo') return extendedGateAllowed('ms1_pine');
   return baseMs1GateAllowed(key);
 };
 var baseMs1GateReason = extendedGateReason;
@@ -23975,6 +24114,8 @@ window.__MOSS__ = {
   farmPlanDaysLeft: farmPlanDaysLeft,
   farmPlanTotalFee: farmPlanTotalFee,
   normalizeFarmPlan: normalizeFarmPlan,
+  segmentJourneyPreview: segmentJourneyPreview,
+  bookSegmentJourney: bookSegmentJourney,
   OUTWORK_ASSIGNMENTS: OUTWORK_ASSIGNMENTS,
   farmOutwork: farmOutwork,
   farmOutworkUnlocked: farmOutworkUnlocked,

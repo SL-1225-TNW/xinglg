@@ -70,6 +70,7 @@ const BROWSER = [
   /* 第九版第一部新地点：白松驿村、白松山径、潮汐港、王都、回声谷共 17 个场景；
      自然入口、门洞进出、十名新增人物、公共传送节点与全境地图标记 */
   'run-ms1-locations.mjs',
+  'run-m1-segment-travel.mjs',
   /* 探索线：森林/矿山三道闸门、三层矿洞、采集再生、存档重载与钢制工具，
      脚本内部自带 index.html + 单文件版两轮 */
   'run-exploration.mjs',
@@ -138,6 +139,7 @@ run('run-r5-mobile-touch-single-file', path.join(here, 'run-r5-mobile-touch.mjs'
 run('run-m0-story-single-file', path.join(here, 'run-m0-story.mjs'), ['--single-file']);
 run('run-m0-story-city-single-file', path.join(here, 'run-m0-story-city.mjs'), ['--single-file']);
 run('run-ms1-locations-single-file', path.join(here, 'run-ms1-locations.mjs'), ['--single-file']);
+run('run-m1-segment-travel-single-file', path.join(here, 'run-m1-segment-travel.mjs'), ['--single-file']);
 run('run-fixes-single-file', path.join(here, 'run-fixes.mjs'), ['--single-file']);
 
 console.log(failed ? `\n共 ${failed} 项失败。` : '\n两层全部通过。');

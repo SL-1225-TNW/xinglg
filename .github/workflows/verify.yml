@@ -124,6 +124,25 @@ jobs:
           path: site
           retention-days: 14
 
+  m1-segment-travel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright test dependency
+        run: npm install --no-save --no-package-lock playwright@1.63.0
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build the offline single-file game
+        run: node tests/build-single-file.mjs
+      - name: Verify segment travel in source and single-file builds
+        run: |
+          node tests/run-m1-segment-travel.mjs
+          node tests/run-m1-segment-travel.mjs --single-file
+
   r3-natural-route:
     runs-on: ubuntu-latest
     timeout-minutes: 30
