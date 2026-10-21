@@ -136,7 +136,9 @@ async function travelTo(name) {
 }
 
 /* 夹具：更早阶段已经到访过的地方与已办下来的通行，
-   让新地点能从既有世界走过去；地形、门洞、出口、人物位置全部靠真实走路验证。 */
+   让新地点能从既有世界走过去；地形、门洞、出口、人物位置全部靠真实走路验证。
+   P0-2 规则变更：跨地区现在按凭证放行，夹具补上 M0 的核验函与四张跨境凭证，
+   门槛本身由 tests/run-m1-cross-border.mjs 单独守着。 */
 await p.evaluate(() => {
   const M = window.__MOSS__, s = M.state;
   s.energy = 100; s.coins = 800; s.timeMinutes = 540; s.totalDay = 12;
@@ -145,6 +147,10 @@ await p.evaluate(() => {
   /* 已办下来的到访凭证与湿地调查结论：这两样是进入邻领与河港的既有前提 */
   M.professionalLifeState().passes.visit = true;
   M.wetlandLifeState().causeFound = true;
+  /* P0-2：跨封国凭证。缺了它们就走不到白松、潮汐港、王都与回声谷。 */
+  M.storyRecordEvidence('civil_check', 'S017 · 宫城一层门厅');
+  ['neighbor_pass', 'tide_route', 'capital_pass', 'echo_guide']
+    .forEach(id => M.storyRecordEvidence(id, '夹具 · P0-2 跨境凭证'));
   M.saveNow();
 });
 

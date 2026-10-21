@@ -726,7 +726,12 @@ var STORY_EVIDENCE = {
   inquiry_letter:{ title: '塞琳的承诺：宫城收过一份问路函', source: 'S013 · 花园接待' },
   household_page:{ title: '逐户复核页副本', source: 'S015 · 议事厅档案角' },
   lena_receipt:  { title: '母亲保留的查询回单', source: 'S015 · 议事厅档案角' },
-  civil_check:   { title: '民用资料核验函', source: 'S017 · 宫城一层门厅' }
+  civil_check:   { title: '民用资料核验函', source: 'S017 · 宫城一层门厅' },
+  /* P0-2 合法跨封国：跨境凭证本身就是证据，记出处与日期，读档后照样有效 */
+  neighbor_pass: { title: '邻领通行文书（民用行程登记）', source: '邻领边城 · 领地联络处 · 阿丽娅' },
+  tide_route:    { title: '航路引荐信（船期与泊位）', source: '白蔷薇下游河港 · 船务屋 · 米娅' },
+  capital_pass:  { title: '皇家驿路接驳登记凭证', source: '白蔷薇下游河港 · 驿站接驳处 · 莱昂' },
+  echo_guide:    { title: '赫莎的带路约定（现场核验许可）', source: '白松驿舍 · 停运登记簿 · 赫莎' }
 };
 
 /* --- 场次：台词、旁白、选择与互动步骤 --- */
@@ -4114,8 +4119,18 @@ function checkExit() {
   var e;
   for (e = 0; e < (map.exits || []).length; e++) {
     var ex = map.exits[e];
-    if (ex.x === px && ex.y === py) { if(ex.to==='city'&&!exploreState().city){toast('先在小镇南口驿路牌按 E 办理城市通行证。');return false;} if(ex.to === 'forest' && !exploreState().forest){toast('森林入口尚未清理。到小镇北口路牌按 E 修复。');return false;} doSwitchScene(ex.to, ex.tx, ex.ty); return true; }
+    if (ex.x === px && ex.y === py) { if(ex.to==='city'&&!exploreState().city){toast('先在小镇南口驿路牌按 E 办理城市通行证。');return false;} if(ex.to === 'forest' && !exploreState().forest){toast('森林入口尚未清理。到小镇北口路牌按 E 修复。');return false;}
+      /* 跨境出口按凭证放行：缺什么就当场说清楚，不让人在门口猜。
+         人被拦下时还站在出口格上，面板只弹一次：每帧重弹会把人锁在面板里。 */
+      if (ex.gate && !extendedGateAllowed(ex.gate)) {
+        var hold = state.sceneId + ':' + ex.x + ',' + ex.y;
+        if (Game.gateHold !== hold) { Game.gateHold = hold; openCrossBorderGate(ex.gate); }
+        return false;
+      }
+      Game.gateHold = null;
+      doSwitchScene(ex.to, ex.tx, ex.ty); return true; }
   }
+  Game.gateHold = null;
   if (map.eastExits) {
     for (e = 0; e < map.eastExits.length; e++) {
       var ex2 = map.eastExits[e];
@@ -19704,22 +19719,29 @@ function normalizeSegmentJourney(raw) {
   });
   return j;
 }
-function segmentJourneyPreview(key, days) {
+/* 付款方式：public = 公共核验任务支付，private = 私人预存。
+   P0-2 的门禁把民用资料核验函变成进入四个地区的必经，如果还按「持函即公付」一刀切，
+   私人预存、逐日核销与取消退未核销部分这条线就永远够不着（CI 已抓到）。
+   现在两种方式在安排面板上分开列出，由玩家自己选：公付只在持函时可选。 */
+function segmentJourneyPreview(key, days, mode) {
   var r = SEGMENT_ROUTES[key], n = days === 7 ? 7 : 3;
   if (!r) return { ok:false, reason:'没有这段行程。' };
   var node = travelNodeById(r.node), gap = farmPlanCareGap(n);
-  var publicPaid = storyHasEvidence('civil_check');
+  var hasLetter = storyHasEvidence('civil_check');
+  var want = mode === 'public' ? 'public' : mode === 'private' ? 'private' : (hasLetter ? 'public' : 'private');
+  var publicPaid = want === 'public';
   var total = n * (r.fare + r.guide + r.reception);
   var reason = farmPlanState().booked ? '先完成或取消当前离农计划。' :
     !node || !travelNodeUnlocked(node) ? (node ? travelLockReason(node) : '目的地尚未开放。') :
     !gap.ok ? farmPlanCareGapText(gap) :
     farmCareFeedNeed() && farmCareFeedCoverage(n).days < n ? '牲畜口粮不足：请补齐、缩短行程或延期。' :
     !resolveSafeLanding(node) || !resolveSafeLanding(travelNodeById('farm.home')) ? '当前没有安全落点，请稍后安排。' :
+    want === 'public' && !hasLetter ? '这段行程不是公共核验任务，只能自费预存。' :
     !publicPaid && state.coins < total ? '私人旅行需预存 ' + total + ' 金，余额不足。' : '';
-  return {ok:!reason, reason:reason, total:total, publicPaid:publicPaid};
+  return {ok:!reason, reason:reason, total:total, publicPaid:publicPaid, canPublic:hasLetter};
 }
-function bookSegmentJourney(key, days) {
-  var pv = segmentJourneyPreview(key, days);
+function bookSegmentJourney(key, days, mode) {
+  var pv = segmentJourneyPreview(key, days, mode);
   if (!pv.ok) { toast(pv.reason); return false; }
   var c = newFarmPlan(), n = days === 7 ? 7 : 3;
   c.journeyArchive = segmentArchive(farmPlanState());
@@ -19781,7 +19803,7 @@ function landSegmentJourney(node,p) {
 function appendSegmentJourneyPanel(b, c) {
   var box = el('div','panel-box');
   box.appendChild(el('div','section-title','分段旅行 · 白松／潮汐港／王都／回声谷'));
-  box.appendChild(el('p','muted','次日出发，逐日过夜推进，最后一天返回农场。雨天先暂停；照料缺料时须补齐或提前返程。民用核验函持有人由公共核验任务直接支付必要费用，不计玩家收入；其他旅行自费预存，取消退未使用部分。'));
+  box.appendChild(el('p','muted','次日出发，逐日过夜推进，最后一天返回农场。雨天先暂停；照料缺料时须补齐或提前返程。持有民用核验函的公共核验任务，由公账直接支付必要费用，不计玩家收入；也可以自己预存走私人行程，预存的钱逐日核销，取消只退未核销部分，公共支付不能转成退款。'));
   if (c.journey) {
     var j=c.journey;
     box.appendChild(el('p','work-summary',SEGMENT_ROUTES[j.route].name+' · '+(j.publicPaid?'公共核验任务支付':'私人预存 '+j.deposit+' 金')+(j.returned?' · 已返程 · 退回 '+j.refunded+' 金':' · 在途')));
@@ -19790,12 +19812,32 @@ function appendSegmentJourneyPanel(b, c) {
   }
   if (!c.booked) Object.keys(SEGMENT_ROUTES).forEach(function(key){
     var r=SEGMENT_ROUTES[key];
-    [3,7].forEach(function(n){var pv=segmentJourneyPreview(key,n);
-      var btn=mkBtn(r.name+' · '+n+' 天 · '+pv.total+' 金'+(pv.publicPaid?'（公付）':'（自费）'),'',function(){if(bookSegmentJourney(key,n))renderWindow();});
-      btn.disabled=!pv.ok; box.appendChild(btn);
-      box.appendChild(el('p','muted',pv.reason || '每日路费 '+r.fare+'／向导 '+r.guide+'／接应 '+r.reception+' 金'));
+    [3,7].forEach(function(n){
+      var pub=segmentJourneyPreview(key,n,'public'), pri=segmentJourneyPreview(key,n,'private');
+      /* 公付只在持函时可选：没有公共核验任务，就只能自己预存。两种方式都摆出来，由玩家选。 */
+      if (pub.canPublic) {
+        var pb=mkBtn(r.name+' · '+n+' 天 · '+pub.total+' 金（公付）','primary',function(){if(bookSegmentJourney(key,n,'public'))renderWindow();});
+        pb.disabled=!pub.ok; box.appendChild(pb);
+      }
+      var vb=mkBtn(r.name+' · '+n+' 天 · '+pri.total+' 金（自费）','',function(){if(bookSegmentJourney(key,n,'private'))renderWindow();});
+      vb.disabled=!pri.ok; box.appendChild(vb);
+      var note = pub.canPublic ? (pub.ok ? (pri.ok ? '' : pri.reason) : pub.reason) : pri.reason;
+      box.appendChild(el('p','muted',note || '每日路费 '+r.fare+'／向导 '+r.guide+'／接应 '+r.reception+' 金'));
     });
   });
+  /* P0-2：跨境条件单列一栏，缺哪一项、到哪里办都写出来，不必猜。 */
+  var cbBox=el('div','panel-box');
+  cbBox.appendChild(el('div','section-title','跨境通行条件'));
+  cbBox.appendChild(el('p','muted','行程能不能约，先看这边的条件。缺的条件都要本人到指定的地方办。'));
+  Object.keys(CROSS_BORDER_ROUTES).forEach(function(key){
+    var route=CROSS_BORDER_ROUTES[key],missing=crossBorderMissing(key);
+    cbBox.appendChild(el('p',missing.length?'muted':'req-chip ok',route.name+'：'+(missing.length?'还缺 '+missing.length+' 项':'条件已齐')));
+    route.requires.forEach(function(q){
+      cbBox.appendChild(el('p',q.ok()?'req-chip ok':'req-chip',(q.ok()?'已具备 · ':'还缺 · ')+q.label+'（'+q.where+'）'));
+    });
+    cbBox.appendChild(mkBtn('查看 · '+route.name,'' ,function(){openCrossBorderPanel(key);}));
+  });
+  box.appendChild(cbBox);
   b.appendChild(box);
 }
 function newFarmPlan() {
@@ -20834,8 +20876,19 @@ function openProfessionSite(site){
         if(portS.shipment==='neighbor'&&!portS.settled)b.appendChild(el('p','req-chip','互市葡萄汁运单已发出；到邻领互市行栈签收。'));
       }
       if(portS.choice)b.appendChild(el('p','req-chip ok','货单处置：'+(portS.choice==='claim'?'已追索差额，后续优先级降低。':'已补运，合作方保留舱位。')));
+      /* P0-2：去潮汐港的航路引荐在船务屋办理，写清船期、泊位与随船的人。 */
+      b.appendChild(el('p',null,'去潮汐港的航路引荐也在这里办：船期、泊位、随船的人都要写清。引荐只对本人有效，替人代领不受理。'));
+      if(storyHasEvidence('tide_route'))b.appendChild(el('p','req-chip ok','航路引荐已开（第 '+((storyState().evidence.tide_route||{}).day||'—')+' 天）：船期与泊位写在引荐上。'));
+      else if(storyHasEvidence('civil_check'))extendedWorkButton(b,'port','办理航路引荐（船期与泊位）· 20分钟',{minutes:20,guard:function(){return storyHasEvidence('civil_check')&&crossBorderReadyFor(CROSS_BORDER_ROUTES.tide)&&!storyHasEvidence('tide_route');},reason:'引荐已经办过；同一段航路不重复引荐。'},function(){crossBorderGrant(CROSS_BORDER_ROUTES.tide,'白蔷薇下游河港 · 船务屋 · 米娅');});
+      else b.appendChild(el('p','req-chip','办理航路引荐要带白蔷薇宫的民用资料核验函（宫城一层门厅 · 塞琳交付）。'));
     }
-    if(site==='lock'){b.appendChild(el('p',null,'莱昂：船闸水尺会随降雨变化。人的省内快速传送不会搬运货物；货船只有靠泊并核验后才算抵港。当前水利方案：'+(ww.allocation==='irrigation'?'优先农田用水':ww.allocation==='navigation'?'优先通航':'待协商')+'。'));engDutyReadout(b, p.projects[ENG_PROJECT_ID], '船闸按闸门养护记录核发短期靠泊额度；执行入口仍在控制室与风铃磨坊。');}
+    if(site==='lock'){b.appendChild(el('p',null,'莱昂：船闸水尺会随降雨变化。人的省内快速传送不会搬运货物；货船只有靠泊并核验后才算抵港。当前水利方案：'+(ww.allocation==='irrigation'?'优先农田用水':ww.allocation==='navigation'?'优先通航':'待协商')+'。'));engDutyReadout(b, p.projects[ENG_PROJECT_ID], '船闸按闸门养护记录核发短期靠泊额度；执行入口仍在控制室与风铃磨坊。');
+      /* P0-2：皇家驿路从下游河港接驳，班次要对上船期；登记要带核验函。 */
+      b.appendChild(el('p',null,'往王都的皇家驿路在这里接驳：船到泊位，驿车按同一班次接人。班次由驿路那边定，河港只负责对得上。'));
+      if(storyHasEvidence('capital_pass'))b.appendChild(el('p','req-chip ok','皇家驿路接驳已登记（第 '+((storyState().evidence.capital_pass||{}).day||'—')+' 天）。'));
+      else if(storyHasEvidence('civil_check'))extendedWorkButton(b,'lock','办理皇家驿路接驳登记 · 20分钟',{minutes:20,guard:function(){return storyHasEvidence('civil_check')&&crossBorderReadyFor(CROSS_BORDER_ROUTES.capital)&&!storyHasEvidence('capital_pass');},reason:'接驳已经登记过；同一段驿路不重复登记。'},function(){crossBorderGrant(CROSS_BORDER_ROUTES.capital,'白蔷薇下游河港 · 驿站接驳处 · 莱昂');});
+      else b.appendChild(el('p','req-chip','办理接驳登记要带白蔷薇宫的民用资料核验函（宫城一层门厅 · 塞琳交付）。'));
+    }
     if(site==='quarry'){
       b.appendChild(el('p',null,'玛尔：先量裂隙和支护，再选稳定面或石灰层。每个游戏日只安排一次采掘，避免重复挖同一批原石。'));
       if(!q.surveyed)extendedWorkButton(b,'quarry','测量裂隙 · 20分钟',{minutes:20,energy:2,guard:function(){return !q.surveyed;}},function(){q.surveyed=true;p.access.quarry=true;bumpRoute('engineering');});
@@ -21122,20 +21175,21 @@ addExtendedRoom('ms1_echo_house', '回声谷 · 测绘屋', 18, 12, 'ms1_echo_vi
  ['ms1_echo_village', 'ms1_echo_house', 26, 8, '进入测绘屋']
 ].forEach(function (p) { extendedDoor(p[0], p[1], p[2], p[3], p[4]); });
 
-/* --- 通行：既有世界与新地区之间双向登记 --- */
-ms1Pine.exits = [{ x: 0, y: 14, to: 'neighbor_border', tx: 41, ty: 18 }, { x: 39, y: 14, to: 'ms1_pine_path', tx: 1, ty: 14 }];
-ms1Path.exits = [{ x: 0, y: 14, to: 'ms1_pine_village', tx: 38, ty: 14 }, { x: 41, y: 6, to: 'ms1_echo_fork', tx: 1, ty: 12 }];
-ms1Fork.exits = [{ x: 0, y: 12, to: 'ms1_pine_path', tx: 40, ty: 6 }, { x: 16, y: 0, to: 'ms1_echo_village', tx: 16, ty: 11 }, { x: 39, y: 20, to: 'ms1_echo_route', tx: 1, ty: 12 }];
-ms1Valley.exits = [{ x: 16, y: 0, to: 'ms1_echo_fork', tx: 16, ty: 11 }, { x: 37, y: 12, to: 'ms1_echo_route', tx: 36, ty: 12 }];
-ms1Route.exits = [{ x: 0, y: 12, to: 'ms1_echo_village', tx: 36, ty: 12 }, { x: 10, y: 25, to: 'ms1_echo_fork', tx: 36, ty: 20 }];
-ms1Tide.exits = [{ x: 0, y: 12, to: 'port', tx: 32, ty: 18 }, { x: 18, y: 0, to: 'ms1_capital_street', tx: 18, ty: 28 }, { x: 43, y: 16, to: 'ms1_tide_seawall', tx: 35, ty: 12 }];
+/* --- 通行：既有世界与新地区之间双向登记 ---
+   跨边界的出口带 gate：凭证不齐就停在路口，面板会写明缺哪一项。 */
+ms1Pine.exits = [{ x: 0, y: 14, to: 'neighbor_border', tx: 41, ty: 18, gate: 'ms1_pine' }, { x: 39, y: 14, to: 'ms1_pine_path', tx: 1, ty: 14 }];
+ms1Path.exits = [{ x: 0, y: 14, to: 'ms1_pine_village', tx: 38, ty: 14 }, { x: 41, y: 6, to: 'ms1_echo_fork', tx: 1, ty: 12, gate: 'ms1_echo' }];
+ms1Fork.exits = [{ x: 0, y: 12, to: 'ms1_pine_path', tx: 40, ty: 6, gate: 'ms1_echo' }, { x: 16, y: 0, to: 'ms1_echo_village', tx: 16, ty: 11, gate: 'ms1_echo' }, { x: 39, y: 20, to: 'ms1_echo_route', tx: 1, ty: 12, gate: 'ms1_echo' }];
+ms1Valley.exits = [{ x: 16, y: 0, to: 'ms1_echo_fork', tx: 16, ty: 11, gate: 'ms1_echo' }, { x: 37, y: 12, to: 'ms1_echo_route', tx: 36, ty: 12, gate: 'ms1_echo' }];
+ms1Route.exits = [{ x: 0, y: 12, to: 'ms1_echo_village', tx: 36, ty: 12, gate: 'ms1_echo' }, { x: 10, y: 25, to: 'ms1_echo_fork', tx: 36, ty: 20, gate: 'ms1_echo' }];
+ms1Tide.exits = [{ x: 0, y: 12, to: 'port', tx: 32, ty: 18, gate: 'ms1_tide' }, { x: 18, y: 0, to: 'ms1_capital_street', tx: 18, ty: 28, gate: 'ms1_capital' }, { x: 43, y: 16, to: 'ms1_tide_seawall', tx: 35, ty: 12 }];
 /* 海堤的出口不能和落点重合：落点正压在出口格上，玩家会被立刻弹回去。 */
 ms1Seawall.exits = [{ x: 36, y: 12, to: 'ms1_tide_docks', tx: 42, ty: 16 }];
-ms1Capital.exits = [{ x: 18, y: 29, to: 'ms1_tide_docks', tx: 18, ty: 1 }];
-/* 既有场景那一侧也要有出口，否则从新地点走不回去 */
-MAPS.neighbor_border.exits.push({ x: 43, y: 18, to: 'ms1_pine_village', tx: 1, ty: 14 });
+ms1Capital.exits = [{ x: 18, y: 29, to: 'ms1_tide_docks', tx: 18, ty: 1, gate: 'ms1_capital' }];
+/* 既有场景那一侧也要有出口，否则从新地点走不回去；跨境出口同样带门禁。 */
+MAPS.neighbor_border.exits.push({ x: 43, y: 18, to: 'ms1_pine_village', tx: 1, ty: 14, gate: 'ms1_pine' });
 /* 河港东侧是水面，泊位在岸线那一格（32,18），不是水里 */
-MAPS.port.exits.push({ x: 32, y: 18, to: 'ms1_tide_docks', tx: 1, ty: 12 });
+MAPS.port.exits.push({ x: 32, y: 18, to: 'ms1_tide_docks', tx: 1, ty: 12, gate: 'ms1_tide' });
 
 /* --- 场景归属：地图、区域与旅行节点 --- */
 ['ms1_pine_village', 'ms1_pine_path', 'ms1_echo_fork', 'ms1_echo_village', 'ms1_echo_route',
@@ -21191,6 +21245,152 @@ extendedGateReason = function (key) {
   if (key === 'ms1_echo') return '未解锁 · 取得现场核验许可，并有向导带路上山径';
   return baseMs1GateReason(key);
 };
+
+/* ============================================================
+   P0-2 合法跨封国（总规 §26.1）
+   ------------------------------------------------------------
+   三条进入路线各有各的凭证：邻领线去白松驿村，航路线去潮汐港，
+   皇家驿路线去王都；回声谷走白松的路，另加向导带路。
+   门禁不再只写一句「未解锁」：缺哪一项、到哪里办，写在面板上。
+   凭证本身就是证据：记出处、记日期，读档后照样有效。
+   这一轮不新造前提：核验函取自 M0，河港调查取自既有湿地与商旅事实，
+   登记与引荐都发生在真实存在的柜台和工作台上。
+   ============================================================ */
+var CROSS_BORDER_ROUTES = {
+  pine: {
+    key: 'pine', name: '邻领线 · 白松驿村', gate: 'ms1_pine', credential: 'neighbor_pass',
+    path: '白蔷薇城 → 云峰关口 → 古道 → 邻领边城 → 白松旧驿村',
+    note: '第二幕从白松开始：核验函与邻领登记齐备即可，军事委任不在这条线上。',
+    requires: [
+      { id: 'letter', label: '民用资料核验函', where: '白蔷薇宫城 · 一层门厅（塞琳交付）', ok: function () { return storyHasEvidence('civil_check'); } },
+      { id: 'register', label: '邻领民用行程登记', where: '北境邻领边城 · 领地联络处（阿丽娅）', cred: true, ok: function () { return storyHasEvidence('neighbor_pass'); } }
+    ]
+  },
+  tide: {
+    key: 'tide', name: '航路线 · 潮汐港', gate: 'ms1_tide', credential: 'tide_route',
+    path: '白蔷薇下游河港 → 泊位 → 潮汐港 · 海关码头',
+    note: '第三幕从潮汐港开始：河港要有调查记录，航路要落到纸面的船期与泊位。',
+    requires: [
+      { id: 'letter', label: '民用资料核验函', where: '白蔷薇宫城 · 一层门厅（塞琳交付）', ok: function () { return storyHasEvidence('civil_check'); } },
+      { id: 'portSurvey', label: '河港调查记录', where: '白蔷薇下游河港（湿地巡护记录，或两次本地运输的商旅介绍信）', ok: function () { return extendedGateAllowed('port'); } },
+      { id: 'route', label: '航路引荐信（船期与泊位）', where: '白蔷薇下游河港 · 船务屋（米娅）', cred: true, ok: function () { return storyHasEvidence('tide_route'); } }
+    ]
+  },
+  capital: {
+    key: 'capital', name: '皇家驿路线 · 王都', gate: 'ms1_capital', credential: 'capital_pass',
+    path: '白蔷薇下游河港 → 皇家驿路 → 王都 · 驿站街与钟楼前庭',
+    note: '第四幕从王都开始：驿路接驳要有登记，不靠身份，也不靠传闻。',
+    requires: [
+      { id: 'letter', label: '民用资料核验函', where: '白蔷薇宫城 · 一层门厅（塞琳交付）', ok: function () { return storyHasEvidence('civil_check'); } },
+      { id: 'portSurvey', label: '河港调查记录', where: '白蔷薇下游河港（湿地巡护记录，或两次本地运输的商旅介绍信）', ok: function () { return extendedGateAllowed('port'); } },
+      { id: 'coach', label: '皇家驿路接驳登记', where: '白蔷薇下游河港 · 驿站接驳处（莱昂）', cred: true, ok: function () { return storyHasEvidence('capital_pass'); } }
+    ]
+  },
+  echo: {
+    key: 'echo', name: '山径线 · 回声谷', gate: 'ms1_echo', credential: 'echo_guide',
+    path: '白松旧驿村 → 白松山径 → 旧官道分岔 → 回声谷 · 村落',
+    note: '第五幕从回声谷开始：白松的通行之外，还要现场核验许可与向导带路。',
+    requires: [
+      { id: 'letter', label: '民用资料核验函', where: '白蔷薇宫城 · 一层门厅（塞琳交付）', ok: function () { return storyHasEvidence('civil_check'); } },
+      { id: 'register', label: '邻领民用行程登记', where: '北境邻领边城 · 领地联络处（阿丽娅）', ok: function () { return storyHasEvidence('neighbor_pass'); } },
+      { id: 'guide', label: '向导带路约定（现场核验许可）', where: '白松驿舍 · 赫莎的停运登记簿', cred: true, ok: function () { return storyHasEvidence('echo_guide'); } }
+    ]
+  }
+};
+function crossBorderRequirements(key) { var r = CROSS_BORDER_ROUTES[key]; return r ? r.requires : []; }
+function crossBorderMissing(key) { return crossBorderRequirements(key).filter(function (q) { return !q.ok(); }); }
+function crossBorderOpen(key) { var r = CROSS_BORDER_ROUTES[key]; return !!r && crossBorderMissing(key).length === 0; }
+function crossBorderMissingText(key) {
+  var m = crossBorderMissing(key);
+  if (!m.length) return '';
+  return m.map(function (q) { return q.label + '（' + q.where + '）'; }).join('、');
+}
+function crossBorderRouteByGate(gate) {
+  var keys = Object.keys(CROSS_BORDER_ROUTES);
+  for (var i = 0; i < keys.length; i++) if (CROSS_BORDER_ROUTES[keys[i]].gate === gate) return CROSS_BORDER_ROUTES[keys[i]];
+  return null;
+}
+/* 除本项凭证以外的条件是否已经齐备：齐了才办得动这一项。 */
+function crossBorderReadyFor(route) {
+  if (!route) return false;
+  var other = crossBorderRequirements(route.key).filter(function (q) { return !q.cred; });
+  for (var i = 0; i < other.length; i++) if (!other[i].ok()) return false;
+  return true;
+}
+/* 凭证即证据：只记一次，出处与日期一起留下。 */
+function crossBorderGrant(route, source) {
+  if (!route || storyHasEvidence(route.credential)) return false;
+  storyRecordEvidence(route.credential, source);
+  markDirty();
+  return true;
+}
+function crossBorderStatusText(key) {
+  var route = CROSS_BORDER_ROUTES[key], m = crossBorderMissing(key);
+  if (!route) return '';
+  if (!m.length) return '已开放 · ' + route.name;
+  return '未解锁 · 还缺 ' + m.length + ' 项：' + m.map(function (q) { return q.label; }).join('、');
+}
+/* 门禁改读跨境条件：缺什么说什么，凭证到手才放行。 */
+var baseP0GateAllowed = extendedGateAllowed;
+extendedGateAllowed = function (key) {
+  var route = crossBorderRouteByGate(key);
+  if (route) return crossBorderOpen(route.key);
+  return baseP0GateAllowed(key);
+};
+var baseP0GateReason = extendedGateReason;
+extendedGateReason = function (key) {
+  var route = crossBorderRouteByGate(key);
+  if (route) {
+    if (!crossBorderMissing(route.key).length) return '已具备 ' + route.name + ' 的全部条件，现在就能走。';
+    return '未解锁 · 还缺：' + crossBorderMissingText(route.key);
+  }
+  return baseP0GateReason(key);
+};
+var baseP0RegionStatus = worldRegionStatus;
+worldRegionStatus = function (r) {
+  if (r && r.id === 'ms1_pine') return crossBorderStatusText('pine');
+  if (r && r.id === 'ms1_tide') return crossBorderStatusText('tide');
+  if (r && r.id === 'ms1_capital') return crossBorderStatusText('capital');
+  if (r && r.id === 'ms1_echo') return crossBorderStatusText('echo');
+  return baseP0RegionStatus(r);
+};
+/* 每条路线一张面板：写清缺哪一项、到哪里办、能不能代办。 */
+function openCrossBorderPanel(key) {
+  var route = CROSS_BORDER_ROUTES[key];
+  if (!route) return;
+  var missing = crossBorderMissing(key);
+  openWindow({
+    id: 'crossborder', kind: 'custom', wide: true, title: route.name + ' · 跨境条件',
+    build: function (b) {
+      b.appendChild(el('p', null, route.note));
+      b.appendChild(el('p', 'muted', '走法：' + route.path));
+      route.requires.forEach(function (q) {
+        var has = q.ok();
+        b.appendChild(el('p', has ? 'req-chip ok' : 'req-chip', (has ? '已具备 · ' : '还缺 · ') + q.label + '（' + q.where + '）'));
+      });
+      b.appendChild(el('p', 'muted', missing.length
+        ? '缺的条件都要本人到指定的地方办，不能由别人代办，也不能凭传闻算已经办好。'
+        : '条件已经齐了，这段路现在就能走。'));
+      var other = el('div', 'panel-box');
+      other.appendChild(el('div', 'section-title', '另外几条进入路线'));
+      Object.keys(CROSS_BORDER_ROUTES).forEach(function (k) {
+        if (k === key) return;
+        var r = CROSS_BORDER_ROUTES[k], m = crossBorderMissing(k);
+        other.appendChild(el('p', m.length ? 'muted' : 'req-chip ok', r.name + '：' + (m.length
+          ? '还缺 ' + m.length + ' 项（' + m.map(function (q) { return q.label; }).join('、') + '）'
+          : '条件已齐')));
+      });
+      b.appendChild(other);
+    },
+    actions: [{ label: '关闭', kind: 'ghost', close: true }]
+  });
+}
+/* 路口被拦时，直接把缺项面板端出来。 */
+function openCrossBorderGate(gate) {
+  var route = crossBorderRouteByGate(gate);
+  if (!route) { toast('这条路暂时走不通。'); return; }
+  openCrossBorderPanel(route.key);
+}
 
 /* --- 地点里住着的人（总规 §25.1 的十一名新增人物） --- */
 extendedAddResident('ms1_hessa', '赫莎', '驿舍经营者兼向导', 'ms1_pine_inn', 5, 6, 'baker', ['#6B4F3A', '#E8DCC0', '#A8674E'], [
@@ -21435,6 +21635,11 @@ function openNeighborSite(site){
       b.appendChild(el('p',null,'邻领联络官阿丽娅：界碑记录不一致，但现有证据显示旧驿路曾改线。请先交换拓片与双方维护册，再决定互市或共同复测。'));
       if(!n.caseFound&&n.oldroadVerified)militarySiteButton(b,site,'交换双方驿路记录 · 20分钟',{minutes:20,guard:function(){return n.evidence>0&&!n.caseFound;}},function(){n.caseFound=true;});
       if(n.caseFound)b.appendChild(el('p','req-chip ok','两方都承认路段需要复测；未将居民、商旅或邻领正规部队视为袭扰者。'));
+      /* P0-2：民用行程登记与边界争议分开办。登记看核验函与行程，不看委任，也不代替互市。 */
+      b.appendChild(el('p',null,'民用行程登记与边界争议分开办：登记只看你有没有核验函、行程写没写清楚，不看委任，也不能替互市合同作证。'));
+      if(storyHasEvidence('neighbor_pass'))b.appendChild(el('p','req-chip ok','民用行程已登记：邻领通行文书在手（第 '+((storyState().evidence.neighbor_pass||{}).day||'—')+' 天）。'));
+      else if(storyHasEvidence('civil_check'))militarySiteButton(b,site,'登记民用行程 · 领邻领通行文书 · 15分钟',{minutes:15,guard:function(){return storyHasEvidence('civil_check')&&!storyHasEvidence('neighbor_pass');},reason:'登记已经办过；同一趟行程不重复登记。'},function(){crossBorderGrant(CROSS_BORDER_ROUTES.pine,'邻领边城 · 领地联络处 · 阿丽娅');});
+      else b.appendChild(el('p','req-chip','登记民用行程要带白蔷薇宫的民用资料核验函（宫城一层门厅 · 塞琳交付）。'));
     }
     if(site==='neighbor_exchange'){
       if(n.caseFound&&!n.choice&&!n.settled)[['trade','试签一季互市合同'],['demarcate','共同复测界标并临时维持现状']].forEach(function(o){militarySiteButton(b,site,o[1]+' · 15分钟',{minutes:15,guard:function(){return n.caseFound&&!n.choice&&!n.settled;}},function(){n.choice=o[0];n.signedDay=state.totalDay;});});
@@ -21490,6 +21695,13 @@ function openMs1Site(site) {
     build: function (b) {
       b.appendChild(el('p', null, info[1]));
       b.appendChild(el('p', 'muted', info[2]));
+      /* P0-2：白松驿舍的停运登记簿兼办带路约定。赫莎只对本人带路。 */
+      if (site === 'ms1_pine_ledger') {
+        b.appendChild(el('p', null, '赫莎：旧图上的路我不再带人走了。你要去回声谷，我可以带一段，但要先看你的核验函和邻领登记。'));
+        if (storyHasEvidence('echo_guide')) b.appendChild(el('p', 'req-chip ok', '赫莎已经答应带路（第 '+((storyState().evidence.echo_guide||{}).day||'—')+' 天）：山径与接应坪按她说的走。'));
+        else if (crossBorderReadyFor(CROSS_BORDER_ROUTES.echo)) extendedWorkButton(b, 'ms1_pine_ledger', '约定赫莎带路上山径 · 20分钟', { minutes: 20, guard: function () { return !storyHasEvidence('echo_guide') && crossBorderReadyFor(CROSS_BORDER_ROUTES.echo); }, reason: '带路已经约过，不用再约一次。' }, function () { crossBorderGrant(CROSS_BORDER_ROUTES.echo, '白松驿舍 · 停运登记簿 · 赫莎'); });
+        else b.appendChild(el('p', 'req-chip', '还缺：' + crossBorderMissingText('echo')));
+      }
       b.appendChild(el('p', 'muted', '这一处属于第二幕到终幕的施工，现在只有地点，还不能操作。'));
     },
     actions: [{ label: '关闭', kind: 'ghost', close: true }]
@@ -23497,6 +23709,7 @@ window.__MOSS__ = {
   openWetlandSite:openWetlandSite, openProfessionSite:openProfessionSite, openMilitarySite:openMilitarySite,
   openOldRoadSite:openOldRoadSite, openNeighborSite:openNeighborSite, openExtendedJournal:openExtendedJournal,
   extendedGateAllowed:extendedGateAllowed, extendedGateReason:extendedGateReason, battleJudge:battleJudge, resolveFrontierBattle:resolveFrontierBattle,
+  worldRegionStatus: worldRegionStatus,
   extendedActionPoints:EXTENDED_ACTION_POINTS, extendedRegionByScene:EXTENDED_REGION_BY_SCENE,
 
   meadowLifeState:meadowLifeState, meadowSites:MEADOW_SITES, openMeadowLife:openMeadowLife,
@@ -24116,6 +24329,17 @@ window.__MOSS__ = {
   normalizeFarmPlan: normalizeFarmPlan,
   segmentJourneyPreview: segmentJourneyPreview,
   bookSegmentJourney: bookSegmentJourney,
+  /* P0-2 合法跨封国：条件、缺项与凭证办理 */
+  CROSS_BORDER_ROUTES: CROSS_BORDER_ROUTES,
+  crossBorderMissing: crossBorderMissing,
+  crossBorderOpen: crossBorderOpen,
+  crossBorderReadyFor: crossBorderReadyFor,
+  crossBorderMissingText: crossBorderMissingText,
+  crossBorderStatusText: crossBorderStatusText,
+  crossBorderGrant: crossBorderGrant,
+  openCrossBorderPanel: openCrossBorderPanel,
+  storyRecordEvidence: storyRecordEvidence,
+  storyHasEvidence: storyHasEvidence,
   OUTWORK_ASSIGNMENTS: OUTWORK_ASSIGNMENTS,
   farmOutwork: farmOutwork,
   farmOutworkUnlocked: farmOutworkUnlocked,

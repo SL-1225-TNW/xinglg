@@ -16,7 +16,11 @@ try {
   await boot(p);await p.locator('#tutorialSkip').click();
   eq(await p.evaluate(()=>__MOSS__.normalizeFarmPlan({}).journey),null,'旧计划不补造旅行');
   ok(!(await p.evaluate(()=>__MOSS__.segmentJourneyPreview('pine',3))).ok,'未满足既有通行条件不能预约');
-  await p.evaluate(()=>{__MOSS__.professionalLifeState().routes.trade=4;__MOSS__.professionalLifeState().passes.visit=true;__MOSS__.state.coins=2000;});
+  await p.evaluate(()=>{const M=__MOSS__;M.professionalLifeState().routes.trade=4;M.professionalLifeState().passes.visit=true;M.state.coins=2000;
+    /* P0-2 规则变更：跨地区现在按凭证放行，夹具补上 M0 的核验函与四张跨境凭证；
+       门槛本身由 tests/run-m1-cross-border.mjs 单独守着。 */
+    M.storyRecordEvidence('civil_check','S017 · 宫城一层门厅');
+    ['neighbor_pass','tide_route','capital_pass','echo_guide'].forEach(id=>M.storyRecordEvidence(id,'夹具 · P0-2 跨境凭证'));});
   for(const [key,name,scene] of [['pine','白松驿村','ms1_pine_village'],['tide','潮汐港','ms1_tide_docks'],['capital','王都','ms1_capital_street'],['echo','回声谷','ms1_echo_village']]) {
     const before=await snap();const pv=await p.evaluate(k=>__MOSS__.segmentJourneyPreview(k,3),key);
     ok(pv.ok,name+'可安排：'+pv.reason);await book(name);

@@ -143,6 +143,25 @@ jobs:
           node tests/run-m1-segment-travel.mjs
           node tests/run-m1-segment-travel.mjs --single-file
 
+  m1-cross-border:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright test dependency
+        run: npm install --no-save --no-package-lock playwright@1.63.0
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build the offline single-file game
+        run: node tests/build-single-file.mjs
+      - name: Verify legal cross-border gates in source and single-file builds
+        run: |
+          node tests/run-m1-cross-border.mjs
+          node tests/run-m1-cross-border.mjs --single-file
+
   r3-natural-route:
     runs-on: ubuntu-latest
     timeout-minutes: 30
