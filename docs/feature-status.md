@@ -7,7 +7,7 @@
 
 ## 最终地图标记
 
-共 18 个；这里是地图标记 ID，不是场景 ID。
+共 22 个；这里是地图标记 ID，不是场景 ID。
 
 | 标记 ID | 名称 |
 |---|---|
@@ -29,6 +29,10 @@
 | border_camp | 边境营地 |
 | old_road | 古道遗址 |
 | neighbor | 北境邻领边城 |
+| ms1_pine | 白松旧驿村 |
+| ms1_tide | 潮汐港 |
+| ms1_capital | 王都 |
+| ms1_echo | 回声谷 |
 
 ## 已注册场景
 
@@ -130,6 +134,23 @@
 | oldroad_survey | 古道遗址 · 调查站 | 2 | 0 |
 | neighbor_office | 北境边城 · 领地联络处 | 2 | 0 |
 | neighbor_exchange | 北境边城 · 互市行栈 | 2 | 0 |
+| ms1_pine_village | 白松旧驿村 | 2 | 1 |
+| ms1_pine_path | 白松山径 | 3 | 0 |
+| ms1_echo_fork | 回声谷 · 旧官道分岔 | 2 | 0 |
+| ms1_echo_village | 回声谷 · 村落 | 3 | 2 |
+| ms1_echo_route | 回声谷 · 北坡临时通道与接应坪 | 1 | 0 |
+| ms1_tide_docks | 潮汐港 · 海关码头与工人街 | 3 | 1 |
+| ms1_tide_seawall | 潮汐港 · 外海堤 | 2 | 1 |
+| ms1_capital_street | 王都 · 驿站街与钟楼前庭 | 5 | 4 |
+| ms1_pine_inn | 白松驿舍 | 2 | 0 |
+| ms1_tide_post | 潮汐港 · 邮务所 | 2 | 0 |
+| ms1_tide_clinic | 潮汐港 · 海员医舍 | 2 | 0 |
+| ms1_capital_inn | 王都 · 行旅舍 | 2 | 0 |
+| ms1_capital_office | 王都 · 调查公署 | 2 | 0 |
+| ms1_capital_archive | 王都 · 档案院 | 2 | 0 |
+| ms1_capital_hearing | 王都 · 公议厅 | 2 | 0 |
+| ms1_echo_hall | 回声谷 · 公屋 | 2 | 0 |
+| ms1_echo_house | 回声谷 · 测绘屋 | 2 | 0 |
 | palace_grounds | 白蔷薇宫苑 | 11 | 6 |
 | palace_gallery | 白蔷薇宫城 · 二层 回廊 | 2 | 1 |
 | palace_terrace | 白蔷薇宫城 · 翼楼露台 | 3 | 1 |
@@ -184,6 +205,10 @@
 | camp.frontier | 边境营地 | border_camp |
 | road.ancient | 古道遗址调查区 | old_road |
 | neighbor.market_town | 北境邻领边城 | neighbor_border |
+| pine.station_village | 白松旧驿村 | ms1_pine_village |
+| tide.harbor | 潮汐港 · 海关码头与工人街 | ms1_tide_docks |
+| capital.station_street | 王都 · 驿站街与钟楼前庭 | ms1_capital_street |
+| echo.valley | 回声谷 · 村落 | ms1_echo_village |
 | castle.palace | 白蔷薇宫城 | palace_grounds |
 
 ## 玩法验收边界（人工审阅）
