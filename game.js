@@ -677,7 +677,7 @@ var QUEST_SITES = {
    ------------------------------------------------------------
    剧本来源：《游戏总体规划》第九版 §27.1（序章 P01—P04）与 §27.2（第一幕 A01—A05）。
    场号 S000A—S018 保持稳定；未修桥时的镇内替代演出用 S005-T / S006-T / S007-T。
-   本切片只实装 9 个任务；B01 及以后属于 M1—M3，面板里如实写「后续章节」，
+   M0 的 9 个任务之后接 M1 第二幕 5 个任务；C01 及以后如实写「后续章节」，
    不放空按钮，也不预告不存在的入口（总规 §26.1、§28.1）。
    场次正文不另写一份剧情：台词、旁白与选择全部取自总规分场稿。
    ============================================================ */
@@ -1080,6 +1080,984 @@ function registerStoryEntries() {
 /* ============================================================
    剧情状态与引擎
    ============================================================ */
+/* 第二幕：总规 §27.3 S019—S028 原稿；事务只读已办理事实。 */
+STORY_TASKS.push.apply(STORY_TASKS, [
+  {
+    "id": "MQ1-B01",
+    "act": 3,
+    "actName": "第二幕 · 群山不答，灯火犹温",
+    "title": "关山之外，有人候雪",
+    "goal": "过云峰山口，到邻领联络处核对此次民用行程。",
+    "scenes": [
+      "S019",
+      "S020"
+    ],
+    "next": "MQ1-B02",
+    "exp": 60
+  },
+  {
+    "id": "MQ1-B02",
+    "act": 3,
+    "actName": "第二幕 · 群山不答，灯火犹温",
+    "title": "旧驿无人，炉火尚温",
+    "goal": "找到赫莎，完成驿舍炉灶的安全小事务。",
+    "scenes": [
+      "S021",
+      "S022"
+    ],
+    "next": "MQ1-B03",
+    "exp": 60
+  },
+  {
+    "id": "MQ1-B03",
+    "act": 3,
+    "actName": "第二幕 · 群山不答，灯火犹温",
+    "title": "不在地图上的晚餐",
+    "goal": "完成公共食材分工，核对近期见闻与停宿捎信记录。",
+    "scenes": [
+      "S023",
+      "S024"
+    ],
+    "next": "MQ1-B04",
+    "exp": 60
+  },
+  {
+    "id": "MQ1-B04",
+    "act": 3,
+    "actName": "第二幕 · 群山不答，灯火犹温",
+    "title": "山径两分，人心未定",
+    "goal": "与赫莎核验三处外段路况，选择安全走法。",
+    "scenes": [
+      "S025",
+      "S026"
+    ],
+    "next": "MQ1-B05",
+    "exp": 60
+  },
+  {
+    "id": "MQ1-B05",
+    "act": 3,
+    "actName": "第二幕 · 群山不答，灯火犹温",
+    "title": "请将灯留给后来的人",
+    "goal": "安置返程旅人，回驿舍核对通往潮汐港的转交单。",
+    "scenes": [
+      "S027",
+      "S028"
+    ],
+    "next": "MQ1-C01",
+    "exp": 60
+  }
+]);
+/* 第三幕：总规 §27.4 S029—S038 原稿。潮汐港现场事务与码头、邮务、岸上接应同源。 */
+STORY_TASKS.push.apply(STORY_TASKS, [
+  {
+    "id": "MQ1-C01",
+    "act": 4,
+    "actName": "第三幕 · 潮声尽处，尚有来信",
+    "title": "风把远客送到岸边",
+    "goal": "在潮汐港码头核对船与人真正到岸，取一份本地工作见证。",
+    "scenes": [
+      "S029",
+      "S030"
+    ],
+    "next": "MQ1-C02",
+    "exp": 60
+  },
+  {
+    "id": "MQ1-C02",
+    "act": 4,
+    "actName": "第三幕 · 潮声尽处，尚有来信",
+    "title": "千帆过后，名字犹存",
+    "goal": "在海员医舍与停靠牌前配对船名、日期与停靠地，取得伊文近期返回山谷的见证。",
+    "scenes": [
+      "S031",
+      "S032"
+    ],
+    "next": "MQ1-C03",
+    "exp": 60
+  },
+  {
+    "id": "MQ1-C03",
+    "act": 4,
+    "actName": "第三幕 · 潮声尽处，尚有来信",
+    "title": "潮湿的纸，未说完的话",
+    "goal": "在邮务所按确切日期排序材料，区分原件、抄件与私人陈述。",
+    "scenes": [
+      "S033",
+      "S034"
+    ],
+    "next": "MQ1-C04",
+    "exp": 60
+  },
+  {
+    "id": "MQ1-C04",
+    "act": 4,
+    "actName": "第三幕 · 潮声尽处，尚有来信",
+    "title": "今夜有人等船归",
+    "goal": "在外海堤参与岸上接应，按自己的分工把到岸的人接住。",
+    "scenes": [
+      "S035",
+      "S036"
+    ],
+    "next": "MQ1-C05",
+    "exp": 60
+  },
+  {
+    "id": "MQ1-C05",
+    "act": 4,
+    "actName": "第三幕 · 潮声尽处，尚有来信",
+    "title": "向群塔寄出一封信",
+    "goal": "在邮务所寄出核验申请与家书，带上同行证言前往王都。",
+    "scenes": [
+      "S037",
+      "S038"
+    ],
+    "next": "MQ1-D01",
+    "exp": 60
+  }
+]);
+Object.assign(STORY_SCENES, {
+  "S019": {
+    "task": "MQ1-B01",
+    "place": "云峰山口",
+    "time": "日",
+    "where": "云峰山口 · 关口避雨棚下的来函",
+    "lines": [
+      {
+        "who": "",
+        "text": "一辆空车等在关门外。莱娜把文件举到避雨棚下，没有跨过检查线。"
+      },
+      {
+        "who": "莱娜",
+        "text": "名字、来处、要去的地方。到这里，每样都得重新说一次。"
+      },
+      {
+        "who": "主角",
+        "text": "你小时候也从这里走过？"
+      },
+      {
+        "who": "莱娜",
+        "text": "那次我坐在车上。一路盯着后面，怕父亲追来时找不到我们。"
+      },
+      {
+        "who": "守路人",
+        "text": "过关后先去联络处。旧山路不能凭这张函自己闯。"
+      }
+    ]
+  },
+  "S020": {
+    "task": "MQ1-B01",
+    "place": "邻领联络处",
+    "time": "日",
+    "where": "邻领联络处 · 联络处的民用行程核对",
+    "lines": [
+      {
+        "who": "",
+        "text": "阿丽娅核验来函，将一张标有白松驿村的路条交还主角。"
+      },
+      {
+        "who": "阿丽娅",
+        "text": "民用调查可以登记。涉及住户的材料，要先问本人愿不愿意提供。"
+      },
+      {
+        "who": "主角",
+        "text": "谷里到底还有没有人？"
+      },
+      {
+        "who": "阿丽娅",
+        "text": "外围交易有人报告，现住名单却不全。我也需要核实。\n去找赫莎。她知道最近哪段路能走。"
+      },
+      {
+        "step": "pine_S020",
+        "mode": "pine",
+        "action": "register",
+        "text": "核对此次民用行程：来源为宫城核验函，同行主角与莱娜，范围为白松外段，返回白蔷薇农场。涉及住户先征得本人同意。"
+      }
+    ]
+  },
+  "S021": {
+    "task": "MQ1-B02",
+    "place": "白松旧驿村",
+    "time": "日",
+    "where": "白松旧驿村 · 驿舍前的新脚印",
+    "lines": [
+      {
+        "who": "",
+        "text": "旧站牌只剩一根横木。驿舍侧门有新扫出的脚印，门后传来锅盖碰响。"
+      },
+      {
+        "who": "莱娜",
+        "text": "我以为这里已经没人了。"
+      },
+      {
+        "who": "赫莎（画外）",
+        "text": "没人卖票了。吃饭的人还在。"
+      },
+      {
+        "who": "",
+        "text": "赫莎推门出来，先看两人的鞋，再看天色。"
+      },
+      {
+        "who": "赫莎",
+        "text": "问山路的？先别站在落水檐底下。"
+      }
+    ]
+  },
+  "S022": {
+    "task": "MQ1-B02",
+    "place": "白松驿舍",
+    "time": "日",
+    "where": "白松驿舍 · 灶边的委托",
+    "lines": [
+      {
+        "who": "",
+        "text": "灶门的扣件松了，烟从缝里漏出。赫莎递给主角一条干布。"
+      },
+      {
+        "who": "赫莎",
+        "text": "能帮忙就搭把手。不会修，把窗撑开也算。"
+      },
+      {
+        "who": "主角",
+        "text": "我们找伊文。"
+      },
+      {
+        "who": "赫莎",
+        "text": "他帮我记过烟道的裂口，也欠我一顿饭。\n先让这口锅能用。坐下，我慢慢说。"
+      },
+      {
+        "step": "pine_S022",
+        "mode": "pine",
+        "action": "",
+        "text": "到驿舍炉灶检修处（15,6）完成安全修灶；已修好直接核对记录。"
+      }
+    ]
+  },
+  "S023": {
+    "task": "MQ1-B03",
+    "place": "白松驿舍厨房",
+    "time": "暮",
+    "where": "白松驿舍厨房 · 厨房的分工",
+    "lines": [
+      {
+        "who": "",
+        "text": "主角与莱娜分洗菜叶。赫莎把客用碗数了一遍，又添上一只。"
+      },
+      {
+        "who": "主角",
+        "text": "还有人来？"
+      },
+      {
+        "who": "赫莎",
+        "text": "运柴的人晚一点。他住在图上空白的那一边。"
+      },
+      {
+        "who": "莱娜",
+        "text": "回声谷？"
+      },
+      {
+        "who": "赫莎",
+        "text": "对。那里有人跟我换盐，夏天走山径，冷了走旧隧道。\n你在白纸上看不见他们，他们也得吃饭。"
+      },
+      {
+        "step": "pine_S023",
+        "mode": "pine",
+        "action": "",
+        "text": "到共同晚餐备餐处（7,6）完成分工；公共食材由赫莎提供，已做过不重做。"
+      }
+    ]
+  },
+  "S024": {
+    "task": "MQ1-B03",
+    "place": "白松驿舍饭桌",
+    "time": "夜",
+    "where": "白松驿舍饭桌 · 晚餐后的见闻",
+    "lines": [
+      {
+        "who": "",
+        "text": "一名旅人把一只旧木勺放在碗边。莱娜看了很久。"
+      },
+      {
+        "who": "莱娜",
+        "text": "我父亲也会这样削勺柄，留一个凹口。"
+      },
+      {
+        "who": "旅人",
+        "text": "鲁恩做的？谷里有个修东西的，腿不好。我不敢说就是同一个。"
+      },
+      {
+        "who": "莱娜",
+        "text": "你上次见他，什么时候？"
+      },
+      {
+        "who": "旅人",
+        "text": "上个月。我能告诉你见面的地方，不能替他认女儿。"
+      },
+      {
+        "who": "主角",
+        "text": "那就先记“见过一个人”。我们亲自去问。"
+      },
+      {
+        "who": "",
+        "text": "赫莎从旧账册里找到一张停宿页，指给莱娜看。"
+      },
+      {
+        "who": "赫莎",
+        "text": "灾后第二年，鲁恩在这里托过一封去南线收容站的信。\n我能证明这次停宿和捎信，后面送没送到，不由我猜。"
+      },
+      {
+        "step": "pine_S024",
+        "mode": "pine",
+        "action": "",
+        "text": "在饭桌询问近期见闻，再到停运登记簿（4,4）查停宿与捎信记录。"
+      }
+    ]
+  },
+  "S025": {
+    "task": "MQ1-B04",
+    "place": "白松山径入口",
+    "time": "日",
+    "where": "白松山径入口 · 山径入口的旧图",
+    "lines": [
+      {
+        "who": "",
+        "text": "赛芙把旧图的桥位圈在透明覆纸上，赫莎指向已经改道的水流。"
+      },
+      {
+        "who": "赛芙",
+        "text": "图能说明当时怎么走，不能保证今天的桥还在。"
+      },
+      {
+        "who": "赫莎",
+        "text": "外段我领过人。再往里，上周塌过一次，得先有新测绘。"
+      },
+      {
+        "who": "主角",
+        "text": "我们先核这里，不往看不清的地方走。"
+      },
+      {
+        "step": "pine_S025",
+        "mode": "pine",
+        "action": "",
+        "text": "到白松驿舍停运登记簿与赫莎约定带路，凭既有约定也可继续。"
+      }
+    ]
+  },
+  "S026": {
+    "task": "MQ1-B04",
+    "place": "白松山径分岔",
+    "time": "日",
+    "where": "白松山径分岔 · 外段实测路簿",
+    "lines": [
+      {
+        "who": "",
+        "text": "一块松石落进沟里。主角停下，在实测路簿中标出裂边和稳固的树根。"
+      },
+      {
+        "who": "莱娜",
+        "text": "旧图画的是直路。现在得绕出去这么远。"
+      },
+      {
+        "choice": "b04_route",
+        "prompt": "选择已经核验的民用走法；本次没有军事护送授权。",
+        "options": [
+          {
+            "id": "A",
+            "text": "标清承重点，按安全范围排险。"
+          },
+          {
+            "id": "B",
+            "text": "请赫莎带我们沿下方缓坡绕行。"
+          }
+        ]
+      },
+      {
+        "who": "赫莎",
+        "text": "选能走回来的那条。别为了省一笔墨，让人去试命。"
+      },
+      {
+        "step": "pine_S026",
+        "mode": "pine",
+        "action": "",
+        "text": "三处外段观察和选路必须为当天、同天气的现场记录：碎石坡（12,14）、浅溪（25,10）、风口（34,6）。"
+      }
+    ]
+  },
+  "S027": {
+    "task": "MQ1-B05",
+    "place": "白松山径返程段",
+    "time": "暮",
+    "where": "白松山径返程段 · 返程路边的旅人",
+    "lines": [
+      {
+        "who": "",
+        "text": "一名带行李的旅人扶着崴脚的同伴。远处车铃催行。莱娜回头看向即将离开的信使。"
+      },
+      {
+        "who": "莱娜",
+        "text": "那班车带着伊文最近的转交单。"
+      },
+      {
+        "choice": "b05_help",
+        "prompt": "怎样分工？",
+        "options": [
+          {
+            "id": "A",
+            "text": "我留下帮忙，请你去核转交单。"
+          },
+          {
+            "id": "B",
+            "text": "先一起把人送到路边，请信使留副本。"
+          }
+        ]
+      },
+      {
+        "who": "莱娜",
+        "text": "我记下车号，办完回驿舍等你。",
+        "when": function (c) { return c.b05_help === 'A'; }
+      },
+      {
+        "who": "莱娜",
+        "text": "我来喊他。你别一个人搬行李。",
+        "when": function (c) { return c.b05_help === 'B'; }
+      },
+      {
+        "step": "pine_S027",
+        "mode": "pine",
+        "action": "help",
+        "text": "按所选分工，把旅人和行李安置到稳固路边，由同行者继续照护。"
+      }
+    ]
+  },
+  "S028": {
+    "task": "MQ1-B05",
+    "place": "白松驿舍",
+    "time": "夜",
+    "where": "白松驿舍 · 窗前灯下的转交单",
+    "lines": [
+      {
+        "who": "",
+        "text": "赫莎把灯挪到窗前。转交单铺在干布上，收件去向写着潮汐港。"
+      },
+      {
+        "who": "赫莎",
+        "text": "伊文给王都递过材料。先到了港口，后面我不知道。"
+      },
+      {
+        "who": "莱娜",
+        "text": "找到他之前，我想把这条消息寄给母亲。"
+      },
+      {
+        "who": "主角",
+        "text": "就写我们确实听到的。明天再找下一段。"
+      },
+      {
+        "step": "pine_S028",
+        "mode": "pine",
+        "action": "transfer",
+        "text": "核对驿舍留存副本：伊文递往王都的材料先到潮汐港；错过信使仍可查留存号。"
+      }
+    ]
+  },
+  "S029": {
+    "task": "MQ1-C01",
+    "place": "潮汐港码头",
+    "time": "日",
+    "where": "潮汐港码头 · 落脚板边",
+    "lines": [
+      {
+        "who": "",
+        "text": "缆绳绷紧，维克站在落脚板边让人依次下船。海关牌与白蔷薇的路牌制式不同。"
+      },
+      {
+        "who": "维克",
+        "text": "先上岸，再看风景。脚下这块板还要给人走。"
+      },
+      {
+        "who": "莱娜",
+        "text": "我第一次看见这么多船。"
+      },
+      {
+        "who": "维克",
+        "text": "等你找一只丢了的箱子，就不会嫌它们少了。"
+      }
+    ]
+  },
+  "S030": {
+    "task": "MQ1-C01",
+    "place": "潮汐港工人街",
+    "time": "日",
+    "where": "潮汐港工人街 · 货箱堆场",
+    "lines": [
+      {
+        "who": "",
+        "text": "工人街的货箱按船、按班次堆着。维克把三块空箱标牌拍在箱面上。"
+      },
+      {
+        "who": "主角",
+        "text": "我找伊文。他的材料在这里转交过。"
+      },
+      {
+        "who": "维克",
+        "text": "记得，一个带病人上岸的测绘师。娜汀给他们换过药。\n邮务所查纸上的去向，医舍能问人走的时候怎么样。"
+      },
+      {
+        "step": "tide_S030",
+        "mode": "tide",
+        "action": "cargo",
+        "text": "按干货、湿货、通道三标归置公共空箱，拿到本地工作见证。"
+      }
+    ]
+  },
+  "S031": {
+    "task": "MQ1-C02",
+    "place": "潮汐港海员医舍",
+    "time": "日",
+    "where": "潮汐港海员医舍 · 擦净的桌面",
+    "lines": [
+      {
+        "who": "",
+        "text": "娜汀擦净桌面，等病人同意后才取出与伊文有关的同行登记。"
+      },
+      {
+        "who": "娜汀",
+        "text": "他陪一位谷里的病人来过。人留院，他托船户带过信。"
+      },
+      {
+        "who": "莱娜",
+        "text": "他是不是说，谷里已经没有别人了？"
+      },
+      {
+        "who": "娜汀",
+        "text": "没有。他问过能否请人进谷。他自己还要回去。"
+      },
+      {
+        "step": "tide_S031",
+        "mode": "tide",
+        "action": "chart",
+        "text": "在病人同意后取得同行登记副本与娜汀的见证。"
+      }
+    ]
+  },
+  "S032": {
+    "task": "MQ1-C02",
+    "place": "潮汐港停靠牌前",
+    "time": "日",
+    "where": "潮汐港停靠牌前 · 班次牌与旧船名",
+    "lines": [
+      {
+        "who": "",
+        "text": "维克把登记中的船名指给主角，再用班次牌排除一只同名旧船。"
+      },
+      {
+        "who": "维克",
+        "text": "看船名，也看日期。这只上个月才修好。"
+      },
+      {
+        "who": "主角",
+        "text": "伊文走的是支线。他不在北上王都那班乘客里。"
+      },
+      {
+        "who": "娜汀",
+        "text": "这是他临走留下的回信地址。先问许可，再带走副本。"
+      },
+      {
+        "step": "tide_S032",
+        "mode": "tide",
+        "action": "berth",
+        "text": "按船名、日期与停靠地配对，排除同名旧船，取得近期返回山谷的见证。"
+      }
+    ]
+  },
+  "S033": {
+    "task": "MQ1-C03",
+    "place": "潮汐港邮务所",
+    "time": "日",
+    "where": "潮汐港邮务所 · 有查阅许可的材料包",
+    "lines": [
+      {
+        "who": "",
+        "text": "莱娜核验转交号。职员将有查阅许可的材料包放在吸水纸上，包封仍在。"
+      },
+      {
+        "who": "邮务职员",
+        "text": "私信和旧案材料混装，按转交程序留了号。私人部分现在可以领取。"
+      },
+      {
+        "who": "主角",
+        "text": "不是丢了，是一直没人告诉收信人它停在哪里。"
+      },
+      {
+        "who": "莱娜",
+        "text": "这句话也得写进回执。"
+      },
+      {
+        "step": "tide_S033",
+        "mode": "tide",
+        "action": "sort",
+        "text": "按确切日期排序，区分原件、抄件与私人陈述。"
+      }
+    ]
+  },
+  "S034": {
+    "task": "MQ1-C03",
+    "place": "潮汐港邮务所阅读桌",
+    "time": "日",
+    "where": "同一邮务所 · 阅读桌上的三张材料",
+    "lines": [
+      {
+        "who": "",
+        "text": "主角排列三张材料：原异议抄件、港口交接条、给朋友的短笺。"
+      },
+      {
+        "who": "伊文（书面文字）",
+        "text": "南线先走，是我当时的判断。别替我删去。\n但北侧的名字还没有核完，“全部迁出”不是我写的。"
+      },
+      {
+        "who": "莱娜",
+        "text": "他知道这件事。可我们一直不知道。"
+      },
+      {
+        "who": "主角",
+        "text": "现在我们能问清：哪一页写了什么，又是谁改的。"
+      },
+      {
+        "step": "tide_S034",
+        "mode": "tide",
+        "action": "read",
+        "text": "取得王都档案索引与私人短笺；核心原件仍在档案院。"
+      }
+    ]
+  },
+  "S035": {
+    "task": "MQ1-C04",
+    "place": "潮汐港外海堤",
+    "time": "暮",
+    "where": "潮汐港外海堤 · 警铃与缆柱",
+    "lines": [
+      {
+        "who": "",
+        "text": "警铃响起。一只近岸工作艇失去动力，维克先让围观者退到缆柱后。"
+      },
+      {
+        "who": "维克",
+        "text": "只做交给你的事。不要跳下去。"
+      },
+      {
+        "who": "娜汀",
+        "text": "上岸的人先到这边，干布和担架分开放。"
+      },
+      {
+        "who": "",
+        "text": "主角选择A：协助岸上缆绳和照明。\n主角选择B：留在医疗接应点。\n主角选择C：经维克确认后，随现成救援船队协作。"
+      },
+      {
+        "choice": "c04_role",
+        "prompt": "今晚你在哪个位置？",
+        "options": [
+          { "id": "A", "text": "我协助岸上缆绳和照明（检查安全缆柱、按信号稳缆）" },
+          { "id": "B", "text": "我留在医疗接应点（分配保温、登记伤情并交医护）" },
+          { "id": "C", "text": "我随现成救援船队协作（经维克确认，不独驾船）" }
+        ]
+      }
+    ]
+  },
+  "S036": {
+    "task": "MQ1-C04",
+    "place": "海堤安全坪",
+    "time": "夜",
+    "where": "海堤安全坪 · 毯子与点名",
+    "lines": [
+      {
+        "who": "",
+        "text": "被接回的港工裹着毯子。莱娜蹲下替他找掉落的鞋，没有催他回答问题。"
+      },
+      {
+        "who": "港工",
+        "text": "船上的那只工具箱……"
+      },
+      {
+        "who": "维克",
+        "text": "记下位置，天亮再取。今晚先点人。"
+      },
+      {
+        "who": "莱娜",
+        "text": "名字呢？我替你报平安。"
+      },
+      {
+        "who": "主角",
+        "text": "把到岸人数与出艇名单一一核上。"
+      },
+      {
+        "step": "tide_S036",
+        "mode": "tide",
+        "action": "rescue",
+        "text": "按所选分工完成接应，把到岸人数与出艇名单核上。"
+      }
+    ]
+  },
+  "S037": {
+    "task": "MQ1-C05",
+    "place": "潮汐港邮务所",
+    "time": "日",
+    "where": "潮汐港邮务所 · 寄往群塔的信",
+    "lines": [
+      {
+        "who": "",
+        "text": "莱娜写好寄王都的核验申请，将需要遮去的私人住址另封。主角在农场来信上拆开封口。"
+      },
+      {
+        "who": "芽芽（信件旁白）",
+        "text": "家里的事按你留下的安排在办。别怕问人，也别逞能。\n回来的时候，给我说说海是什么样。"
+      },
+      {
+        "who": "主角",
+        "text": "先回一封。不能总让别人等消息。"
+      },
+      {
+        "step": "tide_S037",
+        "mode": "tide",
+        "action": "letter",
+        "text": "寄出核验申请与家书；家书按真实照料结果写，缺料就写明问题。"
+      }
+    ]
+  },
+  "S038": {
+    "task": "MQ1-C05",
+    "place": "潮汐港启程处",
+    "time": "日",
+    "where": "潮汐港启程处 · 下一班安全航路",
+    "lines": [
+      {
+        "who": "",
+        "text": "娜汀递来需本人同意才可使用的同行证言。维克指向下一班安全航路。"
+      },
+      {
+        "who": "娜汀",
+        "text": "如果要进谷，先把医疗接应说清。我可以参加一段，不是整季都离开。"
+      },
+      {
+        "who": "莱娜",
+        "text": "王都的公署，能听我们说完吗？"
+      },
+      {
+        "who": "主角",
+        "text": "先把能证明的带过去。剩下的，当面问。"
+      },
+      {
+        "step": "tide_S038",
+        "mode": "tide",
+        "action": "dispatch",
+        "text": "保存信件、证言与材料副本，公共必要差旅列任务专款。"
+      }
+    ]
+  }
+});
+Object.assign(STORY_SCENE_LOC, {
+  "S019": "cloud_pass",
+  "S020": "neighbor_office",
+  "S021": "ms1_pine_village",
+  "S022": "ms1_pine_inn",
+  "S023": "ms1_pine_inn",
+  "S024": "ms1_pine_inn",
+  "S025": "ms1_pine_path",
+  "S026": "ms1_pine_path",
+  "S027": "ms1_pine_path",
+  "S028": "ms1_pine_inn",
+  "S029": "ms1_tide_docks",
+  "S030": "ms1_tide_docks",
+  "S031": "ms1_tide_clinic",
+  "S032": "ms1_tide_docks",
+  "S033": "ms1_tide_post",
+  "S034": "ms1_tide_post",
+  "S035": "ms1_tide_seawall",
+  "S036": "ms1_tide_seawall",
+  "S037": "ms1_tide_post",
+  "S038": "ms1_tide_docks"
+});
+STORY_ENTRIES.push.apply(STORY_ENTRIES, [
+  {
+    "id": "ms1_b_s019",
+    "scene": "cloud_pass",
+    "x": 20,
+    "y": 18,
+    "label": "关口避雨棚下的来函",
+    "task": "MQ1-B01",
+    "storyScene": "S019"
+  },
+  {
+    "id": "ms1_b_s020",
+    "scene": "neighbor_office",
+    "x": 17,
+    "y": 6,
+    "label": "联络处的民用行程核对",
+    "task": "MQ1-B01",
+    "storyScene": "S020"
+  },
+  {
+    "id": "ms1_b_s021",
+    "scene": "ms1_pine_village",
+    "x": 15,
+    "y": 15,
+    "label": "驿舍前的新脚印",
+    "task": "MQ1-B02",
+    "storyScene": "S021"
+  },
+  {
+    "id": "ms1_b_s022",
+    "scene": "ms1_pine_inn",
+    "x": 17,
+    "y": 4,
+    "label": "灶边的委托",
+    "task": "MQ1-B02",
+    "storyScene": "S022"
+  },
+  {
+    "id": "ms1_b_s023",
+    "scene": "ms1_pine_inn",
+    "x": 11,
+    "y": 6,
+    "label": "厨房的分工",
+    "task": "MQ1-B03",
+    "storyScene": "S023"
+  },
+  {
+    "id": "ms1_b_s024",
+    "scene": "ms1_pine_inn",
+    "x": 8,
+    "y": 10,
+    "label": "晚餐后的见闻",
+    "task": "MQ1-B03",
+    "storyScene": "S024"
+  },
+  {
+    "id": "ms1_b_s025",
+    "scene": "ms1_pine_path",
+    "x": 5,
+    "y": 14,
+    "label": "山径入口的旧图",
+    "task": "MQ1-B04",
+    "storyScene": "S025"
+  },
+  {
+    "id": "ms1_b_s026",
+    "scene": "ms1_pine_path",
+    "x": 30,
+    "y": 10,
+    "label": "外段实测路簿",
+    "task": "MQ1-B04",
+    "storyScene": "S026"
+  },
+  {
+    "id": "ms1_b_s027",
+    "scene": "ms1_pine_path",
+    "x": 20,
+    "y": 17,
+    "label": "返程路边的旅人",
+    "task": "MQ1-B05",
+    "storyScene": "S027"
+  },
+  {
+    "id": "ms1_b_s028",
+    "scene": "ms1_pine_inn",
+    "x": 11,
+    "y": 10,
+    "label": "窗前灯下的转交单",
+    "task": "MQ1-B05",
+    "storyScene": "S028"
+  },
+  {
+    "id": "ms1_c_s029",
+    "scene": "ms1_tide_docks",
+    "x": 15,
+    "y": 26,
+    "label": "栈桥落脚板边",
+    "task": "MQ1-C01",
+    "storyScene": "S029"
+  },
+  {
+    "id": "ms1_c_s030",
+    "scene": "ms1_tide_docks",
+    "x": 36,
+    "y": 14,
+    "label": "工人街的货箱堆场",
+    "task": "MQ1-C01",
+    "storyScene": "S030"
+  },
+  {
+    "id": "ms1_c_s031",
+    "scene": "ms1_tide_clinic",
+    "x": 10,
+    "y": 8,
+    "label": "擦净的诊疗桌",
+    "task": "MQ1-C02",
+    "storyScene": "S031"
+  },
+  {
+    "id": "ms1_c_s032",
+    "scene": "ms1_tide_docks",
+    "x": 37,
+    "y": 10,
+    "label": "停靠牌前的班次栏",
+    "task": "MQ1-C02",
+    "storyScene": "S032"
+  },
+  {
+    "id": "ms1_c_s033",
+    "scene": "ms1_tide_post",
+    "x": 3,
+    "y": 4,
+    "label": "领取台与转交号",
+    "task": "MQ1-C03",
+    "storyScene": "S033"
+  },
+  {
+    "id": "ms1_c_s034",
+    "scene": "ms1_tide_post",
+    "x": 11,
+    "y": 9,
+    "label": "阅读桌的三张材料",
+    "task": "MQ1-C03",
+    "storyScene": "S034"
+  },
+  {
+    "id": "ms1_c_s035",
+    "scene": "ms1_tide_seawall",
+    "x": 18,
+    "y": 13,
+    "label": "警铃下的缆柱",
+    "task": "MQ1-C04",
+    "storyScene": "S035"
+  },
+  {
+    "id": "ms1_c_s036",
+    "scene": "ms1_tide_seawall",
+    "x": 30,
+    "y": 14,
+    "label": "海堤安全坪",
+    "task": "MQ1-C04",
+    "storyScene": "S036"
+  },
+  {
+    "id": "ms1_c_s037",
+    "scene": "ms1_tide_post",
+    "x": 16,
+    "y": 5,
+    "label": "寄信窗口",
+    "task": "MQ1-C05",
+    "storyScene": "S037"
+  },
+  {
+    "id": "ms1_c_s038",
+    "scene": "ms1_tide_docks",
+    "x": 31,
+    "y": 26,
+    "label": "启程处的班次牌",
+    "task": "MQ1-C05",
+    "storyScene": "S038"
+  }
+]);
+
 function newStoryState() {
   return {
     started: false,
@@ -1087,6 +2065,10 @@ function newStoryState() {
     tasks: {},
     scenes: {},
     evidence: {},
+    pineWork: newPineWorkState(),
+    pineChapter: newPineChapterState(),
+    tideWork: newTideWorkState(),
+    tideChapter: newTideChapterState(),
     choices: {},
     flags: {},
     lenaStance: '',
@@ -1104,6 +2086,10 @@ function normalizeStory(raw) {
   var d = newStoryState();
   if (!raw || typeof raw !== 'object') return d;
   d.started = raw.started === true;
+  d.pineWork = normalizePineWork(raw.pineWork);
+  d.pineChapter = normalizePineChapter(raw.pineChapter);
+  d.tideWork = normalizeTideWork(raw.tideWork);
+  d.tideChapter = normalizeTideChapter(raw.tideChapter);
   d.act = isInt(raw.act) && raw.act >= 0 ? raw.act : 0;
   if (raw.tasks && typeof raw.tasks === 'object') {
     for (var k in raw.tasks) {
@@ -1160,6 +2146,28 @@ function normalizeStory(raw) {
   d.householdChoices = (raw.householdChoices && typeof raw.householdChoices === 'object') ? raw.householdChoices : {};
   d.support = (raw.support && typeof raw.support === 'object') ? raw.support : {};
   d.outcome = typeof raw.outcome === 'string' ? raw.outcome : '';
+  /* 白松证据索引只来自有效事务；坏档不能留下一份没有对应事实的证明。 */
+  Object.keys(d.evidence).forEach(function (k) { if (k.indexOf('pine_work_') === 0) delete d.evidence[k]; });
+  Object.keys(d.pineWork.records).forEach(function (k) {
+    var r = d.pineWork.records[k], id = 'pine_work_' + k;
+    d.evidence[id] = { id: id, title: PINE_WORK_ACTIONS[k].title, source: r.source, day: r.day };
+  });
+  Object.keys(d.evidence).forEach(function (k) { if (k.indexOf('pine_chapter_') === 0) delete d.evidence[k]; });
+  Object.keys(d.pineChapter.records).forEach(function (k) {
+    var r = d.pineChapter.records[k], id = 'pine_chapter_' + k;
+    d.evidence[id] = { id: id, title: { register: '此次民用行程范围', help: '旅人接应分工', transfer: '潮汐港转交单副本' }[k], source: r.source, day: r.day };
+  });
+  /* 潮汐港同理：证据索引只来自有效事务与有效演出记录。 */
+  Object.keys(d.evidence).forEach(function (k) { if (k.indexOf('tide_work_') === 0) delete d.evidence[k]; });
+  Object.keys(d.tideWork.records).forEach(function (k) {
+    var r = d.tideWork.records[k], id = 'tide_work_' + k;
+    d.evidence[id] = { id: id, title: TIDE_WORK_ACTIONS[k].title, source: r.source, day: r.day };
+  });
+  Object.keys(d.evidence).forEach(function (k) { if (k.indexOf('tide_chapter_') === 0) delete d.evidence[k]; });
+  Object.keys(d.tideChapter.records).forEach(function (k) {
+    var r = d.tideChapter.records[k], id = 'tide_chapter_' + k;
+    d.evidence[id] = { id: id, title: TIDE_CHAPTER_ACTIONS[k].title, source: r.source, day: r.day };
+  });
   return d;
 }
 
@@ -1183,6 +2191,8 @@ function storySceneFinished(id) {
   var rec = storyState().scenes[id];
   /* 只读：判断一个场次演没演完，不该顺手在存档里留下一条场次记录。 */
   if (!rec) return false;
+  if (def.task.indexOf('MQ1-B') === 0) return rec.seen === true;
+  if (def.task.indexOf('MQ1-C') === 0) return rec.seen === true;
   return rec.idx >= (def.lines || []).length;
 }
 function storySceneSeen(id) { return !!storyState().scenes[id] && storyState().scenes[id].seen === true; }
@@ -1198,6 +2208,8 @@ function storyTaskStatus(id) {
 }
 function storyTaskUnlocked(t) {
   if (t.id === 'MQ1-P01') return true;
+  if (t.id === 'MQ1-B01') return !storyBEntryReason();
+  if (t.id === 'MQ1-C01') return !storyCEntryReason();
   if (t.id === 'MQ1-A01') {
     if (storyState().tasks['MQ1-P04'] !== 'done') return false;
     if (!storyEntryAchievement().ok) return false;
@@ -1289,6 +2301,273 @@ function storyFlagArr(key) {
    ============================================================ */
 function storyChoices() { return storyState().choices; }
 
+function newPineChapterState() { return { records: {} }; }
+function normalizePineChapter(raw) {
+  var d = newPineChapterState(), defs = { register: ['confirm'], help: ['A', 'B'], transfer: ['copy'] };
+  if (!raw || !raw.records || typeof raw.records !== 'object') return d;
+  Object.keys(defs).forEach(function (key) {
+    var r = raw.records[key];
+    if (!r || defs[key].indexOf(r.choice) < 0 || !isInt(r.day) || r.day < 1 ||
+        typeof r.source !== 'string' || !r.source || r.source.length > 160 ||
+        typeof r.text !== 'string' || !r.text || r.text.length > 600) return;
+    if (key === 'transfer' && !d.records.help) return;
+    d.records[key] = { choice: r.choice, day: r.day, source: r.source, text: r.text };
+  });
+  return d;
+}
+function pineChapterState() {
+  var st = storyState();
+  if (!st.pineChapter) st.pineChapter = newPineChapterState();
+  return st.pineChapter;
+}
+/* 第三幕的现场办理记录。每一项都要有真实前置：没有对应的事务事实，
+   演出里的那一步就做不了，也不能靠读完文字当成办过。 */
+var TIDE_CHAPTER_ACTIONS = {
+  cargo: { title: '码头工作见证', source: '潮汐港工人街货箱堆场 · 维克与当班柜台' },
+  chart: { title: '同行登记副本与医护见证', source: '潮汐港海员医舍 · 娜汀与病人本人' },
+  berth: { title: '近期返回山谷的航路见证', source: '潮汐港停靠牌前 · 维克与班次牌' },
+  sort: { title: '材料分类与王都档案索引', source: '潮汐港邮务所 · 分拣台与领取台' },
+  read: { title: '私人短笺与阅读记录', source: '潮汐港邮务所阅读桌 · 三张材料' },
+  rescue: { title: '岸上接应分工与到岸点名', source: '潮汐港海堤安全坪 · 维克与娜汀' },
+  letter: { title: '寄往王都的核验申请与家书', source: '潮汐港邮务所 · 寄信窗口' },
+  dispatch: { title: '同行证言与材料副本', source: '潮汐港启程处 · 娜汀与维克' }
+};
+function newTideChapterState() { return { records: {} }; }
+function normalizeTideChapter(raw) {
+  var d = newTideChapterState();
+  var defs = {
+    cargo: ['form', 'marks', 'pile'], chart: ['consent', 'form', 'copy'],
+    berth: ['form', 'chain'], sort: ['chain', 'pile'], read: ['read'],
+    rescue: ['A', 'B', 'C'], letter: ['sent'], dispatch: ['kept']
+  };
+  if (!raw || !raw.records || typeof raw.records !== 'object') return d;
+  Object.keys(defs).forEach(function (key) {
+    var r = raw.records[key];
+    if (!r || defs[key].indexOf(r.choice) < 0 || !isInt(r.day) || r.day < 1 ||
+        typeof r.source !== 'string' || !r.source || r.source.length > 160 ||
+        typeof r.text !== 'string' || !r.text || r.text.length > 600) return;
+    /* 前置次序：后一步依赖前一步的事实，缺前置的记录一律丢弃。 */
+    var needs = { berth: ['chart'], read: ['sort'], dispatch: ['letter'], rescue: [] };
+    if ((needs[key] || []).some(function (k) { return !d.records[k]; })) return;
+    d.records[key] = { choice: r.choice, day: r.day, source: r.source, text: r.text };
+  });
+  return d;
+}
+function tideChapterState() {
+  var st = storyState();
+  if (!st.tideChapter) st.tideChapter = newTideChapterState();
+  return st.tideChapter;
+}
+function storyBEntryReason() {
+  if (storyState().tasks['MQ1-A05'] !== 'done') return '先完成第一幕 A05。';
+  if (!storyHasEvidence('civil_check')) return '先到宫城取得民用资料核验函。';
+  var gap = farmPlanCareGap(3);
+  if (!gap.ok) return '出发前准备三天照料：' + farmPlanCareGapText(gap);
+  if (farmCareFeedNeed() && farmCareFeedCoverage(3).days < 3) return '出发前三天牲畜口粮不足，请补齐或延期。';
+  return '';
+}
+function storyBNear(sid) {
+  var e = storyEntryForScene(sid);
+  return !!e && state.sceneId === e.scene && Math.abs(state.player.x - e.x) + Math.abs(state.player.y - e.y) <= 1;
+}
+function storyBMissing(sid) {
+  var r = pineWorkState().records, c = pineChapterState().records;
+  if (sid === 'S019') return storyBEntryReason();
+  if (sid === 'S020') return !storyHasEvidence('neighbor_pass') ? '到本联络处阿丽娅柜台办理邻领民用行程登记。' : !c.register ? '请确认本次来源、同行人员、核验范围与返回地点。' : '';
+  if (sid === 'S022' && !r.repair) return '请到驿舍炉灶检修处（15,6）完成安全修灶。';
+  if (sid === 'S023' && !r.supper) return '请到共同晚餐备餐处（7,6）完成公共食材分工。';
+  if (sid === 'S024') return !r.recent ? '请到备餐处（7,6）确认旅人见闻的地点与日期。' : !r.ledger ? '请到停运登记簿（4,4）查阅停宿与捎信页。' : '';
+  if (sid === 'S025' && !storyHasEvidence('echo_guide')) return '请到白松驿舍（4,4）与赫莎约定带路。';
+  if (sid === 'S026') {
+    if (!storyHasEvidence('echo_guide')) return '先与赫莎约定带路。';
+    var missing = ['rockLook', 'rockRoute', 'waterLook', 'waterRoute', 'bridgeLook', 'bridgeRoute'].filter(function (k) {
+      return !r[k] || r[k].day !== state.totalDay || r[k].weather !== state.weather.today;
+    });
+    if (missing.length) return '请在当天、同天气完成：' + missing.map(function (k) { return PINE_WORK_ACTIONS[k].title; }).join('、');
+    if (['A', 'B'].indexOf(storyChoices().b04_route) < 0) return '请选择民用走法。';
+  }
+  if (sid === 'S027') return !c.help ? '请选择分工并实际安置旅人。' : '';
+  if (sid === 'S028') return !c.help ? '先在返程路边安置旅人。' : !c.transfer ? '请核对驿舍留存的转交单副本。' : '';
+  return '';
+}
+function buildStoryBStep(line, sid) {
+  var wrap = el('div', 'story-items'), c = pineChapterState().records, missing = storyBMissing(sid);
+  if (missing) wrap.appendChild(el('p', 'req-chip', missing));
+  if (line.action && !c[line.action]) {
+    var key = line.action, ready = key === 'register' ? storyHasEvidence('neighbor_pass') : key === 'help' ? ['A','B'].indexOf(storyChoices().b05_help) >= 0 : !!c.help;
+    if (ready) wrap.appendChild(mkBtn(key === 'register' ? '确认此次民用行程 · 10分钟' : key === 'help' ? '按分工安置旅人 · 20分钟' : '核对留存副本 · 10分钟', 'primary', function () {
+      var e = storyEntryForScene(sid);
+      performAction({ point: e, minutes: key === 'help' ? 20 : 10, guard: function () {
+        return storyBNear(sid) && !pineChapterState().records[key] &&
+          (key === 'register' ? storyHasEvidence('neighbor_pass') : key === 'help' ? ['A','B'].indexOf(storyChoices().b05_help) >= 0 : !!pineChapterState().records.help);
+      }, apply: function () {
+        var choice = key === 'register' ? 'confirm' : key === 'help' ? storyChoices().b05_help : 'copy';
+        var text = key === 'register' ? '宫城核验函；同行主角与莱娜；白松外段民用调查；返回白蔷薇农场；住户材料先征同意。原通行与职业资格保留，不授军事指挥权。' :
+          key === 'help' ? (choice === 'A' ? '分头协作：我把旅人和行李安置在稳固路边，同行者接手照护；莱娜独自核转交单，约在驿舍会合。旅人托同行者致谢。' : '共同照护：我与莱娜先把旅人和行李安置到路边，由同行者继续照护；请信使留副本。旅人当面向两人致谢。') :
+          '已核对驿舍留存转交单副本（白松／第 ' + c.help.day + ' 天／旅人接应）：伊文给王都的材料先到潮汐港，后续送达未知。错过信使也可凭此留存号续查。';
+        var source = key === 'register' ? '邻领联络处 · 阿丽娅核对' : key === 'help' ? '白松山径 · 旅人与同行者' : '白松驿舍 · 赫莎留存副本';
+        c[key] = { day: state.totalDay, choice: choice, text: text, source: source };
+        if (key === 'help') storyState().rescueMethod = choice === 'A' ? 'split' : 'together';
+        var id = 'pine_chapter_' + key;
+        storyState().evidence[id] = { id: id, title: key === 'register' ? '此次民用行程范围' : key === 'help' ? '旅人接应分工' : '潮汐港转交单副本', source: source, day: state.totalDay };
+      }});
+    }));
+  }
+  if (!missing) wrap.appendChild(mkBtn('核对已办记录，继续', 'primary', function () {
+    if (!storyBNear(sid) || storyBMissing(sid)) { refreshWindow(); return; }
+    storyAdvance(sid);
+  }));
+  else wrap.appendChild(mkBtn('先去现场办理', 'sm', closeWindow));
+  return wrap;
+}
+function openStoryBReview(sid) {
+  var def = storySceneDef(sid);
+  openWindow({ id: 'story_b_review', kind: 'story', wide: true, title: sid + ' · 已演回看', build: function (b) {
+    b.appendChild(el('p', 'muted', '只回看已经演过的场次；不改选择、日期或奖励。'));
+    def.lines.forEach(function (l) {
+      if (!storyLineVisible(l)) return;
+      b.appendChild(el('p', null, l.choice ? '当时选择：' + storyChoiceText(l, storyChoices()[l.choice]) : l.step ? '已办理：' + l.text : (l.who ? l.who + '：' : '') + l.text));
+    });
+  }, actions: [{ label: '关闭', close: true }] });
+}
+/* 第三幕入场：航路要落到纸面的船期与泊位，个人传送不代替船舶到达。 */
+function storyCEntryReason() {
+  if (storyState().tasks['MQ1-B05'] !== 'done') return '先完成第二幕 B05。';
+  if (!crossBorderOpen('tide')) return '还缺：' + crossBorderMissingText('tide');
+  return '';
+}
+function storyCNear(sid) {
+  var e = storyEntryForScene(sid);
+  return !!e && state.sceneId === e.scene && Math.abs(state.player.x - e.x) + Math.abs(state.player.y - e.y) <= 1;
+}
+function storyCMissing(sid) {
+  var w = tideWorkState().records, c = tideChapterState().records;
+  if (sid === 'S029') return storyCEntryReason();
+  if (sid === 'S030') return !w.customs ? '请到海关报关棚（20,12）按清册核对当班船与货物件数。' : !w.cargo ? '请到工人街货箱堆场（34,12）按三标归置公共空箱。' : '';
+  if (sid === 'S031') return !w.chart ? '请到海员医舍复诊记录处（7,8）先问本人同意再取同行事实。' : '';
+  if (sid === 'S032') return !c.chart ? '先在医舍取得同行登记副本与娜汀的见证。' : !c.berth ? '请在停靠牌前（37,10）按船名、日期与停靠地配对，排除同名旧船。' : '';
+  if (sid === 'S033') return !w.sort ? '请到邮务所分拣台（9,4）查清材料的通信链。' : '';
+  if (sid === 'S034') return !c.sort ? '先在邮务所按确切日期排好序、分清原件与抄件。' : !c.read ? '请在阅读桌（11,9）整理三张材料。' : '';
+  if (sid === 'S035') return !w.bollard ? '请先到海堤缆桩（16,12）检查今晚能用的缆桩与绳。' : '';
+  if (sid === 'S036') return ['A', 'B', 'C'].indexOf(storyChoices().c04_role) < 0 ? '请选择今晚的分工。' : !c.rescue ? '请按所选分工实际完成接应并核对到岸人数。' : '';
+  if (sid === 'S037') return !c.read ? '先在阅读桌取得私人短笺与档案索引。' : '';
+  if (sid === 'S038') return !c.letter ? '先在邮务所寄信窗口（16,5）寄出核验申请与家书。' : !c.dispatch ? '请在启程处（31,26）收好同行证言与材料副本。' : '';
+  return '';
+}
+function buildStoryCStep(line, sid) {
+  var wrap = el('div', 'story-items'), c = tideChapterState().records, missing = storyCMissing(sid);
+  if (missing) wrap.appendChild(el('p', 'req-chip', missing));
+  if (line.action && !c[line.action]) {
+    var key = line.action, ready = tideStepReady(key);
+    if (ready) {
+      var label = TIDE_STEP_LABELS[key] || '办理这一步 · 10分钟', minutes = TIDE_STEP_MINUTES[key] || 10;
+      var work = tideWorkState().records;
+      if (key === 'cargo' && work.cargo.choice === 'pile') label = '重新按三标归箱并疏通通道 · 25分钟';
+      if (key === 'chart' && work.chart.choice === 'copy') label = '重新询问本人同意，只取同行登记 · 20分钟';
+      if (key === 'sort' && work.sort.choice === 'pile') label = '重新分三堆、查转交号并按日期排序 · 20分钟';
+      if (key === 'rescue' && work.bollard.choice === 'fast') label = '补查磨损并换绳，再按分工接应 · 25分钟';
+      wrap.appendChild(mkBtn(label, 'primary', function () {
+        var e = storyEntryForScene(sid);
+        performAction({ point: e, minutes: minutes, guard: function () {
+          return storyCNear(sid) && !tideChapterState().records[key] && tideStepReady(key);
+        }, apply: function () {
+          tideStepApply(key);
+        }});
+      }));
+    }
+  }
+  if (!missing) wrap.appendChild(mkBtn('核对已办记录，继续', 'primary', function () {
+    if (!storyCNear(sid) || storyCMissing(sid)) { refreshWindow(); return; }
+    storyAdvance(sid);
+  }));
+  else wrap.appendChild(mkBtn('先去现场办理', 'sm', closeWindow));
+  return wrap;
+}
+var TIDE_STEP_LABELS = {
+  cargo: '按三标归置公共空箱 · 25分钟',
+  chart: '问过同意后取同行登记 · 20分钟',
+  berth: '按船名与日期配对停靠记录 · 20分钟',
+  sort: '按日期排序并分类材料 · 20分钟',
+  read: '整理三张材料并登记索引 · 20分钟',
+  rescue: '按分工完成岸上接应 · 25分钟',
+  letter: '寄出核验申请与家书 · 20分钟',
+  dispatch: '收好证言与材料副本 · 10分钟'
+};
+var TIDE_STEP_MINUTES = { cargo: 25, chart: 20, berth: 20, sort: 20, read: 20, rescue: 25, letter: 20, dispatch: 10 };
+function tideStepReady(key) {
+  var w = tideWorkState().records, c = tideChapterState().records;
+  if (key === 'cargo') return !!w.customs && !!w.cargo;
+  if (key === 'chart') return !!w.chart;
+  if (key === 'berth') return !!c.chart;
+  if (key === 'sort') return !!w.sort;
+  if (key === 'read') return !!c.sort;
+  if (key === 'rescue') return !!w.bollard && ['A', 'B', 'C'].indexOf(storyChoices().c04_role) >= 0;
+  if (key === 'letter') return !!c.read;
+  if (key === 'dispatch') return !!c.letter;
+  return false;
+}
+function tideStepApply(key) {
+  var c = tideChapterState().records, choice = '', text = '', source = '';
+  if (key === 'cargo') {
+    var wc = tideWorkState().records.cargo;
+    choice = wc ? wc.choice : 'marks';
+    text = (choice === 'pile' ? '先前堆箱堵了通道，本次重新分箱并疏通。' : '') + '已在工人街货箱堆场按干货、湿货、通道三标归置公共空箱，并取得本地工作见证：货与人真正到岸，不是听来的。';
+    source = '潮汐港工人街货箱堆场 · 维克与当班柜台';
+  } else if (key === 'chart') {
+    var wt = tideWorkState().records.chart;
+    choice = wt ? wt.choice : 'consent';
+    text = (choice === 'copy' ? '先前抄整本被拒，本次重新询问并取得本人同意，只取同行事实。' : '') + '已取得同行登记副本与娜汀的见证（病人本人同意后）：伊文陪一位谷中病人上岸，人留院，他托船户带信，并问过能否请人进谷；他说过还要回去。';
+    source = '潮汐港海员医舍 · 娜汀与病人本人';
+  } else if (key === 'berth') {
+    choice = 'form';
+    text = '已按船名、日期与停靠地配对：伊文走的是支线，不在北上王都那班乘客里；同名旧船上个月才修好，已排除。取得近期返回山谷的见证，未谎称已经见到本人。';
+    source = '潮汐港停靠牌前 · 维克与班次牌';
+  } else if (key === 'sort') {
+    var ws = tideWorkState().records.sort;
+    choice = ws ? ws.choice : 'chain';
+    text = (choice === 'pile' ? '先前合排不能追踪去向，本次重新分三堆并查转交号。' : '') + '已按确切日期排序并分类：原异议抄件属抄件，港口交接条属原件，给朋友的短笺属私人陈述。核心原件仍在王都档案院，一张抄件不能直接撤销工程。取得王都档案索引。';
+    source = '潮汐港邮务所 · 分拣台与领取台';
+  } else if (key === 'read') {
+    choice = 'read';
+    text = '已整理三张材料：伊文自存的南线判断照原文保留，北侧名单未核完这一句没有被删去。取得私人短笺与王都档案索引，原件仍需在档案院按许可调阅。';
+    source = '潮汐港邮务所阅读桌 · 三张材料';
+  } else if (key === 'rescue') {
+    var role = storyChoices().c04_role;
+    choice = role;
+    text = role === 'A' ? '岸上接应：我检查了安全缆柱，按维克的三短一长信号稳缆，把工作艇上的三个人接上安全坪；器材损耗记在公共物资账上。' :
+      role === 'B' ? '医疗接应：我在接应点分配干布与担架，逐个登记伤情并交医护；两个轻伤今夜处理，一个延后复诊。' :
+      '随船协作：经维克确认后随现成救援船队协作，只做分派到的活，不掌舵、不独驾；把人带回安全坪后交岸上接手。';
+    if (tideWorkState().records.bollard.choice === 'fast') text = '接应前补查磨损并更换不合用的绳，确认缆桩可用。' + text;
+    source = '潮汐港海堤安全坪 · 维克与娜汀';
+  } else if (key === 'letter') {
+    choice = 'sent';
+    var care = farmCareState(), gap = farmPlanCareGap(3);
+    text = '已寄出寄往王都的核验申请与一封家书。照料快照（第 ' + state.totalDay + ' 天）：' +
+      (gap.need || gap.crops ? farmPlanCareGapText(gap) : '家中没有需要委托的未熟作物或牲畜。') +
+      ' 已照料 ' + care.deliveredDays + ' 天，缺料 ' + care.shortageDays + ' 天。' +
+      (care.lastSummary ? '最近回报：' + care.lastSummary + '。' : '尚无照料回报。') + '可暂停行程返家。私人住址另封。';
+    source = '潮汐港邮务所 · 寄信窗口';
+  } else if (key === 'dispatch') {
+    choice = 'kept';
+    text = '同行证言与材料副本已保存：证言须娜汀本人同意才可使用，她同意参加一段而非整季。公共必要差旅列任务专款，没有动用个人贷款。';
+    source = '潮汐港启程处 · 娜汀与维克';
+  }
+  c[key] = { day: state.totalDay, choice: choice, text: text, source: source };
+  var id = 'tide_chapter_' + key;
+  storyState().evidence[id] = { id: id, title: TIDE_CHAPTER_ACTIONS[key].title, source: source, day: state.totalDay };
+}
+
+function openStoryCReview(sid) {
+  var def = storySceneDef(sid);
+  openWindow({ id: 'story_c_review', kind: 'story', wide: true, title: sid + ' · 已演回看', build: function (b) {
+    b.appendChild(el('p', 'muted', '只回看已经演过的场次；不改选择、日期或奖励。'));
+    def.lines.forEach(function (l) {
+      if (!storyLineVisible(l)) return;
+      b.appendChild(el('p', null, l.choice ? '当时选择：' + storyChoiceText(l, storyChoices()[l.choice]) : l.step ? '已办理：' + l.text : (l.who ? l.who + '：' : '') + l.text));
+    });
+  }, actions: [{ label: '关闭', close: true }] });
+}
+
 function storyLineVisible(line) {
   if (!line.when) return true;
   try { return !!line.when(storyChoices()); } catch (e) { return true; }
@@ -1297,6 +2576,20 @@ function storyLineVisible(line) {
 function openStoryScene(sceneId) {
   var def = storySceneDef(sceneId);
   if (!def) { toast('这一段还没有实装。'); return; }
+  if (def.task.indexOf('MQ1-B') === 0) {
+    if (storySceneSeen(sceneId)) { openStoryBReview(sceneId); return; }
+    var bt = storyTask(def.task), next = storyNextScene(bt);
+    if (storyTaskStatus(bt.id) === 'locked') { openStoryLocked(bt); return; }
+    if (next && next !== sceneId) { openStoryOrderPanel(bt, next, storySceneDef(next), sceneId); return; }
+    if (!storyBNear(sceneId)) { openStoryTaskPanel(bt); return; }
+  }
+  if (def.task.indexOf('MQ1-C') === 0) {
+    if (storySceneSeen(sceneId)) { openStoryCReview(sceneId); return; }
+    var ct = storyTask(def.task), cnext = storyNextScene(ct);
+    if (storyTaskStatus(ct.id) === 'locked') { openStoryLocked(ct); return; }
+    if (cnext && cnext !== sceneId) { openStoryOrderPanel(ct, cnext, storySceneDef(cnext), sceneId); return; }
+    if (!storyCNear(sceneId)) { openStoryTaskPanel(ct); return; }
+  }
   var st = storyState();
   st.started = true;
   var t = storyTask(def.task);
@@ -1322,6 +2615,9 @@ function buildStoryScene(b, sceneId) {
   head.appendChild(el('div', 'story-task-title', t ? t.title : ''));
   head.appendChild(el('div', 'story-task-goal', t ? t.goal : ''));
   b.appendChild(head);
+  if ((sceneId === 'S022' && pineWorkState().records.repair) || (sceneId === 'S023' && pineWorkState().records.supper)) {
+    b.appendChild(el('p', 'req-chip ok', '你已经办理过这件事。下文回看初访时的情景，现场成果保留，不重修、不重复用料。'));
+  }
   var box = el('div', 'story-scene');
   for (var i = 0; i < lines.length && i <= rec.idx; i++) {
     var line = lines[i];
@@ -1348,6 +2644,7 @@ function buildStoryScene(b, sceneId) {
   b.appendChild(box);
   if (rec.idx >= lines.length) {
     b.appendChild(el('div', 'story-end', '—— 本场结束 ——'));
+    if (def.task.indexOf('MQ1-B') === 0 && storyBMissing(sceneId)) b.appendChild(el('p', 'req-chip', storyBMissing(sceneId)));
     if (def.memory) b.appendChild(el('p', 'muted', '回忆不改写世界日期、天气、体力和钱包；跳过的部分之后可以回看。'));
   }
 }
@@ -1366,6 +2663,8 @@ function buildStoryChoice(line, sceneId) {
       storyState().choices[line.choice] = o.id;
       /* 对莱娜的表态在选下去的那一刻就生效，不等整段演完 */
       if (line.choice === 'a04_stance') storyState().lenaStance = o.id === 'A' ? 'cautious' : 'public';
+      if (line.choice === 'b04_route') storyState().routeMethod = o.id === 'A' ? 'marked' : 'detour';
+      if (line.choice === 'c04_role') storyState().support.c04_role = o.id;
       markDirty();
       storyAdvance(sceneId);
     }));
@@ -1385,6 +2684,8 @@ function buildStoryStep(line, sceneId) {
   if (line.mode === 'items') wrap.appendChild(buildStoryItemsStep(line, sceneId));
   else if (line.mode === 'overlay') wrap.appendChild(buildStoryOverlayStep(line, sceneId));
   else if (line.mode === 'reception') wrap.appendChild(buildStoryReceptionStep(line, sceneId));
+  else if (line.mode === 'pine') wrap.appendChild(buildStoryBStep(line, sceneId));
+  else if (line.mode === 'tide') wrap.appendChild(buildStoryCStep(line, sceneId));
   else wrap.appendChild(el('p', 'muted', '这一步还没有实装。'));
   return wrap;
 }
@@ -1569,6 +2870,18 @@ function storySceneActions(sceneId) {
 function storyFinishScene(sceneId) {
   var def = storySceneDef(sceneId);
   if (!def) return;
+  if (def.task.indexOf('MQ1-B') === 0) {
+    if (storySceneProgress(sceneId).idx < def.lines.length) return;
+    if (!storyBNear(sceneId)) { openStoryTaskPanel(storyTask(def.task)); return; }
+    var missing = storyBMissing(sceneId);
+    if (missing) { toast(missing); refreshWindow(); return; }
+  }
+  if (def.task.indexOf('MQ1-C') === 0) {
+    if (storySceneProgress(sceneId).idx < def.lines.length) return;
+    if (!storyCNear(sceneId)) { openStoryTaskPanel(storyTask(def.task)); return; }
+    var cmissing = storyCMissing(sceneId);
+    if (cmissing) { toast(cmissing); refreshWindow(); return; }
+  }
   var rec = storySceneProgress(sceneId);
   rec.seen = true;
   rec.day = state.totalDay;
@@ -1592,7 +2905,7 @@ function storyFinishScene(sceneId) {
   if (next) {
     var nextDef = storySceneDef(next);
     /* 下一场在别的场景：不替玩家瞬移，写清地点让玩家自己走过去 */
-    if (nextDef && storySceneLoc(next) !== storySceneLoc(sceneId) && storySceneLoc(next) !== 'memory') {
+    if (nextDef && ((def.task.indexOf('MQ1-B') === 0) || (def.task.indexOf('MQ1-C') === 0) || (storySceneLoc(next) !== storySceneLoc(sceneId) && storySceneLoc(next) !== 'memory'))) {
       openStoryNextPlace(t, next, nextDef);
       return;
     }
@@ -1795,6 +3108,8 @@ function openStoryLocked(t) {
 }
 
 function storyLockReason(t) {
+  if (t.id === 'MQ1-B01') return storyBEntryReason() || '条件已满足。';
+  if (t.id === 'MQ1-C01') return storyCEntryReason() || '条件已满足。';
   if (t.id === 'MQ1-A01') {
     if (storyState().tasks['MQ1-P04'] !== 'done') return '先完成序章：' + storyTaskTitle('MQ1-P04') + '。';
     var ach = storyEntryAchievement();
@@ -1911,9 +3226,9 @@ function storyNextStepText(taskId) {
 
 function openStoryLog() {
   openWindow({
-    id: 'story_log', kind: 'story', wide: true, title: '主线 · 长风有归处（第一幕切片）',
+    id: 'story_log', kind: 'story', wide: true, title: '主线 · 长风有归处（至第三幕）',
     build: function (b) {
-      b.appendChild(el('p', 'muted', '第九版第一部主线。M0 切片实装序章与第一幕共 9 个任务；后续章节仍在制作中，这里如实写「未实装」。'));
+      b.appendChild(el('p', 'muted', '第九版第一部主线。序章至第三幕共 19 个任务已实装；第四幕及以后仍在制作中，这里如实写「未实装」。'));
       var st = storyState();
       var curAct = 0;
       STORY_TASKS.forEach(function (t) {
@@ -1957,6 +3272,16 @@ function openStoryLog() {
         b.appendChild(el('div', 'story-evidence', '· ' + e.title + '（' + e.source + '）'));
       });
       appendSegmentLedger(b, farmPlanState());
+      appendPineWorkLedger(b);
+      appendTideWorkLedger(b);
+      Object.keys(pineChapterState().records).forEach(function (k) {
+        var r = pineChapterState().records[k];
+        b.appendChild(el('p', 'story-evidence', '第 ' + r.day + ' 天 · ' + r.source + '：' + r.text));
+      });
+      Object.keys(tideChapterState().records).forEach(function (k) {
+        var r = tideChapterState().records[k];
+        b.appendChild(el('p', 'story-evidence', '第 ' + r.day + ' 天 · ' + r.source + '：' + r.text));
+      });
       b.appendChild(mkBtn('分段旅行与照料安排', 'sm', openFarmSchedulePanel));
       if (st.lenaStance) {
         b.appendChild(el('div', 'section-title', '记录'));
@@ -1993,6 +3318,8 @@ function storyTodayLine() {
       return { tier: 'later', tag: '主线', text: '主线 ' + t.id + ' · ' + storyLockReason(t), open: openStoryLog };
     }
   }
+  if (crossBorderOpen('pine')) return { tier: 'soon', tag: '白松事务', text: pineWorkNextText(), open: openStoryLog };
+  if (crossBorderOpen('tide')) return { tier: 'soon', tag: '潮汐港事务', text: tideWorkNextText(), open: openStoryLog };
   return null;
 }
 
@@ -21460,6 +22787,8 @@ ms1Site('ms1_pine_path', 12, 14, '第一处岔口 · 碎石坡', 'ms1_path_fork1
 ms1Site('ms1_pine_path', 25, 10, '第二处岔口 · 浅溪', 'ms1_path_fork2');
 ms1Site('ms1_pine_path', 34, 6, '第三处岔口 · 风口', 'ms1_path_fork3');
 ms1Site('ms1_pine_inn', 4, 4, '赫莎的停运登记簿', 'ms1_pine_ledger');
+ms1Site('ms1_pine_inn', 15, 6, '驿舍炉灶检修处', 'ms1_pine_stove');
+ms1Site('ms1_pine_inn', 7, 6, '共同晚餐备餐处', 'ms1_pine_supper');
 ms1Site('ms1_echo_fork', 13, 5, '封闭的旧隧道口', 'ms1_echo_tunnel');
 ms1Site('ms1_echo_fork', 24, 14, '当年的救援现场标记', 'ms1_echo_site');
 ms1Site('ms1_echo_village', 28, 19, '弥拉的菜地', 'ms1_echo_garden');
@@ -21687,7 +23016,240 @@ var MS1_SITE_INFO = {
   ms1_capital_hearing: ['公议厅的质询席', '质询时先问谁、用什么事实回应，都由当场的人决定。', '第四幕要在这里完成一次质询。'],
   ms1_capital_letters: ['行旅舍的寄存与家书', '寄存物和家书分两柜。写给收不到的人的信，柜里最多。', '第四幕与第五幕之间要把该寄的信寄出去。']
 };
+/* P0-3 首批：白松事务独立于演出与任务奖励，提前探索也保留亲手做过的事实。
+   依据总规 §27.3；旧簿中的历史时间与玩家查阅日分开，不推定信已送达或父女关系。 */
+var PINE_WORK_SITES = {
+  ms1_pine_sign: ['旧路牌 · 通信去向', ['sign']],
+  ms1_pine_stove: ['驿舍炉灶 · 安全检修', ['vent', 'clear', 'cool', 'repair']],
+  ms1_pine_supper: ['共同晚餐 · 公共食材', ['supper', 'recent']],
+  ms1_pine_ledger: ['赫莎的停运登记簿', ['ledger']],
+  ms1_path_fork1: ['碎石坡 · 落石边界', ['rockLook', 'rockRoute']],
+  ms1_path_fork2: ['浅溪 · 坡脚水痕', ['waterLook', 'waterRoute']],
+  ms1_path_fork3: ['风口 · 旧桥桥基', ['bridgeLook', 'bridgeRoute']]
+};
+var PINE_WORK_ACTIONS = {
+  sign: { title: '通信去向', source: '白松旧驿村 · 旧路牌', choices: { read: '核对停运告示：驿车停运，迁居居民改由商队捎信；具体班次与日期待查原簿。' } },
+  vent: { title: '通风', source: '白松驿舍 · 赫莎与现场检修', choices: { open: '撑开窗户，先让烟散出。' } },
+  clear: { title: '移开可燃物', source: '白松驿舍 · 现场检修', needs: ['vent'], choices: { clear: '移开灶旁布料和柴草，留出操作位置。' } },
+  cool: { title: '停火冷却', source: '白松驿舍 · 现场检修', needs: ['clear'], minutes: 30, choices: { wait: '停火等待冷却后检查灶门，不带火修理。' } },
+  repair: { title: '炉灶小事务', source: '白松驿舍 · 赫莎验看', needs: ['cool'], choices: { fix: '固定可修扣件，赫莎验看后恢复用灶。', spare: '取赫莎备好的安全替件，由赫莎装好并验看。' } },
+  supper: { title: '共同晚餐分工', source: '白松驿舍 · 赫莎与共同炊事记录', needs: ['repair'], minutes: 25, choices: { wash: '我洗菜备料，赫莎掌灶；用公共食材完成晚餐并留出晚归者的一份。', table: '我清理餐桌、分碗留餐，赫莎备菜掌灶；用公共食材完成晚餐。' } },
+  recent: { title: '近期见闻（尚待本人核实）', source: '白松驿舍 · 晚餐旅人口述', needs: ['supper'], choices: { ask: '旅人说上个月在回声谷见过腿脚不便、会修东西的鲁恩；木勺仅作线索，不能据此确认亲子关系。' } },
+  ledger: { title: '停宿与捎信记录', source: '白松驿舍 · 赫莎出示的停宿页与烟道记录', choices: { copy: '伊文记过烟道裂口；灾后第二年鲁恩在此停宿，托过一封去南线收容站的信。赫莎只证明停宿与捎信，是否送达尚不明。' } },
+  rockLook: { title: '落石边界观察', source: '白松山径 · 赫莎陪同现场核验', road: true, choices: { inspect: '标出裂边、落石边界与稳固树根；不越过未核验的内段。' } },
+  rockRoute: { title: '碎石坡走法', source: '白松山径 · 外段选路记录', needs: ['rockLook'], road: true, choices: { mark: '标清承重点，沿已核验的稳固边线步行，不进落石区。', detour: '请赫莎带队沿下方缓坡绕行。' } },
+  waterLook: { title: '坡脚水痕观察', source: '白松山径 · 赫莎陪同现场核验', road: true, choices: { inspect: '核对水痕和退路；晴天也不把浅水当成自动可涉。' } },
+  waterRoute: { title: '浅溪走法', source: '白松山径 · 外段选路记录', needs: ['waterLook'], road: true, choices: { bank: '沿已核验的高岸步行，避开涉水点。', detour: '随赫莎绕回干燥缓坡，保留原路退回的路线。' } },
+  bridgeLook: { title: '旧桥桥基观察', source: '白松山径 · 赫莎陪同现场核验', road: true, choices: { inspect: '核对旧桥断口与桥基；旧图不能证明今天可通行。' } },
+  bridgeRoute: { title: '风口走法', source: '白松山径 · 外段选路记录', needs: ['bridgeLook'], road: true, choices: { sheltered: '沿已核验的背风绕行线抵达外段观测点。', return: '退回稳固路段，沿赫莎核验的低处绕行线到外段观测点。' } }
+};
+/* P0-3 第二批：潮汐港现场事务。依据总规 §27.4。
+   码头、邮务与接应各有各的判断：报关看制式不看板，归箱按三标不按印象，
+   病历要先问同意，信件按真实照料结果写。五处操作台与第三幕演出同源，
+   提前探索也能留档，但不自动完成 C01—C05，也不发主线经验。 */
+var TIDE_WORK_SITES = {
+  ms1_tide_customs: ['海关报关棚 · 班次核对', ['customs']],
+  ms1_tide_cargo: ['工人街货箱堆场 · 三标归置', ['cargo']],
+  ms1_tide_bollard: ['海堤缆桩 · 接应准备', ['bollard']],
+  ms1_tide_sort: ['邮务所分拣台 · 通信链', ['sort']],
+  ms1_tide_chart: ['娜汀的复诊记录', ['chart']]
+};
+var TIDE_WORK_ACTIONS = {
+  customs: {
+    title: '报关棚的班次核对', source: '潮汐港海关报关棚 · 当班柜台',
+    minutes: 20,
+    choices: {
+      form: { label: '按清册逐件核对', text: '按当班清册核对了船名、靠泊班次与货物件数；海关牌与白蔷薇的路牌制式不同，不能只凭牌面认船。' },
+      gate: { label: '只看板面就放行', text: '只核了牌面就放行了一件旧箱；维克当场把箱子退回，改按清册逐件点数。' }
+    }
+  },
+  cargo: {
+    title: '公共空箱三标归置', source: '潮汐港工人街货箱堆场 · 维克示范',
+    minutes: 25, needs: [],
+    choices: {
+      marks: { label: '按三标归置公共空箱', text: '按干货、湿货、通道三块标牌把公共空箱归置：干货箱干燥可叠，湿货箱单独留位，通道箱留出下船走的路。' },
+      pile: { label: '按到货先后堆成一垛', text: '把空箱按到货先后堆成一垛，省地方；但维克说通道被堵了，后来下船的人只能从货堆边挤过去。' }
+    }
+  },
+  bollard: {
+    title: '缆桩与绳的接应准备', source: '潮汐港外海堤 · 维克与缆桩',
+    minutes: 20,
+    choices: {
+      check: { label: '逐个查缆桩与缆绳磨损', text: '逐个检查缆桩与缆绳的磨损、结扣和受力方向，记下今晚能用的几处；风大的一侧不用。' },
+      fast: { label: '只把绳理顺就位', text: '只把绳理顺就位，没有查磨损；维克说今晚风起时这段绳撑不住，得换。' }
+    }
+  },
+  sort: {
+    title: '通信分拣与去向', source: '潮汐港邮务所 · 分拣台',
+    minutes: 20,
+    choices: {
+      chain: { label: '分三堆并查到转交号', text: '把待送、待领与退回三堆分开，按转交号找到伊文那一件；写明它在哪个架、哪一天到、现在在谁手里。' },
+      pile: { label: '按件号合排', text: '把三堆材料合在一起按件号排；件号能对上，但读不出材料停在哪里、为什么退回。' }
+    }
+  },
+  chart: {
+    title: '复诊记录的同行事实', source: '潮汐港海员医舍 · 娜汀与病人本人',
+    minutes: 20,
+    choices: {
+      consent: { label: '先问同意再取同行事实', text: '先请病人本人同意，再由娜汀取出同行登记；只记录他陪病人上岸、托船户带信、问过能否请人进谷这几件同行事实。' },
+      copy: { label: '直接抄走整份病历', text: '直接抄走整份病历。娜汀把本子收回去：没有本人同意，不抄走与这次查找无关的病历。' }
+    }
+  }
+};
+function newTideWorkState() { return { records: {} }; }
+function normalizeTideWork(raw) {
+  var d = newTideWorkState();
+  if (!raw || !raw.records || typeof raw.records !== 'object' || Array.isArray(raw.records)) return d;
+  Object.keys(TIDE_WORK_ACTIONS).forEach(function (key) {
+    var r = raw.records[key], def = TIDE_WORK_ACTIONS[key];
+    if (!r || !Object.prototype.hasOwnProperty.call(def.choices, r.choice) || !isInt(r.day) || r.day < 0 ||
+        typeof r.text !== 'string' || !r.text || r.text.length > 600 ||
+        typeof r.source !== 'string' || !r.source || r.source.length > 160) return;
+    if ((def.needs || []).some(function (k) { return !d.records[k]; })) return;
+    d.records[key] = { choice: r.choice, day: r.day, text: r.text, source: r.source };
+  });
+  return d;
+}
+function tideWorkState() {
+  var st = storyState();
+  if (!st.tideWork) st.tideWork = newTideWorkState();
+  return st.tideWork;
+}
+function tideWorkReason(key) {
+  var def = TIDE_WORK_ACTIONS[key], records = tideWorkState().records;
+  if (!crossBorderOpen('tide')) return '还缺：' + crossBorderMissingText('tide');
+  var r = records[key];
+  if (r) return '这项事实已经记录，无需重复办理。';
+  var missing = (def.needs || []).filter(function (k) { return !records[k]; });
+  return missing.length ? '先完成：' + missing.map(function (k) { return TIDE_WORK_ACTIONS[k].title; }).join('、') : '';
+}
+function tideWorkNextText() {
+  var records = tideWorkState().records, sites = Object.keys(TIDE_WORK_SITES);
+  for (var i = 0; i < sites.length; i++) {
+    var site = TIDE_WORK_SITES[sites[i]], keys = site[1];
+    for (var j = 0; j < keys.length; j++) if (!records[keys[j]]) return '潮汐港事务 · ' + site[0] + '：' + TIDE_WORK_ACTIONS[keys[j]].title;
+  }
+  return '潮汐港事务已记录；码头、邮务与接应的事实都在案，第三幕演出可按这些事实推进。';
+}
+function appendTideWorkLedger(b) {
+  if (!crossBorderOpen('tide') && !Object.keys(tideWorkState().records).length) return;
+  b.appendChild(el('div', 'section-title', '潮汐港现场记录（独立事务）'));
+  b.appendChild(el('p', 'quest-next', tideWorkNextText()));
+  Object.keys(tideWorkState().records).forEach(function (key) {
+    var r = tideWorkState().records[key];
+    b.appendChild(el('p', 'story-evidence', TIDE_WORK_ACTIONS[key].title + ' · 第 ' + r.day + ' 天记录 · ' + r.source + '：' + r.text));
+  });
+}
+function openTideWorkSite(site) {
+  var info = TIDE_WORK_SITES[site];
+  openWindow({ id: 'tide_work', kind: 'custom', title: info[0], build: function (b) {
+    b.appendChild(el('p', 'muted', '现场事务会记下来源和操作日，可在主线日志回看。办理事务不会自动完成剧情任务；回到对应演出入口核对后继续。'));
+    b.appendChild(el('p', 'quest-next', tideWorkNextText()));
+    info[1].forEach(function (key) {
+      var def = TIDE_WORK_ACTIONS[key], r = tideWorkState().records[key], reason = tideWorkReason(key);
+      var box = el('div', 'panel-box');
+      box.appendChild(el('div', 'section-title', def.title));
+      if (r) box.appendChild(el('p', 'pine-record', '第 ' + r.day + ' 天 · ' + r.source + '：' + r.text));
+      if (reason) box.appendChild(el('p', 'muted', reason));
+      else Object.keys(def.choices).forEach(function (choice) {
+        extendedWorkButton(box, site, def.choices[choice].label + ' · ' + (def.minutes || 10) + '分钟', {
+          minutes: def.minutes || 10, guard: function () { return !tideWorkReason(key); }, reason: '条件已变化或已经办过，请重新查看记录。'
+        }, function () {
+          var text = def.choices[choice].text;
+          tideWorkState().records[key] = { choice: choice, day: state.totalDay, source: def.source, text: text };
+          var eid = 'tide_work_' + key;
+          storyState().evidence[eid] = { id: eid, title: def.title, source: def.source, day: state.totalDay };
+        });
+      });
+      b.appendChild(box);
+    });
+  }, actions: [{ label: '关闭', kind: 'ghost', close: true }] });
+}
+function newPineWorkState() { return { records: {} }; }
+function normalizePineWork(raw) {
+  var d = newPineWorkState();
+  if (!raw || !raw.records || typeof raw.records !== 'object' || Array.isArray(raw.records)) return d;
+  Object.keys(PINE_WORK_ACTIONS).forEach(function (key) {
+    var r = raw.records[key], def = PINE_WORK_ACTIONS[key];
+    if (!r || !Object.prototype.hasOwnProperty.call(def.choices, r.choice) || !isInt(r.day) || r.day < 0 ||
+        typeof r.text !== 'string' || !r.text || r.text.length > 600 ||
+        typeof r.source !== 'string' || !r.source || r.source.length > 160 ||
+        (r.weather !== 'sun' && r.weather !== 'rain')) return;
+    if ((def.needs || []).some(function (k) { return !d.records[k]; })) return;
+    d.records[key] = { choice: r.choice, day: r.day, text: r.text, source: r.source, weather: r.weather };
+  });
+  return d;
+}
+function pineWorkState() {
+  var st = storyState();
+  if (!st.pineWork) st.pineWork = newPineWorkState();
+  return st.pineWork;
+}
+function pineWorkReason(key) {
+  var def = PINE_WORK_ACTIONS[key], records = pineWorkState().records;
+  if (!crossBorderOpen('pine')) return '还缺：' + crossBorderMissingText('pine');
+  if (def.road && !storyHasEvidence('echo_guide')) return '先到白松驿舍的停运登记簿，与赫莎约定带路。';
+  var r = records[key];
+  if (r && (!def.road || (r.day === state.totalDay && r.weather === state.weather.today))) return '这项事实已经记录，无需重复办理。';
+  var missing = (def.needs || []).filter(function (k) {
+    var prev = records[k];
+    return !prev || (def.road && (prev.day !== state.totalDay || prev.weather !== state.weather.today));
+  });
+  return missing.length ? '先完成：' + missing.map(function (k) { return PINE_WORK_ACTIONS[k].title; }).join('、') + (def.road ? '（当天、同一天气）' : '') : '';
+}
+function pineWorkNextText() {
+  var records = pineWorkState().records, sites = Object.keys(PINE_WORK_SITES);
+  for (var i = 0; i < sites.length; i++) {
+    var site = PINE_WORK_SITES[sites[i]], keys = site[1];
+    for (var j = 0; j < keys.length; j++) if (!records[keys[j]]) return '白松事务 · ' + site[0] + '：' + PINE_WORK_ACTIONS[keys[j]].title;
+  }
+  return '白松事务已记录；山径记录只证明当日外段，跨日重访需重新核验。可继续第二幕演出。';
+}
+function appendPineWorkLedger(b) {
+  if (!crossBorderOpen('pine') && !Object.keys(pineWorkState().records).length) return;
+  b.appendChild(el('div', 'section-title', '白松现场记录（独立事务）'));
+  b.appendChild(el('p', 'quest-next', pineWorkNextText()));
+  Object.keys(pineWorkState().records).forEach(function (key) {
+    var r = pineWorkState().records[key];
+    b.appendChild(el('p', 'story-evidence', PINE_WORK_ACTIONS[key].title + ' · 第 ' + r.day + ' 天记录 · ' + r.source + '：' + r.text + (PINE_WORK_ACTIONS[key].road ? '（' + (r.weather === 'rain' ? '雨天' : '晴天') + '，仅当日外段有效）' : '')));
+  });
+}
+function openPineWorkSite(site) {
+  var info = PINE_WORK_SITES[site];
+  openWindow({ id: 'pine_work', kind: 'custom', title: info[0], build: function (b) {
+    b.appendChild(el('p', 'muted', '现场事务会记下来源和查阅／操作日，可在主线日志回看。办理事务不会自动完成剧情任务；回到对应演出入口核对后继续。'));
+    b.appendChild(el('p', 'quest-next', pineWorkNextText()));
+    if (site === 'ms1_pine_stove' || site === 'ms1_pine_supper') b.appendChild(el('p', null, '材料与食材由赫莎提供；不用个人背包物品，不收费，不发重复奖励。'));
+    if (site === 'ms1_pine_ledger') {
+      if (storyHasEvidence('echo_guide')) b.appendChild(el('p', 'req-chip ok', '赫莎已经答应带路。'));
+      else if (crossBorderReadyFor(CROSS_BORDER_ROUTES.echo)) extendedWorkButton(b, site, '约定赫莎带路上山径 · 20分钟', { minutes: 20, guard: function () { return !storyHasEvidence('echo_guide') && crossBorderReadyFor(CROSS_BORDER_ROUTES.echo); } }, function () { crossBorderGrant(CROSS_BORDER_ROUTES.echo, '白松驿舍 · 停运登记簿 · 赫莎'); });
+      else b.appendChild(el('p', 'req-chip', '还缺：' + crossBorderMissingText('echo')));
+    }
+    info[1].forEach(function (key) {
+      var def = PINE_WORK_ACTIONS[key], r = pineWorkState().records[key], reason = pineWorkReason(key);
+      var box = el('div', 'panel-box');
+      box.appendChild(el('div', 'section-title', def.title));
+      if (r) box.appendChild(el('p', 'pine-record', '第 ' + r.day + ' 天 · ' + r.source + '：' + r.text + (def.road ? '（' + (r.weather === 'rain' ? '雨天' : '晴天') + '，仅当日外段有效）' : '')));
+      if (reason) box.appendChild(el('p', 'muted', reason));
+      else Object.keys(def.choices).forEach(function (choice) {
+        extendedWorkButton(box, site, def.choices[choice] + ' · ' + (def.minutes || 10) + '分钟', {
+          minutes: def.minutes || 10, guard: function () { return !pineWorkReason(key); }, reason: '条件已变化或已经办过，请重新查看记录。'
+        }, function () {
+          var text = def.choices[choice];
+          if (def.road && state.weather.today === 'rain') text += ' 雨天水涨、石面湿滑，避开水线与裂边，不涉溪、不走断桥。';
+          pineWorkState().records[key] = { choice: choice, day: state.totalDay, source: def.source, text: text, weather: state.weather.today };
+          /* 证据索引与详细事务账共用同一次动作；复核可更新当日记录，但不会重复发奖。 */
+          var eid = 'pine_work_' + key;
+          storyState().evidence[eid] = { id: eid, title: def.title, source: def.source, day: state.totalDay };
+        });
+      });
+      b.appendChild(box);
+    });
+  }, actions: [{ label: '关闭', kind: 'ghost', close: true }] });
+}
 function openMs1Site(site) {
+  if (PINE_WORK_SITES[site]) { openPineWorkSite(site); return; }
+  if (TIDE_WORK_SITES[site]) { openTideWorkSite(site); return; }
   var info = MS1_SITE_INFO[site];
   if (!info) { toast('这个工作台当前没有操作。'); return; }
   openWindow({
@@ -23702,6 +25264,15 @@ window.__MOSS__ = {
   storyRouteFor: storyRouteFor, storyTaskScenes: storyTaskScenes,
   openStoryScene: openStoryScene, openStoryLog: openStoryLog, openStoryEntry: openStoryEntry,
   storySceneSeen: storySceneSeen, storySceneFinished: storySceneFinished,
+  /* 第二幕与第三幕的现场事务、章节记录与门槛判定（测试与界面读同一份事实） */
+  pineWorkState: pineWorkState, pineChapterState: pineChapterState,
+  tideWorkState: tideWorkState, tideChapterState: tideChapterState,
+  pineWorkNextText: pineWorkNextText, tideWorkNextText: tideWorkNextText,
+  storyBEntryReason: storyBEntryReason, storyCEntryReason: storyCEntryReason,
+  storyBMissing: storyBMissing, storyCMissing: storyCMissing,
+  storyBNear: storyBNear, storyCNear: storyCNear,
+  TIDE_WORK_ACTIONS: TIDE_WORK_ACTIONS, TIDE_CHAPTER_ACTIONS: TIDE_CHAPTER_ACTIONS,
+  openTideWorkSite: openTideWorkSite, openStoryCReview: openStoryCReview,
   wetlandLifeState:wetlandLifeState, professionalLifeState:professionalLifeState, militaryLifeState:militaryLifeState,
   /* R5-D 军事权限链：界面与测试读同一份判断 */
   milChainStatus:milChainStatus, milDeployGate:milDeployGate, milUnderCommand:milUnderCommand,
