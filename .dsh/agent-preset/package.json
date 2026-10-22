@@ -1,0 +1,12 @@
+{
+  "name": "@local/dsh-xinglu-preset",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "苔芽农场开发模式：项目专用 Agent preset（persona + 工具集 + 项目技能目录）",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

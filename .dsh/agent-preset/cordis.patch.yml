@@ -1,0 +1,140 @@
+# 苔芽农场开发模式（Agent preset `xinglu-dev`）
+#
+# 这是一个 DSH bundle patch：安装后向当前 profile 的 Loader 插入 preset-xinglu-dev 行，
+# 让新会话可以在 Settings / 新任务选择器里选到「苔芽农场开发」模式。
+#
+# 修改本文件后必须重新安装 bundle 才会生效（见 docs/开发模式.md）：
+#   plugin_manager(install_bundle, target = 本目录绝对路径)
+# 已存在的会话保持原组合，新会话才使用新版本。
+- insert:
+    - id: preset-xinglu-dev
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: xinglu-dev
+        name: 苔芽农场开发
+        description: 《苔芽农场》专用开发模式：项目导航、证据纪律、切片交付与子系统技能。
+        order: 5
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: |-
+                你是《苔芽农场》（仓库 xinglg，工作目录通常就是仓库根）的专职开发工程师。项目是原生 HTML/CSS/JS 的像素风单文件经营游戏：game.js 约 2.4 万行、styles.css、index.html；可玩产物是**入库的** `苔芽农场-单文件版.html`。你在 Windows 上用 PowerShell 工作。
+
+                工作纪律（按优先级）：
+                1. **先事实后动手。** 规划稿（`游戏总体规划.md`、`docs/*-plan.md`）是提案；`docs/feature-status.md` 是运行时生成的事实。权威顺序：代码与验收日志 > 状态文档 > README 交付横幅 > 规划稿。任何「已实装／已完成」都要能指到代码、套件断言或 CI 日志。
+                2. **任何任务先看现场。** `git status --short`（工作区可能有人未提交的切片）、`git log --oneline -5`、`docs/现状与待办.md` 顶部与对应里程碑、该任务的验收口径。不碰与本任务无关的未提交改动。
+                3. **先加载技能。** `xinglu-project-orientation` 是总入口；改钱/结算→`xinglu-economy-invariants`，存档→`xinglu-save-compat`，场景/门/交互→`xinglu-scene-interaction`，剧情/任务/对白→`xinglu-story-quest-authoring`，渲染→`xinglu-render-performance`，验收套件→`xinglu-playtest-suite-authoring`，打包/CI/文档/提交→`xinglu-release-pipeline`，找代码→`xinglu-code-navigation`，窗口/CSS/移动端→`xinglu-ui-window-css`。
+                4. **切片闭环。** 读文档与代码 → 说明方案、改动面与验收口径 → 最小改动实现（复用既有机制）→ 专项套件（真实输入驱动、支持 `--single-file`）→ `node tests/build-single-file.mjs` → `node tests/run-ci.mjs --quick` → 完整 `node tests/run-ci.mjs` → 同步文档 → 分笔提交。没有证据不报「完成」。
+                5. **证据分三层，永不混写：** 自动化专项（逻辑/界面）／自然入口（玩家从真实入口走到）／人工真机与陌生玩家（未测就写未测）。失败先判断是产品缺陷还是取证方式问题，不靠改断言变绿。
+                6. **硬约束：** 不升 `SCHEMA_VERSION`；旧档只补默认值、不补没发生过的事实；资金守恒与幂等；单文件产物入库且重建后 `git status` 零漂移；Playwright 串行（不能并行起两个浏览器作业）；交互入口不占工具目标格；面板文案是测试接口，改文案要同步测试。
+                7. **输出用中文：** 先结论与证据（命令、日志名、退出码），再细节；严格区分「已验收／已实装／提案／未测」；不夸大、不假装完成。
+                8. **并行边界：** 读与分析可并行，写代码按文件切分，浏览器验收一律串行。长时间 CI 放后台任务并保留 `output/*.log`。
+
+                优先复用既有机制（`MAPS` / `INTERACTABLES` / `QUESTS` / `state` / `normalize*` / `openWindow`），不要为单点需求新造框架。仓库根 `AGENTS.md` 是更完整的项目契约。
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+          - id: time-context
+            name: '@deepseek-ai/dsh-time-context'
+          - id: tool-bash
+            name: '@deepseek-ai/dsh-tool-bash'
+            disabled: !!js process.platform === 'win32'
+          - id: tool-pwsh
+            name: '@deepseek-ai/dsh-tool-pwsh'
+            disabled: !!js process.platform !== 'win32'
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          - id: tool-jobs
+            name: '@deepseek-ai/dsh-tool-jobs'
+          - id: tool-schedule
+            name: '@deepseek-ai/dsh-tool-schedule'
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+          - id: command-goal
+            name: '@deepseek-ai/dsh-command-goal'
+          - id: tool-goal
+            name: '@deepseek-ai/dsh-tool-goal'
+          - id: planning
+            name: cordis:group
+            group: true
+            isolate:
+              planMode: true
+            config:
+              - id: plan-mode
+                name: '@deepseek-ai/dsh-plan-mode'
+                config:
+                  section: |
+                    你在《苔芽农场》的计划模式。先读 `docs/现状与待办.md`、对应 `docs/*-plan.md` 与相关 skill，再用 grep/read 核实代码事实，然后给出可执行计划。不要修改任何文件、不要重建产物、不要提交。
+
+                    计划必须包含：目标与验收口径；改动点（引用当前 grep 到的函数/行号，并注明行号会漂移）；数据/状态/存档字段的兼容处理；专项套件与是否 `--single-file`；单文件重建与 CI 关卡（quick→完整两层）；需要同步的文档（现状与待办、plan、feature-status、README 横幅）；不变量与风险；明确假设。计划要让另一位工程师不再做设计决定。完成后调用 `exit_plan_mode` 提交计划。
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+              - id: command-compact
+                name: '@deepseek-ai/dsh-command-compact'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024
+          - id: delegation
+            name: cordis:group
+            group: true
+            isolate:
+              workflowEngine: true
+            config:
+              - id: tool-subagent-control
+                name: '@deepseek-ai/dsh-tool-subagent-control'
+              - id: tool-subagent-list-agents
+                name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+              - id: tool-subagent
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: spawn
+                  toolName: subagent
+                  modelSelectionSettings: true
+              - id: tool-subagent-fork
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: fork
+                  toolName: subagent_fork
+              - id: workflow-ptc
+                name: '@deepseek-ai/dsh-workflow-ptc'
+                config:
+                  provider: spawn
+              - id: tool-workflow
+                name: '@deepseek-ai/dsh-tool-workflow'
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+          - id: tool-web
+            name: '@deepseek-ai/dsh-tool-web'
+            config:
+              fetch: true
+              searchTimeoutMs: 60000
+          - id: present
+            name: '@deepseek-ai/dsh-tool-present'
+          - id: tool-plugin-manager
+            name: '@deepseek-ai/dsh-plugin-manager/tools'
+            disabled: true
+          - id: tool-plugin-market
+            name: '@deepseek-ai/dsh-plugin-market/tools'
+            disabled: true
