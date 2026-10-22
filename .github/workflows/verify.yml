@@ -162,6 +162,46 @@ jobs:
           node tests/run-m1-cross-border.mjs
           node tests/run-m1-cross-border.mjs --single-file
 
+  m1-pine-work:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright test dependency
+        run: npm install --no-save --no-package-lock playwright@1.63.0
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build the offline single-file game
+        run: node tests/build-single-file.mjs
+      - name: Verify Pine station work in source and single-file builds
+        run: |
+          node tests/run-m1-pine-work.mjs
+          node tests/run-m1-pine-work.mjs --single-file
+          node tests/run-m1-pine-story.mjs
+          node tests/run-m1-pine-story.mjs --single-file
+
+  m1-tide-story:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright test dependency
+        run: npm install --no-save --no-package-lock playwright@1.63.0
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build the offline single-file game
+        run: node tests/build-single-file.mjs
+      - name: Verify Tide story in source and single-file builds
+        run: |
+          node tests/run-m1-tide-story.mjs
+          node tests/run-m1-tide-story.mjs --single-file
+
   r3-natural-route:
     runs-on: ubuntu-latest
     timeout-minutes: 30

@@ -474,7 +474,7 @@ eq('出发选择已记录', (await story()).choices.a05_depart, 'B');
 await runToEnd('S018');
 await endScene();
 ok('A05 完成（第一幕收口）', await taskStatus('MQ1-A05') === 'done');
-ok('M0 之后的章节标为未实装', await p.evaluate(() => window.__MOSS__.storyTaskStatus('MQ1-B01')) === 'locked');
+ok('第二、三幕已经登记，第四幕仍未实装', await p.evaluate(() => !!window.__MOSS__.storyTask('MQ1-B01') && !!window.__MOSS__.storyTask('MQ1-C01') && window.__MOSS__.storyTaskStatus('MQ1-D01') === 'locked')); // M1 接入后边界移到 D01。
 
 /* ================= 八、存档往返 ================= */
 console.log('\n【8】第一幕存档往返');

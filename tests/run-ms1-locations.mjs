@@ -240,7 +240,8 @@ const siteOk = await p.evaluate(() => {
   const ids = ['ms1_pine_sign', 'ms1_path_fork1', 'ms1_path_fork2', 'ms1_path_fork3', 'ms1_pine_ledger',
     'ms1_echo_tunnel', 'ms1_echo_site', 'ms1_echo_garden', 'ms1_echo_table', 'ms1_echo_desk', 'ms1_echo_staging',
     'ms1_tide_customs', 'ms1_tide_cargo', 'ms1_tide_bollard', 'ms1_tide_sort', 'ms1_tide_chart',
-    'ms1_capital_notice', 'ms1_capital_desk', 'ms1_capital_archive', 'ms1_capital_hearing', 'ms1_capital_letters'];
+    'ms1_capital_notice', 'ms1_capital_desk', 'ms1_capital_archive', 'ms1_capital_hearing', 'ms1_capital_letters',
+    'ms1_pine_stove', 'ms1_pine_supper']; // P0-3：驿舍新增真实检修与备餐入口。
   const missing = [];
   Object.keys(M.INTERACTABLES).forEach(sc => {
     (M.INTERACTABLES[sc] || []).forEach(it => {

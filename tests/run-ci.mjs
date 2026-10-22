@@ -74,6 +74,9 @@ const BROWSER = [
   /* 第九版 M1 前置 P0-2：合法跨封国。四条进入路线各有凭证与缺项清单，
      四张凭证在真实柜台办理，边界出口按凭证放行 */
   'run-m1-cross-border.mjs',
+  'run-m1-pine-work.mjs',
+  'run-m1-pine-story.mjs',
+  'run-m1-tide-story.mjs',
   /* 探索线：森林/矿山三道闸门、三层矿洞、采集再生、存档重载与钢制工具，
      脚本内部自带 index.html + 单文件版两轮 */
   'run-exploration.mjs',
@@ -144,6 +147,9 @@ run('run-m0-story-city-single-file', path.join(here, 'run-m0-story-city.mjs'), [
 run('run-ms1-locations-single-file', path.join(here, 'run-ms1-locations.mjs'), ['--single-file']);
 run('run-m1-segment-travel-single-file', path.join(here, 'run-m1-segment-travel.mjs'), ['--single-file']);
 run('run-m1-cross-border-single-file', path.join(here, 'run-m1-cross-border.mjs'), ['--single-file']);
+run('run-m1-pine-work-single-file', path.join(here, 'run-m1-pine-work.mjs'), ['--single-file']);
+run('run-m1-pine-story-single-file', path.join(here, 'run-m1-pine-story.mjs'), ['--single-file']);
+run('run-m1-tide-story-single-file', path.join(here, 'run-m1-tide-story.mjs'), ['--single-file']);
 run('run-fixes-single-file', path.join(here, 'run-fixes.mjs'), ['--single-file']);
 
 console.log(failed ? `\n共 ${failed} 项失败。` : '\n两层全部通过。');
