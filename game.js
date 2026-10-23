@@ -1058,7 +1058,7 @@ function storyToolTargetNear(sceneId, x, y) {
    每次换场景重算一次，登记本身不重复添加。 */
 function registerStoryEntries() {
   STORY_ENTRIES.forEach(function (def) {
-    if (!MAPS[def.scene]) return;
+    if (!MAPS[def.scene] || def.workSite) return;
     var list = INTERACTABLES[def.scene] = INTERACTABLES[def.scene] || [];
     var it = null, i;
     for (i = 0; i < list.length; i++) if (list[i].id === def.id) { it = list[i]; break; }
@@ -2058,6 +2058,683 @@ STORY_ENTRIES.push.apply(STORY_ENTRIES, [
   }
 ]);
 
+/* 第四幕：正文逐句取自总规 §27.5；只在原稿之后接入现场操作。 */
+STORY_TASKS.push.apply(STORY_TASKS, [
+  {
+    "id": "MQ1-D01",
+    "act": 5,
+    "actName": "第四幕 · 高塔之下，众声如河",
+    "title": "初见王都，先问炊烟",
+    "goal": "核对皇家驿路登记，入住与会合预约。",
+    "scenes": [
+      "S039",
+      "S040"
+    ],
+    "next": "MQ1-D02",
+    "exp": 60
+  },
+  {
+    "id": "MQ1-D02",
+    "act": 5,
+    "actName": "第四幕 · 高塔之下，众声如河",
+    "title": "钟声经过每一扇窗",
+    "goal": "按来源受理材料，科林的亲历边界。",
+    "scenes": [
+      "S041",
+      "S042"
+    ],
+    "next": "MQ1-D03",
+    "exp": 60
+  },
+  {
+    "id": "MQ1-D03",
+    "act": 5,
+    "actName": "第四幕 · 高塔之下，众声如河",
+    "title": "被折起的一页山河",
+    "goal": "按许可调阅原件，对照日期与签核。",
+    "scenes": [
+      "S043",
+      "S044"
+    ],
+    "next": "MQ1-D04",
+    "exp": 60
+  },
+  {
+    "id": "MQ1-D04",
+    "act": 5,
+    "actName": "第四幕 · 高塔之下，众声如河",
+    "title": "当众人说起故乡",
+    "goal": "三项事实质询，核验结果的公开范围。",
+    "scenes": [
+      "S045",
+      "S046"
+    ],
+    "next": "MQ1-D05",
+    "exp": 60
+  },
+  {
+    "id": "MQ1-D05",
+    "act": 5,
+    "actName": "第四幕 · 高塔之下，众声如河",
+    "title": "愿你所见，足以为证",
+    "goal": "现场核验许可，启程前的空白意见栏。",
+    "scenes": [
+      "S047",
+      "S048"
+    ],
+    "next": null,
+    "exp": 60
+  }
+]);
+STORY_TASKS.find(function(t){return t.id==='MQ1-C05';}).next='MQ1-D01';
+Object.assign(STORY_SCENES, {
+  "S039": {
+    "task": "MQ1-D01",
+    "place": "外景 王都驿站街 日",
+    "time": "",
+    "where": "王都 · 核对皇家驿路登记",
+    "lines": [
+      {
+        "who": "",
+        "text": "钟声越过屋顶。莱娜抬头看塔，主角差点挡住推炊车的店家，侧身让路。"
+      },
+      {
+        "who": "店家",
+        "text": "看钟楼往旁边站。汤烫着呢。"
+      },
+      {
+        "who": "莱娜",
+        "text": "我还以为到了这里，大家都会很严肃。"
+      },
+      {
+        "who": "主角",
+        "text": "他们也得先吃饭。"
+      },
+      {
+        "who": "店家",
+        "text": "住店顺着烟囱走。办事的公署在街另一头，别走反。"
+      },
+      {
+        "step": "capital_arrival",
+        "mode": "capital",
+        "action": "arrival",
+        "text": "核对皇家驿路登记"
+      }
+    ]
+  },
+  "S040": {
+    "task": "MQ1-D01",
+    "place": "内景 王都行旅舍 日",
+    "time": "",
+    "where": "王都 · 入住与会合预约",
+    "lines": [
+      {
+        "who": "",
+        "text": "主角确认床位，莱娜将公署收件回执压在杯下。旅舍掌柜指向公共留言板。"
+      },
+      {
+        "who": "掌柜",
+        "text": "核验会面约在明天午后，也可以改约。行李放屋里，不必全背着。"
+      },
+      {
+        "who": "莱娜",
+        "text": "我想把材料再看一遍。"
+      },
+      {
+        "choice": "d01_meal",
+        "prompt": "请选择。",
+        "options": [
+          {
+            "id": "A",
+            "text": "一起看，先把不确定的标出来。"
+          },
+          {
+            "id": "B",
+            "text": "先吃饭，晚一点再看。"
+          }
+        ]
+      },
+      {
+        "who": "莱娜",
+        "text": "好。别把写在同一张纸上的事，都当成同一份证明。"
+      },
+      {
+        "step": "capital_lodging",
+        "mode": "capital",
+        "action": "lodging",
+        "text": "入住与会合预约"
+      }
+    ]
+  },
+  "S041": {
+    "task": "MQ1-D02",
+    "place": "内景 王都调查公署 日",
+    "time": "",
+    "where": "王都 · 按来源受理材料",
+    "lines": [
+      {
+        "who": "",
+        "text": "奥蕾尔把桌面分成“亲见”“转交材料”“尚待核验”三处，请两人逐项放置。"
+      },
+      {
+        "who": "奥蕾尔",
+        "text": "你们希望查什么？"
+      },
+      {
+        "who": "主角",
+        "text": "伊文的原报告，谷里现在的人，还有谁把迁居写成完成。"
+      },
+      {
+        "who": "奥蕾尔",
+        "text": "可以受理。你们有需要核实的事实，还没有对所有责任的结论。"
+      },
+      {
+        "who": "奥蕾尔",
+        "text": "先找科林。他参与过旧图汇编。档案院的艾诺按许可给你们查原件。"
+      },
+      {
+        "step": "capital_intake",
+        "mode": "capital",
+        "action": "intake",
+        "text": "按来源受理材料"
+      }
+    ]
+  },
+  "S042": {
+    "task": "MQ1-D02",
+    "place": "外景 王都驿站街·钟楼前庭 日",
+    "time": "",
+    "where": "王都 · 科林的亲历边界",
+    "lines": [
+      {
+        "who": "",
+        "text": "科林坐在修补过的木椅上，听见伊文的名字，把正在画的塔影翻扣在膝上。"
+      },
+      {
+        "who": "科林",
+        "text": "我抄过他的图，没有到过每一户。"
+      },
+      {
+        "who": "莱娜",
+        "text": "可您签了汇编。"
+      },
+      {
+        "who": "科林",
+        "text": "是。我以为后续核查会来。后来有人问，我就说按结项办了。"
+      },
+      {
+        "who": "主角",
+        "text": "您现在愿意说明，哪一段您没有核过吗？"
+      },
+      {
+        "who": "",
+        "text": "科林把画板翻回来，在图框外写下自己的姓名。"
+      },
+      {
+        "choice": "d02_tone",
+        "prompt": "询问亲历边界",
+        "options": [
+          {
+            "id": "A",
+            "text": "请明确您没有核过哪一段。"
+          },
+          {
+            "id": "B",
+            "text": "慢慢说，把亲历和听说分开。"
+          }
+        ]
+      },
+      {
+        "step": "capital_witness",
+        "mode": "capital",
+        "action": "witness",
+        "text": "科林的亲历边界"
+      }
+    ]
+  },
+  "S043": {
+    "task": "MQ1-D03",
+    "place": "内景 王都档案院 日",
+    "time": "",
+    "where": "王都 · 按许可调阅原件",
+    "lines": [
+      {
+        "who": "",
+        "text": "艾诺检查查阅范围，将原件、后续修订和正式结项放在三个托盘里。"
+      },
+      {
+        "who": "艾诺",
+        "text": "书页不离桌。需要副本，我登记出处。"
+      },
+      {
+        "who": "主角",
+        "text": "这张为什么折在里面？"
+      },
+      {
+        "who": "艾诺",
+        "text": "附页。卷宗目录有它，结项摘要没引用。"
+      },
+      {
+        "step": "capital_original",
+        "mode": "capital",
+        "action": "original",
+        "text": "按许可调阅原件"
+      }
+    ]
+  },
+  "S044": {
+    "task": "MQ1-D03",
+    "place": "内景 同一档案院·对照台 日",
+    "time": "",
+    "where": "王都 · 对照日期与签核",
+    "lines": [
+      {
+        "who": "",
+        "text": "玩家对齐日期与签章。伊文原页上写“北侧尚余住户，逐户名单待复核”；结项页写“住户迁居完成”。"
+      },
+      {
+        "who": "莱娜",
+        "text": "中间没有新增名单。只有一句话变了。"
+      },
+      {
+        "who": "艾诺",
+        "text": "最后签核人是伯兰。谁提供依据，需要他回答。"
+      },
+      {
+        "who": "主角",
+        "text": "我们抄下差异，不把推测也写成原文。"
+      },
+      {
+        "who": "艾诺",
+        "text": "我会证明你们看过的是哪几页。"
+      },
+      {
+        "step": "capital_compare",
+        "mode": "capital",
+        "action": "compare",
+        "text": "对照日期与签核"
+      }
+    ]
+  },
+  "S045": {
+    "task": "MQ1-D04",
+    "place": "内景 王都公议厅 日",
+    "time": "",
+    "where": "王都 · 三项事实质询",
+    "lines": [
+      {
+        "who": "",
+        "text": "人数不多，前排留有家属席。奥蕾尔让书记员读出本次核验范围。伯兰带来当前隧道风险图。"
+      },
+      {
+        "who": "伯兰",
+        "text": "旧路已经不可靠。继续让人依靠它，再出事故，谁负责？"
+      },
+      {
+        "who": "主角",
+        "text": "我们没有要求把危险写成安全。我们问的是，这些人的去处由谁核过。"
+      },
+      {
+        "who": "伯兰",
+        "text": "当时必须让新路运转。我以为地方会完成剩下的安置。"
+      },
+      {
+        "who": "莱娜",
+        "text": "您“以为”的十二年里，我们收到的是已经完成。"
+      },
+      {
+        "step": "capital_questions",
+        "mode": "capital",
+        "action": "questions",
+        "text": "三项事实质询"
+      }
+    ]
+  },
+  "S046": {
+    "task": "MQ1-D04",
+    "place": "内景 同一公议厅 日",
+    "time": "",
+    "where": "王都 · 核验结果的公开范围",
+    "lines": [
+      {
+        "who": "",
+        "text": "科林站起来，把未逐户核验的范围指给书记员。伯兰沉默片刻，收回准备好的结论页。"
+      },
+      {
+        "choice": "d04_public",
+        "prompt": "请选择。",
+        "options": [
+          {
+            "id": "A",
+            "text": "分别记录已证实差异与未确认责任。"
+          },
+          {
+            "id": "B",
+            "text": "请把已证实差异向受影响家庭公开。"
+          }
+        ]
+      },
+      {
+        "who": "奥蕾尔",
+        "text": "先补正事实，再按职责查责任。证据不足的部分不先判定。",
+        "condition": "A"
+      },
+      {
+        "who": "奥蕾尔",
+        "text": "可公开核验结果。住址与病情先遮去，不让家属再受伤害。",
+        "condition": "B"
+      },
+      {
+        "who": "伯兰",
+        "text": "我愿接受签核调查。但安全问题不会因为我签错而消失。"
+      },
+      {
+        "who": "主角",
+        "text": "所以我们还要去见他们，听他们要什么。"
+      },
+      {
+        "step": "capital_resolution",
+        "mode": "capital",
+        "action": "resolution",
+        "text": "核验结果的公开范围"
+      }
+    ]
+  },
+  "S047": {
+    "task": "MQ1-D05",
+    "place": "内景 王都调查公署 日",
+    "time": "",
+    "where": "王都 · 现场核验许可",
+    "lines": [
+      {
+        "who": "",
+        "text": "奥蕾尔写下暂缓处置范围，另附一张必须由邻领确认的现场核验表。"
+      },
+      {
+        "who": "奥蕾尔",
+        "text": "争议路段暂缓封闭，不代表旧隧道准许通行。"
+      },
+      {
+        "who": "奥蕾尔",
+        "text": "我们派正式核验人员。你们作为有关当事人与协助者同行。"
+      },
+      {
+        "who": "莱娜",
+        "text": "找到的人，能自己说愿不愿意走吗？"
+      },
+      {
+        "who": "奥蕾尔",
+        "text": "必须问。需要照护的人，也先听本人和家属。"
+      },
+      {
+        "step": "capital_permit",
+        "mode": "capital",
+        "action": "permit",
+        "text": "现场核验许可"
+      }
+    ]
+  },
+  "S048": {
+    "task": "MQ1-D05",
+    "place": "外景 王都驿站街 日",
+    "time": "",
+    "where": "王都 · 启程前的空白意见栏",
+    "lines": [
+      {
+        "who": "",
+        "text": "莱娜将新表夹进旧图，留下没有填写的“现住意见”一栏。"
+      },
+      {
+        "who": "莱娜",
+        "text": "这次不能先把答案带过去。"
+      },
+      {
+        "who": "主角",
+        "text": "嗯。先见到他们。"
+      },
+      {
+        "who": "",
+        "text": "科林赶到车站旁，递来标过地形疑点的透明覆纸。"
+      },
+      {
+        "who": "科林",
+        "text": "这上面写的是我不确定的地方。请你们回来告诉我。"
+      },
+      {
+        "step": "capital_departure",
+        "mode": "capital",
+        "action": "departure",
+        "text": "启程前的空白意见栏"
+      }
+    ]
+  }
+});
+Object.keys(STORY_SCENES).filter(function(id){return STORY_SCENES[id].task.indexOf('MQ1-D')===0;}).forEach(function(id){STORY_SCENES[id].lines.forEach(function(l){if(l.condition){var c=l.condition;l.when=function(){return storyChoices().d04_public===c;};delete l.condition;}});});
+STORY_ENTRIES.push.apply(STORY_ENTRIES, [
+  {
+    "id": "ms2_d_s039",
+    "scene": "ms1_capital_street",
+    "x": 21,
+    "y": 12,
+    "label": "核对皇家驿路登记",
+    "task": "MQ1-D01",
+    "storyScene": "S039",
+    "workSite": "ms1_capital_notice"
+  },
+  {
+    "id": "ms2_d_s040",
+    "scene": "ms1_capital_inn",
+    "x": 8,
+    "y": 9,
+    "label": "入住与会合预约",
+    "task": "MQ1-D01",
+    "storyScene": "S040",
+    "workSite": "ms1_capital_letters"
+  },
+  {
+    "id": "ms2_d_s041",
+    "scene": "ms1_capital_office",
+    "x": 8,
+    "y": 10,
+    "label": "按来源受理材料",
+    "task": "MQ1-D02",
+    "storyScene": "S041",
+    "workSite": "ms1_capital_desk"
+  },
+  {
+    "id": "ms2_d_s042",
+    "scene": "ms1_capital_street",
+    "x": 15,
+    "y": 10,
+    "label": "科林的亲历边界",
+    "task": "MQ1-D02",
+    "storyScene": "S042"
+  },
+  {
+    "id": "ms2_d_s043",
+    "scene": "ms1_capital_archive",
+    "x": 8,
+    "y": 10,
+    "label": "按许可调阅原件",
+    "task": "MQ1-D03",
+    "storyScene": "S043",
+    "workSite": "ms1_capital_archive"
+  },
+  {
+    "id": "ms2_d_s044",
+    "scene": "ms1_capital_archive",
+    "x": 8,
+    "y": 10,
+    "label": "对照日期与签核",
+    "task": "MQ1-D03",
+    "storyScene": "S044",
+    "workSite": "ms1_capital_archive"
+  },
+  {
+    "id": "ms2_d_s045",
+    "scene": "ms1_capital_hearing",
+    "x": 8,
+    "y": 12,
+    "label": "三项事实质询",
+    "task": "MQ1-D04",
+    "storyScene": "S045",
+    "workSite": "ms1_capital_hearing"
+  },
+  {
+    "id": "ms2_d_s046",
+    "scene": "ms1_capital_hearing",
+    "x": 8,
+    "y": 12,
+    "label": "核验结果的公开范围",
+    "task": "MQ1-D04",
+    "storyScene": "S046",
+    "workSite": "ms1_capital_hearing"
+  },
+  {
+    "id": "ms2_d_s047",
+    "scene": "ms1_capital_office",
+    "x": 8,
+    "y": 10,
+    "label": "现场核验许可",
+    "task": "MQ1-D05",
+    "storyScene": "S047",
+    "workSite": "ms1_capital_desk"
+  },
+  {
+    "id": "ms2_d_s048",
+    "scene": "ms1_capital_street",
+    "x": 24,
+    "y": 14,
+    "label": "启程前的空白意见栏",
+    "task": "MQ1-D05",
+    "storyScene": "S048"
+  }
+]);
+STORY_ENTRIES.filter(function(e){return e.task.indexOf('MQ1-D')===0;}).forEach(function(e){STORY_SCENE_LOC[e.storyScene]=e.scene;});
+
+var CAPITAL_KEYS = ['arrival','lodging','intake','witness','original','compare','questions','resolution','permit','departure'];
+var CAPITAL_ACTIONS = {arrival:'皇家驿路到站登记',lodging:'专款床位与预约',intake:'按来源受理与查阅许可',witness:'科林的自愿说明',original:'原件查阅登记',compare:'日期签核差异与副本编号',questions:'三项质询事实',resolution:'补正与公开范围',permit:'有限现场核验许可',departure:'待填写的现住意见'};
+var CAPITAL_SITES = ['ms1_capital_notice','ms1_capital_letters','ms1_capital_desk','ms1_capital_archive','ms1_capital_hearing'];
+var CAPITAL_DATES = ['灾害当日','异议提交日','旧图汇编日','正式结项日'];
+function newCapitalChapterState(){return {records:{},draft:{dates:[],answers:[],sort:[]},appointmentDay:-1,appointmentMinute:720,permitUntil:-1};}
+function normalizeCapitalChapter(raw){
+  var d=newCapitalChapterState();if(!raw||typeof raw!=='object')return d;
+  CAPITAL_KEYS.forEach(function(k,i){
+    var r=raw.records&&raw.records[k];
+    if(!r||!isInt(r.day)||r.day<1||typeof r.text!=='string'||!r.text||r.text.length>4000||typeof r.source!=='string'||!r.source||r.source.length>180||typeof r.choice!=='string'||r.choice.length>60)return;
+    if(i&&(!d.records[CAPITAL_KEYS[i-1]]||r.day<d.records[CAPITAL_KEYS[i-1]].day))return;
+    var choices={arrival:['registered'],lodging:['A','B'],intake:['classified'],witness:['A','B'],original:['viewed'],compare:['indexed'],questions:['answered'],resolution:['A','B'],permit:['limited'],departure:['deferred']};if(choices[k].indexOf(r.choice)<0)return;
+    d.records[k]={day:r.day,choice:r.choice,text:r.text,source:r.source};
+  });
+  if(d.records.lodging && isInt(raw.appointmentMinute) && raw.appointmentMinute>=360 && raw.appointmentMinute<=1320)d.appointmentMinute=raw.appointmentMinute;
+  var p=raw.draft||{};
+  ['dates','answers','sort'].forEach(function(k){var allow=k==='dates'?CAPITAL_DATES:k==='answers'?['ivan','difference','risk']:['seen','copy','pending'];d.draft[k]=Array.isArray(p[k])?p[k].filter(function(v,i,a){return allow.indexOf(v)>=0&&a.indexOf(v)===i;}).slice(0,allow.length):[];});
+  ['signer','basis','feedback'].forEach(function(k){if(typeof p[k]==='string'&&p[k].length<250)d.draft[k]=p[k];});
+  if(d.records.lodging&&isInt(raw.appointmentDay)&&raw.appointmentDay>=d.records.lodging.day)d.appointmentDay=raw.appointmentDay;
+  if(d.records.permit&&isInt(raw.permitUntil)&&raw.permitUntil>=d.records.permit.day)d.permitUntil=raw.permitUntil;
+  return d;
+}
+function capitalChapterState(){var st=storyState();if(!st.capitalChapter)st.capitalChapter=newCapitalChapterState();return st.capitalChapter;}
+function storyDEntryReason(){
+  if(storyState().tasks['MQ1-C05']!=='done')return '先完成第三幕 C05，寄出核验申请并收好同行证言。';
+  if(!crossBorderOpen('capital'))return '还缺：'+crossBorderMissingText('capital');
+  var c=tideChapterState().records;
+  if(!c.sort||!c.read||!c.dispatch||!c.rescue)return '还缺第三幕材料分类、私人短笺、接应亲历与同行证言记录；请回潮汐港核对来源。';
+  return '';
+}
+function capitalKey(sid){return CAPITAL_KEYS[Number(sid.slice(1))-39];}
+function capitalReady(sid){
+  if(storyDEntryReason())return storyDEntryReason();
+  var i=Number(sid.slice(1))-39,c=capitalChapterState();
+  if(i>0&&!c.records[CAPITAL_KEYS[i-1]])return '先完成：'+CAPITAL_ACTIONS[CAPITAL_KEYS[i-1]]+'。';
+  if(i===2&&(c.appointmentDay<0||state.totalDay<c.appointmentDay||(state.totalDay===c.appointmentDay&&state.timeMinutes<c.appointmentMinute)))return '会面约在第 '+c.appointmentDay+' 天午后；请明确选择过夜，或回行旅舍改约今日空档。';
+  return '';
+}
+function storyDMissing(sid){return capitalReady(sid)||(!capitalChapterState().records[capitalKey(sid)]?'请在'+storySceneDef(sid).where+'完成「'+CAPITAL_ACTIONS[capitalKey(sid)]+'」。':'');}
+function capitalRecord(key,choice,text){
+  var c=capitalChapterState();if(c.records[key])return;
+  var e=storyEntryForScene('S0'+(39+CAPITAL_KEYS.indexOf(key)));
+  var source=storySceneDef(e.storyScene).where+' · '+e.storyScene;
+  c.records[key]={day:state.totalDay,choice:choice,text:text,source:source};
+  var id='capital_chapter_'+key;storyState().evidence[id]={id:id,title:CAPITAL_ACTIONS[key],source:source,day:state.totalDay};
+}
+function capitalDo(sid,fn){
+  return performAction({point:storyEntryForScene(sid),minutes:5,guard:function(){return storyCNear(sid)&&!capitalReady(sid)&&!capitalChapterState().records[capitalKey(sid)];},apply:fn});
+}
+function capitalDraftButton(b,sid,label,fn){b.appendChild(mkBtn(label,'sm',function(){if(!storyCNear(sid)||capitalReady(sid)||capitalChapterState().records[capitalKey(sid)])return;fn(capitalChapterState().draft);markDirty();saveNow();refreshWindow();}));}
+function capitalActionButton(b,sid,label,fn){b.appendChild(mkBtn(label,'primary',function(){capitalDo(sid,fn);}));}
+function capitalSource(r){return r?'第 '+r.day+' 天 · '+r.source+'：'+r.text:'没有这份记录，不冒充已取证';}
+function buildStoryDStep(line,sid){
+  var b=el('div','story-items'),c=capitalChapterState(),key=line.action,p=c.draft,missing=capitalReady(sid);
+  if(missing){b.appendChild(el('p','req-chip',missing));return b;}
+  if(c.records[key]){
+    b.appendChild(el('p','panel-box',c.records[key].text));
+    b.appendChild(mkBtn('核对已办记录，继续','primary',function(){if(storyCNear(sid)&&!storyDMissing(sid))storyAdvance(sid);}));return b;
+  }
+  if(p.feedback)b.appendChild(el('p','req-chip',p.feedback));
+  if(key==='arrival')capitalActionButton(b,sid,'核对皇家驿路凭证并登记到站',function(){capitalRecord(key,'registered','已沿合法皇家驿路线抵达王都；街道、旅舍与公署位置已核对。不要求高级官职。');});
+  if(key==='lodging'){
+    b.appendChild(el('p','muted','必要床位列核验差旅专款，私人费用 0 金；此处不自动过夜。会面暂约明天午后，可在寄存柜改约。'));
+    capitalActionButton(b,sid,storyChoices().d01_meal==='B'?'饭后回到留言板，核材料并确认床位':'一起核材料并确认专款床位',function(){
+      c.appointmentDay=state.totalDay+1;c.appointmentMinute=720;capitalRecord(key,storyChoices().d01_meal||'A','专款床位已确认，私人支付 0 金。'+(storyChoices().d01_meal==='B'?'先吃饭后返回留言板核材料。':'一起标记不确定材料。')+'初次预约第 '+c.appointmentDay+' 天午后，可改约；需要过夜请通过正常睡觉明确选择。');
+    });
+    if(storyChoices().d01_meal==='B')b.appendChild(mkBtn('先去吃饭，稍后回留言板','ghost',closeWindow));
+  }
+  if(key==='intake'){
+    b.appendChild(el('p','panel-box','已知材料：'+capitalSource(tideChapterState().records.sort)));
+    b.appendChild(el('p','muted','把岸上亲历、转交的异议抄件、责任推测分别放入亲见／转交材料／尚待核验。已分类 '+p.sort.length+'/3。'));
+    [['seen','岸上接应 → 亲见'],['copy','异议抄件 → 转交材料'],['pending','责任推测 → 尚待核验']].forEach(function(a){capitalDraftButton(b,sid,a[1],function(d){if(d.sort.indexOf(a[0])<0)d.sort.push(a[0]);d.feedback='';});});
+    capitalDraftButton(b,sid,'把异议抄件当作档案原件',function(d){d.feedback='抄件不能冒充原件。核心原件仍在档案院，请重新按来源分类。';d.sort=[];});
+    if(p.sort.length===3)capitalActionButton(b,sid,'提交分类并领取有限查阅许可',function(){
+      var st=storyState(),q=st.choices;
+      capitalRecord(key,'classified','受理亲见、转交与待核三类；许可仅查原图、附页、修订与结项，不预判责任。A03提问：'+(q.a03_question==='A'?'先问亲眼见闻':q.a03_question==='B'?'追问离开原因':'旧档未记录')+'；A04态度：'+(st.lenaStance||'未记录')+'。C03材料来源快照：'+capitalSource(tideChapterState().records.sort)+'。C03短笺快照：'+capitalSource(tideChapterState().records.read)+'。接应亲历快照：'+capitalSource(tideChapterState().records.rescue)+'。C05同行证言快照：'+capitalSource(tideChapterState().records.dispatch));
+    });
+  }
+  if(key==='witness')capitalActionButton(b,sid,'登记科林自愿说明与亲历边界',function(){capitalRecord(key,storyChoices().d02_tone||'A','科林承认参与汇编但未逐户核验；两种询问语气均取得自愿说明，不靠送礼或运气。此前A04态度：'+(storyState().lenaStance||'未记录')+'；'+(storyState().lenaStance==='public'?'同意公开亲历边界，遮去私人资料。':'先保留在核验卷内，公开须另核范围。'));});
+  if(key==='original')capitalActionButton(b,sid,'出示许可，现场调阅三托盘原件',function(){capitalRecord(key,'viewed','艾诺核对受理许可，调出原图附页、后续修订和正式结项。原件留馆；附页在目录内但结项摘要未引用。查阅登记号 CAP-'+state.totalDay+'-D03。');});
+  if(key==='compare'){
+    b.appendChild(el('p','panel-box','卷内先后日期：灾害当日 → 异议提交日 → 旧图汇编日 → 正式结项日。原页：北侧尚余住户，逐户名单待复核。结项：住户迁居完成。中间没有新增逐户名单。'));
+    b.appendChild(el('p',null,'已排：'+p.dates.join(' → ')));
+    CAPITAL_DATES.forEach(function(v){capitalDraftButton(b,sid,'日期卡：'+v,function(d){if(d.dates.indexOf(v)<0)d.dates.push(v);});});
+    capitalDraftButton(b,sid,'重排日期卡',function(d){d.dates=[];d.feedback='';});
+    ['伯兰','科林'].forEach(function(v){capitalDraftButton(b,sid,'最后签核人：'+v,function(d){d.signer=v;});});
+    ['未附新增逐户名单','已完成逐户核验'].forEach(function(v){capitalDraftButton(b,sid,'依据：'+v,function(d){d.basis=v;});});
+    b.appendChild(el('p',null,'签核人：'+(p.signer||'待选')+'；依据：'+(p.basis||'待选')));
+    capitalActionButton(b,sid,'核对日期与签核，登记可核副本',function(){
+      if(p.dates.join('|')!==CAPITAL_DATES.join('|')||p.signer!=='伯兰'||p.basis!=='未附新增逐户名单'){p.feedback='对照未通过：按卷内日期重排；最后签核人是伯兰，结项未附新增逐户名单。可重排，不消耗原件。';return;}
+      p.feedback='';capitalRecord(key,'indexed','日期先后：'+p.dates.join(' → ')+'。最后签核人伯兰，依据未附新增逐户名单。只记录原文差异，不把推测写成原文。艾诺登记副本编号 COPY-'+state.totalDay+'-D03，原图不离馆；副本不在手可凭本登记编号补核。');
+    });
+  }
+  if(key==='questions'){
+    b.appendChild(el('p','panel-box','伯兰现场提交的当前隧道风险图：旧隧道不准通行。旧案差异与现行风险须分开回答。'));
+    b.appendChild(el('p',null,'已有依据：'+capitalSource(tideChapterState().records.read)));
+    b.appendChild(el('p',null,'档案登记：'+c.records.compare.text));
+    b.appendChild(el('p',null,'已回答：'+p.answers.join('、')));
+    [['ivan','引用私人短笺：承认伊文自己的南线选择'],['difference','引用副本：说明原页与结项差异'],['difference','凭登记编号请艾诺补核差异'],['risk','引用当前风险图：不把危险说成安全']].forEach(function(a){capitalDraftButton(b,sid,a[1],function(d){if(a[0]==='ivan'&&!tideChapterState().records.read){d.feedback='缺私人短笺来源，请先核材料。';return;}if(d.answers.indexOf(a[0])<0)d.answers.push(a[0]);d.feedback='';});});
+    capitalDraftButton(b,sid,'指控所有人蓄意隐瞒',function(d){d.feedback='现有材料不能证明所有人的主观意图。请改述为已证实差异，未确认责任另查。';d.answers=[];});
+    if(p.answers.length===3)capitalActionButton(b,sid,'提交三项有来源的回答',function(){capitalRecord(key,'answered','分别引用私人短笺、档案差异登记与伯兰现场风险图：承认伊文的选择，说明报告差异，保留当前风险。无证据指控已排除；缺副本可用已有登记编号补核。');});
+  }
+  if(key==='resolution')capitalActionButton(b,sid,'确认补正与公开范围',function(){capitalRecord(key,storyChoices().d04_public||'A',storyChoices().d04_public==='B'?'向受影响家庭公开已证实差异；住址与病情遮去，未确认责任另查。':'分别记录已证实差异与未确认责任，先补正事实再按职责调查。');});
+  if(key==='permit')capitalActionButton(b,sid,'登记有限范围、双方人员与续约条件',function(){c.permitUntil=state.totalDay+7;capitalRecord(key,'limited','争议路段暂缓封闭，旧隧道仍不准通行。王国方为奥蕾尔指派的正式核验人员，主角与莱娜为当事人与协助者；邻领方须由阿丽娅按本地权限确认。许可至第 '+c.permitUntil+' 天，逾期回公署续约；现场条件变化需重新核验。邻领确认及核验队、向导近期复测后才可给入谷安全线，本许可不是安全通行证。');});
+  if(key==='departure')capitalActionButton(b,sid,'收好疑点覆纸，保留现住意见空栏',function(){capitalRecord(key,'deferred','科林覆纸只记录不确定地形；现住意见留空，不能替居民作决定。允许延期启程、返家照料。第五幕尚未实装，后续需邻领权限复核与近期路线复测，不凭旧图穿隧道。');});
+  return b;
+}
+function openCapitalSite(site){
+  var entries=STORY_ENTRIES.filter(function(e){return e.workSite===site;}),c=capitalChapterState();
+  openWindow({id:'capital_site',kind:'story',title:MS1_SITE_INFO[site][0],build:function(b){
+    b.appendChild(el('p','muted','按现场进度办理；尚未具备的许可与材料会逐项说明。提前来过不等于已办理。'));
+    entries.forEach(function(e){b.appendChild(mkBtn((storySceneSeen(e.storyScene)?'回看 ':'办理 ')+e.storyScene+' · '+e.label,'primary',function(){openStoryScene(e.storyScene);}));});
+    if(site==='ms1_capital_letters'&&c.records.lodging){
+      b.appendChild(el('p',null,'当前会面：第 '+c.appointmentDay+' 天 '+Math.floor(c.appointmentMinute/60)+':'+String(c.appointmentMinute%60).padStart(2,'0')+'。可以改约，不自动过夜。'));
+      ['今日空档','明天午后'].forEach(function(v,i){b.appendChild(mkBtn('改约'+v,'sm',function(){if(!storyCNear('S040'))return;performAction({point:storyEntryForScene('S040'),minutes:5,apply:function(){c.appointmentDay=state.totalDay+i;c.appointmentMinute=i?720:Math.floor(state.timeMinutes);}});}));});
+    }
+    if(site==='ms1_capital_desk'&&c.records.permit){
+      b.appendChild(el('p','panel-box','许可有效至第 '+c.permitUntil+' 天；仍须邻领确认与近期安全复测。'));
+      if(state.totalDay>c.permitUntil)b.appendChild(mkBtn('重新核对范围并续约七天','primary',function(){performAction({point:storyEntryForScene('S047'),minutes:10,guard:function(){return state.totalDay>c.permitUntil;},apply:function(){c.permitUntil=state.totalDay+7;}});}));
+    }
+  },actions:[{label:'关闭',close:true}]});
+}
+
 function newStoryState() {
   return {
     started: false,
@@ -2069,6 +2746,7 @@ function newStoryState() {
     pineChapter: newPineChapterState(),
     tideWork: newTideWorkState(),
     tideChapter: newTideChapterState(),
+    capitalChapter: newCapitalChapterState(),
     choices: {},
     flags: {},
     lenaStance: '',
@@ -2090,6 +2768,7 @@ function normalizeStory(raw) {
   d.pineChapter = normalizePineChapter(raw.pineChapter);
   d.tideWork = normalizeTideWork(raw.tideWork);
   d.tideChapter = normalizeTideChapter(raw.tideChapter);
+  d.capitalChapter = normalizeCapitalChapter(raw.capitalChapter);
   d.act = isInt(raw.act) && raw.act >= 0 ? raw.act : 0;
   if (raw.tasks && typeof raw.tasks === 'object') {
     for (var k in raw.tasks) {
@@ -2168,6 +2847,8 @@ function normalizeStory(raw) {
     var r = d.tideChapter.records[k], id = 'tide_chapter_' + k;
     d.evidence[id] = { id: id, title: TIDE_CHAPTER_ACTIONS[k].title, source: r.source, day: r.day };
   });
+  Object.keys(d.evidence).forEach(function(k){if(k.indexOf('capital_chapter_')===0)delete d.evidence[k];});
+  Object.keys(d.capitalChapter.records).forEach(function(k){var r=d.capitalChapter.records[k],id='capital_chapter_'+k;d.evidence[id]={id:id,title:CAPITAL_ACTIONS[k],source:r.source,day:r.day};});
   return d;
 }
 
@@ -2192,7 +2873,7 @@ function storySceneFinished(id) {
   /* 只读：判断一个场次演没演完，不该顺手在存档里留下一条场次记录。 */
   if (!rec) return false;
   if (def.task.indexOf('MQ1-B') === 0) return rec.seen === true;
-  if (def.task.indexOf('MQ1-C') === 0) return rec.seen === true;
+  if (def.task.indexOf('MQ1-C') === 0 || def.task.indexOf('MQ1-D') === 0) return rec.seen === true;
   return rec.idx >= (def.lines || []).length;
 }
 function storySceneSeen(id) { return !!storyState().scenes[id] && storyState().scenes[id].seen === true; }
@@ -2210,6 +2891,7 @@ function storyTaskUnlocked(t) {
   if (t.id === 'MQ1-P01') return true;
   if (t.id === 'MQ1-B01') return !storyBEntryReason();
   if (t.id === 'MQ1-C01') return !storyCEntryReason();
+  if (t.id === 'MQ1-D01') return !storyDEntryReason();
   if (t.id === 'MQ1-A01') {
     if (storyState().tasks['MQ1-P04'] !== 'done') return false;
     if (!storyEntryAchievement().ok) return false;
@@ -2561,6 +3243,7 @@ function openStoryCReview(sid) {
   var def = storySceneDef(sid);
   openWindow({ id: 'story_c_review', kind: 'story', wide: true, title: sid + ' · 已演回看', build: function (b) {
     b.appendChild(el('p', 'muted', '只回看已经演过的场次；不改选择、日期或奖励。'));
+    if(def.task.indexOf('MQ1-D')===0){var cr=capitalChapterState().records[capitalKey(sid)];if(cr)b.appendChild(el('p','panel-box',cr.text));}
     def.lines.forEach(function (l) {
       if (!storyLineVisible(l)) return;
       b.appendChild(el('p', null, l.choice ? '当时选择：' + storyChoiceText(l, storyChoices()[l.choice]) : l.step ? '已办理：' + l.text : (l.who ? l.who + '：' : '') + l.text));
@@ -2589,6 +3272,13 @@ function openStoryScene(sceneId) {
     if (storyTaskStatus(ct.id) === 'locked') { openStoryLocked(ct); return; }
     if (cnext && cnext !== sceneId) { openStoryOrderPanel(ct, cnext, storySceneDef(cnext), sceneId); return; }
     if (!storyCNear(sceneId)) { openStoryTaskPanel(ct); return; }
+  }
+  if (def.task.indexOf('MQ1-D') === 0) {
+    if(storySceneSeen(sceneId)){openStoryCReview(sceneId);return;}
+    var dt=storyTask(def.task),dn=storyNextScene(dt);
+    if(storyDEntryReason() || storyTaskStatus(dt.id)==='locked'){openStoryLocked(dt);return;}
+    if(dn && dn!==sceneId){openStoryOrderPanel(dt,dn,storySceneDef(dn),sceneId);return;}
+    if(!storyCNear(sceneId)){openStoryTaskPanel(dt);return;}
   }
   var st = storyState();
   st.started = true;
@@ -2686,6 +3376,7 @@ function buildStoryStep(line, sceneId) {
   else if (line.mode === 'reception') wrap.appendChild(buildStoryReceptionStep(line, sceneId));
   else if (line.mode === 'pine') wrap.appendChild(buildStoryBStep(line, sceneId));
   else if (line.mode === 'tide') wrap.appendChild(buildStoryCStep(line, sceneId));
+  else if (line.mode === 'capital') wrap.appendChild(buildStoryDStep(line, sceneId));
   else wrap.appendChild(el('p', 'muted', '这一步还没有实装。'));
   return wrap;
 }
@@ -2882,6 +3573,7 @@ function storyFinishScene(sceneId) {
     var cmissing = storyCMissing(sceneId);
     if (cmissing) { toast(cmissing); refreshWindow(); return; }
   }
+  if(def.task.indexOf('MQ1-D')===0 && (storySceneProgress(sceneId).idx<def.lines.length || !storyCNear(sceneId) || storyDMissing(sceneId))){toast(storyDMissing(sceneId)||'请在现场完成本场。');return;}
   var rec = storySceneProgress(sceneId);
   rec.seen = true;
   rec.day = state.totalDay;
@@ -2905,7 +3597,7 @@ function storyFinishScene(sceneId) {
   if (next) {
     var nextDef = storySceneDef(next);
     /* 下一场在别的场景：不替玩家瞬移，写清地点让玩家自己走过去 */
-    if (nextDef && ((def.task.indexOf('MQ1-B') === 0) || (def.task.indexOf('MQ1-C') === 0) || (storySceneLoc(next) !== storySceneLoc(sceneId) && storySceneLoc(next) !== 'memory'))) {
+    if (nextDef && ((def.task.indexOf('MQ1-B') === 0) || (def.task.indexOf('MQ1-C') === 0) || (def.task.indexOf('MQ1-D') === 0) || (storySceneLoc(next) !== storySceneLoc(sceneId) && storySceneLoc(next) !== 'memory'))) {
       openStoryNextPlace(t, next, nextDef);
       return;
     }
@@ -3110,6 +3802,7 @@ function openStoryLocked(t) {
 function storyLockReason(t) {
   if (t.id === 'MQ1-B01') return storyBEntryReason() || '条件已满足。';
   if (t.id === 'MQ1-C01') return storyCEntryReason() || '条件已满足。';
+  if (t.id === 'MQ1-D01') return storyDEntryReason() || '条件已满足。';
   if (t.id === 'MQ1-A01') {
     if (storyState().tasks['MQ1-P04'] !== 'done') return '先完成序章：' + storyTaskTitle('MQ1-P04') + '。';
     var ach = storyEntryAchievement();
@@ -3226,9 +3919,9 @@ function storyNextStepText(taskId) {
 
 function openStoryLog() {
   openWindow({
-    id: 'story_log', kind: 'story', wide: true, title: '主线 · 长风有归处（至第三幕）',
+    id: 'story_log', kind: 'story', wide: true, title: '主线 · 长风有归处（至第四幕）',
     build: function (b) {
-      b.appendChild(el('p', 'muted', '第九版第一部主线。序章至第三幕共 19 个任务已实装；第四幕及以后仍在制作中，这里如实写「未实装」。'));
+      b.appendChild(el('p', 'muted', '第九版第一部主线。序章至第四幕共 24 个任务已实装；第五幕及以后仍在制作中，这里如实写「未实装」。'));
       var st = storyState();
       var curAct = 0;
       STORY_TASKS.forEach(function (t) {
@@ -3278,6 +3971,7 @@ function openStoryLog() {
         var r = pineChapterState().records[k];
         b.appendChild(el('p', 'story-evidence', '第 ' + r.day + ' 天 · ' + r.source + '：' + r.text));
       });
+      Object.keys(capitalChapterState().records).forEach(function(k){var r=capitalChapterState().records[k];b.appendChild(el('p',null,CAPITAL_ACTIONS[k]+' · 第 '+r.day+' 天 · '+r.source+'：'+r.text));});
       Object.keys(tideChapterState().records).forEach(function (k) {
         var r = tideChapterState().records[k];
         b.appendChild(el('p', 'story-evidence', '第 ' + r.day + ' 天 · ' + r.source + '：' + r.text));
@@ -23249,6 +23943,7 @@ function openPineWorkSite(site) {
   }, actions: [{ label: '关闭', kind: 'ghost', close: true }] });
 }
 function openMs1Site(site) {
+  if(CAPITAL_SITES.indexOf(site)>=0){openCapitalSite(site);return;}
   if (PINE_WORK_SITES[site]) { openPineWorkSite(site); return; }
   if (TIDE_WORK_SITES[site]) { openTideWorkSite(site); return; }
   var info = MS1_SITE_INFO[site];
@@ -25272,6 +25967,7 @@ window.__MOSS__ = {
   storyBEntryReason: storyBEntryReason, storyCEntryReason: storyCEntryReason,
   storyBMissing: storyBMissing, storyCMissing: storyCMissing,
   storyBNear: storyBNear, storyCNear: storyCNear,
+  capitalChapterState: capitalChapterState, storyDEntryReason: storyDEntryReason, storyDMissing: storyDMissing,
   TIDE_WORK_ACTIONS: TIDE_WORK_ACTIONS, TIDE_CHAPTER_ACTIONS: TIDE_CHAPTER_ACTIONS,
   openTideWorkSite: openTideWorkSite, openStoryCReview: openStoryCReview,
   wetlandLifeState:wetlandLifeState, professionalLifeState:professionalLifeState, militaryLifeState:militaryLifeState,
