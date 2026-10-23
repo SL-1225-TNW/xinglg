@@ -10,6 +10,9 @@ output/playwright/*.err
 output/*.log
 output/*.err
 
+# 自然串联诊断检查点；最终验收始终从新档运行
+output/natural-story-*.json
+
 # 只在用例失败时才写出的排查截图，不是验收证据
 output/playwright/guide-failed.png
 

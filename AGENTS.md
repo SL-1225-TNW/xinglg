@@ -125,7 +125,7 @@ node tests/build-single-file.mjs           # 重建入库产物
 node tests/prepare-site.mjs                # 生成 site/（CI 用，不入库）
 cd tests
 node run-ci.mjs --quick                    # 快速层：5 步（语法/重建/站点/单文件冒烟）
-node run-ci.mjs                            # 完整两层（5 快速步 + 84 条浏览器层 + 26 条单文件复跑 = 115 次脚本运行）
+node run-ci.mjs                            # 完整两层（5 快速步 + 87 条浏览器层 + 29 条单文件复跑 = 121 次脚本运行）
 node run-ci.mjs --only=run-m1-tide-story   # 单条
 node ../tests/run-m1-tide-story.mjs --single-file   # 单文件轮
 ```
