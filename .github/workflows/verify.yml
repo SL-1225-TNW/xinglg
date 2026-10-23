@@ -202,6 +202,31 @@ jobs:
           node tests/run-m1-tide-story.mjs
           node tests/run-m1-tide-story.mjs --single-file
 
+  m1-natural-story:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright test dependency
+        run: npm install --no-save --no-package-lock playwright@1.63.0
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build offline game
+        run: node tests/build-single-file.mjs
+      - name: Verify civil passage and care letters in both builds
+        run: |
+          node tests/run-m1-civil-road.mjs
+          node tests/run-m1-civil-road.mjs --single-file
+          node tests/run-m1-letter-care.mjs
+          node tests/run-m1-letter-care.mjs --single-file
+      - name: Play three acts from fresh saves in both builds
+        run: |
+          node tests/run-m1-natural-story.mjs
+          node tests/run-m1-natural-story.mjs --single-file
+
   r3-natural-route:
     runs-on: ubuntu-latest
     timeout-minutes: 30
