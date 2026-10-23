@@ -21956,7 +21956,8 @@ function extendedGateAllowed(key){var p=professionalLifeState(),w=wetlandLifeSta
   if(key==='cloud_pass')return (projectAcceptedFlag(p)&&p.trust>0)||p.passes.visit;
   /* 接任务需要第二层授权；指挥军队需要第三层，只看军事登记与委任 */
   if(key==='border_camp')return projectAcceptedFlag(p)||p.passes.commission||professionalCanCommand();
-  if(key==='old_road')return !!m.campaign.active||!!m.campaign.reported||p.passes.commission;
+  /* 民用核验行程可借古道通行；不因此取得巡路任务或军事权限。 */
+  if(key==='old_road')return !!m.campaign.active||!!m.campaign.reported||p.passes.commission||!!(p.passes.visit&&storyHasEvidence('civil_check'));
   if(key==='neighbor')return !!(m.campaign.reported&&m.neighbor.oldroadVerified)||p.passes.visit;
   return false;
 }
@@ -21979,7 +21980,7 @@ function extendedGateReason(key){var p=professionalLifeState(),w=wetlandLifeStat
   if(key==='waterworks')return '先验收矿山第二层排水或风铃磨坊水轮 —— 任一条走通就能进场；也可以先核验河港货单。';
   if(key==='cloud_pass')return '先完成水利站跨地点工程合同并取得工程资历；或让工程、商旅、巡林三条路线中的任意一条带你过关口。';
   if(key==='border_camp')return '先完成水利站工程合同；或先拿到一条路线的正式接任务授权，营地才受理巡防登记。';
-  if(key==='old_road')return '先接受云峰关口的巡路任务；或先取得一条路线的接任务授权，古道站才会对你开放。';
+  if(key==='old_road')return '民用通行需到访资格与宫城的民用资料核验函；巡路任务或接任务授权也可通行。民用通行不授予军事任务权限。';
   if(key==='neighbor')return '先完成关口巡防任务并在古道站核验两份驿路记录；或先取得任意一条路线的到访授权，边城市场只认这个。';
   return '这条路线尚未开放。';
 }
@@ -23353,7 +23354,7 @@ function extendedSceneAllowed(s,region){
   }
   if(region==='cloud_pass')return projectAcceptedFlag(p)&&p.trust>0||!!passes.visit;
   if(region==='border_camp')return projectAcceptedFlag(p)||!!passes.commission||(m.registered&&MIL_COMMAND_RANKS.indexOf(m.rank)>=0);
-  if(region==='old_road')return !!m.campaign.active||!!m.campaign.reported||!!passes.commission;
+  if(region==='old_road')return !!m.campaign.active||!!m.campaign.reported||!!passes.commission||!!(passes.visit&&s.story&&s.story.evidence&&s.story.evidence.civil_check);
   if(region==='neighbor')return !!m.campaign.reported&&!!m.neighbor.oldroadVerified||!!passes.visit;
   return true;
 }
