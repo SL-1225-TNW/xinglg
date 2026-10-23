@@ -80,6 +80,7 @@ const BROWSER = [
   'run-m1-civil-road.mjs',
   'run-m1-letter-care.mjs',
   'run-m1-natural-story.mjs',
+  'run-m2-capital-story.mjs',
   /* 探索线：森林/矿山三道闸门、三层矿洞、采集再生、存档重载与钢制工具，
      脚本内部自带 index.html + 单文件版两轮 */
   'run-exploration.mjs',
@@ -156,6 +157,7 @@ run('run-m1-tide-story-single-file', path.join(here, 'run-m1-tide-story.mjs'), [
 run('run-m1-civil-road-single-file', path.join(here, 'run-m1-civil-road.mjs'), ['--single-file']);
 run('run-m1-letter-care-single-file', path.join(here, 'run-m1-letter-care.mjs'), ['--single-file']);
 run('run-m1-natural-story-single-file', path.join(here, 'run-m1-natural-story.mjs'), ['--single-file']);
+run('run-m2-capital-story-single-file', path.join(here, 'run-m2-capital-story.mjs'), ['--single-file']);
 run('run-fixes-single-file', path.join(here, 'run-fixes.mjs'), ['--single-file']);
 
 console.log(failed ? `\n共 ${failed} 项失败。` : '\n两层全部通过。');

@@ -227,6 +227,25 @@ jobs:
           node tests/run-m1-natural-story.mjs
           node tests/run-m1-natural-story.mjs --single-file
 
+  m2-capital-story:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright test dependency
+        run: npm install --no-save --no-package-lock playwright@1.63.0
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build offline game
+        run: node tests/build-single-file.mjs
+      - name: Verify capital chapter and existing entrances in both builds
+        run: |
+          node tests/run-m2-capital-story.mjs
+          node tests/run-m2-capital-story.mjs --single-file
+
   r3-natural-route:
     runs-on: ubuntu-latest
     timeout-minutes: 30
