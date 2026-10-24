@@ -32,7 +32,10 @@ if (html.includes('styles.css') || html.includes('src="game.js"')) {
 }
 
 const out = path.join(ROOT, '苔芽农场-单文件版.html');
-fs.writeFileSync(out, html, 'utf8');
+// 快速层与站点构建会连续调用本脚本；内容相同就不重复打开写句柄。
+// 仍先完成全部内联校验；实际变更必须写入，任何读写错误仍正常报错。
+const unchanged = fs.existsSync(out) && fs.readFileSync(out, 'utf8') === html;
+if (!unchanged) fs.writeFileSync(out, html, 'utf8');
 const kb = Math.round(fs.statSync(out).size / 1024);
 console.log(`已生成 ${path.basename(out)}（${kb} KB）`);
 console.log('外部依赖检查：' + (/https?:\/\/(?!www\.w3\.org)/.test(html.replace(/<!--[\s\S]*?-->/g, '')) ? '仍有 http(s) 外链' : '无 http(s) 外链'));
