@@ -60,7 +60,7 @@ try {
 
 - 串行跑：`cd tests; node run-xxx.mjs`（`run-ci.mjs` 也是逐条 `spawnSync`）。**不要并行起两个浏览器作业** ——
   会撞出 `Page crashed` / `Target crashed` 的假回归。开工先 `node tests/env-check.mjs`，它会报是否已有浏览器作业。
-- 全量/分批用 `node tests/run-ci.mjs --status` 看台账（x/123）、`--resume` 续跑；长跑期间别再手动起浏览器套件。
+- 全量/分批用 `node tests/run-ci.mjs --status` 看台账（x/103）、`--resume` 续跑；长跑期间别再手动起浏览器套件。
 - Windows 沙箱里 Playwright 可能直接 `browserType.launch: spawn EPERM`（chrome-headless-shell 用 `--remote-debugging-pipe`，
   沙箱禁命名管道）。这是环境拒绝，不是代码回归；换到不受限的文件策略再跑。
 - 截图写到 `output/playwright/`（按 `fileURLToPath(import.meta.url)` 定位，别用相对路径——`run-ci` 的 cwd 是 `tests/`）。
@@ -69,11 +69,12 @@ try {
 
 ## 挂进 CI（以 `tests/run-ci.mjs` 当前代码为准）
 
-- **浏览器层**是 `BROWSER` 字符串数组，直接加一项 `'run-xxx.mjs'`；**单文件复跑**在下方列表加 `run('run-xxx-single-file', path.join(here, 'run-xxx.mjs'), ['--single-file'])`。
+- **浏览器层**是 `BROWSER_FILES` 字符串数组，直接加一项 `'run-xxx.mjs'`；**单文件复跑**是 `SINGLE_FILES` 数组，只挂**产物敏感**的套件（剧情 UI、门洞与出口、旧档迁移、存档快照、跨境门槛、触屏布局、跨系统修复回归）——纯逻辑与长程自然串联不进单文件层：产物与源码的 JS 逐字相同，复跑一遍不增加产物风险，却要把全量拖长。
+- 同一段路的两条自然套件只留覆盖更全的那条进 CI（`run-m1-natural-story` 是 `run-m2-natural-story` 的真子集，已退出 CI，文件保留可手动跑）。
 - 快速层的语法检查会自动 `node --check` 全部 `tests/*.mjs`，**临时探针文件也会被检查**，交付前清掉 `tmp-*.mjs`。
-- 层数/条数以 `node tests/run-ci.mjs --dump-steps` 为准（当前 5 快速＋88 浏览器＋30 单文件＝123）；历史轮的「121 组」是旧口径，不是现状。
-- 挂完先 `node tests/run-ci.mjs --only=run-xxx` 单条验证；全量交给台账跑（`--status` 看 x/123），中断就 `--resume`，不必为一条套件从头重跑。
-- 通过判据：同 treeHash 台账 123 阶段全绿＋末行「两层全部通过。」＋`output/ci-exit.log` 退出码 0；单条套件看自己的末行 `PASS … N 项通过`。
+- 层数/条数以 `node tests/run-ci.mjs --dump-steps` 为准（当前 5 快速＋88 浏览器＋10 单文件＝103）；历史轮的「121 组」「125 阶段」是旧口径，不是现状。
+- 挂完先 `node tests/run-ci.mjs --only=run-xxx` 单条验证；**日常迭代只跑受影响的套件，全量留给切片收口**；全量交给台账跑（`--status` 看 x/103），中断就 `--resume`，不必为一条套件从头重跑。
+- 通过判据：同 treeHash 台账 103 阶段全绿＋末行「两层全部通过。」＋`output/ci-exit.log` 退出码 0；单条套件看自己的末行 `PASS … N 项通过`。
 
 ## 完工检查
 

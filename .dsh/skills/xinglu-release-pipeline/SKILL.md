@@ -27,7 +27,7 @@ node tests\prepare-site.mjs           # 生成 site/（CI 用，不入库）
 
 ## 完整两层 CI：判据是台账，不是一次进程
 
-2026-10-25 起完成度记在 `output/ci-journal.json`：**同一 treeHash** 的 123 条阶段（5 快速＋88 浏览器＋30 单文件）全绿，
+2026-10-25 起完成度记在 `output/ci-journal.json`：**同一 treeHash** 的 103 条阶段（5 快速＋88 浏览器＋10 单文件）全绿，
 再叠加末行「两层全部通过。」与 `output/ci-exit.log` 的退出码 0。允许跨多次进程；中断时台账只记已完成步骤。
 
 ### 0. 预检（开工第一条）
@@ -46,13 +46,17 @@ node tests/run-ci.mjs --quick
 ```
 
 快速层 5 步：`node --check game.js`、全部 `tests/*.mjs` 语法（含临时探针，交付前清掉 `tmp-*.mjs`）、单文件重建、站点产物、
-单文件冒烟（6 项）。合计 5 个快速阶段＋88 条浏览器层＋30 条单文件复跑＝123 个阶段（118 次浏览器作业）。
+单文件冒烟（6 项）。合计 5 个快速阶段＋88 条浏览器层＋10 条单文件复跑＝103 个阶段（98 次浏览器作业）。
+单文件层只留产物敏感的十类（剧情 UI、门洞与出口、旧档迁移、存档快照、跨境门槛、触屏布局、跨系统修复回归）；
+长程自然串联只在浏览器层跑一条（`run-m2-natural-story`），`run-m1-natural-story` 是它的真子集、已退出 CI。
+2026-10-25 实测：125 阶段那轮跑到 2 小时 18 分时单文件层连续 4 步被系统杀掉（资源耗尽，非断言失败），
+收到 103 阶段后一轮约 100 分钟；再压只能靠浏览器层分片并行。
 
 ### 2. 全量：交给计划任务，会话只观察
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tests\gate-detached.ps1 -Action start     # 触发计划任务 MossFarmCI（跑 node tests\run-ci.mjs --resume）
-node tests/run-ci.mjs --status                            # x/123、当前步骤、ETA、失败、未跑
+node tests/run-ci.mjs --status                            # x/103、当前步骤、ETA、失败、未跑
 powershell -NoProfile -ExecutionPolicy Bypass -File tests\gate-detached.ps1 -Action status   # 台账＋心跳＋退出码汇总
 ```
 
@@ -65,15 +69,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\gate-detached.ps1 -Act
 
 ### 3. 中断、续跑与止损
 
-- 中断（无末行、心跳停、进程没了）既不是通过也不是产品红：台账只记已完成步骤，写「分层通过 x/123（原因：…，下一步：…）」。
+- 中断（无末行、心跳停、进程没了）既不是通过也不是产品红：台账只记已完成步骤，写「分层通过 x/103（原因：…，下一步：…）」。
 - 源码/测试/产物没变就直接 `--resume`（再 `-Action start` 或手动跑）；变了 treeHash 就变，旧台账作废、重新记账。
 - `--from=<step-id>` 从某步重跑、`--stop-after=N` 只跑 N 个阶段（验证续跑/分批）、`--dump-steps` 查 step-id。
-- **连续 2 次非产品中断** → 必须改 OS 级执行方式（`gate-detached.ps1`）再 `--resume`；**连续 3 次** → 拆层出证据（写「分层通过 x/123」＋各步日志），不得再从头重跑。
+- **连续 2 次非产品中断** → 必须改 OS 级执行方式（`gate-detached.ps1`）再 `--resume`；**连续 3 次** → 拆层出证据（写「分层通过 x/103」＋各步日志），不得再从头重跑。
 - 产品/断言失败仍按原规则修，不靠改断言变绿。
 
 ### 4. 长跑期间
 
-每 15–20 分钟或每个阶段簇报一次 x/123、ETA、风险、现在能交什么；任一验证单元通过就先同步/提交，不等全量。
+每 15–20 分钟或每个阶段簇报一次 x/103、ETA、风险、现在能交什么；任一验证单元通过就先同步/提交，不等全量。
 
 ## 文档同步（发布证据的一部分）
 
@@ -104,7 +108,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\gate-detached.ps1 -Act
 - [ ] `node tests/env-check.mjs` 通过：无 EPERM、无并行浏览器作业、心跳不是中断状态
 - [ ] `node --check game.js` 通过
 - [ ] 快速层通过；单文件冒烟 6 项通过
-- [ ] `node tests/run-ci.mjs --status` 显示同 treeHash 123/123 全绿，末行「两层全部通过。」，`output/ci-exit.log` 退出码 0
+- [ ] `node tests/run-ci.mjs --status` 显示同 treeHash 103/103 全绿，末行「两层全部通过。」，`output/ci-exit.log` 退出码 0
 - [ ] 全量是在**冻结产物**上跑的（运行期没改源码/测试/产物，treeHash 未变）
 - [ ] 本次新增/修改的套件都挂了 `--single-file` 复跑
 - [ ] `node tests/check-docs.mjs --regen` 绿；状态文档由生成器更新且人工节完好；README/待办/plan 与数字一致

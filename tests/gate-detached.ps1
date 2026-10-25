@@ -250,9 +250,9 @@ function Show-Status {
             Write-Host ('台账    ：没有当前 tree {0} 的记录' -f (Get-ShortHash $treeHash))
             $unrun = -1
         } else {
-            # 收口判据固定 123 步；heartbeat.step.total 只是「本次运行范围」
-            #（--quick/--only/--stop-after 会小于 123），不能当分母。
-            $total = 123
+            # 收口判据固定 103 步（5 快速＋88 浏览器＋10 单文件）；heartbeat.step.total 只是
+            #「本次运行范围」（--quick/--only/--stop-after 会小于 103），不能当分母。
+            $total = 103
             if ($stepTotal -gt $total) { $total = $stepTotal }
             if ($null -ne $tree.steps) {
                 foreach ($sp in $tree.steps.PSObject.Properties) {
@@ -275,8 +275,8 @@ function Show-Status {
                 Write-Host '失败    ：无'
             }
             Write-Host ('未跑    ：{0} 步' -f $unrun)
-            if ($stepTotal -gt 0 -and $stepTotal -lt 123) {
-                Write-Host ('范围提示：本次运行 total={0} 步（--quick/--only/--stop-after 等过滤/截断运行不构成全量收口判据，全量口径 123 步）' -f $stepTotal) -ForegroundColor Yellow
+            if ($stepTotal -gt 0 -and $stepTotal -lt 103) {
+                Write-Host ('范围提示：本次运行 total={0} 步（--quick/--only/--stop-after 等过滤/截断运行不构成全量收口判据，全量口径 103 步）' -f $stepTotal) -ForegroundColor Yellow
             }
         }
     }
