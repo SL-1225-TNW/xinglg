@@ -24503,7 +24503,10 @@ ms1Path.exits = [{ x: 0, y: 14, to: 'ms1_pine_village', tx: 38, ty: 14 }, { x: 4
 ms1Fork.exits = [{ x: 0, y: 12, to: 'ms1_pine_path', tx: 40, ty: 6, gate: 'ms1_echo' }, { x: 16, y: 0, to: 'ms1_echo_village', tx: 16, ty: 11, gate: 'ms1_echo' }, { x: 39, y: 20, to: 'ms1_echo_route', tx: 1, ty: 12, gate: 'ms1_echo' }];
 ms1Valley.exits = [{ x: 16, y: 0, to: 'ms1_echo_fork', tx: 16, ty: 11, gate: 'ms1_echo' }, { x: 37, y: 12, to: 'ms1_echo_route', tx: 36, ty: 12, gate: 'ms1_echo' }];
 ms1Route.exits = [{ x: 0, y: 12, to: 'ms1_echo_village', tx: 36, ty: 12, gate: 'ms1_echo' }, { x: 10, y: 25, to: 'ms1_echo_fork', tx: 36, ty: 20, gate: 'ms1_echo' }];
-ms1Tide.exits = [{ x: 0, y: 12, to: 'port', tx: 32, ty: 18, gate: 'ms1_tide' }, { x: 18, y: 0, to: 'ms1_capital_street', tx: 18, ty: 28, gate: 'ms1_capital' }, { x: 43, y: 16, to: 'ms1_tide_seawall', tx: 35, ty: 12 }];
+/* 落点不能压在目标场景的出口格上：checkExit 每帧按当前位置判定，
+   踩在出口格上会被立刻弹回原场景，人还没站稳就被送走。
+   河港的泊位出口在 (32,18)，从码头走回河港要落在旁边的 (31,18)。 */
+ms1Tide.exits = [{ x: 0, y: 12, to: 'port', tx: 31, ty: 18, gate: 'ms1_tide' }, { x: 18, y: 0, to: 'ms1_capital_street', tx: 18, ty: 28, gate: 'ms1_capital' }, { x: 43, y: 16, to: 'ms1_tide_seawall', tx: 35, ty: 12 }];
 /* 海堤的出口不能和落点重合：落点正压在出口格上，玩家会被立刻弹回去。 */
 ms1Seawall.exits = [{ x: 36, y: 12, to: 'ms1_tide_docks', tx: 42, ty: 16 }];
 ms1Capital.exits = [{ x: 18, y: 29, to: 'ms1_tide_docks', tx: 18, ty: 1, gate: 'ms1_capital' }];
