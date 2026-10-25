@@ -13,6 +13,15 @@ output/*.err
 # 自然串联诊断检查点；最终验收始终从新档运行
 output/natural-story-*.json
 
+# CI 台账/心跳/锁/步骤日志：本机跨进程续跑状态，不是入库证据（文档只记 treeHash 与汇总）
+output/ci-journal.json
+output/ci-journal*.json
+output/ci-journal.lock
+output/ci-heartbeat.json
+output/ci-exit.log
+output/ci-step-logs/
+output/ci-run-*.log
+
 # 只在用例失败时才写出的排查截图，不是验收证据
 output/playwright/guide-failed.png
 
