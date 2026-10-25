@@ -200,6 +200,11 @@ ok('娜汀在医舍里', clinic.inside);
 console.log('\n【3】王都 · 驿站街与钟楼前庭');
 /* 先从外海堤走回码头，再沿皇家驿路走进王都 */
 ok('从外海堤走回码头', await walkOut('ms1_tide_seawall', 'ms1_tide_docks'));
+/* 反方向也要走得通：码头→河港的落点曾经压在河港自己的泊位出口格上，
+   checkExit 每帧按当前位置判定，人会被立刻弹回码头，等于这条路不通。 */
+ok('从码头走回下游河港', await walkOut('ms1_tide_docks', 'port'));
+eq('走回下游河港', await scene(), 'port');
+ok('从河港再走回码头', await walkOut('port', 'ms1_tide_docks'));
 ok('沿皇家驿路走进王都', await walkOut('ms1_tide_docks', 'ms1_capital_street'));
 eq('进了王都驿站街', await scene(), 'ms1_capital_street');
 ok('行旅舍能进能出', await throughDoor('ms1_capital_street', 'ms1_capital_inn'));
@@ -266,6 +271,22 @@ const standOk = await p.evaluate(() => {
   return bad;
 });
 eq('新地点的操作台都站得住', standOk, []);
+
+/* 出口落点结构：落点不能压在目标场景的出口格上（checkExit 每帧按当前位置判定，
+   踩上去会被立刻弹回原场景），也不能落在实心格上（人会被卡住）。 */
+const landingBad = await p.evaluate(() => {
+  const M = window.__MOSS__, bad = [];
+  Object.keys(M.MAPS).forEach(sc => {
+    (M.MAPS[sc].exits || []).forEach(ex => {
+      if (!M.MAPS[ex.to]) return;
+      const hit = (M.MAPS[ex.to].exits || []).find(e => e.x === ex.tx && e.y === ex.ty);
+      if (hit) bad.push(sc + '→' + ex.to + ' 落点 ' + ex.tx + ',' + ex.ty + ' 压在出口格上');
+      if (M.isSolid(ex.to, ex.tx, ex.ty)) bad.push(sc + '→' + ex.to + ' 落点 ' + ex.tx + ',' + ex.ty + ' 是实心格');
+    });
+  });
+  return bad;
+});
+eq('所有出口落点都不压出口格、不落实心格', landingBad, []);
 
 ok('全程无控制台报错', r.errors.length === 0, r.errors.join('\n'));
 console.log('\nPASS 第九版新地点验收：' + checks + ' 项（' + (single ? '单文件版' : '源码') + '）');

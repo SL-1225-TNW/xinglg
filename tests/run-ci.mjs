@@ -130,6 +130,8 @@ const BROWSER_FILES = [
   'run-m1-letter-care.mjs',
   'run-m1-natural-story.mjs',
   'run-m2-capital-story.mjs',
+  /* 第九版第四幕自然串联：新档走到王都——河港接驳登记→潮汐港北口步行→十场现场办理 */
+  'run-m2-natural-story.mjs',
   /* 探索线：森林/矿山三道闸门、三层矿洞、采集再生、存档重载与钢制工具，脚本内部自带两轮 */
   'run-exploration.mjs',
   /* 探索线手机端：390×844 竖屏 + 触摸闸门与矿洞渲染 */
@@ -158,6 +160,7 @@ const SINGLE_FILES = [
   'run-m1-segment-travel.mjs', 'run-m1-cross-border.mjs', 'run-m1-pine-work.mjs',
   'run-m1-pine-story.mjs', 'run-m1-tide-story.mjs', 'run-m1-civil-road.mjs',
   'run-m1-letter-care.mjs', 'run-m1-natural-story.mjs', 'run-m2-capital-story.mjs',
+  'run-m2-natural-story.mjs',
   'run-fixes.mjs'
 ];
 
@@ -535,7 +538,7 @@ function statusReport() {
   if (t) {
     /* ETA 分三步：已知同名步骤的真实耗时为王；已知超长套件用经验值兜底；其余按层给经验值。
        不能只拿「已完成阶段的平均耗时」，否则先跑的几条 2 秒套件会把 ETA 算成 4 分钟。 */
-    const HEAVY = { 'browser/run-m1-natural-story': 1600, 'single/run-m1-natural-story': 1600 };
+    const HEAVY = { 'browser/run-m1-natural-story': 1600, 'single/run-m1-natural-story': 1600, 'browser/run-m2-natural-story': 2100, 'single/run-m2-natural-story': 2100 };
     const KIND_DEFAULT_SEC = { fast: 8, browser: 14, single: 14 };
     const known = new Map();
     for (const tree of Object.values(j.trees || {})) {
