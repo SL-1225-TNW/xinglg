@@ -17,6 +17,9 @@ try {
    交付记录（R4／R5 的专项项数与证据链接都在里面）。重跑生成器时原样保留，否则一次
    重新生成就会把验收证据抹掉——那不叫同步文档。 */
 const OUT = fileURLToPath(new URL('../docs/feature-status.md', import.meta.url));
+/* --stdout：只把生成内容打到 stdout、不写盘（tests/check-docs.mjs --regen 用）。
+   默认行为不变：写 docs/feature-status.md，并在 stdout 打一行运行时盘点。 */
+const STDOUT_ONLY = process.argv.includes('--stdout');
 const TAIL_MARK = '## 玩法验收边界（人工审阅）';
 const DEFAULT_TAIL = [
   TAIL_MARK, '',
@@ -37,5 +40,12 @@ const lines = ['# 功能状态表', '', ...(statusLine ? [statusLine, ''] : []),
   '','## 公共传送节点','','| 节点 ID | 名称 | 场景 ID |','|---|---|---|',
   ...snapshot.nodes.map(n=>`| ${n.id} | ${n.name} | ${n.sceneId} |`),
   '', tail];
-fs.writeFileSync(OUT, lines.join('\n'));
-console.log(`运行时盘点：地图 ${snapshot.regions.length}；场景 ${snapshot.scenes.length}；传送节点 ${snapshot.nodes.length}`);
+const generated = lines.join('\n');
+const summary = `运行时盘点：地图 ${snapshot.regions.length}；场景 ${snapshot.scenes.length}；传送节点 ${snapshot.nodes.length}`;
+if (STDOUT_ONLY) {
+  process.stderr.write(`${summary}\n`);
+  process.stdout.write(generated);
+} else {
+  fs.writeFileSync(OUT, generated);
+  console.log(summary);
+}
