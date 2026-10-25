@@ -19,6 +19,16 @@ description: 为苔芽农场（单文件浏览器经营游戏，game.js 约 2.6 
 
 写新套件时先问：这条断言证明的是**逻辑正确**、**玩家能走到**，还是**手感可接受**？三层不要混写。
 
+## 套件分层（2026-10-25）
+
+| 层 | 典型内容 | 断言口径 | 项数怎么用 |
+| --- | --- | --- | --- |
+| 夹具套件 | 固定 seed／预置存档／直接给状态，确定性 | 精确项数（如「195 项通过」） | 可写进文档与计划 |
+| 自然入口套件 | 真实按键/按钮从头走到尾，含过夜与分支 | 只断言「任务全通／状态推进／无浏览器错误」 | 当元数据，不进正文（会漂移：279/291/289） |
+
+- 时间/体力预算类算术断言下沉快速夹具，不让约 27 分钟的自然路线承担精准算术——自然路线负责「玩家能不能走到」，不负责「数值刚好是 37」。
+- 两层都要支持 `--single-file`；挂进 `run-ci` 后由 `output/ci-journal.json` 记录，不再要求整轮一次跑完。
+
 ## 骨架
 
 ```js
@@ -42,33 +52,37 @@ try {
 2. **不要读整个容器做"含某文案"判断**。`.win-body` 里包含顶部分页网格（每页标题都印着），`winText()` 一旦读整窗，
    「第 3 页是果酱加工」这种断言停在哪页都能过 —— 这是已发生过的假绿。
 3. **计数要有时源**：`Report` 的通过项数就是这个套件的验收条数，写进文档、别手抄。
-4. **幂等与跨日各写一条**：重复点同一按钮、Escape 再进、次日重开面板，都是真实玩家会做的事。
-5. 断言信息写清实际值/期望值（`Report.eq` 已带），失败时要能直接看出差在哪。
+4. **汇总行约定**（台账与文档机检会解析）：成功末行写 `PASS … N 项通过`（源码轮/单文件轮各一句），失败摘要写 `通过 N 项，失败 M 项`；不要只写「完成」。
+5. **幂等与跨日各写一条**：重复点同一按钮、Escape 再进、次日重开面板，都是真实玩家会做的事。
+6. 断言信息写清实际值/期望值（`Report.eq` 已带），失败时要能直接看出差在哪。
 
 ## 运行时环境
 
 - 串行跑：`cd tests; node run-xxx.mjs`（`run-ci.mjs` 也是逐条 `spawnSync`）。**不要并行起两个浏览器作业** ——
-  会撞出 `Page crashed` / `Target crashed` 的假回归。
+  会撞出 `Page crashed` / `Target crashed` 的假回归。开工先 `node tests/env-check.mjs`，它会报是否已有浏览器作业。
+- 全量/分批用 `node tests/run-ci.mjs --status` 看台账（x/123）、`--resume` 续跑；长跑期间别再手动起浏览器套件。
 - Windows 沙箱里 Playwright 可能直接 `browserType.launch: spawn EPERM`（chrome-headless-shell 用 `--remote-debugging-pipe`，
   沙箱禁命名管道）。这是环境拒绝，不是代码回归；换到不受限的文件策略再跑。
 - 截图写到 `output/playwright/`（按 `fileURLToPath(import.meta.url)` 定位，别用相对路径——`run-ci` 的 cwd 是 `tests/`）。
 - 失败才需要看：`WALK_DEBUG=1` 会打印 `walkTo` 卡在哪一格。
 - 夹具注意：`boot(page, { seed })` 实际写的是 **`moss-farm-v1`**；v2 旧档要么自己 `localStorage.setItem('moss-farm-v2', …)` 后 reload，要么用 `__MOSS__.normalizeSaveForTest` / `replaceSave`。旧档套件优先 `isolatedPage`，避免旧页面卸载时自动保存覆盖预置存档。
 
-## 挂进 CI（2026-10-22 结构，以 `tests/run-ci.mjs` 当前代码为准）
+## 挂进 CI（以 `tests/run-ci.mjs` 当前代码为准）
 
-- **浏览器层**是第 28–96 行的一个**字符串数组 `BROWSER`**，直接加一项 `'run-xxx.mjs'`（不是 `run(...)` 调用；调用在第 127 行统一发起）。
-- **单文件复跑**在第 128–153 行，逐条 `run('run-xxx-single-file', path.join(here, 'run-xxx.mjs'), ['--single-file'])`。
-- 第 19–25 行 FAST 层会自动 `node --check` 全部 `tests/*.mjs`，**临时探针文件也会被检查**，交付前清掉 `tmp-*.mjs`。
-- 当前口径：5 个快速阶段 + 88 条浏览器层 + 30 条单文件复跑 = 123 次脚本阶段（118 次浏览器作业）。
-- 挂完必须真跑一次 `node run-ci.mjs`，不要只跑自己那条；通过判据是末行「两层全部通过。」+ 退出码 0。
+- **浏览器层**是 `BROWSER` 字符串数组，直接加一项 `'run-xxx.mjs'`；**单文件复跑**在下方列表加 `run('run-xxx-single-file', path.join(here, 'run-xxx.mjs'), ['--single-file'])`。
+- 快速层的语法检查会自动 `node --check` 全部 `tests/*.mjs`，**临时探针文件也会被检查**，交付前清掉 `tmp-*.mjs`。
+- 层数/条数以 `node tests/run-ci.mjs --dump-steps` 为准（当前 5 快速＋88 浏览器＋30 单文件＝123）；历史轮的「121 组」是旧口径，不是现状。
+- 挂完先 `node tests/run-ci.mjs --only=run-xxx` 单条验证；全量交给台账跑（`--status` 看 x/123），中断就 `--resume`，不必为一条套件从头重跑。
+- 通过判据：同 treeHash 台账 123 阶段全绿＋末行「两层全部通过。」＋`output/ci-exit.log` 退出码 0；单条套件看自己的末行 `PASS … N 项通过`。
 
 ## 完工检查
 
 - [ ] `node --check tests/run-xxx.mjs` 通过
 - [ ] 源码轮、`--single-file` 轮都通过，`errors.length === 0`
 - [ ] 文件头注释写清夹具给了什么、什么由按钮产生
-- [ ] 已挂进 `run-ci.mjs`（BROWSER 字符串数组 + 单文件复跑列表）
+- [ ] 已挂进 `run-ci.mjs`（BROWSER 字符串数组 + 单文件复跑列表），`node tests/run-ci.mjs --dump-steps` 能列出它
+- [ ] 夹具套件写精确项数；自然入口套件写「任务全通/状态推进/无浏览器错误」，项数当元数据
 - [ ] 验收项数写进 `docs/feature-status.md` 与对应 `docs/*-plan.md`；CI 数字以 `run-ci.mjs` 当前内容为准
+- [ ] 交付前 `node tests/check-docs.mjs --regen` 绿（数字与台账/退出码一致）
 
 `references/harness-api.md` 是 `tests/harness.mjs` 的接口清单与坑位。
