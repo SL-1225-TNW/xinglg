@@ -324,8 +324,19 @@ try{
    for(let batch=0;batch<2;batch++){
      if(batch){check(await sleepViaMenu(page),'真实隔夜开始第二批运输');await dismissSettlement(page);}
      /* 工位一律按注册表里的交互物定位：point 要的是交互格，不是它旁边的站立格。 */
-     for(const [sc,work,label]of [['city_quay_store','receive','登记木材2'],['city_sawmill','saw','批次细剖'],['city_quay_store','stock','核验板材6并入库'],['city_quay_store','stock','本地装运至船棚'],['city_shipyard','receipt','签收板材6']]){
-       await go(sc);await point(await workSite(sc,work));await click(label);await closeWin(page);
+     for(const [sc,work,label,minutes,energy,stage]of [['city_quay_store','receive','登记木材2',5,0,1],['city_sawmill','saw','批次细剖',60,10,2],['city_quay_store','stock','核验板材6并入库',5,0,3],['city_quay_store','stock','本地装运至船棚',25,1,5],['city_shipyard','receipt','签收板材6',5,0,6]]){
+       // 按钮存在不代表工序已成功：晚到或体力不足时真实过夜后返回原工位。
+       let ready=false;
+       for(let attempt=0;attempt<3;attempt++){
+         await go(sc);await point(await workSite(sc,work));
+         if(await freshenDay(minutes+10,label))continue;
+         if((await snap(page)).energy<energy){await closeWin(page);assert.ok(await sleepViaMenu(page),'体力不足时真实过夜');await dismissSettlement(page);continue;}
+         ready=true;break;
+       }
+       assert.ok(ready,'工序准备完成 '+label);
+       await click(label);
+       eq(await page.evaluate(()=>__MOSS__.state.industry.stage),stage,'真实工序完成 '+label);
+       await closeWin(page);
      }
    }
    check(await page.evaluate(()=>__MOSS__.professionalLifeState().routes.trade>=2),'两批真实签收取得商旅到访资格');

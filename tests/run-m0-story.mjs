@@ -129,7 +129,7 @@ async function leaveHouse() {
 /* ================= 一、序章：回忆 → 旧信 → 交出寄存的索引 ================= */
 console.log('\n【1】MQ1-P01 一封信，一处屋檐');
 /* 入口不能占用工具目标格：点田地会被入口抢走，锄地就做不成。
-   这条断言守着 20 个入口的落点与站位，别让下一次挪动再犯同样的事。 */
+   同时检查独立剧情入口与复用的现场操作台。 */
 const conflicts = await p.evaluate(() => {
   const M = window.__MOSS__, bad = [];
   const isTool = (sc, x, y) => {
@@ -146,10 +146,11 @@ const conflicts = await p.evaluate(() => {
   M.STORY_ENTRIES.forEach(e => {
     const map = M.MAPS[e.scene];
     if (!map) { bad.push(e.id + ' 场景不存在'); return; }
-    const hit = (M.INTERACTABLES[e.scene] || []).find(i => i.id === e.id);
+    const hit = (M.INTERACTABLES[e.scene] || []).find(i => e.workSite ? i.work === e.workSite : i.id === e.id);
     if (!hit) { bad.push(e.id + ' 未登记'); return; }
+    if (hit.x !== e.x || hit.y !== e.y) bad.push(e.id + ' 与现场坐标不一致');
     (M.INTERACTABLES[e.scene] || []).forEach(o => {
-      if (o.id !== e.id && o.x === e.x && o.y === e.y) bad.push(e.id + ' 与 ' + o.id + ' 同格');
+      if (o !== hit && o.x === e.x && o.y === e.y) bad.push(e.id + ' 与 ' + (o.id || o.work || o.kind) + ' 同格');
     });
     /* 入口格本身不能是工具目标：那就抢了锄地或采集 */
     if (isTool(e.scene, e.x, e.y)) bad.push(e.id + ' 落在工具目标上');
