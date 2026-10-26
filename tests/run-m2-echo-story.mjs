@@ -202,6 +202,24 @@ try{
   ok(await p.evaluate(()=>!!(__MOSS__.NPCS.ms1_iven&&__MOSS__.NPCS.ms1_ruen&&__MOSS__.NPCS.ms1_mira)),'伊文、鲁恩、弥拉照常在场');
   await ctx.close();
  }
+ /* --- 回归：新档路径的 echoChapter.draft 必须自带数组默认值 --- */
+ {
+  const ctx=await load(structuredClone(base));
+  const fresh=await p.evaluate(()=>{const M=__MOSS__;
+   const a=M.newStoryState().echoChapter.draft,b=M.freshState().story.echoChapter.draft;
+   return {a:Object.keys(a).sort().join(','),b:Object.keys(b).sort().join(',')};});
+  eq(fresh.a,'checks,confirmed,readback,reply,wishes','新档 story 状态的 draft 带五个数组默认值');
+  eq(fresh.b,'checks,confirmed,readback,reply,wishes','新游戏状态的 draft 带五个数组默认值');
+  /* 运行态被换成新档的空 draft 形状时，访问器要补齐，否则面板读 p.reply.length 会炸。 */
+  const shape=await p.evaluate(()=>{const M=__MOSS__;
+   M.state.story.echoChapter={records:{},draft:{}};
+   const d=M.echoChapterState().draft;
+   return {keys:Object.keys(d).sort().join(','),
+    ok:['reply','wishes','readback','checks','confirmed'].every(k=>Array.isArray(d[k]))};});
+  eq(shape.keys,'checks,confirmed,readback,reply,wishes','运行态 draft 缺数组时访问器补齐');
+  ok(shape.ok,'五个 draft 数组都可用');
+  await ctx.close();
+ }
  /* --- 主流程：两个分支各走一遍十场 --- */
  for(const v of [0,1]){
   const s=structuredClone(base);
@@ -237,7 +255,11 @@ try{
   const s51=await p.evaluate(()=>__MOSS__.STORY_SCENES.S051.lines.filter(l=>!l.when||l.when(__MOSS__.storyState().choices)).map(l=>l.text||''));
   ok(s51.some(t=>t.includes('上次我问你为什么留在这里'))===!!v,'伊文再访对白按已重逢切换');
   ok(s51.some(t=>t.includes('你到了。'))===!v,'首次重逢才说「你到了」');
+  /* 行为回归：把运行态 draft 换成修 bug 前新档的空对象形状（不经过读档归一化），
+     第五幕面板仍要能正常办理，不能读 p.reply.length 炸掉。 */
+  if(!v){await p.evaluate(()=>{__MOSS__.state.story.echoChapter.draft={};});}
   await play('S052',v);
+  if(!v)ok(await p.evaluate(()=>Array.isArray(__MOSS__.echoChapterState().draft.reply)),'新档形状的 draft 也能正常办理');
   const reply=await p.evaluate(()=>__MOSS__.echoChapterState().records.reply);
   ok(reply.text.includes('尝试联系过')&&reply.text.includes('不是邮局退回'),'尝试联系与后来退缩分开记');
   ok(reply.text.includes('暂不原谅')&&!reply.text.includes('已原谅'),'不替居民下原谅的结论');
