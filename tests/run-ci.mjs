@@ -131,6 +131,8 @@ const BROWSER_FILES = [
   /* run-m1-natural-story.mjs 不再进 CI：它是 run-m2-natural-story 的真子集（同一段新档路线），
      两者都挂等于同一段路在一次全量里跑两遍。文件保留可手动跑，M1 交付记录见 docs/m1-natural-story.md。 */
   'run-m2-capital-story.mjs',
+  /* 第九版第五幕：回声谷十场、六处操作台、入谷三道门槛与提前探索接续 */
+  'run-m2-echo-story.mjs',
   /* 第九版第四幕自然串联：新档走到王都——河港接驳登记→潮汐港北口步行→十场现场办理 */
   'run-m2-natural-story.mjs',
   /* 探索线：森林/矿山三道闸门、三层矿洞、采集再生、存档重载与钢制工具，脚本内部自带两轮 */
@@ -154,7 +156,7 @@ const BROWSER_FILES = [
  *
  * 只复跑「产物敏感」的套件：打包产物与源码的差别只有内联后的 CSS/JS、存档读写路径与
  * 移动端布局，纯逻辑套件在源码轮已覆盖，复跑一遍不增加产物风险、却要把全量拖长。
- * 保留的十类：剧情 UI（m0／第二幕／第三幕／第四幕）、17 新场景的门洞与出口、旧档迁移、
+ * 保留的十类：剧情 UI（m0／第二幕／第三幕／第四幕／第五幕）、17 新场景的门洞与出口、旧档迁移、
  * 存档快照、跨境凭证与门槛、移动端触屏布局、跨系统修复回归。
  * 不进本层的长程自然串联（run-m1/run-m2-natural-story）：产物与源码的 JS 逐字相同，
  * 其产物风险由上面的剧情与新地点套件覆盖；双版本证据另行实跑并留 exit 日志。
@@ -162,7 +164,7 @@ const BROWSER_FILES = [
 const SINGLE_FILES = [
   'run-m0-story.mjs', 'run-ms1-locations.mjs',
   'run-m1-pine-story.mjs', 'run-m1-tide-story.mjs', 'run-m1-letter-care.mjs', 'run-m1-cross-border.mjs',
-  'run-m2-capital-story.mjs', 'run-r4-legacy-save.mjs', 'run-r5-mobile-touch.mjs',
+  'run-m2-capital-story.mjs', 'run-m2-echo-story.mjs', 'run-r4-legacy-save.mjs', 'run-r5-mobile-touch.mjs',
   'run-fixes.mjs'
 ];
 

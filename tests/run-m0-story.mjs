@@ -146,7 +146,10 @@ const conflicts = await p.evaluate(() => {
   M.STORY_ENTRIES.forEach(e => {
     const map = M.MAPS[e.scene];
     if (!map) { bad.push(e.id + ' 场景不存在'); return; }
-    const hit = (M.INTERACTABLES[e.scene] || []).find(i => e.workSite ? i.work === e.workSite : i.id === e.id);
+    /* 入口登记在两种形态里：与操作台同场景时由操作台本身充当入口（按 work 找），
+       跨场景时入口单独登记成可按 E 的点（按 id 找）。两种都要查到同一个格。 */
+    const list = M.INTERACTABLES[e.scene] || [];
+    const hit = list.find(i => i.id === e.id) || (e.workSite ? list.find(i => i.work === e.workSite) : null);
     if (!hit) { bad.push(e.id + ' 未登记'); return; }
     if (hit.x !== e.x || hit.y !== e.y) bad.push(e.id + ' 与现场坐标不一致');
     (M.INTERACTABLES[e.scene] || []).forEach(o => {

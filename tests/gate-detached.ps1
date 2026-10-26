@@ -170,6 +170,17 @@ function Get-TreeFromJournal {
     return $best
 }
 
+function Get-CiTotalSteps {
+    # 阶段总数以 tests/run-ci.mjs --dump-steps 为准（唯一权威）：套件增删后不必再改这里。
+    # 读不到时返回 0，调用方退回心跳里的本次运行范围。
+    try {
+        $out = (& $nodeExe $runCi --dump-steps 2>$null | Out-String)
+        $m = [regex]::Match($out, '"all"\s*:\s*(\d+)')
+        if ($m.Success) { return [int]$m.Groups[1].Value }
+    } catch { }
+    return 0
+}
+
 function Show-Status {
     Write-Host ''
     Write-Host '== MossFarmCI 状态 =='
@@ -250,9 +261,10 @@ function Show-Status {
             Write-Host ('台账    ：没有当前 tree {0} 的记录' -f (Get-ShortHash $treeHash))
             $unrun = -1
         } else {
-            # 收口判据固定 103 步（5 快速＋88 浏览器＋10 单文件）；heartbeat.step.total 只是
-            #「本次运行范围」（--quick/--only/--stop-after 会小于 103），不能当分母。
-            $total = 103
+            # 收口判据固定为 run-ci.mjs --dump-steps 报出的阶段总数（5 快速＋89 浏览器＋11 单文件＝105）；
+            # heartbeat.step.total 只是「本次运行范围」（--quick/--only/--stop-after 会小于总数），不能当分母。
+            $total = Get-CiTotalSteps
+            if ($total -le 0) { $total = 103 }
             if ($stepTotal -gt $total) { $total = $stepTotal }
             if ($null -ne $tree.steps) {
                 foreach ($sp in $tree.steps.PSObject.Properties) {
@@ -275,8 +287,8 @@ function Show-Status {
                 Write-Host '失败    ：无'
             }
             Write-Host ('未跑    ：{0} 步' -f $unrun)
-            if ($stepTotal -gt 0 -and $stepTotal -lt 103) {
-                Write-Host ('范围提示：本次运行 total={0} 步（--quick/--only/--stop-after 等过滤/截断运行不构成全量收口判据，全量口径 103 步）' -f $stepTotal) -ForegroundColor Yellow
+            if ($stepTotal -gt 0 -and $stepTotal -lt $total) {
+                Write-Host ('范围提示：本次运行 total={0} 步（--quick/--only/--stop-after 等过滤/截断运行不构成全量收口判据，全量口径 {1} 步）' -f $stepTotal, $total) -ForegroundColor Yellow
             }
         }
     }
