@@ -4214,7 +4214,12 @@ var ECHO_DRAFT_LISTS = {
   checks: ['slope', 'water', 'stone', 'north'],
   confirmed: ['mira', 'stay']
 };
-function newEchoChapterState() { return { records: {}, draft: {} }; }
+/* 新档（newStoryState）与新游戏（newGameState）都直接建出这份状态：draft 的五个数组
+   必须在新建时就给默认值，否则新档连续游玩（不经过读档归一化）打开第五幕面板时
+   读 p.reply.length 会炸。旧档缺字段由 normalizeEchoChapter 补，不升存档版本。 */
+function newEchoChapterState() {
+  return { records: {}, draft: { wishes: [], reply: [], readback: [], checks: [], confirmed: [] } };
+}
 function normalizeEchoChapter(raw) {
   var d = newEchoChapterState();
   if (!raw || typeof raw !== 'object') return d;
@@ -4239,7 +4244,17 @@ function normalizeEchoChapter(raw) {
     d.records.route_recheck = { day: rr.day, choice: 'rechecked', text: rr.text, source: rr.source };
   return d;
 }
-function echoChapterState() { var st = storyState(); if (!st.echoChapter) st.echoChapter = newEchoChapterState(); return st.echoChapter; }
+/* 兜底：运行态里的 echoChapter 可能来自没带 draft 的旧结构（新建档、坏档、手改存档）。
+   这里只补缺失的数组与对象，绝不删玩家已有事实；读档归一化仍由 normalizeEchoChapter 负责。 */
+function echoChapterState() {
+  var st = storyState();
+  if (!st.echoChapter || typeof st.echoChapter !== 'object') st.echoChapter = newEchoChapterState();
+  var c = st.echoChapter;
+  if (!c.records || typeof c.records !== 'object') c.records = {};
+  if (!c.draft || typeof c.draft !== 'object') c.draft = {};
+  Object.keys(ECHO_DRAFT_LISTS).forEach(function (k) { if (!Array.isArray(c.draft[k])) c.draft[k] = []; });
+  return c;
+}
 function storyEchoVisited() { return !!storyState().flags.echoVisited; }
 function storyEchoMet(who) { return !!storyState().flags['echo_met_' + who]; }
 
