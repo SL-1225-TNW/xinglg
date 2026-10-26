@@ -2030,7 +2030,8 @@ var STORY_EVIDENCE = {
   neighbor_pass: { title: '邻领通行文书（民用行程登记）', source: '邻领边城 · 领地联络处 · 阿丽娅' },
   tide_route:    { title: '航路引荐信（船期与泊位）', source: '白蔷薇下游河港 · 船务屋 · 米娅' },
   capital_pass:  { title: '皇家驿路接驳登记凭证', source: '白蔷薇下游河港 · 驿站接驳处 · 莱昂' },
-  echo_guide:    { title: '赫莎的带路约定（现场核验许可）', source: '白松驿舍 · 停运登记簿 · 赫莎' }
+  echo_guide:    { title: '赫莎的带路约定（现场核验许可）', source: '白松驿舍 · 停运登记簿 · 赫莎' },
+  neighbor_confirm: { title: '邻领权限确认（官方核验范围）', source: '邻领边城 · 领地联络处 · 阿丽娅' }
 };
 
 /* --- 场次：台词、旁白、选择与互动步骤 --- */
@@ -2357,7 +2358,9 @@ function storyToolTargetNear(sceneId, x, y) {
    每次换场景重算一次，登记本身不重复添加。 */
 function registerStoryEntries() {
   STORY_ENTRIES.forEach(function (def) {
-    if (!MAPS[def.scene] || def.workSite) return;
+    /* 操作台与入口同场景时，操作台本身就是入口，不再重复登记交互点；
+       不同场景时（回声谷公屋门前的去向建议），入口要单独登记成可按 E 的点。 */
+    if (!MAPS[def.scene] || (def.workSite && (!def.siteScene || def.siteScene === def.scene))) return;
     var list = INTERACTABLES[def.scene] = INTERACTABLES[def.scene] || [];
     var it = null, i;
     for (i = 0; i < list.length; i++) if (list[i].id === def.id) { it = list[i]; break; }
@@ -3809,6 +3812,143 @@ Object.assign(STORY_SCENES, {
   }
 });
 Object.keys(STORY_SCENES).filter(function(id){return STORY_SCENES[id].task.indexOf('MQ1-D')===0;}).forEach(function(id){STORY_SCENES[id].lines.forEach(function(l){if(l.condition){var c=l.condition;l.when=function(){return storyChoices().d04_public===c;};delete l.condition;}});});
+
+/* 第五幕：正文逐句取自总规 §27.6；现场办理接既有机制，不新造框架。
+   §26.4 的提前探索接续按角色分开处理：主角已重逢伊文 → S051 走再访对白；
+   莱娜首次见父亲 → 保留她的重逢；父女已单独谈过 → 走「今天继续」。 */
+STORY_TASKS.push.apply(STORY_TASKS, [
+  { id: 'MQ1-E01', act: 6, actName: '第五幕 · 地图之外，炊烟未冷', title: '群山深处，仍有人家',
+    goal: '核对核验手续与近期路线，登记入谷，查居民自记簿。',
+    scenes: ['S049', 'S050'], next: 'MQ1-E02', exp: 60 },
+  { id: 'MQ1-E02', act: 6, actName: '第五幕 · 地图之外，炊烟未冷', title: '你曾说过，会回来',
+    goal: '核对未寄出的信与旧图抄页，与莱娜、鲁恩分别核对旧信。',
+    scenes: ['S051', 'S052'], next: 'MQ1-E03', exp: 60 },
+  { id: 'MQ1-E03', act: 6, actName: '第五幕 · 地图之外，炊烟未冷', title: '地图没有画出的名字',
+    goal: '记录本户意愿与可协助事项，把记录读回本人并逐户分列。',
+    scenes: ['S053', 'S054'], next: 'MQ1-E04', exp: 60 },
+  { id: 'MQ1-E04', act: 6, actName: '第五幕 · 地图之外，炊烟未冷', title: '旧路尽头，故人未远',
+    goal: '对照当年的救援选择与结项改写，在界绳内核坡体与北坡线。',
+    scenes: ['S055', 'S056'], next: 'MQ1-E05', exp: 60 },
+  { id: 'MQ1-E05', act: 6, actName: '第五幕 · 地图之外，炊烟未冷', title: '这一次，请听他们说',
+    goal: '逐户确认去向，登记去向建议与协作分工。',
+    scenes: ['S057', 'S058'], next: null, exp: 60 }
+]);
+STORY_TASKS.find(function(t){return t.id==='MQ1-D05';}).next='MQ1-E01';
+Object.assign(STORY_SCENES, {
+  S049: { task: 'MQ1-E01', place: '外景 回声谷村落入口', time: '日', where: '回声谷 · 村落口登记',
+    lines: [
+      { who: '', text: '石墙后晾着洗过的布。一名孩子追着滚落的线轴跑过路口，弥拉叫他远离坡沿。' },
+      { who: '', text: '莱娜停在旧门柱前。她用手比了比门柱上自己小时候的刻线。' },
+      { who: '莱娜', text: '它比我记得的小。', when: function () { return !storyEchoVisited(); } },
+      { who: '主角', text: '你已经长大了。', when: function () { return !storyEchoVisited(); } },
+      { who: '莱娜', text: '上次来的时候，我在这里问过路。', when: function () { return storyEchoVisited(); } },
+      { who: '主角', text: '这次我来，不是问路。', when: function () { return storyEchoVisited(); } },
+      { who: '弥拉', text: '要找人先来公屋。这里还有人在晾东西，别把路堵了。' },
+      { step: 'echo_entry', mode: 'echo', action: 'entry', text: '核对核验手续与近期路线，登记入谷' }
+    ] },
+  S050: { task: 'MQ1-E01', place: '内景 回声谷公屋', time: '日', where: '回声谷 · 公屋的住户自记簿',
+    lines: [
+      { who: '', text: '弥拉给来客安排座位，拿出居民自记的送药与换粮簿。' },
+      { who: '弥拉', text: '我们不是什么失落古城。上周还托人买过盐。' },
+      { who: '主角', text: '我们想核现在的住户，也想找伊文。' },
+      { who: '弥拉', text: '他在测绘屋，鲁恩也在。先说好，谁愿意让你们记，问谁。' },
+      { who: '弥拉', text: '还有，别又跟我们说“很快就好了”。' },
+      { step: 'echo_roster', mode: 'echo', action: 'roster', text: '查阅居民自记的送药与换粮簿' }
+    ] },
+  S051: { task: 'MQ1-E02', place: '内景 回声谷测绘屋', time: '日', where: '回声谷 · 伊文的测绘桌',
+    lines: [
+      { who: '', text: '伊文俯在图上量角度。门响，他抬头，看见主角，手中的铅笔滚到桌边。' },
+      { who: '伊文', text: '你到了。', when: function () { return !storyEchoMet('iven'); } },
+      { who: '主角', text: '到了很久。你说会回白蔷薇。', when: function () { return !storyEchoMet('iven'); } },
+      { who: '伊文', text: '我以为把这段量完，就能——', when: function () { return !storyEchoMet('iven'); } },
+      { who: '伊文', text: '我寄过一次改约，跟核验材料一起转走了。但我没有再确认你收到。', when: function () { return !storyEchoMet('iven'); } },
+      { who: '伊文', text: '让你一直等，是我失约。', when: function () { return !storyEchoMet('iven'); } },
+      { who: '莱娜', text: '你每次都以为还能再等一下？', when: function () { return !storyEchoMet('iven'); } },
+      { who: '主角', text: '上次我问你为什么留在这里。现在原报告核过了，我想把你没说清的责任一起谈完。', when: function () { return storyEchoMet('iven'); } },
+      { who: '伊文', text: '好。这里有人想走，也有人想留。我不该只告诉你我想修哪条路。', when: function () { return storyEchoMet('iven'); } },
+      { who: '莱娜', text: '也请把鲁恩的事，当着我们说清。', when: function () { return storyEchoMet('iven'); } },
+      { who: '', text: '里间传来椅脚响。鲁恩拄着短杖走到门边，看见莱娜袖上旧样式的邮袋扣。' },
+      { choice: 'e02_lena_privacy', prompt: '鲁恩还在里间。旧信要当着莱娜的面摊开，还是请她先在门外等？', options: [
+        { id: 'A', text: '当着莱娜的面摊开。' },
+        { id: 'B', text: '先请莱娜在门外等一会儿。' } ] },
+      { step: 'echo_letters', mode: 'echo', action: 'letters', text: '核对未寄出的信与旧图抄页' }
+    ] },
+  S052: { task: 'MQ1-E02', place: '内景 同一测绘屋', time: '日', where: '回声谷 · 测绘屋的旧信',
+    lines: [
+      { who: '', text: '鲁恩试着说话，先喊出莱娜小时候的名字，又停住。', when: function () { return storyChoices().e02_lena_privacy !== 'B'; } },
+      { who: '', text: '莱娜在门外等了一会儿。门开时，她手里捏着那封没有地址的信。', when: function () { return storyChoices().e02_lena_privacy === 'B'; } },
+      { who: '莱娜', text: '先别叫我那个。你为什么没来？', when: function () { return storyChoices().e02_lena_privacy !== 'B'; } },
+      { who: '莱娜', text: '见面时没谈完的，今天继续。', when: function () { return storyChoices().e02_lena_privacy === 'B'; } },
+      { who: '鲁恩', text: '最初我去了南线收容站，你们已经迁走。后来在白松托过信，也问过旧登记处。' },
+      { who: '鲁恩', text: '伤腿以后，我留下照顾这里的人。可腿伤没把我所有的路都堵死。' },
+      { who: '鲁恩', text: '再后来，我害怕你们问，为什么总说下一次再来。我又拖了几年。' },
+      { who: '莱娜', text: '信在哪里？我想自己看。' },
+      { who: '', text: '鲁恩把写着不同退回日期的信束放在桌上，没有递近逼她接。' },
+      { who: '', text: '莱娜翻到最晚那封。封口没有封过，地址栏空着。' },
+      { who: '莱娜', text: '这封没寄。不是没人替你送。' },
+      { who: '鲁恩', text: '对。没有写完，也没再出去找。这一段是我退了，不是邮局。' },
+      { who: '莱娜', text: '我知道你回来过，也知道你后来停下了。我现在没办法说原谅。' },
+      { who: '鲁恩', text: '你不用今天答我。我把自己的事说清楚，剩下的由你决定。' },
+      { step: 'echo_reply', mode: 'echo', action: 'reply', text: '与莱娜、鲁恩分别核对旧信' }
+    ] },
+  S053: { task: 'MQ1-E03', place: '外景 回声谷村落', time: '日', where: '回声谷 · 弥拉的菜地',
+    lines: [
+      { who: '', text: '弥拉试着将孩子的旧衣叠进行李，又拿出来比大小。主角在院门外停下。' },
+      { who: '弥拉', text: '我想走。孩子上学，看病，不该每次都盼山路别坏。' },
+      { who: '主角', text: '其他人知道你的意思吗？' },
+      { who: '弥拉', text: '有人说走了就不是这里的人。我在这里种过的地，不会因为搬走就没种过。' },
+      { step: 'echo_labor', mode: 'echo', action: 'labor', text: '记录本户意愿与可协助事项' }
+    ] },
+  S054: { task: 'MQ1-E03', place: '内景 回声谷公屋', time: '日', where: '回声谷 · 公屋的逐户记录',
+    lines: [
+      { who: '', text: '主角完成居民同意的一项协作，将记录读回给本人。另一位居民看着屋外的菜畦。' },
+      { who: '居民', text: '我想先留下。不是要你保证这山永远不塌，我想知道哪儿能走，谁来修。' },
+      { who: '主角', text: '我记“希望留下，需核通路和照护条件”。这样准确吗？' },
+      { who: '居民', text: '对。别只记前半句。' },
+      { who: '', text: '莱娜将表上“意见一致”划掉，改为逐户分列。' },
+      { step: 'echo_readback', mode: 'echo', action: 'readback', text: '把记录读回本人并逐户分列' }
+    ] },
+  S055: { task: 'MQ1-E04', place: '外景 回声谷旧官道分岔', time: '日', where: '回声谷 · 旧官道分岔',
+    lines: [
+      { who: '', text: '伊文停在界绳前。南侧石基尚存，北侧旧路被滑坡切断。主角将原报告副本与现场对齐。' },
+      { who: '伊文', text: '重伤的人得先过南线。鲁恩留下陪北边的人，我说会带第二批回来。' },
+      { who: '伊文', text: '我回来了。之后却没把他们每个人的去向，一直核到最后。' },
+      { who: '莱娜', text: '后来你知道结项写错了。' },
+      { who: '伊文', text: '知道。我提过异议，没追到结果，又把自己扎进这里。' },
+      { step: 'echo_rescue', mode: 'echo', action: 'rescue', text: '对照当年的救援选择与结项改写' }
+    ] },
+  S056: { task: 'MQ1-E04', place: '外景 同一分岔·安全石台', time: '日', where: '回声谷 · 分岔安全石台',
+    lines: [
+      { who: '', text: '主角在可用北坡线与已经危险的旧隧道之间摆开测量标记。' },
+      { who: '伊文', text: '只要旧路能再开一次——' },
+      { choice: 'e04_reply', prompt: '伊文在等你的回答。', options: [
+        { id: 'A', text: '他们需要安全的办法，不需要替你证明当年。' },
+        { id: 'B', text: '我会帮你。不过先问他们想去哪里。' } ] },
+      { who: '伊文', text: '……你说得重。但我不能只听顺耳的。', when: function (c) { return c.e04_reply === 'A'; } },
+      { who: '伊文', text: '好。路可以重画，不能把人又画回原位。', when: function (c) { return c.e04_reply === 'B'; } },
+      { step: 'echo_slope', mode: 'echo', action: 'slope', text: '在界绳内核坡体、水痕与北坡线' }
+    ] },
+  S057: { task: 'MQ1-E05', place: '内景 回声谷公屋', time: '暮', where: '回声谷 · 公屋的逐户确认',
+    lines: [
+      { who: '', text: '伊文铺开新地图，把铅笔放在桌中央。居民逐户确认记录，不由他先画箭头。' },
+      { who: '弥拉', text: '我带孩子离开。以后能回来，我也会回来。' },
+      { who: '鲁恩', text: '我先去接应点把腿看清楚。莱娜，你不必为了陪我改掉自己的工作。' },
+      { who: '莱娜', text: '我会去接你。之后的事，之后再谈。' },
+      { who: '主角', text: '需要照护的先有接应，愿留下的也要有联络。没确认安全之前，谁都不走险路。' },
+      { step: 'echo_confirm', mode: 'echo', action: 'confirm', text: '逐户确认去向，未答复的留空' }
+    ] },
+  S058: { task: 'MQ1-E05', place: '外景 回声谷公屋门前', time: '暮', where: '回声谷 · 公屋门前',
+    lines: [
+      { who: '', text: '伊文把两种去向分别标进图里，为没有答复的人留空。' },
+      { who: '伊文', text: '我一直想把这张图画完整。' },
+      { who: '主角', text: '空着的地方，可以等人自己说。' },
+      { who: '伊文', text: '这一次我等。' },
+      { choice: 'e05_plan', prompt: '去向建议怎么写？', options: [
+        { id: 'A', text: '先转移需要照护者。' },
+        { id: 'B', text: '医疗人员分段照护、其余逐户分批。' } ] },
+      { step: 'echo_plan', mode: 'echo', action: 'plan', text: '登记去向建议与协作分工' }
+    ] }
+});
 STORY_ENTRIES.push.apply(STORY_ENTRIES, [
   {
     "id": "ms2_d_s039",
@@ -3910,6 +4050,23 @@ STORY_ENTRIES.push.apply(STORY_ENTRIES, [
   }
 ]);
 STORY_ENTRIES.filter(function(e){return e.task.indexOf('MQ1-D')===0;}).forEach(function(e){STORY_SCENE_LOC[e.storyScene]=e.scene;});
+
+/* 第五幕十场的落点：九场挂在回声谷既有操作台上（操作台本身就是入口），
+   村落口的入谷登记与公屋门前的去向建议各自是独立交互点。
+   siteScene 记下操作台所在的场景：与入口不同场景时，入口要单独登记成可按 E 的点。 */
+STORY_ENTRIES.push.apply(STORY_ENTRIES, [
+  { id: 'ms2_e_s049', scene: 'ms1_echo_village', x: 18, y: 11, label: '村落口的入谷登记', task: 'MQ1-E01', storyScene: 'S049' },
+  { id: 'ms2_e_s050', scene: 'ms1_echo_hall', x: 10, y: 9, label: '住户自记的送药与换粮簿', task: 'MQ1-E01', storyScene: 'S050', workSite: 'ms1_echo_table' },
+  { id: 'ms2_e_s051', scene: 'ms1_echo_house', x: 5, y: 5, label: '伊文的旧信与旧图抄页', task: 'MQ1-E02', storyScene: 'S051', workSite: 'ms1_echo_desk' },
+  { id: 'ms2_e_s052', scene: 'ms1_echo_house', x: 5, y: 5, label: '莱娜与鲁恩的旧信核对', task: 'MQ1-E02', storyScene: 'S052', workSite: 'ms1_echo_desk' },
+  { id: 'ms2_e_s053', scene: 'ms1_echo_village', x: 28, y: 19, label: '弥拉菜地里的去留意愿', task: 'MQ1-E03', storyScene: 'S053', workSite: 'ms1_echo_garden' },
+  { id: 'ms2_e_s054', scene: 'ms1_echo_hall', x: 10, y: 9, label: '读回本人并逐户分列', task: 'MQ1-E03', storyScene: 'S054', workSite: 'ms1_echo_table' },
+  { id: 'ms2_e_s055', scene: 'ms1_echo_fork', x: 24, y: 14, label: '当年的救援选择与结项改写', task: 'MQ1-E04', storyScene: 'S055', workSite: 'ms1_echo_site' },
+  { id: 'ms2_e_s056', scene: 'ms1_echo_fork', x: 13, y: 5, label: '界绳内的坡体与北坡线', task: 'MQ1-E04', storyScene: 'S056', workSite: 'ms1_echo_tunnel' },
+  { id: 'ms2_e_s057', scene: 'ms1_echo_hall', x: 10, y: 9, label: '逐户确认去向', task: 'MQ1-E05', storyScene: 'S057', workSite: 'ms1_echo_table' },
+  { id: 'ms2_e_s058', scene: 'ms1_echo_village', x: 10, y: 8, label: '公屋门前的去向建议与协作分工', task: 'MQ1-E05', storyScene: 'S058', workSite: 'ms1_echo_staging', siteScene: 'ms1_echo_route' }
+]);
+STORY_ENTRIES.filter(function(e){return e.task.indexOf('MQ1-E')===0;}).forEach(function(e){STORY_SCENE_LOC[e.storyScene]=e.scene;});
 
 var CAPITAL_KEYS = ['arrival','lodging','intake','witness','original','compare','questions','resolution','permit','departure'];
 var CAPITAL_ACTIONS = {arrival:'皇家驿路到站登记',lodging:'专款床位与预约',intake:'按来源受理与查阅许可',witness:'科林的自愿说明',original:'原件查阅登记',compare:'日期签核差异与副本编号',questions:'三项质询事实',resolution:'补正与公开范围',permit:'有限现场核验许可',departure:'待填写的现住意见'};
@@ -4034,6 +4191,280 @@ function openCapitalSite(site){
   },actions:[{label:'关闭',close:true}]});
 }
 
+/* ============================================================
+   第五幕 · 回声谷（总规 §27.6 正文、§26.4 提前探索接续）
+   十个现场事实 + 入谷三道门槛；不升存档版本，旧档只补默认值。
+   ============================================================ */
+var ECHO_KEYS = ['entry', 'roster', 'letters', 'reply', 'labor', 'readback', 'rescue', 'slope', 'confirm', 'plan'];
+var ECHO_ACTIONS = {
+  entry: '入谷登记与三道门槛核对', roster: '住户自记簿与送药换粮记录', letters: '旧信与旧图抄页互证',
+  reply: '尝试联系与后来退缩分记', labor: '逐户意愿与可协助事项', readback: '记录读回与逐户分列',
+  rescue: '救援选择与结项改写分记', slope: '界绳内坡体与北坡线核验', confirm: '逐户去向与未答复留空',
+  plan: '去向建议与协作分工', route_recheck: '近期路线复测'
+};
+var ECHO_SITES = ['ms1_echo_tunnel', 'ms1_echo_site', 'ms1_echo_garden', 'ms1_echo_table', 'ms1_echo_desk', 'ms1_echo_staging'];
+var ECHO_CHOICES = {
+  entry: ['registered'], roster: ['read'], letters: ['checked'], reply: ['A', 'B'], labor: ['recorded'],
+  readback: ['listed'], rescue: ['separated'], slope: ['marked'], confirm: ['listed'], plan: ['A', 'B']
+};
+var ECHO_DRAFT_LISTS = {
+  wishes: ['mira', 'stay', 'quiet'],
+  reply: ['tried', 'stopped'],
+  readback: ['mira', 'stay', 'quiet'],
+  checks: ['slope', 'water', 'stone', 'north'],
+  confirmed: ['mira', 'stay']
+};
+function newEchoChapterState() { return { records: {}, draft: {} }; }
+function normalizeEchoChapter(raw) {
+  var d = newEchoChapterState();
+  if (!raw || typeof raw !== 'object') return d;
+  var p = raw.draft && typeof raw.draft === 'object' ? raw.draft : {};
+  Object.keys(ECHO_DRAFT_LISTS).forEach(function (k) {
+    var allow = ECHO_DRAFT_LISTS[k];
+    d.draft[k] = Array.isArray(p[k]) ? p[k].filter(function (v, i, a) { return allow.indexOf(v) >= 0 && a.indexOf(v) === i; }).slice(0, allow.length) : [];
+  });
+  ['ivan', 'berlan', 'feedback'].forEach(function (k) { if (typeof p[k] === 'string' && p[k].length < 250) d.draft[k] = p[k]; });
+  ECHO_KEYS.forEach(function (k, i) {
+    var r = raw.records && raw.records[k];
+    if (!r || !isInt(r.day) || r.day < 1 || typeof r.text !== 'string' || !r.text || r.text.length > 4000 ||
+        typeof r.source !== 'string' || !r.source || r.source.length > 180 ||
+        typeof r.choice !== 'string' || r.choice.length > 60) return;
+    if (ECHO_CHOICES[k].indexOf(r.choice) < 0) return;
+    if (i && (!d.records[ECHO_KEYS[i - 1]] || r.day < d.records[ECHO_KEYS[i - 1]].day)) return;
+    d.records[k] = { day: r.day, choice: r.choice, text: r.text, source: r.source };
+  });
+  var rr = raw.records && raw.records.route_recheck;
+  if (rr && isInt(rr.day) && rr.day >= 1 && typeof rr.text === 'string' && rr.text && rr.text.length <= 2000 &&
+      typeof rr.source === 'string' && rr.source && rr.source.length <= 180)
+    d.records.route_recheck = { day: rr.day, choice: 'rechecked', text: rr.text, source: rr.source };
+  return d;
+}
+function echoChapterState() { var st = storyState(); if (!st.echoChapter) st.echoChapter = newEchoChapterState(); return st.echoChapter; }
+function storyEchoVisited() { return !!storyState().flags.echoVisited; }
+function storyEchoMet(who) { return !!storyState().flags['echo_met_' + who]; }
+
+/* 入谷三道门槛：只管官方核验任务，不当日常到访的门槛。
+   普通访问村落不要求王都许可；居民邀请、合格向导与当前安全路线即可。 */
+function echoPermitValid() {
+  var c = capitalChapterState();
+  if (!c.records.permit) return false;
+  if (c.permitUntil < 0) return true;
+  return state.totalDay <= c.permitUntil;
+}
+function echoGateRequirements() {
+  return [
+    { id: 'permit', label: '王都有限现场核验许可', where: '王都 · 调查公署（奥蕾尔的受理台）', ok: function () { return echoPermitValid(); } },
+    { id: 'guide', label: '赫莎的带路约定（现场核验许可）', where: '白松驿舍 · 停运登记簿 · 赫莎', ok: function () { return storyHasEvidence('echo_guide'); } },
+    { id: 'neighbor', label: '邻领权限确认', where: '邻领边城 · 领地联络处 · 阿丽娅', ok: function () { return storyHasEvidence('neighbor_confirm'); } },
+    { id: 'recheck', label: '近期路线复测', where: '白松驿舍 · 停运登记簿 · 赫莎', ok: function () { return !!echoChapterState().records.route_recheck; } }
+  ];
+}
+function storyEEntryReason() {
+  if (storyState().tasks['MQ1-D05'] !== 'done') return '先完成第四幕 D05，取得王都有限现场核验许可。';
+  var m = echoGateRequirements().filter(function (q) { return !q.ok(); });
+  if (m.length) return '还缺 ' + m.length + ' 项：' + m.map(function (q) { return q.label + '（' + q.where + '）'; }).join('、');
+  return '';
+}
+function echoCanRecheck() { return echoPermitValid() && storyHasEvidence('echo_guide') && storyHasEvidence('neighbor_confirm'); }
+function echoCanConfirmNeighbor() { return echoPermitValid() && storyHasEvidence('civil_check') && storyHasEvidence('neighbor_pass'); }
+
+function echoKey(sid) { return ECHO_KEYS[Number(sid.slice(1)) - 49]; }
+function echoReady(sid) {
+  var reason = storyEEntryReason();
+  if (reason) return reason;
+  var i = Number(sid.slice(1)) - 49, c = echoChapterState();
+  if (i > 0 && !c.records[ECHO_KEYS[i - 1]]) return '先完成：' + ECHO_ACTIONS[ECHO_KEYS[i - 1]] + '。';
+  return '';
+}
+function storyEMissing(sid) {
+  return echoReady(sid) || (!echoChapterState().records[echoKey(sid)] ? '请在' + storySceneDef(sid).where + '完成「' + ECHO_ACTIONS[echoKey(sid)] + '」。' : '');
+}
+function echoRecord(key, choice, text) {
+  var c = echoChapterState();
+  if (c.records[key]) return;
+  var e = storyEntryForScene('S0' + (49 + ECHO_KEYS.indexOf(key)));
+  var source = storySceneDef(e.storyScene).where + ' · ' + e.storyScene;
+  c.records[key] = { day: state.totalDay, choice: choice, text: text, source: source };
+  var id = 'echo_chapter_' + key;
+  storyState().evidence[id] = { id: id, title: ECHO_ACTIONS[key], source: source, day: state.totalDay };
+}
+function echoDo(sid, fn) {
+  return performAction({ point: storyEntryForScene(sid), minutes: 5, guard: function () { return storyCNear(sid) && !echoReady(sid) && !echoChapterState().records[echoKey(sid)]; }, apply: fn });
+}
+function echoDraftButton(b, sid, label, fn) {
+  b.appendChild(mkBtn(label, 'sm', function () { if (!storyCNear(sid) || echoReady(sid) || echoChapterState().records[echoKey(sid)]) return; fn(echoChapterState().draft); markDirty(); saveNow(); refreshWindow(); }));
+}
+function echoActionButton(b, sid, label, fn) { b.appendChild(mkBtn(label, 'primary', function () { echoDo(sid, fn); })); }
+/* E02 的十二年互证：两份前章快照 + 现场退信与未寄出信；缺一份不拦主线，但要写明缺哪一份。 */
+function echoSourceTexts() {
+  var parts = [];
+  var rec = storyState().evidence.lena_receipt;
+  if (rec) parts.push('母亲保留的查询回单（第 ' + rec.day + ' 天 · ' + rec.source + '）');
+  var led = pineWorkState().records.ledger;
+  if (led) parts.push('白松驿舍停宿与捎信账页（第 ' + led.day + ' 天 · ' + led.source + '）');
+  return parts;
+}
+function echoMissingSources() {
+  var miss = [];
+  if (!storyHasEvidence('lena_receipt')) miss.push('母亲保留的查询回单');
+  if (!pineWorkState().records.ledger) miss.push('白松驿舍停宿与捎信账页');
+  return miss;
+}
+function buildStoryEStep(line, sid) {
+  var b = el('div', 'story-items'), c = echoChapterState(), key = line.action, p = c.draft, missing = echoReady(sid);
+  if (missing) { b.appendChild(el('p', 'req-chip', missing)); return b; }
+  if (c.records[key]) {
+    b.appendChild(el('p', 'panel-box', c.records[key].text));
+    b.appendChild(mkBtn('核对已办记录，继续', 'primary', function () { if (storyCNear(sid) && !storyEMissing(sid)) storyAdvance(sid); }));
+    return b;
+  }
+  if (p.feedback) b.appendChild(el('p', 'req-chip', p.feedback));
+  if (key === 'entry') {
+    b.appendChild(el('p', 'muted', '这三道门槛只管本次官方核验任务；谷里的日常访问、居民邀请与合格向导不受影响。'));
+    echoGateRequirements().forEach(function (q) {
+      b.appendChild(el('p', q.ok() ? 'req-chip ok' : 'req-chip', (q.ok() ? '已具备 · ' : '还缺 · ') + q.label + '（' + q.where + '）'));
+    });
+    echoActionButton(b, sid, '核对核验手续与近期路线，登记入谷', function () {
+      var cap = capitalChapterState();
+      var guide = storyState().evidence.echo_guide || {};
+      var nb = storyState().evidence.neighbor_confirm || {};
+      var rc = c.records.route_recheck || {};
+      echoRecord('entry', 'registered',
+        '第 ' + state.totalDay + ' 天登记入谷：王都有限现场核验许可（第 ' + (cap.records.permit ? cap.records.permit.day : '—') + ' 天办理，至第 ' + cap.permitUntil + ' 天有效）、赫莎带路约定（第 ' + (guide.day || '—') + ' 天）、邻领权限确认（第 ' + (nb.day || '—') + ' 天）、近期路线复测（第 ' + (rc.day || '—') + ' 天）。本次登记只覆盖官方核验任务；谷中住户的日常访问不由这道门槛决定。');
+    });
+  }
+  if (key === 'roster') {
+    b.appendChild(el('p', 'panel-box', '居民自记的送药与换粮簿：各户自己写，谁愿意让我们记，谁就有一行。'));
+    b.appendChild(el('p', 'muted', '簿上只有住户愿意记的；没写的人这里没有他那一行，不补造。'));
+    echoActionButton(b, sid, '查阅居民自记的送药与换粮簿', function () {
+      echoRecord('roster', 'read', '查阅居民自记的送药与换粮簿：谷里仍有住户，上周托人买过盐；簿上只记住户愿意记的，没写的没有那一行。伊文在测绘屋，鲁恩也在；谁愿意让我们记，逐户问本人。');
+    });
+  }
+  if (key === 'letters') {
+    var srcs = echoSourceTexts(), missL = echoMissingSources();
+    b.appendChild(el('p', 'panel-box', '伊文留存的：改约随核验材料一起转走，但他没有再确认你收到；桌上摊着旧图抄页和几封没寄出的信。'));
+    b.appendChild(el('p', 'muted', '把十二年前的线索一份份对齐：日期与来源互相补足。缺一份不拦主线，但要写明缺哪一份。'));
+    srcs.forEach(function (t) { b.appendChild(el('p', 'req-chip ok', '已核对 · ' + t)); });
+    if (missL.length) b.appendChild(el('p', 'req-chip', '缺 · ' + missL.join('、') + '（不阻断本次核对，但要写进记录）'));
+    echoActionButton(b, sid, '核对未寄出的信与旧图抄页', function () {
+      echoRecord('letters', 'checked',
+        '核对未寄出的信与旧图抄页：伊文的改约随核验材料转走，但他没有再确认收到；桌上的旧图抄页与未寄出的信互相对上。' +
+        (srcs.length ? '已有来源：' + srcs.join('；') + '。' : '') +
+        (missL.length ? '缺：' + missL.join('、') + '（本次不以这两份为前提，记录写明缺失）。' : '两份前章来源齐了。'));
+    });
+  }
+  if (key === 'reply') {
+    b.appendChild(el('p', 'panel-box', '鲁恩的信束按退回日期排着，最晚那封封口没封过，地址栏空着。'));
+    b.appendChild(el('p', 'muted', '分开记两件事：确实尝试联系过，和后来自己停下了。找到一束信不等于他无过。'));
+    echoDraftButton(b, sid, '确认：确实尝试联系过', function (d) { if (d.reply.indexOf('tried') < 0) d.reply.push('tried'); d.feedback = ''; });
+    echoDraftButton(b, sid, '确认：最后一封是自己停下的', function (d) { if (d.reply.indexOf('stopped') < 0) d.reply.push('stopped'); d.feedback = ''; });
+    echoDraftButton(b, sid, '让他一次把十二年都认下来', function (d) { d.feedback = '不能合成一句「都不管」：尝试联系与后来退缩是两件事，分开记。'; d.reply = []; });
+    if (p.reply.length === 2) echoActionButton(b, sid, '与莱娜、鲁恩分别核对旧信', function () {
+      var missR = echoMissingSources();
+      echoRecord('reply', storyChoices().e02_lena_privacy || 'A',
+        '分别核对旧信：确实尝试联系过（南线收容站、白松托信、问过旧登记处）；最后一封没有写完、也没有再寄出，这一段是他自己退的，不是邮局退回。莱娜暂不原谅，鲁恩不以病情逼和解。' +
+        (missR.length ? '缺：' + missR.join('、') + '（不阻断本次核对）。' : ''));
+    });
+  }
+  if (key === 'labor') {
+    b.appendChild(el('p', 'panel-box', '谷里三户有登记：弥拉（带孩子，想走）、另一户（想留，要通路与照护条件）、一户没同意被记录（只记匿名需求）。'));
+    b.appendChild(el('p', 'muted', '只记意愿、需要与可协助事项；不替住户决定去留。'));
+    [['mira', '记下：弥拉想带孩子离开，需要上学与看病的通路'],
+     ['stay', '记下：另一户希望留下，需核通路与照护条件'],
+     ['quiet', '记下：未同意的一户，只记匿名需求（冬储粮与常用药）']].forEach(function (a) {
+      echoDraftButton(b, sid, a[1], function (d) { if (d.wishes.indexOf(a[0]) < 0) d.wishes.push(a[0]); d.feedback = ''; });
+    });
+    echoDraftButton(b, sid, '记下：全村意见一致，都先留下', function (d) { d.feedback = '不能写成意见一致，也不能替住户决定：至少有两户愿望不同。'; d.wishes = []; });
+    if (p.wishes.length >= 2) echoActionButton(b, sid, '记录本户意愿与可协助事项', function () {
+      var w = p.wishes.slice(), txt = '逐户记录意愿、需要与可协助事项：';
+      if (w.indexOf('mira') >= 0) txt += '弥拉——带孩子离开，需要上学与看病的通路，可协助菜地与换粮的人手；';
+      if (w.indexOf('stay') >= 0) txt += '另一户——希望留下，需核通路与照护条件，可协助看水痕与修旧石基；';
+      if (w.indexOf('quiet') >= 0) txt += '未同意的一户——只记匿名需求（冬储粮、常用药），不记意愿；';
+      txt += '未同意者不计入意愿表，也不替住户决定去留。';
+      echoRecord('labor', 'recorded', txt);
+    });
+  }
+  if (key === 'readback') {
+    b.appendChild(el('p', 'panel-box', '表上原有一栏写的是「意见一致」，莱娜把那一栏划掉了。'));
+    b.appendChild(el('p', 'muted', '逐户分列，读回本人；本人没有答的，不进意愿表。'));
+    echoDraftButton(b, sid, '写成：意见一致', function (d) { d.feedback = '不能写成意见一致：至少有两户愿望不同。逐户分列。'; d.readback = []; });
+    echoDraftButton(b, sid, '逐户分列：弥拉（离开）·另一户（留下）·未同意户（只记匿名需求）', function (d) { d.readback = ['mira', 'stay', 'quiet']; d.feedback = ''; });
+    if (p.readback.length === 3) echoActionButton(b, sid, '把记录读回本人并逐户分列', function () {
+      echoRecord('readback', 'listed', '记录已读回本人并逐户分列：弥拉——想带孩子离开；另一户——希望留下，需核通路和照护条件（本人说别只记前半句）；未同意的一户——只记匿名需求，不记意愿。表上不写意见一致，未同意者不计入意愿表。');
+    });
+  }
+  if (key === 'rescue') {
+    b.appendChild(el('p', 'panel-box', '原报告副本与现场对上了：南侧石基尚存，北侧旧路被滑坡切断。'));
+    b.appendChild(el('p', 'muted', '两件事分别记：伊文当时的选择，伯兰在结项里的改写。两件事不互相抵销。'));
+    echoDraftButton(b, sid, '伊文的责任：南线先送重伤者，说会带第二批回来', function (d) { d.ivan = '南线先送重伤者，说会带第二批回来'; d.feedback = ''; });
+    echoDraftButton(b, sid, '伊文的责任：把北侧住户写成迁居完成', function (d) { d.feedback = '这是伯兰在结项里的改写，不是伊文当时的选择。两件事分别记录，不互相抵销。'; });
+    echoDraftButton(b, sid, '伯兰的改写：把北侧住户写成迁居完成', function (d) { d.berlan = '把北侧住户写成迁居完成'; d.feedback = ''; });
+    echoDraftButton(b, sid, '伯兰的改写：南线先送重伤者，说会带第二批回来', function (d) { d.feedback = '这是伊文当时的选择，不是结项里的改写。两件事分别记录，不互相抵销。'; });
+    if (p.ivan && p.berlan) echoActionButton(b, sid, '对照当年的救援选择与结项改写', function () {
+      echoRecord('rescue', 'separated', '分别记录：伊文的选择——' + p.ivan + '；伯兰的改写——' + p.berlan + '。两件事不互相抵销：伊文提过异议没追到结果，伯兰的结项未附新增逐户名单。主角只登记现场事实，不替任何一方下结论。');
+    });
+  }
+  if (key === 'slope') {
+    b.appendChild(el('p', 'panel-box', '界绳内可核：坡体、水痕、旧石基、北坡线。旧隧道仍在封条后面，没有核过。'));
+    b.appendChild(el('p', 'muted', '路线安全由正式核验人员结合测量确认；这一步只改分析方法，不作安全结论。'));
+    [['slope', '核坡体'], ['water', '核水痕'], ['stone', '核旧石基'], ['north', '核北坡线']].forEach(function (a) {
+      echoDraftButton(b, sid, a[1], function (d) { if (d.checks.indexOf(a[0]) < 0) d.checks.push(a[0]); d.feedback = ''; });
+    });
+    echoDraftButton(b, sid, '进旧隧道内部看一眼', function (d) { d.feedback = '旧隧道未核验，不进入；只在界绳内核坡体、水痕、旧石基与北坡线。'; d.checks = []; });
+    if (p.checks.length === 4) echoActionButton(b, sid, '在界绳内核坡体、水痕与北坡线', function () {
+      echoRecord('slope', 'marked', '在界绳内核过坡体、水痕、旧石基与北坡线，未进入旧隧道。北坡线可作近期路线，旧隧道仍封闭不入。路线安全由正式核验人员结合测量确认；这一步只改分析方法，不作安全结论。伊文的责任与伯兰的改写分别记录，不互相抵销。');
+    });
+  }
+  if (key === 'confirm') {
+    b.appendChild(el('p', 'panel-box', '新地图上逐户空着栏。伊文把铅笔放在桌中央，没有先画箭头。'));
+    b.appendChild(el('p', 'muted', '本人答复的照写；还没答复的留空，不替住户填。'));
+    echoDraftButton(b, sid, '确认弥拉：带孩子离开（本人已答复）', function (d) { if (d.confirmed.indexOf('mira') < 0) d.confirmed.push('mira'); d.feedback = ''; });
+    echoDraftButton(b, sid, '确认另一户：先留下，待通路与照护条件核验（本人已答复）', function (d) { if (d.confirmed.indexOf('stay') < 0) d.confirmed.push('stay'); d.feedback = ''; });
+    echoDraftButton(b, sid, '替还没答复的一户填上去向', function (d) { d.feedback = '本人还没答复，这一处留空，不替住户决定。'; d.confirmed = []; });
+    if (p.confirmed.length === 2) echoActionButton(b, sid, '逐户确认去向，未答复的留空', function () {
+      echoRecord('confirm', 'listed', '逐户确认去向：弥拉——带孩子离开（本人已答复）；另一户——先留下，通路与照护条件待核（本人已答复）；未答复的一户——留空，等本人答复，不代填。本人意愿与最低医疗条件始终满足。');
+    });
+  }
+  if (key === 'plan') {
+    var plan = storyChoices().e05_plan;
+    if (!plan) b.appendChild(el('p', 'req-chip', '先选一个去向建议，再登记协作分工。'));
+    else {
+      b.appendChild(el('p', 'muted', '本人意愿与最低医疗条件始终满足；去向建议只调整协作分工与公共普通耗材的分配，不决定谁配获救。'));
+      echoActionButton(b, sid, '登记去向建议与协作分工', function () {
+        echoRecord('plan', plan, plan === 'A'
+          ? '去向建议：先转移需要照护者。协作分工随之调整——先安排照护与陪护，公共普通耗材按批次发放。本人意愿与最低医疗条件始终满足；建议只影响分工与公共普通耗材，不决定谁配获救；未答复的一户留空，等本人答复。'
+          : '去向建议：医疗人员分段照护、其余逐户分批。协作分工随之调整——医护先分段驻点，其余住户按户分批安排接应，公共普通耗材按批次发放。本人意愿与最低医疗条件始终满足；建议只影响分工与公共普通耗材，不决定谁配获救；未答复的一户留空，等本人答复。');
+      });
+    }
+  }
+  return b;
+}
+/* 回声谷六处操作台：面板列出本处能办的场次，三道门槛写在同一页上。 */
+function openEchoSite(site) {
+  var entries = STORY_ENTRIES.filter(function (e) { return e.workSite === site; }), c = echoChapterState();
+  openWindow({ id: 'echo_site', kind: 'story', title: MS1_SITE_INFO[site][0], build: function (b) {
+    b.appendChild(el('p', 'muted', '按现场进度办理；提前来过不等于已办理。'));
+    var gate = storyEEntryReason();
+    if (gate) b.appendChild(el('p', 'req-chip', gate));
+    b.appendChild(el('div', 'section-title', '入谷三道门槛'));
+    echoGateRequirements().forEach(function (q) {
+      b.appendChild(el('p', q.ok() ? 'req-chip ok' : 'req-chip', (q.ok() ? '已具备 · ' : '还缺 · ') + q.label + '（' + q.where + '）'));
+    });
+    b.appendChild(el('p', 'muted', '这三道门槛只管官方核验任务；普通到访、居民邀请与合格向导不受影响。'));
+    if (entries.length) {
+      b.appendChild(el('div', 'section-title', '这里可以办的事'));
+      entries.forEach(function (e) {
+        var away = e.siteScene && e.siteScene !== e.scene;
+        var label = away
+          ? e.storyScene + ' · ' + e.label + '（办理地点在别处）'
+          : (storySceneSeen(e.storyScene) ? '回看 ' : '办理 ') + e.storyScene + ' · ' + e.label;
+        b.appendChild(mkBtn(label, 'primary', function () { openStoryScene(e.storyScene); }));
+      });
+    } else b.appendChild(el('p', 'muted', '这里暂时没有可办理的事。'));
+    if (c.records.route_recheck) b.appendChild(el('p', 'panel-box', '近期路线复测 · 第 ' + c.records.route_recheck.day + ' 天 · ' + c.records.route_recheck.text));
+  }, actions: [{ label: '关闭', close: true }] });
+}
+
 function newStoryState() {
   return {
     started: false,
@@ -4046,6 +4477,7 @@ function newStoryState() {
     tideWork: newTideWorkState(),
     tideChapter: newTideChapterState(),
     capitalChapter: newCapitalChapterState(),
+    echoChapter: newEchoChapterState(),
     choices: {},
     flags: {},
     lenaStance: '',
@@ -4068,6 +4500,7 @@ function normalizeStory(raw) {
   d.tideWork = normalizeTideWork(raw.tideWork);
   d.tideChapter = normalizeTideChapter(raw.tideChapter);
   d.capitalChapter = normalizeCapitalChapter(raw.capitalChapter);
+  d.echoChapter = normalizeEchoChapter(raw.echoChapter);
   d.act = isInt(raw.act) && raw.act >= 0 ? raw.act : 0;
   if (raw.tasks && typeof raw.tasks === 'object') {
     for (var k in raw.tasks) {
@@ -4148,6 +4581,7 @@ function normalizeStory(raw) {
   });
   Object.keys(d.evidence).forEach(function(k){if(k.indexOf('capital_chapter_')===0)delete d.evidence[k];});
   Object.keys(d.capitalChapter.records).forEach(function(k){var r=d.capitalChapter.records[k],id='capital_chapter_'+k;d.evidence[id]={id:id,title:CAPITAL_ACTIONS[k],source:r.source,day:r.day};});
+  Object.keys(d.echoChapter.records).forEach(function(k){var r=d.echoChapter.records[k],id=k==='route_recheck'?'echo_gate_route_recheck':'echo_chapter_'+k;d.evidence[id]={id:id,title:ECHO_ACTIONS[k]||'回声谷现场记录',source:r.source,day:r.day};});
   return d;
 }
 
@@ -4172,7 +4606,7 @@ function storySceneFinished(id) {
   /* 只读：判断一个场次演没演完，不该顺手在存档里留下一条场次记录。 */
   if (!rec) return false;
   if (def.task.indexOf('MQ1-B') === 0) return rec.seen === true;
-  if (def.task.indexOf('MQ1-C') === 0 || def.task.indexOf('MQ1-D') === 0) return rec.seen === true;
+  if (def.task.indexOf('MQ1-C') === 0 || def.task.indexOf('MQ1-D') === 0 || def.task.indexOf('MQ1-E') === 0) return rec.seen === true;
   return rec.idx >= (def.lines || []).length;
 }
 function storySceneSeen(id) { return !!storyState().scenes[id] && storyState().scenes[id].seen === true; }
@@ -4191,6 +4625,7 @@ function storyTaskUnlocked(t) {
   if (t.id === 'MQ1-B01') return !storyBEntryReason();
   if (t.id === 'MQ1-C01') return !storyCEntryReason();
   if (t.id === 'MQ1-D01') return !storyDEntryReason();
+  if (t.id === 'MQ1-E01') return !storyEEntryReason();
   if (t.id === 'MQ1-A01') {
     if (storyState().tasks['MQ1-P04'] !== 'done') return false;
     if (!storyEntryAchievement().ok) return false;
@@ -4579,6 +5014,13 @@ function openStoryScene(sceneId) {
     if(dn && dn!==sceneId){openStoryOrderPanel(dt,dn,storySceneDef(dn),sceneId);return;}
     if(!storyCNear(sceneId)){openStoryTaskPanel(dt);return;}
   }
+  if (def.task.indexOf('MQ1-E') === 0) {
+    if(storySceneSeen(sceneId)){openStoryCReview(sceneId);return;}
+    var et=storyTask(def.task),en=storyNextScene(et);
+    if(storyEEntryReason() || storyTaskStatus(et.id)==='locked'){openStoryLocked(et);return;}
+    if(en && en!==sceneId){openStoryOrderPanel(et,en,storySceneDef(en),sceneId);return;}
+    if(!storyCNear(sceneId)){openStoryTaskPanel(et);return;}
+  }
   var st = storyState();
   st.started = true;
   var t = storyTask(def.task);
@@ -4676,6 +5118,7 @@ function buildStoryStep(line, sceneId) {
   else if (line.mode === 'pine') wrap.appendChild(buildStoryBStep(line, sceneId));
   else if (line.mode === 'tide') wrap.appendChild(buildStoryCStep(line, sceneId));
   else if (line.mode === 'capital') wrap.appendChild(buildStoryDStep(line, sceneId));
+  else if (line.mode === 'echo') wrap.appendChild(buildStoryEStep(line, sceneId));
   else wrap.appendChild(el('p', 'muted', '这一步还没有实装。'));
   return wrap;
 }
@@ -4873,6 +5316,7 @@ function storyFinishScene(sceneId) {
     if (cmissing) { toast(cmissing); refreshWindow(); return; }
   }
   if(def.task.indexOf('MQ1-D')===0 && (storySceneProgress(sceneId).idx<def.lines.length || !storyCNear(sceneId) || storyDMissing(sceneId))){toast(storyDMissing(sceneId)||'请在现场完成本场。');return;}
+  if(def.task.indexOf('MQ1-E')===0 && (storySceneProgress(sceneId).idx<def.lines.length || !storyCNear(sceneId) || storyEMissing(sceneId))){toast(storyEMissing(sceneId)||'请在现场完成本场。');return;}
   var rec = storySceneProgress(sceneId);
   rec.seen = true;
   rec.day = state.totalDay;
@@ -4896,7 +5340,7 @@ function storyFinishScene(sceneId) {
   if (next) {
     var nextDef = storySceneDef(next);
     /* 下一场在别的场景：不替玩家瞬移，写清地点让玩家自己走过去 */
-    if (nextDef && ((def.task.indexOf('MQ1-B') === 0) || (def.task.indexOf('MQ1-C') === 0) || (def.task.indexOf('MQ1-D') === 0) || (storySceneLoc(next) !== storySceneLoc(sceneId) && storySceneLoc(next) !== 'memory'))) {
+    if (nextDef && ((def.task.indexOf('MQ1-B') === 0) || (def.task.indexOf('MQ1-C') === 0) || (def.task.indexOf('MQ1-D') === 0) || (def.task.indexOf('MQ1-E') === 0) || (storySceneLoc(next) !== storySceneLoc(sceneId) && storySceneLoc(next) !== 'memory'))) {
       openStoryNextPlace(t, next, nextDef);
       return;
     }
@@ -5102,6 +5546,7 @@ function storyLockReason(t) {
   if (t.id === 'MQ1-B01') return storyBEntryReason() || '条件已满足。';
   if (t.id === 'MQ1-C01') return storyCEntryReason() || '条件已满足。';
   if (t.id === 'MQ1-D01') return storyDEntryReason() || '条件已满足。';
+  if (t.id === 'MQ1-E01') return storyEEntryReason() || '条件已满足。';
   if (t.id === 'MQ1-A01') {
     if (storyState().tasks['MQ1-P04'] !== 'done') return '先完成序章：' + storyTaskTitle('MQ1-P04') + '。';
     var ach = storyEntryAchievement();
@@ -5218,9 +5663,9 @@ function storyNextStepText(taskId) {
 
 function openStoryLog() {
   openWindow({
-    id: 'story_log', kind: 'story', wide: true, title: '主线 · 长风有归处（至第四幕）',
+    id: 'story_log', kind: 'story', wide: true, title: '主线 · 长风有归处（至第五幕）',
     build: function (b) {
-      b.appendChild(el('p', 'muted', '第九版第一部主线。序章至第四幕共 24 个任务已实装；第五幕及以后仍在制作中，这里如实写「未实装」。'));
+      b.appendChild(el('p', 'muted', '第九版第一部主线。序章至第五幕共 29 个任务已实装；终幕与后日谈仍在制作中，这里如实写「未实装」。'));
       var st = storyState();
       var curAct = 0;
       STORY_TASKS.forEach(function (t) {
@@ -5271,6 +5716,7 @@ function openStoryLog() {
         b.appendChild(el('p', 'story-evidence', '第 ' + r.day + ' 天 · ' + r.source + '：' + r.text));
       });
       Object.keys(capitalChapterState().records).forEach(function(k){var r=capitalChapterState().records[k];b.appendChild(el('p',null,CAPITAL_ACTIONS[k]+' · 第 '+r.day+' 天 · '+r.source+'：'+r.text));});
+      Object.keys(echoChapterState().records).forEach(function(k){var r=echoChapterState().records[k];b.appendChild(el('p',null,ECHO_ACTIONS[k]+' · 第 '+r.day+' 天 · '+r.source+'：'+r.text));});
       Object.keys(tideChapterState().records).forEach(function (k) {
         var r = tideChapterState().records[k];
         b.appendChild(el('p', 'story-evidence', '第 ' + r.day + ' 天 · ' + r.source + '：' + r.text));
@@ -7471,6 +7917,12 @@ function doSwitchScene(to, tx, ty, face) {
   setTimeout(function () {
     state.sceneId = to;
     if (to === 'house') tutorialEvent('entered');
+    /* §26.4：提前合法到过谷里的玩家算「来过」，后面不强制重演初访。 */
+    if (to === 'ms1_echo_village' || to === 'ms1_echo_fork' || to === 'ms1_echo_route' ||
+        to === 'ms1_echo_hall' || to === 'ms1_echo_house') {
+      var st = state.story;
+      if (st) { if (!st.flags) st.flags = {}; if (!st.flags.echoVisited) st.flags.echoVisited = true; }
+    }
     state.player.x = clamp(tx, 0, MAPS[to].w - 1);
     state.player.y = clamp(ty, 0, MAPS[to].h - 1);
     /* 换层落点的朝向：楼梯落点要求「面朝走出来的那侧」，
@@ -12687,6 +13139,13 @@ function npcDialogue(id) {
 
 function talkToNpc(id) {
   var text = npcDialogue(id);
+  /* §26.4：合法提前遇见伊文、鲁恩、弥拉要照常出现并直答，
+     不因为主线还没到就隐形；只多一句「已重逢、待补全旧事」。 */
+  if (id === 'ms1_iven' || id === 'ms1_ruen' || id === 'ms1_mira') {
+    var st = state.story;
+    if (st) { if (!st.flags) st.flags = {}; st.flags['echo_met_' + id.slice(4)] = true; }
+    if (storyState().tasks['MQ1-E02'] !== 'done') text += '\n（已重逢、待补全旧事：本人还有一段没说完的事。）';
+  }
   var d = npcDaily(id);
   var gained = 0;
   if (!d.chat) {
@@ -24613,7 +25072,7 @@ var CROSS_BORDER_ROUTES = {
   echo: {
     key: 'echo', name: '山径线 · 回声谷', gate: 'ms1_echo', credential: 'echo_guide',
     path: '白松旧驿村 → 白松山径 → 旧官道分岔 → 回声谷 · 村落',
-    note: '第五幕从回声谷开始：白松的通行之外，还要现场核验许可与向导带路。',
+    note: '第五幕从回声谷开始：白松的通行之外还要现场核验许可与向导带路；日常到访不另设门槛，官方核验任务另需王都许可、邻领权限确认与近期路线复测。',
     requires: [
       { id: 'letter', label: '民用资料核验函', where: '白蔷薇宫城 · 一层门厅（塞琳交付）', ok: function () { return storyHasEvidence('civil_check'); } },
       { id: 'register', label: '邻领民用行程登记', where: '北境邻领边城 · 领地联络处（阿丽娅）', ok: function () { return storyHasEvidence('neighbor_pass'); } },
@@ -24966,6 +25425,11 @@ function openNeighborSite(site){
       if(storyHasEvidence('neighbor_pass'))b.appendChild(el('p','req-chip ok','民用行程已登记：邻领通行文书在手（第 '+((storyState().evidence.neighbor_pass||{}).day||'—')+' 天）。'));
       else if(storyHasEvidence('civil_check'))militarySiteButton(b,site,'登记民用行程 · 领邻领通行文书 · 15分钟',{minutes:15,guard:function(){return storyHasEvidence('civil_check')&&!storyHasEvidence('neighbor_pass');},reason:'登记已经办过；同一趟行程不重复登记。'},function(){crossBorderGrant(CROSS_BORDER_ROUTES.pine,'邻领边城 · 领地联络处 · 阿丽娅');});
       else b.appendChild(el('p','req-chip','登记民用行程要带白蔷薇宫的民用资料核验函（宫城一层门厅 · 塞琳交付）。'));
+      /* 第五幕：邻领权限确认。王都许可本身写明「不是安全通行证」，
+         这里只按本地权限复核官方核验的范围，不代替入谷安全线。 */
+      if(storyHasEvidence('neighbor_confirm'))b.appendChild(el('p','req-chip ok','邻领权限确认已办（第 '+((storyState().evidence.neighbor_confirm||{}).day||'—')+' 天）：官方核验范围按本地权限复核确认。'));
+      else if(echoCanConfirmNeighbor())militarySiteButton(b,site,'按本地权限确认官方核验范围 · 20分钟',{minutes:20,guard:function(){return echoCanConfirmNeighbor()&&!storyHasEvidence('neighbor_confirm');},reason:'已经确认过，不重复办理。'},function(){storyRecordEvidence('neighbor_confirm','邻领边城 · 领地联络处 · 阿丽娅');});
+      else b.appendChild(el('p','req-chip','邻领权限确认要带王都的有限核验许可；到邻领边城 · 领地联络处找阿丽娅。'));
     }
     if(site==='neighbor_exchange'){
       if(n.caseFound&&!n.choice&&!n.settled)[['trade','试签一季互市合同'],['demarcate','共同复测界标并临时维持现状']].forEach(function(o){militarySiteButton(b,site,o[1]+' · 15分钟',{minutes:15,guard:function(){return n.caseFound&&!n.choice&&!n.settled;}},function(){n.choice=o[0];n.signedDay=state.totalDay;});});
@@ -24996,12 +25460,12 @@ var MS1_SITE_INFO = {
   ms1_path_fork2: ['第二处岔口 · 浅溪', '溪水不深，踩过去就行；雨后水涨，得看水痕再决定。', '第二幕要在这里做一次路况判断。'],
   ms1_path_fork3: ['第三处岔口 · 风口', '风口常年刮风，冬天会结冰。老路在这里断掉，只能绕。', '第二幕要在这里做一次路况判断。'],
   ms1_pine_ledger: ['赫莎的停运登记簿', '谁来过、谁住下、谁又走了，都记在这本簿子上。', '第二幕会在这里查到伊文留下的一笔。'],
-  ms1_echo_tunnel: ['封闭的旧隧道口', '旧官道穿山用的隧道已经封了。封条上的日期和署名牌子对不上。', '第五幕要在这里核对地质与封隧道的经过。'],
-  ms1_echo_site: ['当年的救援现场标记', '十二年前的重伤者是从这一侧抬出去的。石头上还留着刻痕。', '第五幕要在这里对照当年的救援选择。'],
-  ms1_echo_garden: ['弥拉的菜地', '有人打算迁出，也有人把菜地一直种到今天。去留是每户自己的事。', '第五幕要在这里逐户听取去留意见。'],
-  ms1_echo_table: ['公屋的民意桌', '村里开会的地方。桌上有各户的名单，也有人先写好的意见。', '第五幕要在这里听完每一户的说法。'],
-  ms1_echo_desk: ['伊文的测绘桌', '摊着没画完的图和几封没寄出的信。桌面很整齐，纸边却磨得起了毛。', '第五幕要在这里读出旧图与未寄出的信。'],
-  ms1_echo_staging: ['北坡接应坪', '临时通道尽头可以落脚的地方。帐篷、柴堆和几根量过坡度的木桩。', '终幕的接应与分工要在这里准备。'],
+  ms1_echo_tunnel: ['封闭的旧隧道口', '旧官道穿山用的隧道已经封了。封条上的日期和署名牌子对不上。', '第五幕在界绳内核坡体、水痕与北坡线，不进隧道。'],
+  ms1_echo_site: ['当年的救援现场标记', '十二年前的重伤者是从这一侧抬出去的。石头上还留着刻痕。', '第五幕在这里对照当年的救援选择与结项改写，两件事分别记录。'],
+  ms1_echo_garden: ['弥拉的菜地', '有人打算迁出，也有人把菜地一直种到今天。去留是每户自己的事。', '第五幕在这里记录本户意愿、需要与可协助事项，不替住户决定。'],
+  ms1_echo_table: ['公屋的民意桌', '村里开会的地方。桌上有各户的名单，也有人先写好的意见。', '第五幕在这里查住户自记簿、把记录读回本人，并逐户确认去向。'],
+  ms1_echo_desk: ['伊文的测绘桌', '摊着没画完的图和几封没寄出的信。桌面很整齐，纸边却磨得起了毛。', '第五幕在这里核对未寄出的信、旧图抄页，并与莱娜、鲁恩分别核对旧信。'],
+  ms1_echo_staging: ['北坡接应坪', '临时通道尽头可以落脚的地方。帐篷、柴堆和几根量过坡度的木桩。', '第五幕在这里登记去向建议与协作分工；终幕的接应也在这里准备。'],
   ms1_tide_customs: ['海关报关棚', '过关要报关、验货、盖章。棚里排着队的人一半是船上的，一半是工人街的。', '第三幕要在这里理清货与人的来路。'],
   ms1_tide_cargo: ['工人街的货箱堆场', '货箱按船、按班次堆着。标签上的名字有时对不上箱子里的东西。', '第三幕要在这里看船与货真正到岸。'],
   ms1_tide_bollard: ['海堤上的缆桩与绳', '缆桩是岸上接船的地方。绳还够用，风大的时候要提前收。', '第三幕的岸上接应会用到这里。'],
@@ -25221,6 +25685,15 @@ function openPineWorkSite(site) {
       if (storyHasEvidence('echo_guide')) b.appendChild(el('p', 'req-chip ok', '赫莎已经答应带路。'));
       else if (crossBorderReadyFor(CROSS_BORDER_ROUTES.echo)) extendedWorkButton(b, site, '约定赫莎带路上山径 · 20分钟', { minutes: 20, guard: function () { return !storyHasEvidence('echo_guide') && crossBorderReadyFor(CROSS_BORDER_ROUTES.echo); } }, function () { crossBorderGrant(CROSS_BORDER_ROUTES.echo, '白松驿舍 · 停运登记簿 · 赫莎'); });
       else b.appendChild(el('p', 'req-chip', '还缺：' + crossBorderMissingText('echo')));
+      /* 第五幕：近期路线复测。带路约定只是向导，能走的路要靠复测。 */
+      var rc=echoChapterState().records.route_recheck;
+      if(rc)b.appendChild(el('p','req-chip ok','近期路线复测已登记（第 '+rc.day+' 天）：'+rc.text));
+      else if(echoCanRecheck())extendedWorkButton(b,site,'与赫莎、核验队复测近期路线 · 30分钟',{minutes:30,guard:function(){return echoCanRecheck()&&!echoChapterState().records.route_recheck;},reason:'已经复测过，不重复登记。'},function(){
+        var c=echoChapterState();
+        c.records.route_recheck={day:state.totalDay,choice:'rechecked',text:'赫莎与核验队复测近期路线：山径外段与旧官道分岔通行，北坡线可作近期安全路线；旧隧道仍封闭不入。本次复测只覆盖官方核验任务的入谷路线，不替代现场测量结论。',source:'白松驿舍 · 赫莎的停运登记簿 · 赫莎'};
+        storyState().evidence.echo_gate_route_recheck={id:'echo_gate_route_recheck',title:ECHO_ACTIONS.route_recheck,source:'白松驿舍 · 赫莎的停运登记簿 · 赫莎',day:state.totalDay};
+      });
+      else b.appendChild(el('p','req-chip','近期路线复测要王都许可与邻领确认；回白松驿舍找赫莎。'));
     }
     info[1].forEach(function (key) {
       var def = PINE_WORK_ACTIONS[key], r = pineWorkState().records[key], reason = pineWorkReason(key);
@@ -25246,6 +25719,7 @@ function openPineWorkSite(site) {
 }
 function openMs1Site(site) {
   if(CAPITAL_SITES.indexOf(site)>=0){openCapitalSite(site);return;}
+  if(ECHO_SITES.indexOf(site)>=0){openEchoSite(site);return;}
   if (PINE_WORK_SITES[site]) { openPineWorkSite(site); return; }
   if (TIDE_WORK_SITES[site]) { openTideWorkSite(site); return; }
   var info = MS1_SITE_INFO[site];
@@ -27270,6 +27744,11 @@ window.__MOSS__ = {
   storyBMissing: storyBMissing, storyCMissing: storyCMissing,
   storyBNear: storyBNear, storyCNear: storyCNear,
   capitalChapterState: capitalChapterState, storyDEntryReason: storyDEntryReason, storyDMissing: storyDMissing,
+  /* 第五幕：回声谷十场、十项现场事实与入谷三道门槛（界面与测试读同一份判断） */
+  echoChapterState: echoChapterState, storyEEntryReason: storyEEntryReason, storyEMissing: storyEMissing,
+  echoGateRequirements: echoGateRequirements, echoPermitValid: echoPermitValid,
+  storyEchoVisited: storyEchoVisited, storyEchoMet: storyEchoMet, openEchoSite: openEchoSite,
+  ECHO_KEYS: ECHO_KEYS, ECHO_ACTIONS: ECHO_ACTIONS, ECHO_SITES: ECHO_SITES,
   TIDE_WORK_ACTIONS: TIDE_WORK_ACTIONS, TIDE_CHAPTER_ACTIONS: TIDE_CHAPTER_ACTIONS,
   openTideWorkSite: openTideWorkSite, openStoryCReview: openStoryCReview,
   wetlandLifeState:wetlandLifeState, professionalLifeState:professionalLifeState, militaryLifeState:militaryLifeState,
