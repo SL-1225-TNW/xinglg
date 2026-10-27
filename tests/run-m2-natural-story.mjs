@@ -1,8 +1,9 @@
-/* 全新存档连续四幕：只以真实键鼠改变玩法状态；__MOSS__ 只读路线和结果。
+/* 全新存档连续五幕：只以真实键鼠改变玩法状态；__MOSS__ 只读路线和结果。
  * 不注入任务、物品、金钱、时间或落点。--resume 仅用于开发诊断，读取本套件
  * 通过真实操作保存的检查点；默认与 CI 必须从新档开始。公共地图仅用已到访节点。
  * 第四幕段（王都）：河港柜台真实办理皇家驿路接驳登记 → 潮汐港北口步行进
  * 王都驿站街 → 五处操作台逐场真实办理 → D01—D05 全部完成。
+ * 第五幕：真实办理邻领确认、白松复测，首次步行入谷并完成十场。
  * 自动化用时不代表初见玩家时长，也不代表实体手机手感。
  */
 import assert from 'node:assert/strict';
@@ -379,6 +380,50 @@ async function capitalAct(){
   await capitalEntry('S048');await capitalPlay('S048');
   await checkpoint('capital');
 }
+/* 第五幕：所有门槛和场次均由真实步行、E 与按钮产生。 */
+const ECHO_BUTTONS={entry:'核对核验手续与近期路线，登记入谷',roster:'查阅居民自记的送药与换粮簿',letters:'核对未寄出的信与旧图抄页',reply:'与莱娜、鲁恩分别核对旧信',labor:'记录本户意愿与可协助事项',readback:'把记录读回本人并逐户分列',rescue:'对照当年的救援选择与结项改写',slope:'在界绳内核坡体、水痕与北坡线',confirm:'逐户确认去向，未答复的留空',plan:'登记去向建议与协作分工'};
+async function echoStep(key){
+ const choices={reply:['确认：确实尝试联系过','确认：最后一封是自己停下的'],labor:['记下：弥拉想带孩子离开，需要上学与看病的通路','记下：另一户希望留下，需核通路与照护条件'],readback:['逐户分列：弥拉（离开）·另一户（留下）·未同意户（只记匿名需求）'],rescue:['伊文的责任：南线先送重伤者，说会带第二批回来','伯兰的改写：把北侧住户写成迁居完成'],slope:['核坡体','核水痕','核旧石基','核北坡线'],confirm:['确认弥拉：带孩子离开（本人已答复）','确认另一户：先留下，待通路与照护条件核验（本人已答复）']};
+ for(const label of choices[key]||[])await click(label);
+ await click(ECHO_BUTTONS[key]);
+ const rec=await page.evaluate(k=>__MOSS__.echoChapterState().records[k],key);
+ check(!!(rec&&rec.source&&rec.day>0),'第五幕现场记录来源与日期 '+key);
+ await click('核对已办记录，继续');
+}
+async function echoEntry(sid){
+ const e=await page.evaluate(id=>__MOSS__.STORY_ENTRIES.find(x=>x.storyScene===id),sid);
+ assert.ok(e,'没有第五幕入口 '+sid);
+ const it=await page.evaluate(e=>{const a=__MOSS__.INTERACTABLES[e.scene]||[];const own=a.find(i=>i.id===e.id);const site=a.find(i=>i.work===e.workSite);const i=own||site;return i?{...i,scene:e.scene,own:!!own}:null;},e);
+ assert.ok(it,'找不到第五幕入口 '+sid);
+ await go(it.scene);check(await point(it),'真实按 E 走到 '+sid+' 入口');
+ if(!it.own)await click('办理 '+sid+' · '+e.label);
+ check((await winTitle(page)).startsWith(sid+' ·'),'真实开演 '+sid);
+}
+async function echoPlay(sid){
+ await echoEntry(sid);
+ for(let n=0;n<90;n++){
+  const line=await page.evaluate(id=>{const M=__MOSS__;return M.STORY_SCENES[id].lines[M.state.story.scenes[id].idx]||null;},sid);
+  if(!line)break;
+  if(line.choice){await page.locator('.story-options button').first().click();await page.waitForTimeout(150);}
+  else if(line.step)await echoStep(line.action);
+  else await storyNext();
+ }
+ const before=await scene();await storyNext();
+ check(await page.evaluate(id=>__MOSS__.storySceneSeen(id),sid),'自然完成 '+sid);
+ eq(await scene(),before,'下一场不替玩家切图 '+sid);
+}
+async function echoAct(){
+ check(await page.evaluate(()=>__MOSS__.storyHasEvidence('echo_guide')),'前章真实取得赫莎带路约定');
+ await site('neighbor_case');await click('按本地权限确认官方核验范围');
+ check(await page.evaluate(()=>__MOSS__.storyHasEvidence('neighbor_confirm')),'真实办理邻领权限确认');
+ await site('ms1_pine_ledger');await click('与赫莎、核验队复测近期路线');
+ check(await page.evaluate(()=>!!__MOSS__.echoChapterState().records.route_recheck),'真实办理近期路线复测');
+ check(!(await page.evaluate(()=>!!__MOSS__.state.travel.discovered['echo.valley'])),'回声谷公共站此前未登记');
+ await go('ms1_echo_village');
+ check(await page.evaluate(()=>!!__MOSS__.state.travel.discovered['echo.valley']),'首次步行入谷后登记公共站');
+ for(let i=49;i<=58;i++)await echoPlay('S'+String(i).padStart(3,'0'));
+ await checkpoint('echo');
+}
 try{
  const resume=process.argv.find(a=>a.startsWith('--resume='))?.slice(9);
  if(resume){
@@ -472,7 +517,14 @@ try{
  await page.reload();await page.getByRole('button',{name:'继续游戏',exact:true}).click();
  eq(await page.evaluate(()=>__MOSS__.state.story.tasks),end.tasks,'自然取得的二十四任务在正式读档后保留');
  eq(await page.evaluate(()=>Object.keys(__MOSS__.capitalChapterState().records).length),10,'第四幕现场事实在正式读档后保留');
- console.log('PASS 四幕自然串联',checks,'项，自动化耗时秒',Math.round((Date.now()-started)/1000));
+ await echoAct();
+ const echo=await page.evaluate(()=>({tasks:{...__MOSS__.state.story.tasks},records:__MOSS__.echoChapterState().records}));
+ eq(['E01','E02','E03','E04','E05'].map(k=>echo.tasks['MQ1-'+k]),Array(5).fill('done'),'第五幕五任务全部完成');
+ eq(Object.keys(echo.records).length,11,'第五幕十项现场事实与路线复测齐全');
+ await page.reload();await page.getByRole('button',{name:'继续游戏',exact:true}).click();
+ eq(await page.evaluate(()=>__MOSS__.state.story.tasks),echo.tasks,'五幕任务正式读档后保留');
+ eq(await page.evaluate(()=>__MOSS__.echoChapterState().records),echo.records,'第五幕现场事实正式读档后保留');
  eq(errors,[],'自然路线无浏览器错误');
+ console.log('PASS 五幕自然串联',checks,'项通过，自动化耗时秒',Math.round((Date.now()-started)/1000));
 } catch(e){console.error('FAIL SNAPSHOT',JSON.stringify(await snap(page)));await checkpoint('failure');throw e;}
 finally{await browser.close();}
