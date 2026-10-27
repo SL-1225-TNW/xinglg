@@ -2769,6 +2769,105 @@ STORY_ENTRIES.push.apply(STORY_ENTRIES, [
 ]);
 STORY_ENTRIES.filter(function(e){return e.task.indexOf('MQ1-E')===0;}).forEach(function(e){STORY_SCENE_LOC[e.storyScene]=e.scene;});
 
+/* M3／F01：总规 §27.7 的筹备两场；此切片不启动行动窗口。 */
+STORY_TASKS.push({ id:'MQ1-F01', act:7, actName:'终幕 · 愿此长路，终有归人', title:'出发以前，先道珍重',
+  goal:'核对人员照护、通道条件与家务安排；尚不启动行动窗口。', scenes:['S059','S060'], next:null, exp:60 });
+STORY_TASKS.find(function(t){return t.id==='MQ1-E05';}).next='MQ1-F01';
+Object.assign(STORY_SCENES, {
+ S059:{task:'MQ1-F01',place:'内景 回声谷公屋',time:'日',where:'回声谷 · 公屋的民意桌',lines:[
+  {who:'',text:'阿丽娅在邻领现场人员的记录旁签下接应范围。主角逐项核对名单与照护需要。'},
+  {who:'阿丽娅',text:'危险旧隧道仍封着。北坡临时线要在出发前再查，合格才放行。'},
+  {who:'娜汀（已转交的回复，由莱娜读出）',text:'可以在接应坪会合。先报需要担架、搀扶和普通同行的人数。'},
+  {who:'莱娜',text:'我们不能只写“请来帮忙”。得把人家要做什么说清。'},
+  {who:'主角',text:'那就一项一项确认。缺的先补，不催谁上路。'},
+  {step:'finale_prepare',mode:'finale',action:'prepare',text:'核对人员照护、通道条件与家务覆盖'} ]},
+ S060:{task:'MQ1-F01',place:'外景 回声谷安全联络点',time:'日',where:'回声谷 · 北坡接应坪',lines:[
+  {who:'',text:'主角核对返家与照料计划。莱娜收起一份尚未确认的出发单，给主角留下选择空间。'},
+  {choice:'f01_home',prompt:'家里的安排要怎样继续？',options:[
+   {id:'A',text:'我先把家里续约和饲料安排好。'}, {id:'B',text:'安排已经成立，先去核接应回复。'}]},
+  {who:'莱娜',text:'这里等你确认。不要替别人守着灯，却把自己的家丢在黑里。',when:function(){return storyChoices().f01_home==='A';}},
+  {who:'莱娜',text:'我们还没有开表计时。等各处都答复，再决定哪天走。',when:function(){return storyChoices().f01_home==='B';}},
+  {step:'finale_home',mode:'finale',action:'home',text:'核对家务安排，保留未确认的出发单'} ]}
+});
+STORY_ENTRIES.push(
+ {id:'ms3_f_s059',scene:'ms1_echo_hall',x:10,y:9,label:'出发以前的人员与照护筹备',task:'MQ1-F01',storyScene:'S059',workSite:'ms1_echo_table'},
+ {id:'ms3_f_s060',scene:'ms1_echo_route',x:30,y:10,label:'返家与照料安排',task:'MQ1-F01',storyScene:'S060',workSite:'ms1_echo_staging'}
+);
+STORY_SCENE_LOC.S059='ms1_echo_hall'; STORY_SCENE_LOC.S060='ms1_echo_route';
+
+var FINALE_KEYS=['prepare','home'];
+function newFinaleChapterState(){return {records:{}};}
+function normalizeFinaleChapter(raw){
+ var d=newFinaleChapterState(), source=raw&&raw.records;
+ FINALE_KEYS.forEach(function(k,i){
+  var r=source&&source[k];
+  if(!r||!isInt(r.day)||r.day<1||typeof r.text!=='string'||!r.text||r.text.length>4000||
+     typeof r.source!=='string'||!r.source||r.source.length>180||
+     (k==='prepare'&&r.choice!=='preview')||(k==='home'&&['A','B'].indexOf(r.choice)<0))return;
+  if(i&&(!d.records.prepare||r.day<d.records.prepare.day))return;
+  d.records[k]={day:r.day,choice:r.choice,text:r.text,source:r.source};
+ });
+ return d;
+}
+function finaleChapterState(){
+ var st=storyState();
+ if(!st.finaleChapter||typeof st.finaleChapter!=='object')st.finaleChapter=newFinaleChapterState();
+ if(!st.finaleChapter.records||typeof st.finaleChapter.records!=='object')st.finaleChapter.records={};
+ return st.finaleChapter;
+}
+function storyFEntryReason(){
+ if(storyState().tasks['MQ1-E05']!=='done')return '先完成第五幕 E05，记录逐户意见与去向建议。';
+ var r=echoChapterState().records;
+ if(!r.confirm||!r.plan||!r.slope)return '先完成第五幕的逐户确认、去向建议与现场核验记录。';
+ return '';
+}
+function finaleMissing(sid){
+ var reason=storyFEntryReason(),r=finaleChapterState().records;
+ if(reason)return reason;
+ if(sid==='S060'&&!r.prepare)return '先在回声谷公屋核对筹备三栏。';
+ return !r[sid==='S059'?'prepare':'home']?'请在现场核对并记录本场筹备。':'';
+}
+function finaleCareText(gap){
+ return !gap.need&&!gap.crops?'家中没有需要委托的未熟作物或牲畜。':farmPlanCareGapText(gap);
+}
+function buildStoryFStep(line,sid){
+ var box=el('div','story-items'),c=finaleChapterState(),key=line.action,reason=storyFEntryReason();
+ if(reason){box.appendChild(el('p','req-chip',reason));return box;}
+ if(c.records[key]){
+  box.appendChild(el('p','panel-box',c.records[key].text));
+  box.appendChild(mkBtn('核对已办记录，继续','primary',function(){if(storyCNear(sid)&&!finaleMissing(sid))storyAdvance(sid);}));
+  return box;
+ }
+ if(key==='home'&&!c.records.prepare){box.appendChild(el('p','req-chip','先在回声谷公屋核对筹备三栏。'));return box;}
+ var rec=echoChapterState().records, gap=farmPlanCareGap(3);
+ box.appendChild(el('div','section-title','人员照护与本人意见'));
+ box.appendChild(el('p',null,rec.confirm.text));
+ box.appendChild(el('p',null,rec.plan.text));
+ box.appendChild(el('div','section-title','通道条件'));
+ box.appendChild(el('p',null,'旧隧道封闭；北坡临时线出发前须重新核验，旧记录不等于当前放行。'));
+ box.appendChild(el('div','section-title','三日家务覆盖预览'));
+ box.appendChild(el('p',gap.ok?'req-chip ok':'req-chip',finaleCareText(gap)));
+ box.appendChild(el('p','muted','可暂停返家，在委托日志的长期安排中办理照料或补充口粮；这里只预览，不代办。尚未开始三日行动窗口。'));
+ if(key==='home'&&storyChoices().f01_home==='B'&&!gap.ok){
+  box.appendChild(el('p','req-chip','家务覆盖尚未成立；可先返家安排，或回到本场改选。'));
+  box.appendChild(mkBtn('先安排家务','sm',function(){storyState().choices.f01_home='A';markDirty();saveNow();refreshWindow();}));
+  return box;
+ }
+ box.appendChild(mkBtn(key==='prepare'?'记录筹备预览':'记录返家与照料选择','primary',function(){
+  performAction({point:storyEntryForScene(sid),minutes:5,guard:function(){
+   var r=finaleChapterState().records;
+   return storyCNear(sid)&&!storyFEntryReason()&&!r[key]&&(key==='prepare'||(!!r.prepare&&['A','B'].indexOf(storyChoices().f01_home)>=0&&(storyChoices().f01_home!=='B'||farmPlanCareGap(3).ok)));
+  },apply:function(){
+   var nowGap=farmPlanCareGap(3),choice=key==='prepare'?'preview':storyChoices().f01_home;
+   var text=key==='prepare'?'逐户意见与去向建议来自第五幕记录；旧隧道封闭，北坡须在出发前重新核验。':'选择'+(choice==='A'?'先安排家务':'已成立的安排，继续核回执')+'；未确认出发单。';
+   text+=' 第 '+state.totalDay+' 天照料预览：'+finaleCareText(nowGap)+' 三日行动窗口尚未启动。';
+   var source=storySceneDef(sid).where+' · '+sid;
+   finaleChapterState().records[key]={day:state.totalDay,choice:choice,text:text,source:source};
+  }});
+ }));
+ return box;
+}
+
 var CAPITAL_KEYS = ['arrival','lodging','intake','witness','original','compare','questions','resolution','permit','departure'];
 var CAPITAL_ACTIONS = {arrival:'皇家驿路到站登记',lodging:'专款床位与预约',intake:'按来源受理与查阅许可',witness:'科林的自愿说明',original:'原件查阅登记',compare:'日期签核差异与副本编号',questions:'三项质询事实',resolution:'补正与公开范围',permit:'有限现场核验许可',departure:'待填写的现住意见'};
 var CAPITAL_SITES = ['ms1_capital_notice','ms1_capital_letters','ms1_capital_desk','ms1_capital_archive','ms1_capital_hearing'];
@@ -3194,6 +3293,7 @@ function newStoryState() {
     tideChapter: newTideChapterState(),
     capitalChapter: newCapitalChapterState(),
     echoChapter: newEchoChapterState(),
+    finaleChapter: newFinaleChapterState(),
     choices: {},
     flags: {},
     lenaStance: '',
@@ -3217,6 +3317,7 @@ function normalizeStory(raw) {
   d.tideChapter = normalizeTideChapter(raw.tideChapter);
   d.capitalChapter = normalizeCapitalChapter(raw.capitalChapter);
   d.echoChapter = normalizeEchoChapter(raw.echoChapter);
+  d.finaleChapter = normalizeFinaleChapter(raw.finaleChapter);
   d.act = isInt(raw.act) && raw.act >= 0 ? raw.act : 0;
   if (raw.tasks && typeof raw.tasks === 'object') {
     for (var k in raw.tasks) {
@@ -3322,7 +3423,7 @@ function storySceneFinished(id) {
   /* 只读：判断一个场次演没演完，不该顺手在存档里留下一条场次记录。 */
   if (!rec) return false;
   if (def.task.indexOf('MQ1-B') === 0) return rec.seen === true;
-  if (def.task.indexOf('MQ1-C') === 0 || def.task.indexOf('MQ1-D') === 0 || def.task.indexOf('MQ1-E') === 0) return rec.seen === true;
+  if (def.task.indexOf('MQ1-C') === 0 || def.task.indexOf('MQ1-D') === 0 || def.task.indexOf('MQ1-E') === 0 || def.task.indexOf('MQ1-F') === 0) return rec.seen === true;
   return rec.idx >= (def.lines || []).length;
 }
 function storySceneSeen(id) { return !!storyState().scenes[id] && storyState().scenes[id].seen === true; }
@@ -3342,6 +3443,7 @@ function storyTaskUnlocked(t) {
   if (t.id === 'MQ1-C01') return !storyCEntryReason();
   if (t.id === 'MQ1-D01') return !storyDEntryReason();
   if (t.id === 'MQ1-E01') return !storyEEntryReason();
+  if (t.id === 'MQ1-F01') return !storyFEntryReason();
   if (t.id === 'MQ1-A01') {
     if (storyState().tasks['MQ1-P04'] !== 'done') return false;
     if (!storyEntryAchievement().ok) return false;
@@ -3737,6 +3839,13 @@ function openStoryScene(sceneId) {
     if(en && en!==sceneId){openStoryOrderPanel(et,en,storySceneDef(en),sceneId);return;}
     if(!storyCNear(sceneId)){openStoryTaskPanel(et);return;}
   }
+  if (def.task.indexOf('MQ1-F') === 0) {
+    if(storySceneSeen(sceneId)){openStoryCReview(sceneId);return;}
+    var ft=storyTask(def.task),fn=storyNextScene(ft);
+    if(storyFEntryReason() || storyTaskStatus(ft.id)==='locked'){openStoryLocked(ft);return;}
+    if(fn && fn!==sceneId){openStoryOrderPanel(ft,fn,storySceneDef(fn),sceneId);return;}
+    if(!storyCNear(sceneId)){openStoryTaskPanel(ft);return;}
+  }
   var st = storyState();
   st.started = true;
   var t = storyTask(def.task);
@@ -3835,6 +3944,7 @@ function buildStoryStep(line, sceneId) {
   else if (line.mode === 'tide') wrap.appendChild(buildStoryCStep(line, sceneId));
   else if (line.mode === 'capital') wrap.appendChild(buildStoryDStep(line, sceneId));
   else if (line.mode === 'echo') wrap.appendChild(buildStoryEStep(line, sceneId));
+  else if (line.mode === 'finale') wrap.appendChild(buildStoryFStep(line, sceneId));
   else wrap.appendChild(el('p', 'muted', '这一步还没有实装。'));
   return wrap;
 }
@@ -4033,6 +4143,7 @@ function storyFinishScene(sceneId) {
   }
   if(def.task.indexOf('MQ1-D')===0 && (storySceneProgress(sceneId).idx<def.lines.length || !storyCNear(sceneId) || storyDMissing(sceneId))){toast(storyDMissing(sceneId)||'请在现场完成本场。');return;}
   if(def.task.indexOf('MQ1-E')===0 && (storySceneProgress(sceneId).idx<def.lines.length || !storyCNear(sceneId) || storyEMissing(sceneId))){toast(storyEMissing(sceneId)||'请在现场完成本场。');return;}
+  if(def.task.indexOf('MQ1-F')===0 && (storySceneProgress(sceneId).idx<def.lines.length || !storyCNear(sceneId) || finaleMissing(sceneId))){toast(finaleMissing(sceneId)||'请在现场完成本场。');return;}
   var rec = storySceneProgress(sceneId);
   rec.seen = true;
   rec.day = state.totalDay;
@@ -4263,6 +4374,7 @@ function storyLockReason(t) {
   if (t.id === 'MQ1-C01') return storyCEntryReason() || '条件已满足。';
   if (t.id === 'MQ1-D01') return storyDEntryReason() || '条件已满足。';
   if (t.id === 'MQ1-E01') return storyEEntryReason() || '条件已满足。';
+  if (t.id === 'MQ1-F01') return storyFEntryReason() || '条件已满足。';
   if (t.id === 'MQ1-A01') {
     if (storyState().tasks['MQ1-P04'] !== 'done') return '先完成序章：' + storyTaskTitle('MQ1-P04') + '。';
     var ach = storyEntryAchievement();
@@ -26461,6 +26573,7 @@ window.__MOSS__ = {
   storyBNear: storyBNear, storyCNear: storyCNear,
   capitalChapterState: capitalChapterState, storyDEntryReason: storyDEntryReason, storyDMissing: storyDMissing,
   /* 第五幕：回声谷十场、十项现场事实与入谷三道门槛（界面与测试读同一份判断） */
+  finaleChapterState: finaleChapterState, storyFEntryReason: storyFEntryReason, finaleMissing: finaleMissing,
   echoChapterState: echoChapterState, storyEEntryReason: storyEEntryReason, storyEMissing: storyEMissing,
   echoGateRequirements: echoGateRequirements, echoPermitValid: echoPermitValid,
   storyEchoVisited: storyEchoVisited, storyEchoMet: storyEchoMet, openEchoSite: openEchoSite,
