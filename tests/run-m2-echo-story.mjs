@@ -292,7 +292,7 @@ try{
   eq(['E01','E02','E03','E04','E05'].map(k=>done.story.tasks['MQ1-'+k]),Array(5).fill('done'),'五任务按序完成');
   const c=done.story.echoChapter;
   eq(Object.keys(c.records).length,11,'十项现场事实加一条门槛记录');
-  eq(await p.evaluate(()=>__MOSS__.storyTaskStatus('MQ1-F01')),'locked','终幕未实装不伪解锁');
+  eq(await p.evaluate(()=>__MOSS__.storyTaskStatus('MQ1-F01')),'available','第五幕完成且记录齐全后可筹备终幕');
   await closeWin(p);await p.evaluate(()=>__MOSS__.openStoryScene('S056'));
   ok((await p.locator('.win-title').textContent()).includes('已演回看'),'已演只读回看');
   eq(await p.evaluate(()=>__MOSS__.serialize().story),done.story,'回看不改分支与日期事实');
