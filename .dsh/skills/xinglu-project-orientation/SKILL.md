@@ -26,7 +26,7 @@ description: 进入苔芽农场开发、接手一个任务、核对"文档说的
 git status --short          # 工作区可能已有上一轮/别人未提交的切片
 git log --oneline -5        # 现在在哪个切片之后
 node tests/env-check.mjs    # 环境预检：chromium/EPERM、是否已有浏览器作业、心跳是否中断、output 可写、PS 编码、git dirty
-node tests/run-ci.mjs --status   # 有长跑或中断过：x/105、当前步骤、ETA、失败、未跑
+node tests/run-ci.mjs --status   # 有长跑或中断过：x/107、当前步骤、ETA、失败、未跑
 ```
 
 然后读四份东西：
@@ -39,12 +39,12 @@ node tests/run-ci.mjs --status   # 有长跑或中断过：x/105、当前步骤�
 | 任务对应的 `docs/*-plan.md` / `docs/m1-*.md` / `docs/主线剧情-*-审阅稿.md` | 范围、验收口径、实跑记录 | 这次要证明什么、哪些明确没做 |
 
 按 `P0—P4` 编号定位任务。**不要从旧归档或旧审阅稿推断当前行为。**
-若 `--status` 显示有长跑在跑（心跳新鲜），不要并行起浏览器作业；中断了就按台账进度记「分层通过 x/105」，别用无末行的日志当「已通过」。
+若 `--status` 显示有长跑在跑（心跳新鲜），不要并行起浏览器作业；中断了就按台账进度记「分层通过 x/107」，别用无末行的日志当「已通过」。
 
 ## 二、权威顺序（冲突时以此为准）
 
 1. **代码、运行时注册表、验收套件断言** —— 事实。
-2. **CI 台账（`output/ci-journal.json`，同 treeHash）＋各步日志（`output/*.log`）＋退出码（`output/ci-exit.log`）** —— 证据；同 treeHash 105 条阶段全绿＋末行「两层全部通过。」＋退出码 0 才算通过，中断的日志既不是通过也不是产品红。
+2. **CI 台账（`output/ci-journal.json`，同 treeHash）＋各步日志（`output/*.log`）＋退出码（`output/ci-exit.log`）** —— 证据；同 treeHash 107 条阶段全绿＋末行「两层全部通过。」＋退出码 0 才算通过，中断的日志既不是通过也不是产品红。
 3. `docs/现状与待办.md`、各 `docs/*-plan.md` 的交付记录 —— 已核对的摘要。
 4. `README.md` 交付横幅 —— 对外摘要。
 5. `docs/feature-status.md` —— 生成物（勿手改人工节）。
@@ -55,7 +55,7 @@ node tests/run-ci.mjs --status   # 有长跑或中断过：x/105、当前步骤�
 
 判「实现事实」要能指到：运行时注册表（`__MOSS__`/生成器读到的数量）或代码里的注册表项；判「已验收」要能指到：套件项数＋日志＋退出码＋台账里的 treeHash。
 
-**交付状态只用六态**：未开工／在做（未验证）／分层通过 x/105（写原因与下一步）／已验收（同 treeHash 全绿＋末行＋退出码 0）／提案／未测（人工项）。中断不是状态。「已实装」只表示代码里有实现，不是交付状态。
+**交付状态只用六态**：未开工／在做（未验证）／分层通过 x/107（写原因与下一步）／已验收（同 treeHash 全绿＋末行＋退出码 0）／提案／未测（人工项）。中断不是状态。「已实装」只表示代码里有实现，不是交付状态。
 
 ## 三、任务分诊（动手前先答）
 
@@ -88,7 +88,7 @@ node tests/run-ci.mjs --status   # 有长跑或中断过：x/105、当前步骤�
 → 最小改动（复用 MAPS/INTERACTABLES/QUESTS/state/normalize*/openWindow）
 → 写专项套件（真实输入、支持 --single-file、挂 run-ci）
 → node tests/build-single-file.mjs（冻结产物）→ node tests/env-check.mjs → node tests/run-ci.mjs --quick
-→ 全量：powershell -NoProfile -ExecutionPolicy Bypass -File tests\gate-detached.ps1 -Action start；--status 观察 x/105、--resume 续跑
+→ 全量：powershell -NoProfile -ExecutionPolicy Bypass -File tests\gate-detached.ps1 -Action start；--status 观察 x/107、--resume 续跑
 → 同步 docs/现状与待办 + plan + feature-status（生成器）+ README 横幅；交付前 node tests/check-docs.mjs --regen
 → 分笔提交（代码/测试/文档/产物分开）；推送/发布仅在用户明确要求时
 ```
@@ -107,7 +107,7 @@ node tests/run-ci.mjs --status   # 有长跑或中断过：x/105、当前步骤�
 
 - 把 `docs/*-plan.md` 的"计划"当成"已实装"，没看代码和运行时；按总规任务数铺量。
 - 把"上一轮 CI 绿"或**中断/仍在增长的日志**当成"这次改动也绿"——必须在冻结产物上重跑，认同 treeHash 的台账＋末行＋退出码。
-- 把**中断日志当通过、也当产品红**：无末行/心跳停/进程没了只是中断，记「分层通过 x/105（原因：…）」并 `--resume`。
+- 把**中断日志当通过、也当产品红**：无末行/心跳停/进程没了只是中断，记「分层通过 x/107（原因：…）」并 `--resume`。
 - 中断后**从头重跑**：源码/测试/产物没变就 `--resume`；先换执行方式（`gate-detached.ps1`），再续跑。
 - 用会话 `run_in_background` 的 pwsh job 跑全量 CI：会随 harness 重启整树被杀（真实踩过 3 次）；全量交计划任务 `MossFarmCI`。
 - PowerShell 5.1 直接读 UTF-8 日志：乱码、项数读错（曾把 96 项读成 36 项）；必须 `-Encoding utf8` 或 `read` 工具。
@@ -139,7 +139,7 @@ node tests/run-ci.mjs --status   # 有长跑或中断过：x/105、当前步骤�
 
 - [ ] 我看过 `git status`/`git log`，知道工作区有谁的半成品
 - [ ] `node tests/env-check.mjs` 通过：没有并行浏览器作业、心跳不是中断状态
-- [ ] 需要跑 CI 时，我先看 `node tests/run-ci.mjs --status` 的 x/105 台账进度
+- [ ] 需要跑 CI 时，我先看 `node tests/run-ci.mjs --status` 的 x/107 台账进度
 - [ ] 我能说出这是哪个 P 项、验收口径在哪份文档
 - [ ] 我没有在另一个完整 CI 正在跑时并行起浏览器作业
 - [ ] 我加载了对应子系统技能，并用 grep 核实了代码位置
