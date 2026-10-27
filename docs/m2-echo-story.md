@@ -1,9 +1,13 @@
-# M2 第五幕 · 回声谷（规划稿）
+# M2 第五幕 · 回声谷（规划稿 + 交付记录）
 
-更新：2026-10-25。**状态：提案（未落码）**。范围为总规 §27.6 的 E01—E05／S049—S058，
+更新：2026-10-27。范围为总规 §27.6 的 E01—E05／S049—S058，
 加回声谷六处操作台、入谷核验与提前探索接续表；**不含**终幕（F）与后日谈（G）。
 剧情正文只从[总规 §27.6](../游戏总体规划.md)取，不另写剧情。
 第四幕收口（完整两层 CI 证据）见[第四幕记录](m2-capital-story.md)。
+
+**实现事实：已落码。交付状态：在做（未验证）。** 自然路线测试已提交 `02dd6d7`，第四幕检查点诊断通过，完整新档路线仍待实跑；新树 a70f091367a1 脱会话 CI 启动后观察为 8/105 通过、0 失败（`output/ci-run-a70f0913-20261027-131916.log`）。以下为此前记录： `game.js` 落码完成（提交 `75a5a6e`），专项 `tests/run-m2-echo-story.mjs`
+源码与单文件各 293 项通过（提交 `1a5f2c6`），单文件产物已重建入库（提交 `a156e34`）；
+第五幕新档自然串联尚未完成。此前完整 CI 在 treeHash `fff8f1371c33` 上分层通过 65/105、0 失败、40 未跑，已中断在 `browser/run-r5-natural-entry`；完整收口证据尚不存在。当前 `output/ci-exit.log` 的 exit=0 对应 quick 5/5。自然套件改动会改变 treeHash，后续全量验收须在冻结后的新树上进行。
 
 ## 一、验收口径（落码前定死，项数以实跑汇总为准）
 
@@ -115,33 +119,80 @@
 
 ## 六、证据边界（三层分开写，不合并成一句「CI 全绿」）
 
-1. **逻辑与界面正确**：专项用已验收前章与场景落点作夹具，证明规则、面板文案与存档往返。
-2. **玩家能从入口走到**：新档自然串联套件从全新存档真实走到回声谷办完十场；
-   允许用真实地图按钮返回**已到访**公共站，因此不写成「全程无传送」；
-   回声谷若首次到访未登记公共站，那一段只能步行。
-3. **真机手感与陌生玩家理解度**：未测，未经自动化替代。
+1. **逻辑与界面正确**：专项 `tests/run-m2-echo-story.mjs` 用已验收前章与场景落点作夹具，
+   走真实 E 与按钮，证明规则、面板文案与存档往返；源码与单文件各 293 项通过。
+2. **玩家能从入口走到**：**本轮未做**。规划稿要求「新档自然串联套件从全新存档真实走到
+   回声谷办完十场」，现已写入自然套件；十场的现场办理虽已由专项覆盖，但「从入口走到回声谷」
+   这一层证据仍缺，不能拿专项冒充。现已扩展自然串联套件，完整新档运行待验收。
+3. **真机手感与陌生玩家理解度**：未测，未经自动化替代。专项只覆盖 390×844／844×390
+   两个视口的窗口横向溢出，实体手机与初见玩家没做。
 
 ## 七、接入点（`game.js`，复用既有机制，不新造框架）
 
-| 位置 | 改什么 |
-| --- | --- |
-| `STORY_TASKS` | 追加 `MQ1-E01`—`MQ1-E05`（act 6），`MQ1-D05.next` 指向 `MQ1-E01` |
-| `STORY_SCENES` | 追加 `S049`—`S058`（十场，含 `lines`／`choice`／`step`） |
-| `STORY_ENTRIES` / `STORY_SCENE_LOC` | 十场各挂到回声谷既有场景与站位；入口不占工具目标格 |
-| `MS1_SITE_INFO` | 回声谷六处的第三行说明改成实装后的真实操作口径 |
-| `openMs1Site` | 新增 `ECHO_SITES` 分支 → `openEchoSite(site)` |
-| 新状态 | `newEchoChapterState()` / `normalizeEchoChapter()`；`newStoryState()` 与 `normalizeStory()` 补字段，**不升版本** |
-| 步骤渲染 | `buildStoryEStep(line, sid)`（mode `echo`），复用 `capitalActionButton` 同款按钮与 draft 反馈写法 |
-| 跨境条件 | `CROSS_BORDER_ROUTES.echo` 已有 `echo_guide`；补「邻领权限确认」与「近期路线复测」两项可核事实 |
-| 证据索引 | `STORY_EVIDENCE` 追加第五幕条目，来源写清场景与操作台 |
+| 位置 | 改什么 | 状态 |
+| --- | --- | --- |
+| `STORY_TASKS` | 追加 `MQ1-E01`—`MQ1-E05`（act 6），`MQ1-D05.next` 指向 `MQ1-E01` | 已落码 |
+| `STORY_SCENES` | 追加 `S049`—`S058`（十场，含 `lines`／`choice`／`step`） | 已落码 |
+| `STORY_ENTRIES` / `STORY_SCENE_LOC` | 十场各挂到回声谷既有场景与站位；入口不占工具目标格 | 已落码（S058 为跨场景入口，单列登记） |
+| `MS1_SITE_INFO` | 回声谷六处的第三行说明改成实装后的真实操作口径 | 已落码 |
+| `openMs1Site` | 新增 `ECHO_SITES` 分支 → `openEchoSite(site)` | 已落码 |
+| 新状态 | `newEchoChapterState()` / `normalizeEchoChapter()`；`newStoryState()` 与 `normalizeStory()` 补字段，**不升版本** | 已落码 |
+| 步骤渲染 | `buildStoryEStep(line, sid)`（mode `echo`），复用 `capitalActionButton` 同款按钮与 draft 反馈写法 | 已落码 |
+| 跨境条件 | `CROSS_BORDER_ROUTES.echo` 已有 `echo_guide`；补「邻领权限确认」与「近期路线复测」两项可核事实 | 已落码（另加 `neighbor_confirm` 证据与 `route_recheck` 记录） |
+| 证据索引 | `STORY_EVIDENCE` 追加第五幕条目，来源写清场景与操作台 | 已落码 |
+
+**落码时与原稿的两处偏差（都记在这里，便于复核）**：
+
+1. **S058 的办理地点与场面地点不同**：总规 §27.6 的 S058 场面是「回声谷公屋门前」，
+   规划稿把去向建议与协作分工的办理台放在「北坡接应坪」（另一个场景）。
+   实现按规划稿的两列各取一半：场面仍是公屋门前（`place` 写原文），
+   入口登记在村落的公屋门前（`(10,8)`，可按 E），同时在接应坪面板里以
+   「办理地点在别处」列出 S058。`siteScene` 字段就是记这件事的。
+2. **三道门槛写成四项可核条件**：赫莎带路约定（已有 `echo_guide`）、王都有限现场核验许可
+   （第四幕 `permit` 记录，逾期回公署续约）、邻领权限确认（新增 `neighbor_confirm`）、
+   近期路线复测（新增 `route_recheck`）。前两项来自原稿，后两项是原稿「邻领权限确认＋
+   近期路线复测」的拆分，缺项提示用规划稿给的原话。
 
 ## 八、收口顺序
 
 1. 落码（`game.js`）→ 专项脚本（`tests/run-m2-echo-story.mjs`）→ 挂 CI → 重建单文件产物。
 2. 只跑受影响的套件（`--only=`／`--from=`）拿快结论；切片收口再跑一次完整两层 CI。
-3. 完整 CI 判据：同 treeHash 的 103 阶段全绿＋末行「两层全部通过。」＋`output/ci-exit.log` 退出码 0。
+3. 完整 CI 判据：同 treeHash 的 105 阶段全绿＋末行「两层全部通过。」＋`output/ci-exit.log` 退出码 0。
 4. 同步 `docs/现状与待办.md`、`docs/feature-status.md`、README 横幅与本记录；分笔提交；**不推送**。
 
 ## 九、实跑记录
 
-（待填：实现提交、专项项数与日志、完整 CI 日志与退出码、产物 SHA256、明确未做的部分。）
+**落码与提交**
+
+- `75a5a6e` feat(story)：第五幕 E01—E05／S049—S058 落码。十场正文逐句取自总规 §27.6
+  （分支行是 §26.4 的条件增补）；回声谷六处操作台从说明面板改成可办理
+  （`ECHO_SITES` / `openEchoSite` / `buildStoryEStep`）；新状态 `echoChapter`
+  （十项现场事实＋门槛记录 `route_recheck`）与证据 `neighbor_confirm`；不升 `SCHEMA_VERSION`。
+- `1a5f2c6` test(ci)：`tests/run-m2-echo-story.mjs` 与 CI 接线，阶段口径 103→105
+  （5 快速＋89 浏览器＋11 单文件）。
+- `a156e34` build：重建 `苔芽农场-单文件版.html`。
+- 本轮修缺陷：`newEchoChapterState()` 只给 `{records:{},draft:{}}`，draft 的五个数组只在
+  `normalizeEchoChapter` 里补；新档与新游戏都走 `newStoryState()`／`newGameState()`，
+  不经读档归一化，连续游玩走到第五幕时 `buildStoryEStep` 读 `p.reply.length` 会抛
+  TypeError，S052／S053／S054／S056／S057 的办理面板打不开。已改为建档即给五个数组默认值
+  （与第四幕 `newCapitalChapterState()` 同款），并给 `echoChapterState()` 加兜底补齐。
+  回归断言五条，专项从 288 项增至 293 项。
+
+**专项**
+
+`tests/run-m2-echo-story.mjs` 真实键鼠：源码轮 293 项通过、单文件轮 293 项通过（本地串行重跑）。
+修 bug 前把 `game.js` 临时回退，新断言在「新档形状」一条上变红（实际值 `''`），确认缺陷属实。
+
+**完整两层 CI**
+
+当前证据边界：treeHash `fff8f1371c33` 的台账为 65/105 阶段通过、0 失败、40 未跑，进程中断于 `browser/run-r5-natural-entry`；心跳 pid 已不存在。`output/ci-exit.log` 只证明 quick 模式 5/5 通过，不证明全量通过。日志 `output/ci-run-fff8f137-20261026-230910.log` 记录本次尝试。CI 哈希不包含文档；自然套件改动使 treeHash 改变，此台账保留为历史中断记录，收口须在新树上完成。
+
+**明确未做**
+
+- 新档自然串联到回声谷：未做。十场的现场办理已由专项覆盖，但「玩家能从入口走到」
+  这一层证据仍缺（规划稿 §六第 2 条），下一轮补。
+- 实体手机与陌生玩家理解度：未测。专项只覆盖 390×844／844×390 两个视口的窗口横向溢出。
+
+## 2026-10-27 自然路线续作
+
+在原 `tests/run-m2-natural-story.mjs` 后延伸第五幕，保留 CI 中同一条长路线；默认从新档开始，真实办理邻领权限确认与白松路线复测、首次步行入谷，逐场办理 S049—S058 并验证五任务与现场记录正式读档。支持 `--single-file`，长程路线只挂浏览器层。`--resume=capital` 仅读取本套件真实游玩产生的第四幕检查点用于诊断：`output/echo-natural-diagnostic.log`，106 项通过，进程退出码 0；这不是新档自然入口证据。完整新档运行和完整 CI 尚待验证；实体手机与初见玩家未测。
