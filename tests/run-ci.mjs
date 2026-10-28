@@ -135,6 +135,8 @@ const BROWSER_FILES = [
   'run-m2-echo-story.mjs',
   /* 终幕 F01：筹备界面、家务预览和存档往返 */
   'run-m3-finale-prep.mjs',
+  /* 终幕 F02：跨日回执、军事授权与现场分工 */
+  'run-m3-finale-support.mjs',
   /* 第九版第四幕自然串联：新档走到王都——河港接驳登记→潮汐港北口步行→十场现场办理 */
   'run-m2-natural-story.mjs',
   /* 探索线：森林/矿山三道闸门、三层矿洞、采集再生、存档重载与钢制工具，脚本内部自带两轮 */
@@ -166,7 +168,7 @@ const BROWSER_FILES = [
 const SINGLE_FILES = [
   'run-m0-story.mjs', 'run-ms1-locations.mjs',
   'run-m1-pine-story.mjs', 'run-m1-tide-story.mjs', 'run-m1-letter-care.mjs', 'run-m1-cross-border.mjs',
-  'run-m2-capital-story.mjs', 'run-m2-echo-story.mjs', 'run-m3-finale-prep.mjs', 'run-r4-legacy-save.mjs', 'run-r5-mobile-touch.mjs',
+  'run-m2-capital-story.mjs', 'run-m2-echo-story.mjs', 'run-m3-finale-prep.mjs', 'run-m3-finale-support.mjs', 'run-r4-legacy-save.mjs', 'run-r5-mobile-touch.mjs',
   'run-fixes.mjs'
 ];
 

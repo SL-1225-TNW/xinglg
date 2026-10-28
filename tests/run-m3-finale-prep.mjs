@@ -97,7 +97,7 @@ try{
   eq(after.care,before.care,'筹备不代办照料');
   eq(after.story.tasks['MQ1-F01'],'done','完成 F01');
   eq(after.story.finaleChapter.records.home.choice,v?'B':'A','家务选择按真实覆盖记录');
-  eq(Object.keys(after.story.finaleChapter).sort(),['records'],'没有行动窗口计时字段');
+  ok(!('startDay' in after.story.finaleChapter) && !('deadlineDay' in after.story.finaleChapter),'没有行动窗口计时字段');
   await p.reload();await click('继续游戏');
   eq(await p.evaluate(()=>__MOSS__.finaleChapterState().records),after.story.finaleChapter.records,'正式读档保留筹备记录');
   const saved=await p.evaluate(()=>__MOSS__.serialize());
