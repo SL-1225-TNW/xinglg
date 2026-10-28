@@ -260,3 +260,34 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Verify R3 from a fresh save through maintenance
         run: node tests/run-r3-natural-entry.mjs
+
+  m3-finale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright test dependency
+        run: npm install --no-save --no-package-lock playwright@1.63.0
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build offline game
+        run: node tests/build-single-file.mjs
+      - name: Verify fifth act, finale and epilogue in both builds
+        run: |
+          node tests/run-m2-echo-story.mjs
+          node tests/run-m2-echo-story.mjs --single-file
+          node tests/run-m3-finale-prep.mjs
+          node tests/run-m3-finale-prep.mjs --single-file
+          node tests/run-m3-finale-support.mjs
+          node tests/run-m3-finale-support.mjs --single-file
+          node tests/run-m3-finale-action.mjs
+          node tests/run-m3-finale-action.mjs --single-file
+          node tests/run-m3-finale-records.mjs
+          node tests/run-m3-finale-records.mjs --single-file
+          node tests/run-m3-finale-return.mjs
+          node tests/run-m3-finale-return.mjs --single-file
+          node tests/run-m3-epilogue.mjs
+          node tests/run-m3-epilogue.mjs --single-file

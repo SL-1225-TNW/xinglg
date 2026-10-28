@@ -1,9 +1,10 @@
-/* 全新存档连续五幕：只以真实键鼠改变玩法状态；__MOSS__ 只读路线和结果。
+/* 全新存档连续至终幕及后日谈：只以真实键鼠改变玩法状态；__MOSS__ 只读路线和结果。
  * 不注入任务、物品、金钱、时间或落点。--resume 仅用于开发诊断，读取本套件
  * 通过真实操作保存的检查点；默认与 CI 必须从新档开始。公共地图仅用已到访节点。
  * 第四幕段（王都）：河港柜台真实办理皇家驿路接驳登记 → 潮汐港北口步行进
  * 王都驿站街 → 五处操作台逐场真实办理 → D01—D05 全部完成。
  * 第五幕：真实办理邻领确认、白松复测，首次步行入谷并完成十场。
+ * 终幕及后日谈：沿既有真实工位、世界日和地图入口逐场完成，不注入人物、进度或落点。
  * 自动化用时不代表初见玩家时长，也不代表实体手机手感。
  */
 import assert from 'node:assert/strict';
@@ -424,6 +425,75 @@ async function echoAct(){
  for(let i=49;i<=58;i++)await echoPlay('S'+String(i).padStart(3,'0'));
  await checkpoint('echo');
 }
+/* 终幕与后日谈接在同一条新档自然路线上；--resume=echo 仅诊断真实旧检查点。 */
+async function finaleEntry(sid){
+ const e=await page.evaluate(id=>__MOSS__.STORY_ENTRIES.find(x=>x.storyScene===id),sid);
+ assert.ok(e,'没有终幕入口 '+sid);await go(e.scene);
+ const it=await page.evaluate(e=>{const list=__MOSS__.INTERACTABLES[e.scene]||[];
+  const obj=list.find(x=>x.id===e.id)||list.find(x=>x.id===e.workSite||x.work===e.workSite);
+  return obj?{...obj,scene:e.scene}:null;},e);
+ assert.ok(it,'找不到终幕现场 '+sid);check(await point(it),'真实按 E 走到 '+sid+' 入口');
+ if(!(await winTitle(page)).startsWith(sid+' ·'))await click('办理 '+sid+' · '+e.label);
+ check((await winTitle(page)).startsWith(sid+' ·'),'真实开演 '+sid);
+}
+async function finaleStep(sid,key){
+ const seq={prepare:['记录筹备预览'],home:['记录返家与照料选择'],
+  assignment:['核对接应名单','读回接应交接点'],
+  march:['现在出发','与弥拉确认同行并向赫莎交接','与莱娜确认陪护并交接照护需求','与赫莎核对马丁的公共物资交接','登记本段行动'],
+  reception:['与弥拉本人核对到达及孩子的陪护','与娜汀核对已到人员的照护','与莱娜核对未到及未答复记录','登记接应与照护'],
+  roster:['与弥拉核对接应和旧门牌','请鲁恩本人确认到达时间并签名','与莱娜复核留守和未答复记录','登记本人核名与照护'],
+  amendment:['核对原签核页及登记副本','对照救援事实与结项改写','领取伯兰书面说明','领取奥蕾尔正式调查通知','登记补正附页和调查通知'],
+  settlement:['与弥拉及阿丽娅确认临时接收','与鲁恩及娜汀确认后续照护','与赫莎核对留守家庭联络渠道','与伊文确认临时维护与复核日期','提交有限协作申请','登记接收、联络与临时维护'],
+  route_map:['核对本人同意和现住记录','核对季节限制与复核日期','与伊文张贴不含私人地址的修订图','登记修订地图'],
+  mail:['查看来信','收好三件来物'],notice:['张贴经允许的后续消息'],
+  visit:['回应伊文的敲门'],future:['记下自己的选择'],ending:['重读赫莎与娜汀的来信']};
+ if(key==='replies'){
+  await click('发送三处接应询问');await closeWin(page);
+  check(await sleepViaMenu(page),'真实过夜等待终幕回信');await dismissSettlement(page);
+  await finaleEntry(sid);
+  for(const label of ['领取路线回执','领取医疗回执','领取供给回执','确认白松驿舍收货人','登记四份接应确认'])await click(label);
+ }else{
+  for(const label of (key==='home'&&sid==='S071'?[]:(seq[key]||[])))await click(label);
+  if(key==='assignment'){
+   const labels=await page.locator('.win-body button').allTextContents();
+   const work=labels.find(x=>/复核标记并留下后续检查点|核新落石与已核绕路|核收货人和分批运送|核对真实补给清单|与公共承办人核对民用接应/.test(x));
+   assert.ok(work,'缺真实经历对应工作');await click(work);
+   if(await page.getByRole('button',{name:'与获助旅人确认安全坪搬运',exact:true}).count())await click('与获助旅人确认安全坪搬运');
+   await click('登记本次分工与交接');
+  }
+  if(key==='home'&&sid==='S071')await click('与伊文约定到访');
+ }
+ await click('核对已办记录，继续');
+}
+async function finalePlay(sid){
+ if(!(await winTitle(page)).startsWith(sid+' ·'))await finaleEntry(sid);
+ for(let n=0;n<90;n++){
+  const line=await page.evaluate(id=>{const M=__MOSS__;return M.STORY_SCENES[id].lines[M.state.story.scenes[id].idx]||null;},sid);
+  if(!line)break;
+  if(line.choice){await page.locator('.story-options button').nth(line.choice==='f02_role'?1:0).click();await page.waitForTimeout(150);}
+  else if(line.step)await finaleStep(sid,line.action);
+  else await storyNext();
+ }
+ const before=await scene();await storyNext();
+ check(await page.evaluate(id=>__MOSS__.storySceneSeen(id),sid),'自然完成 '+sid);
+ eq(await scene(),before,'下一场不替玩家切图 '+sid);
+}
+async function finaleAct(){
+ for(let i=59;i<=74;i++){
+  const sid='S'+String(i).padStart(3,'0');
+  if(sid==='S063'){
+   /* 正式启动前留足现场行动与走到接应坪的时间，不为测试直接改游戏时间。 */
+   await go('ms1_echo_fork');if(await freshenDay(180,'终幕三日行动前准备'))await go('ms1_echo_fork');
+  }
+  await finalePlay(sid);
+ }
+ const out=await page.evaluate(()=>({tasks:__MOSS__.state.story.tasks,flags:__MOSS__.state.story.flags}));
+ eq(['F01','F02','F03','F04','F05','G01','G02','G03'].map(id=>out.tasks['MQ1-'+id]),Array(8).fill('done'),'自然完成终幕与后日谈');
+ check(out.flags.firstPartComplete===true,'普通收尾后记录第一部完成');
+ await page.reload();await page.getByRole('button',{name:'继续游戏',exact:true}).click();
+ check(await page.evaluate(()=>__MOSS__.state.story.flags.firstPartComplete===true),'终幕与结局正式读档保留');
+ await checkpoint('finale');
+}
 try{
  const resume=process.argv.find(a=>a.startsWith('--resume='))?.slice(9);
  if(resume){
@@ -435,6 +505,7 @@ try{
   await page.getByRole('button',{name:'继续游戏',exact:true}).click();
   console.log('DIAGNOSTIC RESUME',resume,'不能代替默认新档验收');
  }else{await boot(page);await page.locator('#tutorialSkip').click();}
+ if(resume!=='echo'){
  if(!resume){
   eq((await snap(page)).bridge,false,'全新存档未修桥');
   await play('S001');await play('S002');
@@ -524,7 +595,9 @@ try{
  await page.reload();await page.getByRole('button',{name:'继续游戏',exact:true}).click();
  eq(await page.evaluate(()=>__MOSS__.state.story.tasks),echo.tasks,'五幕任务正式读档后保留');
  eq(await page.evaluate(()=>__MOSS__.echoChapterState().records),echo.records,'第五幕现场事实正式读档后保留');
+ }
+ await finaleAct();
  eq(errors,[],'自然路线无浏览器错误');
- console.log('PASS 五幕自然串联',checks,'项通过，自动化耗时秒',Math.round((Date.now()-started)/1000));
+ console.log('PASS 终幕与后日谈自然串联',checks,'项通过，自动化耗时秒',Math.round((Date.now()-started)/1000));
 } catch(e){console.error('FAIL SNAPSHOT',JSON.stringify(await snap(page)));await checkpoint('failure');throw e;}
 finally{await browser.close();}
