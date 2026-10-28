@@ -2795,25 +2795,93 @@ STORY_ENTRIES.push(
 );
 STORY_SCENE_LOC.S059='ms1_echo_hall'; STORY_SCENE_LOC.S060='ms1_echo_route';
 
-var FINALE_KEYS=['prepare','home'];
-function newFinaleChapterState(){return {records:{}};}
-function normalizeFinaleChapter(raw){
+/* F02 正文取自总规 §27.7；回执必须在游戏内逐项产生。 */
+STORY_TASKS.push({id:'MQ1-F02',act:7,actName:'终幕 · 愿此长路，终有归人',title:'今夜群灯，不为一人',
+ goal:'核对真实路线、医疗、供给与收货人回执，明确现场分工。',scenes:['S061','S062'],next:null,exp:60});
+STORY_TASKS.find(function(t){return t.id==='MQ1-F01';}).next='MQ1-F02';
+Object.assign(STORY_SCENES,{
+ S061:{task:'MQ1-F02',place:'内景 白松驿舍',time:'日',where:'白松驿舍 · 赫莎的停运登记簿',lines:[
+  {step:'finale_replies',mode:'finale',action:'replies',text:'发送询问并逐项核对真实接应回执'},
+  {who:'',text:'赫莎在桌上摆三盏灯，分别压着路线、医疗与补给的回执。莱娜逐封念确认事项。'},
+  {who:'赫莎',text:'我接缓坡这一段。病人到坪上再交医护，不在窄路上换人。'},
+  {who:'马丁（回信，由主角读出）',text:'面包按名单做。运到驿舍有人收，才算我这边交完。'},
+  {who:'莱娜',text:'娜汀已经确认医疗班次。不是让她一直等到我们想出发。'}]},
+ S062:{task:'MQ1-F02',place:'外景 回声谷北坡线入口',time:'暮',where:'回声谷 · 北坡接应坪',lines:[
+  {who:'',text:'伊文与核验人员给合格路段立标。主角在个人工作中选一项，并与接应者读回约定。'},
+  {choice:'f02_role',prompt:'这次你负责哪一段？',options:[
+   {id:'A',text:'我留在北坡，负责标记与排险协作。'},
+   {id:'B',text:'我陪同行进，负责人员与民用物资交接。'},
+   {id:'C',text:'有本次授权时，我随护送队执行指定保护任务。',when:function(){return finaleCanEscort();}}]},
+  {who:'伊文',text:'你没选的，也有人负责。把各自在哪儿交接，再说一遍。'},
+  {who:'莱娜',text:'说好了，就在出发前再点一次名字。'},
+  {step:'finale_assignment',mode:'finale',action:'assignment',text:'核名、读回交接并记录本人的分工'}]}
+});
+STORY_ENTRIES.push(
+ {id:'ms3_f_s061',scene:'ms1_pine_inn',x:4,y:4,label:'路线、医疗与供给回执',task:'MQ1-F02',storyScene:'S061',workSite:'ms1_pine_ledger'},
+ {id:'ms3_f_s062',scene:'ms1_echo_route',x:30,y:10,label:'北坡接应分工',task:'MQ1-F02',storyScene:'S062',workSite:'ms1_echo_staging'}
+);
+STORY_SCENE_LOC.S061='ms1_pine_inn';STORY_SCENE_LOC.S062='ms1_echo_route';
+
+var FINALE_KEYS=['prepare','home','replies','assignment'];
+var FINALE_RECEIPTS={route:'赫莎 · 缓坡接应',medical:'娜汀 · 医疗班次',food:'马丁 · 公共受托供给',receiver:'赫莎 · 白松驿舍收货'};
+var FINALE_CHECKS=['names','handoff','experience','guest'];
+function newFinaleChapterState(){return {records:{},support:{sentDay:-1,receipts:{},checks:[],experience:null,authorization:null}};}
+function normalizeFinaleChapter(raw,pineChapter){
  var d=newFinaleChapterState(), source=raw&&raw.records;
+ var choices={prepare:['preview'],home:['A','B'],replies:['confirmed'],assignment:['A','B','C']};
  FINALE_KEYS.forEach(function(k,i){
   var r=source&&source[k];
   if(!r||!isInt(r.day)||r.day<1||typeof r.text!=='string'||!r.text||r.text.length>4000||
-     typeof r.source!=='string'||!r.source||r.source.length>180||
-     (k==='prepare'&&r.choice!=='preview')||(k==='home'&&['A','B'].indexOf(r.choice)<0))return;
-  if(i&&(!d.records.prepare||r.day<d.records.prepare.day))return;
+     typeof r.source!=='string'||!r.source||r.source.length>180||choices[k].indexOf(r.choice)<0)return;
+  if(i&&(!d.records[FINALE_KEYS[i-1]]||r.day<d.records[FINALE_KEYS[i-1]].day))return;
   d.records[k]={day:r.day,choice:r.choice,text:r.text,source:r.source};
  });
+ var p=raw&&raw.support||{},q=d.support;
+ if(d.records.home&&isInt(p.sentDay)&&p.sentDay>=d.records.home.day)q.sentDay=p.sentDay;
+ Object.keys(FINALE_RECEIPTS).forEach(function(k){
+  var v=p.receipts&&p.receipts[k];
+  if(q.sentDay<1||!v||!isInt(v.day)||v.day<=q.sentDay||typeof v.source!=='string'||!v.source||v.source.length>180||
+     typeof v.text!=='string'||!v.text||v.text.length>1500)return;
+  if(k==='receiver'&&!q.receipts.food)return;
+  q.receipts[k]={day:v.day,source:v.source,text:v.text};
+ });
+ if(d.records.home&&p.authorization&&isInt(p.authorization.day)&&p.authorization.day>=d.records.home.day&&
+    typeof p.authorization.source==='string'&&p.authorization.source&&p.authorization.source.length<=180)
+  q.authorization={day:p.authorization.day,source:p.authorization.source};
+ var complete=Object.keys(FINALE_RECEIPTS).every(function(k){return !!q.receipts[k];});
+ if(!complete||(d.records.replies&&Object.keys(q.receipts).some(function(k){return q.receipts[k].day>d.records.replies.day;}))){delete d.records.replies;delete d.records.assignment;}
+ if(d.records.replies&&Array.isArray(p.checks))q.checks=p.checks.filter(function(v,i,a){return FINALE_CHECKS.indexOf(v)>=0&&a.indexOf(v)===i;}).slice(0,FINALE_CHECKS.length);
+ if(q.checks.indexOf('experience')>=0&&p.experience&&['engineering','patrol','trade','farm','public'].indexOf(p.experience.id)>=0&&
+    isInt(p.experience.day)&&p.experience.day>=d.records.replies.day)q.experience={id:p.experience.id,day:p.experience.day};
+ if(!q.experience)q.checks=q.checks.filter(function(k){return k!=='experience';});
+ var help=pineChapter&&pineChapter.records&&pineChapter.records.help;
+ if(d.records.assignment&&(['names','handoff','experience'].some(function(k){return q.checks.indexOf(k)<0;})||
+    (help&&help.choice==='B'&&q.checks.indexOf('guest')<0)||q.experience.day>d.records.assignment.day||
+    (d.records.assignment.choice==='C'&&(!q.authorization||q.authorization.day>d.records.assignment.day))))delete d.records.assignment;
  return d;
 }
 function finaleChapterState(){
  var st=storyState();
  if(!st.finaleChapter||typeof st.finaleChapter!=='object')st.finaleChapter=newFinaleChapterState();
- if(!st.finaleChapter.records||typeof st.finaleChapter.records!=='object')st.finaleChapter.records={};
- return st.finaleChapter;
+ var c=st.finaleChapter;
+ if(!c.records||typeof c.records!=='object')c.records={};
+ if(!c.support||typeof c.support!=='object')c.support=newFinaleChapterState().support;
+ if(!isInt(c.support.sentDay))c.support.sentDay=-1;
+ if(!c.support.receipts||typeof c.support.receipts!=='object')c.support.receipts={};
+ if(!Array.isArray(c.support.checks))c.support.checks=[];
+ return c;
+}
+function finaleCanEscort(){
+ var c=finaleChapterState(),a=c.support.authorization;
+ return !!a&&a.day<=state.totalDay&&milChainStatus().ok;
+}
+function finaleExperience(){
+ var routes=storyEntryAchievement().routes;
+ if(routes.indexOf('工程')>=0)return {id:'engineering',label:'复核标记并留下后续检查点'};
+ if(routes.indexOf('巡林')>=0)return {id:'patrol',label:'核新落石与已核绕路'};
+ if(routes.indexOf('商旅')>=0)return {id:'trade',label:'核收货人和分批运送'};
+ if(routes.indexOf('经营')>=0)return {id:'farm',label:'核对真实补给清单'};
+ return {id:'public',label:'与公共承办人核对民用接应'};
 }
 function storyFEntryReason(){
  if(storyState().tasks['MQ1-E05']!=='done')return '先完成第五幕 E05，记录逐户意见与去向建议。';
@@ -2825,13 +2893,17 @@ function finaleMissing(sid){
  var reason=storyFEntryReason(),r=finaleChapterState().records;
  if(reason)return reason;
  if(sid==='S060'&&!r.prepare)return '先在回声谷公屋核对筹备三栏。';
- return !r[sid==='S059'?'prepare':'home']?'请在现场核对并记录本场筹备。':'';
+ if((sid==='S061'||sid==='S062')&&storyState().tasks['MQ1-F01']!=='done')return '先完成 F01 筹备。';
+ if(sid==='S062'&&!r.replies)return '先到白松驿舍核对四份接应确认。';
+ var key={S059:'prepare',S060:'home',S061:'replies',S062:'assignment'}[sid];
+ return !r[key]?'请在现场核对并记录本场事务。':'';
 }
 function finaleCareText(gap){
  return !gap.need&&!gap.crops?'家中没有需要委托的未熟作物或牲畜。':farmPlanCareGapText(gap);
 }
 function buildStoryFStep(line,sid){
  var box=el('div','story-items'),c=finaleChapterState(),key=line.action,reason=storyFEntryReason();
+ if(key==='replies'||key==='assignment')return buildStoryF02Step(line,sid);
  if(reason){box.appendChild(el('p','req-chip',reason));return box;}
  if(c.records[key]){
   box.appendChild(el('p','panel-box',c.records[key].text));
@@ -2866,6 +2938,89 @@ function buildStoryFStep(line,sid){
   }});
  }));
  return box;
+}
+
+/* F02：回信先发送、至少隔一日逐项领取，接收人另确认；不自动付款或安排出发。 */
+function finaleF02Action(sid,guard,apply){
+ return performAction({point:storyEntryForScene(sid),minutes:5,guard:function(){
+  return storyCNear(sid)&&storyState().tasks['MQ1-F01']==='done'&&guard();
+ },reason:'前置、地点或现场记录已变化，请重新核对。',apply:apply});
+}
+function finaleF02ReceiptText(key){
+ var split=pineChapterState().records.help&&pineChapterState().records.help.choice==='A';
+ if(key==='route')return (split?'莱娜独立核回赫莎的路线回执：':'主角与莱娜核回赫莎的路线回执：')+'赫莎接缓坡段，病人到接应坪再交医护；出发前另复核当前安全线。';
+ if(key==='medical')return '娜汀确认在接应坪参加约定医疗班次；需按名单交接，不是无限期待命。';
+ if(key==='food')return '马丁以公开受托供货人身份确认按名单准备面包；供货回执不是已运达。';
+ return '赫莎确认白松驿舍为收货人，须核数量和批次后才算实际交货。';
+}
+function buildStoryF02Step(line,sid){
+ var b=el('div','story-items'),c=finaleChapterState(),p=c.support,key=line.action;
+ var reason=storyFEntryReason();
+ if(reason||storyState().tasks['MQ1-F01']!=='done'){b.appendChild(el('p','req-chip',reason||'先完成 F01 筹备。'));return b;}
+ if(c.records[key]){
+  b.appendChild(el('p','panel-box',c.records[key].text));
+  b.appendChild(mkBtn('核对已办记录，继续','primary',function(){if(storyCNear(sid)&&!finaleMissing(sid))storyAdvance(sid);}));
+  return b;
+ }
+ if(key==='replies'){
+  b.appendChild(el('p','muted','先发出路线、医疗与供给询问，最早次日逐项领取回执；等待可返家，不开始三日行动窗口。'));
+  if(p.sentDay<1){
+   b.appendChild(mkBtn('发送三处接应询问','primary',function(){finaleF02Action(sid,function(){return finaleChapterState().support.sentDay<1;},function(){finaleChapterState().support.sentDay=state.totalDay;});}));
+   return b;
+  }
+  b.appendChild(el('p','req-chip ok','询问发出：第 '+p.sentDay+' 天；最早第 '+(p.sentDay+1)+' 天领取。'));
+  ['route','medical','food','receiver'].forEach(function(k){
+   var r=p.receipts[k],row=el('div','panel-box');
+   row.appendChild(el('div','section-title',FINALE_RECEIPTS[k]));
+   if(r)row.appendChild(el('p','req-chip ok','第 '+r.day+' 天 · '+r.source+'：'+r.text));
+   else if(state.totalDay<=p.sentDay)row.appendChild(el('p','muted','等待询问回复。'));
+   else if(k==='receiver'&&!p.receipts.food)row.appendChild(el('p','muted','先领取供给回执，再确认由谁接收。'));
+   else row.appendChild(mkBtn(k==='receiver'?'确认白松驿舍收货人':'领取'+({route:'路线',medical:'医疗',food:'供给'}[k])+'回执','sm',function(){
+    finaleF02Action(sid,function(){var x=finaleChapterState().support;return x.sentDay>0&&state.totalDay>x.sentDay&&!x.receipts[k]&&(k!=='receiver'||!!x.receipts.food);},function(){
+     finaleChapterState().support.receipts[k]={day:state.totalDay,source:'白松驿舍 · '+FINALE_RECEIPTS[k],text:finaleF02ReceiptText(k)};
+    });
+   }));
+   b.appendChild(row);
+  });
+  if(Object.keys(FINALE_RECEIPTS).every(function(k){return !!p.receipts[k];}))b.appendChild(mkBtn('登记四份接应确认','primary',function(){
+   finaleF02Action(sid,function(){var x=finaleChapterState();return !x.records.replies&&Object.keys(FINALE_RECEIPTS).every(function(k){return !!x.support.receipts[k];});},function(){
+    var x=finaleChapterState(),parts=Object.keys(FINALE_RECEIPTS).map(function(k){var v=x.support.receipts[k];return FINALE_RECEIPTS[k]+'（第 '+v.day+' 天）：'+v.text;});
+    x.records.replies={day:state.totalDay,choice:'confirmed',source:'白松驿舍 · S061',text:parts.join('；')+' 本人或机构已确认；尚未启动行动窗口。'};
+   });
+  }));
+  return b;
+ }
+ if(!c.records.replies){b.appendChild(el('p','req-chip','先到白松驿舍核对四份接应确认。'));return b;}
+ var role=storyChoices().f02_role,help=pineChapterState().records.help,needsGuest=!!help&&help.choice==='B';
+ if(role==='C'&&!finaleCanEscort()){
+  b.appendChild(el('p','req-chip','本次授权或军事资格已失效；可先重新办理，或改为民用交接。'));
+  b.appendChild(mkBtn('改选民用交接','sm',function(){storyState().choices.f02_role='B';markDirty();saveNow();refreshWindow();}));return b;
+ }
+ b.appendChild(el('p','muted','未选的任务由公共承办人和合格向导分担；本次只记录你实际核对的工作。'));
+ var tasks=[['names','核对接应名单'],['handoff','读回接应交接点'],['experience',finaleExperience().label]];
+ if(needsGuest)tasks.push(['guest','与获助旅人确认安全坪搬运']);
+ tasks.forEach(function(task){
+  var done=p.checks.indexOf(task[0])>=0;
+  if(done)b.appendChild(el('p','req-chip ok','已核对 · '+task[1]));
+  else b.appendChild(mkBtn(task[1],'sm',function(){
+   finaleF02Action(sid,function(){var x=finaleChapterState();return !!x.records.replies&&!x.records.assignment&&x.support.checks.indexOf(task[0])<0&&(storyChoices().f02_role!=='C'||finaleCanEscort());},function(){
+    var x=finaleChapterState().support;x.checks.push(task[0]);
+    if(task[0]==='experience')x.experience={id:finaleExperience().id,day:state.totalDay};
+   });
+  }));
+ });
+ var needed=needsGuest?['names','handoff','experience','guest']:['names','handoff','experience'];
+ if(needed.every(function(k){return p.checks.indexOf(k)>=0;}))b.appendChild(mkBtn('登记本次分工与交接','primary',function(){
+  finaleF02Action(sid,function(){var x=finaleChapterState();return !x.records.assignment&&needed.every(function(k){return x.support.checks.indexOf(k)>=0;})&&['A','B','C'].indexOf(storyChoices().f02_role)>=0&&(storyChoices().f02_role!=='C'||finaleCanEscort());},function(){
+   var x=finaleChapterState(),choice=storyChoices().f02_role,exp=x.support.experience;
+   var labels={engineering:'复核标记并留下后续检查点',patrol:'核新落石与已核绕路',trade:'核收货人和分批运送',farm:'核对真实补给清单',public:'与公共承办人核对民用接应'};
+   var text='本人分工：'+({A:'北坡标记与排险协作',B:'人员与民用物资交接',C:'按本次授权协助警戒与撤离'}[choice])+'；已核接应名单与交接点；实际工作：'+labels[exp.id]+'（第 '+exp.day+' 天）。';
+   if(needsGuest)text+=' 获助旅人在本人同意的范围内参与安全坪搬运。';
+   text+=' 未选择的工作由公共承办人和合格向导负责；三日行动窗口尚未启动。';
+   x.records.assignment={day:state.totalDay,choice:choice,source:'回声谷 · 北坡接应坪 · S062',text:text};
+  });
+ }));
+ return b;
 }
 
 var CAPITAL_KEYS = ['arrival','lodging','intake','witness','original','compare','questions','resolution','permit','departure'];
@@ -3317,7 +3472,7 @@ function normalizeStory(raw) {
   d.tideChapter = normalizeTideChapter(raw.tideChapter);
   d.capitalChapter = normalizeCapitalChapter(raw.capitalChapter);
   d.echoChapter = normalizeEchoChapter(raw.echoChapter);
-  d.finaleChapter = normalizeFinaleChapter(raw.finaleChapter);
+  d.finaleChapter = normalizeFinaleChapter(raw.finaleChapter, d.pineChapter);
   d.act = isInt(raw.act) && raw.act >= 0 ? raw.act : 0;
   if (raw.tasks && typeof raw.tasks === 'object') {
     for (var k in raw.tasks) {
@@ -3915,7 +4070,9 @@ function buildStoryChoice(line, sceneId) {
   wrap.appendChild(el('div', 'story-prompt', line.prompt || '请选择。'));
   var opts = el('div', 'story-options');
   (line.options || []).forEach(function (o) {
+    if (o.when && !o.when()) return;
     opts.appendChild(mkBtn(o.text, 'story-opt', function () {
+      if (o.when && !o.when()) { toast('条件已变化，请重新确认。'); refreshWindow(); return; }
       storyState().choices[line.choice] = o.id;
       /* 对莱娜的表态在选下去的那一刻就生效，不等整段演完 */
       if (line.choice === 'a04_stance') storyState().lenaStance = o.id === 'A' ? 'cautious' : 'public';
@@ -4197,6 +4354,19 @@ function storyTaskTitle(id) {
   return t ? (t.id + '《' + t.title + '》') : '后续章节';
 }
 
+/* F02 收口预览只读已有回执与当前照料情况；F03 尚未接入，不产生启动日。 */
+function openFinaleDeparturePreview(){
+ var c=finaleChapterState();
+ if(storyTaskStatus('MQ1-F02')!=='done'||!c.records.assignment){toast('先完成 F02 的接应确认与分工。');return;}
+ openWindow({id:'finale_departure_preview',kind:'story',title:'行动前预览',build:function(b){
+  b.appendChild(el('p','muted','本页只预览已有安排。下一阶段尚未接入，行动窗口没有启动，也不会自动出发。'));
+  Object.keys(FINALE_RECEIPTS).forEach(function(k){var r=c.support.receipts[k];b.appendChild(el('p',r?'req-chip ok':'req-chip',FINALE_RECEIPTS[k]+'：'+(r?'第 '+r.day+' 天 · '+r.text:'尚未确认')));});
+  b.appendChild(el('p','panel-box',c.records.assignment.text));
+  var gap=farmPlanCareGap(3);b.appendChild(el('p',gap.ok?'req-chip ok':'req-chip','当前家务：'+finaleCareText(gap)));
+  b.appendChild(el('p','muted','北坡安全线须在出发前重新核验；当前预览不代替现场放行。'));
+ },actions:[{label:'关闭',close:true}]});
+}
+
 function openStoryTaskDone(t) {
   var next = t.next ? storyTask(t.next) : null;
   var nextStatus = next ? storyTaskStatus(next.id) : null;
@@ -4206,6 +4376,8 @@ function openStoryTaskDone(t) {
     lines.push('下一段：' + next.id + '《' + next.title + '》');
     if (nextStatus === 'locked') lines.push('尚未解锁：' + storyLockReason(next));
     else lines.push('可以去：' + storyNextStepText(next.id));
+  } else if(t.id==='MQ1-F02') {
+    lines.push('接应确认与分工已记录；下一阶段尚未接入，行动窗口没有启动。');
   } else {
     lines.push('第一部主线到此为止，后面的章节还在制作中。');
   }
@@ -4223,10 +4395,10 @@ function openStoryTaskDone(t) {
         });
       }
     },
-    actions: [
+    actions: (t.id==='MQ1-F02' ? [{ label:'查看出发预览',kind:'primary',close:false,onClick:openFinaleDeparturePreview }] : []).concat([
       { label: '回到主线', kind: 'primary', close: false, onClick: function () { openStoryLog(); } },
       { label: '关闭', kind: 'ghost', close: true }
-    ]
+    ])
   });
 }
 
@@ -4525,6 +4697,7 @@ function openStoryLog() {
         if (status === 'done') {
           var acts2 = el('div', 'item-actions');
           acts2.appendChild(mkBtn('回看场次', 'sm', function () { openStoryReview(t); }));
+          if(t.id==='MQ1-F02')acts2.appendChild(mkBtn('查看出发预览','sm',openFinaleDeparturePreview));
           box.appendChild(acts2);
         }
         b.appendChild(box);
@@ -4545,6 +4718,8 @@ function openStoryLog() {
       });
       Object.keys(capitalChapterState().records).forEach(function(k){var r=capitalChapterState().records[k];b.appendChild(el('p',null,CAPITAL_ACTIONS[k]+' · 第 '+r.day+' 天 · '+r.source+'：'+r.text));});
       Object.keys(echoChapterState().records).forEach(function(k){var r=echoChapterState().records[k];b.appendChild(el('p',null,ECHO_ACTIONS[k]+' · 第 '+r.day+' 天 · '+r.source+'：'+r.text));});
+      Object.keys(finaleChapterState().records).forEach(function(k){var r=finaleChapterState().records[k];b.appendChild(el('p','story-evidence','第 '+r.day+' 天 · '+r.source+'：'+r.text));});
+      Object.keys(finaleChapterState().support.receipts).forEach(function(k){var r=finaleChapterState().support.receipts[k];b.appendChild(el('p','story-evidence',FINALE_RECEIPTS[k]+' · 第 '+r.day+' 天 · '+r.source+'：'+r.text));});
       Object.keys(tideChapterState().records).forEach(function (k) {
         var r = tideChapterState().records[k];
         b.appendChild(el('p', 'story-evidence', '第 ' + r.day + ' 天 · ' + r.source + '：' + r.text));
@@ -24258,6 +24433,11 @@ function openNeighborSite(site){
       if(storyHasEvidence('neighbor_confirm'))b.appendChild(el('p','req-chip ok','邻领权限确认已办（第 '+((storyState().evidence.neighbor_confirm||{}).day||'—')+' 天）：官方核验范围按本地权限复核确认。'));
       else if(echoCanConfirmNeighbor())militarySiteButton(b,site,'按本地权限确认官方核验范围 · 20分钟',{minutes:20,guard:function(){return echoCanConfirmNeighbor()&&!storyHasEvidence('neighbor_confirm');},reason:'已经确认过，不重复办理。'},function(){storyRecordEvidence('neighbor_confirm','邻领边城 · 领地联络处 · 阿丽娅');});
       else b.appendChild(el('p','req-chip','邻领权限确认要带王都的有限核验许可；到邻领边城 · 领地联络处找阿丽娅。'));
+      if(storyState().tasks['MQ1-F01']==='done'&&!finaleChapterState().support.authorization&&milChainStatus().ok){
+        militarySiteButton(b,site,'申请本次北坡护送协作授权 · 15分钟',{minutes:15,guard:function(){return storyState().tasks['MQ1-F01']==='done'&&!finaleChapterState().support.authorization&&milChainStatus().ok;}},function(){
+          finaleChapterState().support.authorization={day:state.totalDay,source:'邻领边城 · 领地联络处 · 阿丽娅'};
+        });
+      }
     }
     if(site==='neighbor_exchange'){
       if(n.caseFound&&!n.choice&&!n.settled)[['trade','试签一季互市合同'],['demarcate','共同复测界标并临时维持现状']].forEach(function(o){militarySiteButton(b,site,o[1]+' · 15分钟',{minutes:15,guard:function(){return n.caseFound&&!n.choice&&!n.settled;}},function(){n.choice=o[0];n.signedDay=state.totalDay;});});
@@ -24510,6 +24690,10 @@ function openPineWorkSite(site) {
     b.appendChild(el('p', 'quest-next', pineWorkNextText()));
     if (site === 'ms1_pine_stove' || site === 'ms1_pine_supper') b.appendChild(el('p', null, '材料与食材由赫莎提供；不用个人背包物品，不收费，不发重复奖励。'));
     if (site === 'ms1_pine_ledger') {
+      if (storyState().tasks['MQ1-F01']==='done') {
+        var f2=storyEntryForScene('S061');
+        b.appendChild(mkBtn((storySceneSeen('S061')?'回看 ':'办理 ')+'S061 · '+f2.label,'primary',function(){openStoryScene('S061');}));
+      }
       if (storyHasEvidence('echo_guide')) b.appendChild(el('p', 'req-chip ok', '赫莎已经答应带路。'));
       else if (crossBorderReadyFor(CROSS_BORDER_ROUTES.echo)) extendedWorkButton(b, site, '约定赫莎带路上山径 · 20分钟', { minutes: 20, guard: function () { return !storyHasEvidence('echo_guide') && crossBorderReadyFor(CROSS_BORDER_ROUTES.echo); } }, function () { crossBorderGrant(CROSS_BORDER_ROUTES.echo, '白松驿舍 · 停运登记簿 · 赫莎'); });
       else b.appendChild(el('p', 'req-chip', '还缺：' + crossBorderMissingText('echo')));
@@ -26573,7 +26757,7 @@ window.__MOSS__ = {
   storyBNear: storyBNear, storyCNear: storyCNear,
   capitalChapterState: capitalChapterState, storyDEntryReason: storyDEntryReason, storyDMissing: storyDMissing,
   /* 第五幕：回声谷十场、十项现场事实与入谷三道门槛（界面与测试读同一份判断） */
-  finaleChapterState: finaleChapterState, storyFEntryReason: storyFEntryReason, finaleMissing: finaleMissing,
+  finaleChapterState: finaleChapterState, storyFEntryReason: storyFEntryReason, finaleMissing: finaleMissing, finaleCanEscort: finaleCanEscort,
   echoChapterState: echoChapterState, storyEEntryReason: storyEEntryReason, storyEMissing: storyEMissing,
   echoGateRequirements: echoGateRequirements, echoPermitValid: echoPermitValid,
   storyEchoVisited: storyEchoVisited, storyEchoMet: storyEchoMet, openEchoSite: openEchoSite,
