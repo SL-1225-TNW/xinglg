@@ -146,10 +146,13 @@ const conflicts = await p.evaluate(() => {
   M.STORY_ENTRIES.forEach(e => {
     const map = M.MAPS[e.scene];
     if (!map) { bad.push(e.id + ' 场景不存在'); return; }
-    /* 入口登记在两种形态里：与操作台同场景时由操作台本身充当入口（按 work 找），
-       跨场景时入口单独登记成可按 E 的点（按 id 找）。两种都要查到同一个格。 */
+    /* 入口登记有三种形态：自身登记成 storyEntry（按 id 找）、由同场景的操作台充当入口
+       （按 work 找）、复用场景里既有的交互点（按 workSite 的 id 找，如农舍手册、任务板、
+       邮局分信柜与农舍门）。三种都要查到同一个格，后面的坐标、同格与工具目标检查照旧。 */
     const list = M.INTERACTABLES[e.scene] || [];
-    const hit = list.find(i => i.id === e.id) || (e.workSite ? list.find(i => i.work === e.workSite) : null);
+    const hit = list.find(i => i.id === e.id)
+      || (e.workSite ? list.find(i => i.work === e.workSite) : null)
+      || (e.workSite ? list.find(i => i.id === e.workSite) : null);
     if (!hit) { bad.push(e.id + ' 未登记'); return; }
     if (hit.x !== e.x || hit.y !== e.y) bad.push(e.id + ' 与现场坐标不一致');
     (M.INTERACTABLES[e.scene] || []).forEach(o => {
