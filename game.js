@@ -12863,7 +12863,11 @@ function talkToNpc(id) {
   if (id === 'ms1_iven' || id === 'ms1_ruen' || id === 'ms1_mira') {
     var st = state.story;
     if (st) { if (!st.flags) st.flags = {}; st.flags['echo_met_' + id.slice(4)] = true; }
-    if (storyState().tasks['MQ1-E02'] !== 'done') text += '\n（已重逢、待补全旧事：本人还有一段没说完的事。）';
+    if (storyState().tasks['MQ1-E02'] !== 'done') {
+      /* 普通会面不依赖官方核验许可；伊文只说自己亲历与自己的责任。 */
+      if (id === 'ms1_iven') text += '\n我当年先送南线的重伤者，答应回来接第二批。我提过未完成名单的异议，后来没有追到底，也回避过追问。谷里还有人。';
+      text += '\n（已重逢、待补全旧事：本人还有一段没说完的事。）';
+    }
   }
   var d = npcDaily(id);
   var gained = 0;
