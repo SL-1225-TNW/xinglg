@@ -349,9 +349,44 @@ try{
   await faceTowards(p,npc.x,npc.y);
   await p.keyboard.press('e');
   await p.waitForTimeout(260);
-  const body=await p.locator('.win-body').textContent();
+  const body=await p.locator('.dlg-body').textContent();
   ok(body.includes('已重逢、待补全旧事'),'提前遇见伊文显示已重逢待补全旧事');
-  ok(['异议','别替我改口','等最后一条路画完'].some(t=>body.includes(t)),'提前遇见照常直答自己的事');
+  ok(body.includes('先送南线的重伤者')&&body.includes('未完成名单的异议')&&body.includes('回避过追问'),'提前遇见照常直答自己的取舍、异议和回避');
+  await ctx.close();
+ }
+ /* 不预置相遇或王都许可：E 键会面只记录本人已遇见，不自动办理官方事实。 */
+ {
+  const s=structuredClone(base);
+  delete s.story.flags.echo_met_iven;
+  delete s.story.capitalChapter.records.permit;
+  s.npcFriendship.ms1_iven=0;
+  delete s.npcDailyInteractions.ms1_iven;
+  const ctx=await load(s);
+  async function talkIven(){
+   await closeWin(p);
+   const npc=await p.evaluate(()=>{const n=__MOSS__.npcRuntime.ms1_iven;return {x:n.x,y:n.y};});
+   await p.evaluate(n=>__MOSS__.devSwitchScene('ms1_echo_house',n.x,n.y+1),npc);
+   await faceTowards(p,npc.x,npc.y);
+   await p.keyboard.press('e');
+   await p.waitForTimeout(260);
+   return await p.locator('.dlg-body').textContent();
+  }
+  const before=await p.evaluate(()=>({task:__MOSS__.state.story.tasks['MQ1-E02']||null,evidence:Object.keys(__MOSS__.state.story.evidence).sort()}));
+  const first=await talkIven();
+  ok(first.includes('先送南线的重伤者')&&first.includes('未完成名单的异议')&&first.includes('回避过追问'),'无王都许可时本人直答三项事实');
+  ok(first.includes('谷里还有人')&&first.includes('已重逢、待补全旧事'),'提前会面说明现状与接续');
+  eq(await p.evaluate(()=>__MOSS__.storyEchoMet('iven')),true,'实际交谈记录伊文已重逢');
+  eq(await p.evaluate(()=>({task:__MOSS__.state.story.tasks['MQ1-E02']||null,evidence:Object.keys(__MOSS__.state.story.evidence).sort()})),before,'普通会面不完成官方任务或补造证据');
+  await p.evaluate(()=>__MOSS__.saveNow());
+  await p.reload();await click('继续游戏');
+  await p.waitForFunction(()=>__MOSS__.state&&document.getElementById('boot').hidden);
+  eq(await p.evaluate(()=>__MOSS__.storyEchoMet('iven')),true,'正式读档保留提前重逢');
+  await p.evaluate(()=>{const s=__MOSS__.state;s.weather.today='rain';s.npcFriendship.ms1_iven=75;delete s.npcDailyInteractions.ms1_iven;});
+  const revisit=await talkIven();
+  ok(revisit.includes('未完成名单的异议')&&revisit.includes('回避过追问'),'雨天高好感重访仍能听到本人说明');
+  await p.evaluate(()=>{const s=__MOSS__.state;s.story.tasks['MQ1-E02']='done';s.weather.today='sun';s.npcFriendship.ms1_iven=0;delete s.npcDailyInteractions.ms1_iven;});
+  const after=await talkIven();
+  ok(!after.includes('未完成名单的异议')&&!after.includes('已重逢、待补全旧事'),'E02 完成后日常对白不反复附加提前会面说明');
   await ctx.close();
  }
  eq(r.errors,[],'第五幕无浏览器错误');
