@@ -147,10 +147,10 @@
     "added": "2026-10-28"
   },
   {
-    "file": "docs/feature-status.md",
-    "contains": "终幕 F01 切片已验收",
-    "rule": "R1",
-    "reason": "F01 冻结树历史验收为 107 阶段，当前 F02 树为 109；状态行明确区分两轮。",
-    "added": "2026-10-28"
+    "file": "docs/现状与待办.md",
+    "contains": "原树 a70f091367a1 的 105/105 阶段全绿",
+    "rule": "R2",
+    "reason": "2026-10-27 第五幕那一轮的历史交付快照：日志 output/ci-run-a70f0913-20261027-131916.log 末行的终止行仍在，但那一轮的 exit=0 当时只写在 output/ci-exit.log，已被后续轮次覆盖，同名 *-exit.log 也不在本机（output/ 被清理），退出码无法事后复核，按历史快照豁免。当前树的退出证据在同一文件下一行（44787ccd 一行）与 output/ci-exit.log。",
+    "added": "2026-10-29"
   }
 ]
