@@ -227,6 +227,8 @@ try {
   /* 普通 NPC 没有自然跨场景日程，以注册表夹具触发通用换场景分支；
    * 只验证运行时落点、旧址交互、搭话及正式读档恢复，不声称自然迁居。 */
   await closeWin(p);
+  const oldPostie = await p.evaluate(() => { const n=__MOSS__.npcRuntime.postie; return {scene:n.scene,x:Math.round(n.x),y:Math.round(n.y)}; });
+  eq('迁场前普通邮递员在邮局', oldPostie.scene, 'city_post');
   await p.evaluate(() => {
     const n = __MOSS__.NPCS.postie;
     n.scene = 'house'; n.schedule = [{ from: 0, to: 1440, x: 6, y: 5 }];
@@ -235,7 +237,7 @@ try {
   eq('普通邮递员迁场落到新场景坐标且不沿旧路寻路', await p.evaluate(() => { const n = __MOSS__.npcRuntime.postie; return [n.scene,n.x,n.y,n.path.length].join(':'); }), 'house:6:5:0');
   eq('普通邮递员迁场后目标场景', await p.evaluate(() => __MOSS__.npcScene('postie')), 'house');
   await goto('city_post', 15, 11);
-  ok('普通邮递员迁场后旧邮局不留可交互实体', await p.evaluate(() => __MOSS__.__findNpcAdjacent(6,6,6,5) !== 'postie'));
+  ok('普通邮递员迁场后旧岗位不留可交互实体', await p.evaluate(({x,y}) => __MOSS__.__findNpcAdjacent(x,y+1,x,y) !== 'postie', oldPostie));
   ok('普通邮递员迁场后农舍可搭话', (await talkAt('postie', 'house')).trim().length > 3);
   await closeWin(p);
   await p.evaluate(() => __MOSS__.saveNow());

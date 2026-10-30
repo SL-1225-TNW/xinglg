@@ -557,7 +557,7 @@ async function presenceFollowup(){
  await page.reload();await page.getByRole('button',{name:'继续游戏',exact:true}).click();
  await location('ms1_mira','neighbor_border',14,10,'读档后弥拉');
  await go('ms1_echo_village');
- check(await page.evaluate(()=>{const M=__MOSS__,s=M.NPCS.ms1_mira.schedule[0];return M.__findNpcAdjacent(s.x,s.y+1,s.x,s.y)!=='ms1_mira';}),'安置后回声谷旧址不能搭话弥拉');
+ check(await page.evaluate(()=>{const M=__MOSS__;return M.NPCS.ms1_mira.schedule.every(s=>M.__findNpcAdjacent(s.x,s.y+1,s.x,s.y)!=='ms1_mira');}),'安置后回声谷旧日程位置均不能搭话弥拉');
 }
 try{
  const resume=process.argv.find(a=>a.startsWith('--resume='))?.slice(9);
