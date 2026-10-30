@@ -2,7 +2,7 @@
 
 > 本文件面向在这个仓库里工作的 AI 代理与工程师，是**项目级契约**，优先于个人习惯；与用户直接指令冲突时以用户指令为准。
 > 配套：开发模式 `.dsh/agent-preset/`（DSH Agent preset「苔芽农场开发」）、项目技能 `.dsh/skills/`、说明 `docs/开发模式.md`。
-> 版本 **v1.8（2026-10-29）**：人物对白专项加入浏览器层与单文件层，当前为 119（5 快速＋96 浏览器＋18 单文件）；完成度仍按同 treeHash 台账、末行与退出证据判定。
+> 版本 **v1.9（2026-10-30）**：人物实体在场专项加入浏览器层与单文件层，当前为 121（5 快速＋97 浏览器＋19 单文件）；完成度仍按同 treeHash 台账、末行与退出证据判定。
 
 ## 0. 一句话、里程碑词汇与交付状态
 
@@ -24,7 +24,7 @@
 | 未开工 | 只有待办条目，没有代码/文档改动 |
 | 在做（未验证） | 有改动，但还拿不出证据（日志名、套件项数、台账进度） |
 | 分层通过 x/119（原因：…，下一步：…） | `output/ci-journal.json` 里同 treeHash 已完成 x 个阶段且全绿；必须写清为什么没跑完（环境中断/时间不够）和下一步（哪段待 `--resume`） |
-| 已验收 | 同 treeHash 119 阶段全绿＋末行「两层全部通过。」＋`output/ci-exit.log` 退出码 0；或切片声明的验收口径逐条有证据（切片级） |
+| 已验收 | 同 treeHash 121 阶段全绿＋末行「两层全部通过。」＋`output/ci-exit.log` 退出码 0；或切片声明的验收口径逐条有证据（切片级） |
 | 提案 | 只活在规划稿/审阅稿，没有落码 |
 | 未测 | 人工项（真机手感、陌生玩家理解度）没做；没做就写未做 |
 
@@ -89,11 +89,11 @@ assets/ supabase/ site/ 美术、后端资料、构建产物（site/ 不入库�
 ## 4. 标准切片流程（固定动作，别省）
 
 1. **读**：现状/待办 + 该切片文档 + 相关技能 + 用 grep 核实要动的代码（行号会漂移，先 grep 再改）；开工先跑 `node tests/env-check.mjs` 与 `node tests/run-ci.mjs --status`。
-2. **定验收**：写清楚"哪条套件、多少项、源码轮与单文件轮、台账口径（全量 119 阶段还是切片级）、哪些是人工验收"。没有验收口径不开工。
+2. **定验收**：写清楚"哪条套件、多少项、源码轮与单文件轮、台账口径（全量 121 阶段还是切片级）、哪些是人工验收"。没有验收口径不开工。
 3. **落码**：最小改动，优先复用既有机制（`MAPS`/`INTERACTABLES`/`QUESTS`/`state`/`normalize*`/`openWindow`），不新造框架。
 4. **专项套件**：真实键鼠/触摸驱动，读式断言；夹具边界写在文件头；支持 `--single-file`；挂进 `tests/run-ci.mjs`（浏览器层必挂；单文件层只挂**产物敏感**的套件——剧情 UI、门洞与出口、旧档迁移、存档快照、跨境门槛、触屏布局、跨系统修复回归；纯逻辑与长程自然串联不进单文件层，它们在源码轮已覆盖，产物与源码的 JS 逐字相同）。同一段路的两条自然套件只留覆盖更全的那条进 CI。夹具/自然入口分层见 `xinglu-playtest-suite-authoring`。
 5. **重建产物**：`node tests/build-single-file.mjs`，之后 `git status` 必须只剩预期改动（产物零漂移）。产物一冻结，运行期就不改源码/测试/产物——改了 treeHash 会变，旧台账作废。
-6. **跑 CI（台账判据＋脱会话长跑＋续跑）**：先 `node tests/run-ci.mjs --quick`；再全量 `powershell -NoProfile -ExecutionPolicy Bypass -File tests\gate-detached.ps1 -Action start`，交给计划任务 `MossFarmCI`，会话只用 `node tests/run-ci.mjs --status` 观察。判据是 `output/ci-journal.json` 里**同一 treeHash** 的 119 条阶段全绿＋末行「两层全部通过。」＋`output/ci-exit.log` 退出码 0。中断时台账只记已完成步骤，用 `--resume` 续跑；**禁止用 `run_in_background` 的 pwsh job 承担全量 CI**（会随 harness 重启被杀）。止损规则见 §4.1。
+6. **跑 CI（台账判据＋脱会话长跑＋续跑）**：先 `node tests/run-ci.mjs --quick`；再全量 `powershell -NoProfile -ExecutionPolicy Bypass -File tests\gate-detached.ps1 -Action start`，交给计划任务 `MossFarmCI`，会话只用 `node tests/run-ci.mjs --status` 观察。判据是 `output/ci-journal.json` 里**同一 treeHash** 的 121 条阶段全绿＋末行「两层全部通过。」＋`output/ci-exit.log` 退出码 0。中断时台账只记已完成步骤，用 `--resume` 续跑；**禁止用 `run_in_background` 的 pwsh job 承担全量 CI**（会随 harness 重启被杀）。止损规则见 §4.1。
 7. **同步文档（中途可交付）**：任一验证单元（一条套件、双版本专项、文档核对）通过即可同步/提交，不等全量 CI；长跑期间要能说清「现在能交什么」。同步 `docs/现状与待办.md`、对应 `docs/*-plan.md`、`docs/feature-status.md`（用生成器）、`README.md` 顶部横幅；数字与证据一致，交付前 `node tests/check-docs.mjs --regen` 必须绿。
 8. **分笔提交**：代码 / 测试 / 文档 / 产物分开；提交信息写根因与范围，不写"修复测试"。
 
@@ -163,7 +163,7 @@ node tests/run-ci.mjs --status             # 台账进度：x/119、当前步骤
 node tests/run-ci.mjs --resume             # 中断后续跑（同 treeHash；计划任务里跑的就是它）
 node tests/run-ci.mjs --from=<step-id>     # 从某步重跑（step-id 用 --dump-steps 查）
 node tests/run-ci.mjs --stop-after=10      # 只跑 10 个阶段就停（验证分批/续跑）
-node tests/run-ci.mjs --dump-steps         # 打印全部 119 个阶段 id
+node tests/run-ci.mjs --dump-steps         # 打印全部 121 个阶段 id
 node tests/run-ci.mjs --only=run-m1-tide-story   # 单条
 
 powershell -NoProfile -ExecutionPolicy Bypass -File tests\gate-detached.ps1 -Action start    # 全量：计划任务 MossFarmCI，脱出会话 job 树
@@ -174,8 +174,8 @@ cd tests
 node run-m1-tide-story.mjs --single-file             # 单文件轮（cwd 在 tests）
 ```
 
-- 通过判据 = **同 treeHash 的台账 119 阶段全绿**＋末行「两层全部通过。」＋`output/ci-exit.log` 退出码 0，三样必须同属一个 treeHash。PASS 行很多但没有汇总、日志被中断/还在增长、只跑了源码轮，都**不算通过**；中断的日志既不是通过也不是产品红。
-- 口径：5 快速＋96 浏览器＋18 单文件＝119 个阶段（114 次浏览器作业）。套件数与分层以 `tests/run-ci.mjs` 当前内容为准，`--dump-steps` 是唯一权威；历史轮次的旧口径不是现状（各轮数字见 `tests/check-docs-allowlist.json`）。
+- 通过判据 = **同 treeHash 的台账 121 阶段全绿**＋末行「两层全部通过。」＋`output/ci-exit.log` 退出码 0，三样必须同属一个 treeHash。PASS 行很多但没有汇总、日志被中断/还在增长、只跑了源码轮，都**不算通过**；中断的日志既不是通过也不是产品红。
+- 口径：5 快速＋97 浏览器＋19 单文件＝121 个阶段（116 次浏览器作业）。套件数与分层以 `tests/run-ci.mjs` 当前内容为准，`--dump-steps` 是唯一权威；历史轮次的旧口径不是现状（各轮数字见 `tests/check-docs-allowlist.json`）。
 - **日常迭代不等全量**：改一行代码先跑受影响的那几条（`--only=run-xxx`／`--from=`／`--stop-after=N`），几分钟出结论；全量只在切片收口跑一次，冻结产物后不再改源码/测试/产物。
 - **长跑会耗尽机器资源**：2026-10-25 一轮 125 阶段跑到 2 小时 18 分时，单文件层连续 4 步被系统杀掉（无末行、日志空、退出码非 0），不是断言失败。判据仍是「分层通过 x/119」＋`--resume` 续跑，不要从头重跑；也因此把阶段口径收到 105。下一轮考虑浏览器层分片并行（独立 browser 实例＋独立日志目录）。
 - 失败先判断：产品缺陷 / 断言写错 / 环境拒绝（Windows 沙箱下 Playwright 可能 `spawn EPERM`，不是回归）/ 被信号打断（无输出、无末行、心跳停）。
@@ -225,4 +225,4 @@ node run-m1-tide-story.mjs --single-file             # 单文件轮（cwd 在 te
 - 技能在 `.dsh/skills/`，按 `skill` 工具加载；新增技能要有 kebab-case 名、`description` 含触发条件、正文 < 8KB（详情放 `references/`）。
 - 开发模式在 `.dsh/agent-preset/`，安装/更新方法见 `docs/开发模式.md`；改完要重装 bundle，并对新会话验证。
 - 本文件与技能里的数字/行号是快照，改动后用 grep 复核；状态数字以 `docs/现状与待办.md` 与 `docs/feature-status.md` 为准。
-- **版本**：v1.8（2026-10-29）——人物对白专项加入两层，当前 119 阶段。v1.7（2026-10-28）——终幕 F03—F05 与后日谈专项加入两层，当前 117 阶段。v1.6（2026-10-27）——终幕 F02 专项加入浏览器层与单文件层，当前 109 阶段。v1.5（2026-10-27）——终幕 F01 专项加入浏览器层与单文件层，当前 107 阶段。v1.4（2026-10-26）——阶段口径 105（5 快速＋89 浏览器＋11 单文件）：第五幕专项（回声谷十场与六处操作台）同时进浏览器层与单文件层。v1.3（2026-10-25）阶段口径 103（5 快速＋88 浏览器＋10 单文件）：M1 自然套件退出 CI（它是 M2 自然套件的真子集，两条都挂等于同一段新档路线跑两遍）、单文件层只复跑产物敏感的十类套件；全量由约 138 分降到约 100 分。v1.2（2026-10-25）阶段口径随第四幕自然串联套件入列；v1.1（2026-10-25）判据改为同 treeHash 可续跑台账、全量 CI 脱会话（计划任务 `MossFarmCI`）、止损与汇报节奏、env-check 开工预检、check-docs 交付机检、套件分层、六态词；旧「只有末行+退出码两件」判据作废。v1.0（2026-10-22）为初版。
+- **版本**：v1.9（2026-10-30）——人物实体在场专项（莱娜岗位与会合、弥拉去向与实体位置）加入两层，当前 121 阶段。v1.8（2026-10-29）——人物对白专项加入两层，当前 119 阶段。v1.7（2026-10-28）——终幕 F03—F05 与后日谈专项加入两层，当前 117 阶段。v1.6（2026-10-27）——终幕 F02 专项加入浏览器层与单文件层，当前 109 阶段。v1.5（2026-10-27）——终幕 F01 专项加入浏览器层与单文件层，当前 107 阶段。v1.4（2026-10-26）——阶段口径 105（5 快速＋89 浏览器＋11 单文件）：第五幕专项（回声谷十场与六处操作台）同时进浏览器层与单文件层。v1.3（2026-10-25）阶段口径 103（5 快速＋88 浏览器＋10 单文件）：M1 自然套件退出 CI（它是 M2 自然套件的真子集，两条都挂等于同一段新档路线跑两遍）、单文件层只复跑产物敏感的十类套件；全量由约 138 分降到约 100 分。v1.2（2026-10-25）阶段口径随第四幕自然串联套件入列；v1.1（2026-10-25）判据改为同 treeHash 可续跑台账、全量 CI 脱会话（计划任务 `MossFarmCI`）、止损与汇报节奏、env-check 开工预检、check-docs 交付机检、套件分层、六态词；旧「只有末行+退出码两件」判据作废。v1.0（2026-10-22）为初版。

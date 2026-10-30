@@ -72,9 +72,9 @@ try {
 - **浏览器层**是 `BROWSER_FILES` 字符串数组，直接加一项 `'run-xxx.mjs'`；**单文件复跑**是 `SINGLE_FILES` 数组，只挂**产物敏感**的套件（剧情 UI、门洞与出口、旧档迁移、存档快照、跨境门槛、触屏布局、跨系统修复回归）——纯逻辑与长程自然串联不进单文件层：产物与源码的 JS 逐字相同，复跑一遍不增加产物风险，却要把全量拖长。
 - 同一段路的两条自然套件只留覆盖更全的那条进 CI（`run-m1-natural-story` 是 `run-m2-natural-story` 的真子集，已退出 CI，文件保留可手动跑）。
 - 快速层的语法检查会自动 `node --check` 全部 `tests/*.mjs`，**临时探针文件也会被检查**，交付前清掉 `tmp-*.mjs`。
-- 层数/条数以 `node tests/run-ci.mjs --dump-steps` 为准（当前 5 快速＋96 浏览器＋18 单文件＝119）；历史轮次的旧口径不是现状（各轮数字见 `tests/check-docs-allowlist.json`）。
+- 层数/条数以 `node tests/run-ci.mjs --dump-steps` 为准（当前 5 快速＋97 浏览器＋19 单文件＝121）；历史轮次的旧口径不是现状（各轮数字见 `tests/check-docs-allowlist.json`）。
 - 挂完先 `node tests/run-ci.mjs --only=run-xxx` 单条验证；**日常迭代只跑受影响的套件，全量留给切片收口**；全量交给台账跑（`--status` 看 x/117），中断就 `--resume`，不必为一条套件从头重跑。
-- 通过判据：同 treeHash 台账 119 阶段全绿＋末行「两层全部通过。」＋`output/ci-exit.log` 退出码 0；单条套件看自己的末行 `PASS … N 项通过`。
+- 通过判据：同 treeHash 台账 121 阶段全绿＋末行「两层全部通过。」＋`output/ci-exit.log` 退出码 0；单条套件看自己的末行 `PASS … N 项通过`。
 
 ## 完工检查
 
