@@ -51,9 +51,9 @@ try{
  await p.evaluate(()=>{__MOSS__.state.story.echoChapter.records.confirm={choice:'listed'};});
  let confirm=await talk(...mira);ok('逐户确认后说明本人想带孩子离开',confirm.includes('我想带孩子走，住处还要落实'));
  await p.evaluate(()=>{__MOSS__.state.story.finaleChapter.records.settlement={choice:'A'};});
- let settled=await talk(...mira);ok('安置记录后不把就学申请当作入学完成',settled.includes('临时房间已经安排好')&&settled.includes('入学手续还要办'));
+ let settled=await talk('ms1_mira','neighbor_border');ok('安置记录后不把就学申请当作入学完成',settled.includes('临时房间已经安排好')&&settled.includes('入学手续还要办'));
  await p.evaluate(()=>{__MOSS__.state.story.epilogueChapter.records.ending={choice:'letter'};});
- let after=await talk(...mira);ok('后日谈后仍依据安置记录',after.includes('临时房间已经安排好'));
+ let after=await talk('ms1_mira','neighbor_border');ok('后日谈后仍依据安置记录',after.includes('临时房间已经安排好'));
  ok('无页面错误',errors.length===0);
  console.log('PASS 十一人人物对白'+(single?'（单文件版）':'')+' '+checks+' 项通过');
 }finally{await browser.close();}
