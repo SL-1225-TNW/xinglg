@@ -494,6 +494,71 @@ async function finaleAct(){
  check(await page.evaluate(()=>__MOSS__.state.story.flags.firstPartComplete===true),'终幕与结局正式读档保留');
  await checkpoint('finale');
 }
+/* 延续真实新档的 S072/F05：不写选择、日期或位置。--resume=finale 使用本套件
+ * 同树新档产生的检查点，仅证明检查点之后的路线；默认 CI 从新档连贯执行。 */
+async function presenceFollowup(){
+ const expected=await page.evaluate(()=>({day:__MOSS__.state.totalDay,choice:__MOSS__.state.story.choices.g02_lena,
+  visit:__MOSS__.state.story.scenes.S072,settlement:__MOSS__.state.story.finaleChapter.records.settlement}));
+ eq(expected.choice,'together','自然选择邀请莱娜同行');
+ check(expected.visit?.seen && expected.visit.day===expected.day,'自然会面发生于当天');
+ check(!!expected.settlement,'弥拉安置回执由自然剧情产生');
+ async function location(id,scene,x,y,label){
+  await page.waitForTimeout(300);
+  const v=await page.evaluate(id=>{const M=__MOSS__,p=M.npcPlace(id),r=M.npcRuntime[id];
+   return {p:{scene:p.scene,x:p.x,y:p.y},r:{scene:r.scene,x:Math.round(r.x),y:Math.round(r.y)},count:Object.keys(M.npcRuntime).filter(k=>k===id).length};},id);
+  eq(v.p,{scene,x,y},label+'目标场景与落点');
+  eq(v.r,{scene,x,y},label+'运行时场景与落点');
+  eq(v.count,1,label+'只有一个运行时实体');
+ }
+ async function talk(id,scene,needle){
+  await closeWin(page);await go(scene);
+  const p=await page.evaluate(id=>{const r=__MOSS__.npcRuntime[id];return [Math.round(r.x),Math.round(r.y)];},id);
+  check(!!await walkAdjacent(page,p[0],p[1]),'真实步行接近 '+id);
+  await faceTowards(page,p[0],p[1]);await page.keyboard.press('e');await page.waitForTimeout(200);
+  const text=await page.locator('.dlg-body').innerText();
+  check(text.trim().length>3&&text.includes(needle),'真实搭话 '+id);await closeWin(page);
+ }
+ async function postieAtSchedule(label){
+  const slot=await page.evaluate(()=>{const M=__MOSS__,t=M.state.timeMinutes;return M.NPCS.postie.schedule.find(s=>t>=s.from&&t<s.to);});
+  assert.ok(slot,'邮递员当前时段未登记');
+  await location('postie','city_post',slot.x,slot.y,label);
+ }
+ await location('ms1_lena','house',6,5,'会面当天莱娜');
+ await talk('ms1_lena','house','今天我按约来了农场');
+ await page.reload();await page.getByRole('button',{name:'继续游戏',exact:true}).click();
+ await location('ms1_lena','house',6,5,'会面当天读档后莱娜');
+ await go('city_post');
+ eq((await snap(page)).day,expected.day,'会面当天走回邮局');
+ await location('ms1_lena','house',6,5,'邮局中莱娜仍只在农舍');
+ check(await page.evaluate(()=>__MOSS__.__findNpcAdjacent(11,9,11,8)!=='ms1_lena'),'会面当天邮局旧岗位不能找到莱娜');
+ await postieAtSchedule('普通邮递员');
+ const counter=await page.evaluate(()=>{const i=__MOSS__.INTERACTABLES.city_post.find(i=>i.x===15&&i.y===9);return i?{...i,scene:'city_post'}:null;});
+ assert.ok(counter,'邮局柜台不存在');check(await point(counter),'真实走到邮局柜台');
+ const before=await page.evaluate(()=>({coins:__MOSS__.state.coins,friend:__MOSS__.state.npcFriendship.teacher||0}));
+ await click('寄信给诺尔');
+ const after=await page.evaluate(()=>({coins:__MOSS__.state.coins,friend:__MOSS__.state.npcFriendship.teacher||0}));
+ eq(before.coins-after.coins,15,'会面当天邮局寄信扣款');eq(after.friend-before.friend,5,'会面当天寄信生效');
+ await closeWin(page);check(await sleepViaMenu(page),'真实过夜结束会面');await dismissSettlement(page);
+ await go('house');
+ check(await page.evaluate(()=>__MOSS__.__findNpcAdjacent(6,6,6,5)!=='ms1_lena'),'次日农舍会面落点不留莱娜');
+ await go('city_post');
+ check((await snap(page)).day>expected.day,'会面已跨日结束');
+ const lena=await page.evaluate(()=>__MOSS__.npcPlace('ms1_lena'));
+ await location('ms1_lena','city_post',lena.x,lena.y,'会面结束莱娜返回岗位');
+ await postieAtSchedule('换场景后普通邮递员');
+ await page.reload();await page.getByRole('button',{name:'继续游戏',exact:true}).click();
+ await location('ms1_lena','city_post',lena.x,lena.y,'次日读档后莱娜');
+ await postieAtSchedule('读档后普通邮递员');
+ await talk('postie','city_post','');
+ check(await point(counter),'次日读档后邮局柜台可用');await closeWin(page);
+ await go('neighbor_border');
+ await location('ms1_mira','neighbor_border',14,10,'安置后弥拉');
+ await talk('ms1_mira','neighbor_border','临时房间已经安排好');
+ await page.reload();await page.getByRole('button',{name:'继续游戏',exact:true}).click();
+ await location('ms1_mira','neighbor_border',14,10,'读档后弥拉');
+ await go('ms1_echo_village');
+ check(await page.evaluate(()=>{const M=__MOSS__,s=M.NPCS.ms1_mira.schedule[0];return M.__findNpcAdjacent(s.x,s.y+1,s.x,s.y)!=='ms1_mira';}),'安置后回声谷旧址不能搭话弥拉');
+}
 try{
  const resume=process.argv.find(a=>a.startsWith('--resume='))?.slice(9);
  if(resume){
@@ -505,7 +570,7 @@ try{
   await page.getByRole('button',{name:'继续游戏',exact:true}).click();
   console.log('DIAGNOSTIC RESUME',resume,'不能代替默认新档验收');
  }else{await boot(page);await page.locator('#tutorialSkip').click();}
- if(resume!=='echo'){
+ if(resume!=='echo'&&resume!=='finale'){
  if(!resume){
   eq((await snap(page)).bridge,false,'全新存档未修桥');
   await play('S001');await play('S002');
@@ -596,7 +661,8 @@ try{
  eq(await page.evaluate(()=>__MOSS__.state.story.tasks),echo.tasks,'五幕任务正式读档后保留');
  eq(await page.evaluate(()=>__MOSS__.echoChapterState().records),echo.records,'第五幕现场事实正式读档后保留');
  }
- await finaleAct();
+ if(resume!=='finale')await finaleAct();
+ await presenceFollowup();
  eq(errors,[],'自然路线无浏览器错误');
  console.log('PASS 终幕与后日谈自然串联',checks,'项通过，自动化耗时秒',Math.round((Date.now()-started)/1000));
 } catch(e){console.error('FAIL SNAPSHOT',JSON.stringify(await snap(page)));await checkpoint('failure');throw e;}

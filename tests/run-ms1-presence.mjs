@@ -7,6 +7,7 @@
  *     写入已发生的剧情事实（合法夹具：这些事实由主线场次与回执产生），
  *     本套件只验证实体位置、对白与记录是否一致。
  *   - 背包里放一份 bread、npcFriendship 归零：用于验证好感与赠礼边界。
+ *   - 临时改写普通邮递员的注册场景及日程，模拟普通 NPC 跨场景；读档后恢复注册表。
  * 真实输入：走到人物旁按 E 搭话、走到柜台按 E 开面板并点击寄信。
  * 不证明：自然路线可达、真机手感、初见玩家理解度。 */
 import assert from 'node:assert/strict';
@@ -222,6 +223,27 @@ try {
   ok('边城对白与安置记录一致', miraTalk.includes('临时房间已经安排好') && miraTalk.includes('入学手续还要办'));
   eq('弥拉搭话不发主线经验', (await expSnapshot()).exp, expBeforeMira.exp);
   eq('弥拉搭话不新增经验记录', (await expSnapshot()).grants, expBeforeMira.grants);
+
+  /* 普通 NPC 没有自然跨场景日程，以注册表夹具触发通用换场景分支；
+   * 只验证运行时落点、旧址交互、搭话及正式读档恢复，不声称自然迁居。 */
+  await closeWin(p);
+  await p.evaluate(() => {
+    const n = __MOSS__.NPCS.postie;
+    n.scene = 'house'; n.schedule = [{ from: 0, to: 1440, x: 6, y: 5 }];
+  });
+  await p.waitForFunction(() => { const n = __MOSS__.npcRuntime.postie; return n.scene === 'house' && n.x === 6 && n.y === 5 && n.path.length === 0; });
+  eq('普通邮递员迁场落到新场景坐标且不沿旧路寻路', await p.evaluate(() => { const n = __MOSS__.npcRuntime.postie; return [n.scene,n.x,n.y,n.path.length].join(':'); }), 'house:6:5:0');
+  eq('普通邮递员迁场后目标场景', await p.evaluate(() => __MOSS__.npcScene('postie')), 'house');
+  await goto('city_post', 15, 11);
+  ok('普通邮递员迁场后旧邮局不留可交互实体', await p.evaluate(() => __MOSS__.__findNpcAdjacent(6,6,6,5) !== 'postie'));
+  ok('普通邮递员迁场后农舍可搭话', (await talkAt('postie', 'house')).trim().length > 3);
+  await closeWin(p);
+  await p.evaluate(() => __MOSS__.saveNow());
+  await p.reload(); await p.getByRole('button', { name: '继续游戏', exact: true }).click();
+  await p.waitForFunction(() => __MOSS__.npcRuntime.postie && __MOSS__.npcRuntime.postie.scene === 'city_post');
+  eq('正式读档后普通邮递员回原场景', await p.evaluate(() => __MOSS__.npcScene('postie')), 'city_post');
+  ok('正式读档后普通邮递员运行时落点匹配日程', await p.evaluate(() => { const M=__MOSS__, n=M.npcRuntime.postie, place=M.npcPlace('postie'); return n.scene===place.scene && n.x===place.x && n.y===place.y; }));
+  ok('正式读档后普通邮递员仍可搭话', (await talkAt('postie', 'city_post')).trim().length > 3);
 
   ok('无页面错误', errors.length === 0);
   console.log('PASS 十一人实体在场与岗位会合' + (single ? '（单文件版）' : '') + ' ' + checks + ' 项通过');
