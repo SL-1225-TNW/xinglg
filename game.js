@@ -9111,7 +9111,7 @@ function postResident(id, scene, x, y) {
     var p = nearestWalkable(scene, s[2], s[3]);
     return {from:s[0],to:s[1],x:p.x,y:p.y};
   });
-  if (npcRuntime && npcRuntime[id]) { npcRuntime[id].x = x; npcRuntime[id].y = y; npcRuntime[id].path = []; }
+  if (npcRuntime && npcRuntime[id]) { npcRuntime[id].x = x; npcRuntime[id].y = y; npcRuntime[id].path = []; npcRuntime[id].scene = scene; }
 }
 addResident('blacksmith','霍尔','白蔷薇铁匠','city',96,63,'engineer',['#4A3E38','#6B5C57','#B4BBC4'],
   ['炉子整晚不熄，想要好工具就得肯等。','铁在火里说了算，不在锤子上。']);
@@ -11219,7 +11219,8 @@ function findNpcAdjacent(px, py, fx, fy) {
   var best = null, bestD = 99;
   for (var id in NPCS) {
     if (!Object.prototype.hasOwnProperty.call(NPCS, id)) continue;
-    if (NPCS[id].scene !== state.sceneId) continue;
+    var place = npcPlaceOf(id);
+    if (!place || place.scene !== state.sceneId) continue;
     // DS 小姐在相遇之前不在场：既不显示也不能对话。
     if (id === 'ds' && !state.dsMet) continue;
     var n = npcRuntime[id];
@@ -12738,7 +12739,7 @@ function ensureNpcRuntime() {
     if (!Object.prototype.hasOwnProperty.call(NPCS, id)) continue;
     if (!npcRuntime[id]) {
       var slot = scheduleSlot(NPCS[id], state.timeMinutes);
-      npcRuntime[id] = { x: slot.x, y: slot.y, face: 'down', path: [], turnT: 0, speed: 1.9 };
+      npcRuntime[id] = { x: slot.x, y: slot.y, face: 'down', path: [], turnT: 0, speed: 1.9, scene: NPCS[id].scene };
     }
   }
 }
@@ -12748,14 +12749,18 @@ function updateNpcPositions(instant) {
   for (var id in npcRuntime) {
     if (!Object.prototype.hasOwnProperty.call(npcRuntime, id)) continue;
     var npc = NPCS[id], r = npcRuntime[id];
-    var slot = scheduleSlot(npc, state.timeMinutes);
-    if(!instant&&npc.scene!==state.sceneId){r.x=slot.x;r.y=slot.y;r.path=[];continue;}
-    if (instant) { r.x = slot.x; r.y = slot.y; r.path = []; r.face = 'down'; continue; }
-    if (r.x === slot.x && r.y === slot.y) { r.path = []; continue; }
-    if (!r.path.length || r.pathGoal !== key2(slot.x, slot.y)) {
-      var p = findPath(npc.scene, r.x, r.y, slot.x, slot.y);
+    var place = npcPlaceOf(id);
+    if (!place) continue;
+    /* 换了场景（剧情会合或迁居）就直接落到新场景的落点，
+       不能拿上一场景的坐标在当前场景里寻路。 */
+    if (r.scene !== place.scene) { r.scene = place.scene; r.x = place.x; r.y = place.y; r.path = []; r.face = 'down'; continue; }
+    if(!instant&&place.scene!==state.sceneId){r.x=place.x;r.y=place.y;r.path=[];continue;}
+    if (instant) { r.x = place.x; r.y = place.y; r.path = []; r.face = 'down'; continue; }
+    if (r.x === place.x && r.y === place.y) { r.path = []; continue; }
+    if (!r.path.length || r.pathGoal !== key2(place.x, place.y)) {
+      var p = findPath(place.scene, r.x, r.y, place.x, place.y);
       r.path = p || [];
-      r.pathGoal = key2(slot.x, slot.y);
+      r.pathGoal = key2(place.x, place.y);
     }
   }
 }
@@ -12839,6 +12844,11 @@ function npcDialogue(id) {
       var story = state.story || {}, echo = story.echoChapter || {}, finale = story.finaleChapter || {};
       if (finale.records && finale.records.settlement) text += '\n边城的临时房间已经安排好，孩子的入学手续还要办。';
       else if (echo.records && echo.records.confirm) text += '\n我想带孩子走，住处还要落实。';
+    }
+    if (id === 'ms1_lena') {
+      /* 岗位时段可读：玩家看得出她此刻在柜台、在分信区，还是按约在外。 */
+      var lplace = npcPlaceOf('ms1_lena'), lo = lplace && lplace.override;
+      if (lo && MS1_PRESENCE_TEXT[lo.state]) text += '\n' + MS1_PRESENCE_TEXT[lo.state];
     }
   } else if (stage > 0 && stage > d.heartStage) {
     d.heartStage = stage;
@@ -19447,10 +19457,11 @@ function npcOccupies(sceneId, x, y) {
   for (var id in npcRuntime) {
     if (!Object.prototype.hasOwnProperty.call(npcRuntime, id)) continue;
     var n = NPCS[id];
-    if (!n || n.scene !== sceneId) continue;
+    if (!n) continue;
+    var place = npcPlaceOf(id);
+    if (!place || place.scene !== sceneId) continue;
     var r = npcRuntime[id];
-    var slot = scheduleSlot(n, state.timeMinutes);
-    if ((r && Math.round(r.x) === x && Math.round(r.y) === y) || (slot.x === x && slot.y === y)) return true;
+    if ((r && Math.round(r.x) === x && Math.round(r.y) === y) || (place.x === x && place.y === y)) return true;
   }
   return false;
 }
@@ -19705,7 +19716,8 @@ function nodeServiceSummary(node, limit) {
     labels.push(it.label);
   });
   Object.keys(NPCS).forEach(function (id) {
-    if (NPCS[id] && NPCS[id].scene === node.sceneId) people.push(NPCS[id].name);
+    var place = NPCS[id] ? npcPlaceOf(id) : null;
+    if (place && place.scene === node.sceneId) people.push(NPCS[id].name);
   });
   var parts = [];
   if (labels.length) parts.push('可去：' + labels.slice(0, max).join('、') + (labels.length > max ? ' 等 ' + labels.length + ' 处' : ''));
@@ -21984,7 +21996,8 @@ function drawScene(g, dt) {
   }
   for (var nid in npcRuntime) {
     if (!Object.prototype.hasOwnProperty.call(npcRuntime, nid)) continue;
-    if (NPCS[nid].scene !== state.sceneId) continue;
+    var nplace = npcPlaceOf(nid);
+    if (!nplace || nplace.scene !== state.sceneId) continue;
     // DS 小姐在相遇之前不出现在场景里。
     if (nid === 'ds' && !state.dsMet) continue;
     var nr = npcRuntime[nid];
@@ -24978,6 +24991,69 @@ var MS1_VOICES = {
   ms1_colin: {lines:['那家修车铺还在，我喜欢看他们换轮子。','我记得茶凉了，可具体时辰还要再想想。','我亲眼见的只有眼前这一段，别把猜测也算进去。'],rain:'雨大了，街边那张棋桌得找个避雨的位置。',heart:{25:'棋下得慢不要紧，我也常想半天。',50:'那天的次序我还记得一点，但不敢说全都准确。',75:'你可以先问关键处。我只说自己亲眼见到的。'}},
   ms1_eno: {lines:['找到卷号了。你可以抄这页，背面的住址请遮住。','这行旧字我也拿不准，得再对照一份目录。','下班后那本书还没读完，书签夹在目录里了。'],rain:'雨天先关窗，把受潮的书页隔开晾护。',heart:{25:'目录放错一格，比书自己长腿还难找。',50:'帮我看看这行旧字？我也有拿不准的时候。',75:'原件仍须按规定保管；这页能公开的部分可以一起核。'}}
 };
+
+/* ============================================================
+   十一人实体在场：值班、休息与剧情会合
+   §25.1a 要求新人物不默认全天站同一柜台，§27.8 要求章节会合只有一个实体。
+   优先级：剧情会合 > 岗位时段 > 既有日程。
+   全部由既有事实推导（剧情选择、场次日期、安置回执），不新增存档字段，
+   读档后不回退；旧档不补造任何未发生的事实。 */
+var MS1_PRESENCE_IDS = { ms1_lena: 1, ms1_mira: 1 };
+var MS1_PRESENCE = {
+  /* 莱娜：早班柜台 → 分信区理信 → 晚班柜台。三段都在同一间邮局，
+     离开柜台的时段落在分信区；街景与挑纸属第三阶段的生活差异。 */
+  ms1_lena: [
+    { from: 360, to: 660, scene: 'city_post', x: 11, y: 8, state: 'duty', label: '柜台值班' },
+    { from: 660, to: 1020, scene: 'city_post', x: 14, y: 6, state: 'sort', label: '分信区理信' },
+    { from: 1020, to: 1320, scene: 'city_post', x: 11, y: 8, state: 'duty', label: '晚班柜台' }
+  ]
+};
+/* 岗位时段的可读说明：玩家看得出她此刻在做什么，而不是全天站同一格。 */
+var MS1_PRESENCE_TEXT = {
+  duty: '今天我在柜台，寄信和捎话的事随时可以来问。',
+  sort: '这段时间我在分信区理信，柜台那边请找小翎。',
+  meeting: '今天我按约来了农场。'
+};
+function ms1FinaleRecords() {
+  var st = state.story || {}, fin = st.finaleChapter || {};
+  return (fin.records && typeof fin.records === 'object') ? fin.records : null;
+}
+/* 莱娜：后日谈 G02 的约定到访。选了同行，她按约到农舍；会面当天她不在邮局，
+   次日回柜台。事实来源只有剧情选择与场次日期，不另存标记。 */
+function ms1LenaMeeting() {
+  var c = storyChoices();
+  if (!c || c.g02_lena !== 'together') return null;
+  var rec = (storyState().scenes || {})['S072'];
+  var day = (rec && isInt(rec.day) && rec.day >= 1) ? rec.day : state.totalDay;
+  if (state.totalDay > day) return null;
+  return { scene: 'house', x: 6, y: 5, state: 'meeting', label: '农舍会面' };
+}
+/* 弥拉：安置回执成立＝她本人同意临时接收（边城）。只有足够事实才改实体位置；
+   未落实安置、暂留或未答复都留在回声谷。 */
+function ms1MiraPlace() {
+  var rec = ms1FinaleRecords();
+  if (rec && rec.settlement) return { scene: 'neighbor_border', x: 14, y: 10, state: 'settled', label: '边城临时安置' };
+  return null;
+}
+function ms1PresenceOverride(id) {
+  if (!MS1_PRESENCE_IDS[id]) return null;
+  if (id === 'ms1_lena') { var meet = ms1LenaMeeting(); if (meet) return meet; }
+  if (id === 'ms1_mira') { var place = ms1MiraPlace(); if (place) return place; }
+  var table = MS1_PRESENCE[id];
+  if (!table) return null;
+  var m = state.timeMinutes;
+  for (var i = 0; i < table.length; i++) { var s = table[i]; if (m >= s.from && m < s.to) return s; }
+  return table[table.length - 1];
+}
+/* 实体当前位置：覆盖优先，否则按既有日程。 */
+function npcPlaceOf(id) {
+  var npc = NPCS[id];
+  if (!npc) return null;
+  var ov = ms1PresenceOverride(id);
+  if (ov) return { scene: ov.scene || npc.scene, x: ov.x, y: ov.y, override: ov };
+  var slot = scheduleSlot(npc, state.timeMinutes);
+  return { scene: npc.scene, x: slot.x, y: slot.y, override: null };
+}
 
 /* --- 地点里的可交互点：先给位置，幕里的现场操作在 M1—M3 接上 --- */
 /* --- 地点里的可交互点：先给位置，幕里的现场操作在 M1—M3 接上 ---
@@ -28069,7 +28145,8 @@ window.__MOSS__ = {
   },
   QUEST_SITES: QUEST_SITES,
   TUTORIAL_DONE: TUTORIAL_DONE,
-  npcScene: function (id) { return NPCS[id].scene; },
+  npcScene: function (id) { return NPCS[id] ? npcPlaceOf(id).scene : ''; },
+  npcPlace: function (id) { return npcPlaceOf(id); },
   invList: function () { return invList(state.inventory); },
   toasts: [],
   freeSlots: function () { return freeSlots(state.inventory); },
