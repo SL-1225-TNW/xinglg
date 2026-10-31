@@ -123,6 +123,8 @@ const BROWSER_FILES = [
   'run-ms1-voices.mjs',
   /* 十一人实体在场：莱娜的岗位时段与剧情会合、弥拉的去向与实体位置 */
   'run-ms1-presence.mjs',
+  'run-ms1-life.mjs',
+  'run-ms1-life-natural.mjs',
   'run-m1-segment-travel.mjs',
   /* 第九版 M1 前置 P0-2：合法跨封国，四条进入路线各有凭证与缺项清单 */
   'run-m1-cross-border.mjs',
@@ -177,7 +179,7 @@ const BROWSER_FILES = [
  * 其产物风险由上面的剧情与新地点套件覆盖；双版本证据另行实跑并留 exit 日志。
  */
 const SINGLE_FILES = [
-  'run-m0-story.mjs', 'run-ms1-locations.mjs', 'run-ms1-voices.mjs', 'run-ms1-presence.mjs',
+  'run-m0-story.mjs', 'run-ms1-locations.mjs', 'run-ms1-voices.mjs', 'run-ms1-presence.mjs', 'run-ms1-life.mjs',
   'run-m1-pine-story.mjs', 'run-m1-tide-story.mjs', 'run-m1-letter-care.mjs', 'run-m1-cross-border.mjs',
   'run-m2-capital-story.mjs', 'run-m2-echo-story.mjs', 'run-m3-finale-prep.mjs', 'run-m3-finale-support.mjs', 'run-m3-finale-action.mjs', 'run-m3-finale-records.mjs', 'run-m3-finale-return.mjs', 'run-m3-epilogue.mjs', 'run-r4-legacy-save.mjs', 'run-r5-mobile-touch.mjs',
   'run-fixes.mjs'
