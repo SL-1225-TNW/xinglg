@@ -51,3 +51,7 @@
 局部自然入口读取原树 cc777daf0284 的新档真实后日谈检查点，预置两位好感为 25；玩家真实过夜、走到邮局和回声谷测绘屋、对本人按 E 并完成两个事件。它证明检查点之后的路线，不证明从零积累好感或全新存档重新走完全程。十一人礼物与事件分支使用好感、物品、时段及场景夹具；真人手机与五位初见玩家仍未测。
 
 同树回归：人物对白源码与单文件各 38 项（`output/life-final-regression-run-ms1-voices-src.log`、`output/life-final-regression-run-ms1-voices-single.log`）；实体在场源码与单文件各 43 项（`output/life-final-regression-run-ms1-presence-src.log`、`output/life-final-regression-run-ms1-presence-single.log`）；后日谈源码与单文件各 106 项（`output/life-final-regression-run-m3-epilogue-src.log`、`output/life-final-regression-run-m3-epilogue-single.log`）；R4 旧档源码 29 项（`output/life-final-regression-run-r4-legacy-save-src.log`）。各日志的同名 `-exit.log` 均为 exit=0；本轮未单独复跑 R4 旧档的单文件层，完整 CI 仍待同树续跑。
+
+### CI 续跑位置（2026-10-31）
+
+旧测试树 bdda1ca7eb53 的 68/121 已完成阶段保留，当前在 `C:/Users/22079/.codex/worktrees/moss-ci-bdda` 同树续跑，计划任务 MossFarmCI 指向该目录；日志及新退出记录也在该工作树的 output。曾因电池条件排队，现已允许该任务在电池供电时启动与继续，已核对进程与心跳。主工作区为人物生活树 e166ff0625f3，分层通过 8/124（原因：只运行快速层与新增专项；下一步：旧轮结束后，先在主工作区用 gate-detached.ps1 -Action install 重新绑定任务，再 -Action start 同树续跑）。不可在旧轮运行期间直接启动另一轮浏览器作业。旧轮结束后需保存其完整日志、台账与独立退出副本。
