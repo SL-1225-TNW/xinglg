@@ -39,3 +39,15 @@
 2. 五位初见玩家：分别记录首次进入、找到目标与完成的时间，遇阻时记录原话、位置和自主尝试；区分独立完成与主持人提示后的结果。
 3. 固定观察点：序章与第一幕目标理解、进入邮局、人物会面与服务、跨区返回、保存恢复。约 65 分钟、40 分钟和至少 180 分钟是待实测目标，不预先记成结果。
 4. 汇总每位玩家的完成情况、提示次数、共性卡点与版本；保留失败和中途停止记录，自动化结果不替代人工结果。
+
+## 本轮实施与验收口径（2026-10-31）
+
+在隔离工作树实施十一人的候选偏好与总规 §27.9 两段关系事件；来源 `ITEMS` 的实际注册与 `isGiftable`，不新增物品或主线奖励。两段事件通过本人对话入口、好感 25、在场场景和明确选择触发；沿用 story 的 flags/choices 保存，不升版本、不补造旧事实。源码与单文件专项覆盖十一人偏好与一般物品、每日限制、扣件与不发经验；事件覆盖未达门槛、稍后、两分支、重复回看、读档、莱娜会面不占岗与伊文提前到访。新增套件进浏览器与单文件两层 CI，自然入口由现有自然路线补充；实体手机与五位初见玩家仍未测。当前状态：分层通过 8/124（原因：只运行快速层与新增专项；下一步：同树续跑其余阶段）。
+
+### 本轮证据（2026-10-31）
+
+冻结测试树 e166ff0625f3：`tests/run-ms1-life.mjs` 源码和单文件各 136 项通过，`tests/run-ms1-life-natural.mjs` 源码 32 项通过，三项登记于过滤运行日志 `output/ci-run-e166ff06-20261031-133136.log`（各阶段 exit=0，过滤运行不构成完整 CI）。单文件局部自然入口 32 项通过，日志 `output/ms1-life-natural-final-single.log`、独立退出记录 `output/ms1-life-natural-final-single-exit.log` 为 exit=0。快速层 5/5 的日志为 `output/ci-run-e166ff06-20261031-133116.log`。
+
+局部自然入口读取原树 cc777daf0284 的新档真实后日谈检查点，预置两位好感为 25；玩家真实过夜、走到邮局和回声谷测绘屋、对本人按 E 并完成两个事件。它证明检查点之后的路线，不证明从零积累好感或全新存档重新走完全程。十一人礼物与事件分支使用好感、物品、时段及场景夹具；真人手机与五位初见玩家仍未测。
+
+同树回归：人物对白源码与单文件各 38 项（`output/life-final-regression-run-ms1-voices-src.log`、`output/life-final-regression-run-ms1-voices-single.log`）；实体在场源码与单文件各 43 项（`output/life-final-regression-run-ms1-presence-src.log`、`output/life-final-regression-run-ms1-presence-single.log`）；后日谈源码与单文件各 106 项（`output/life-final-regression-run-m3-epilogue-src.log`、`output/life-final-regression-run-m3-epilogue-single.log`）；R4 旧档源码 29 项（`output/life-final-regression-run-r4-legacy-save-src.log`）。各日志的同名 `-exit.log` 均为 exit=0；本轮未单独复跑 R4 旧档的单文件层，完整 CI 仍待同树续跑。
