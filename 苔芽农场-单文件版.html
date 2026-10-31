@@ -16058,6 +16058,45 @@ function openFieldJournal(){
   ]});
 }
 /* --- 对话与赠礼 --- */
+/* 关系事件不创建第二个人物，也不依赖主线进度以外的隐藏传送。 */
+function ms1RelationReady(id) {
+  var spec = MS1_RELATION_EVENTS[id];
+  if (!spec || state.sceneId !== spec.scene) return false;
+  var place = npcPlaceOf(id);
+  return !!place && place.scene === spec.scene;
+}
+function openMs1Relationship(id) {
+  var spec = MS1_RELATION_EVENTS[id];
+  if (!spec || !ms1RelationReady(id)) { toast('请在约定地点与本人交谈。'); return; }
+  var st = storyState(), done = st.flags[spec.key] === true;
+  if (!done && (state.npcFriendship[id] || 0) < 25) { toast('好感达到 25 后可以参加。'); return; }
+  var stage = done ? 'done' : 'offer';
+  openWindow({ id:'ms1_relation_' + id, kind:'dialogue', narrow:true, title:spec.title,
+    build:function (b) {
+      b.appendChild(el('p', null, spec.intro));
+      if (stage === 'offer') {
+        b.appendChild(mkBtn('愿意，看看吧', 'primary', function () { stage='choice'; renderWindow(); }));
+        b.appendChild(mkBtn('暂时不参加', 'ghost', function () { closeWindow(); }));
+      } else if (stage === 'choice') {
+        b.appendChild(el('p', 'muted', spec.prompt));
+        spec.options.forEach(function (opt) {
+          b.appendChild(mkBtn(opt.label, 'primary', function () {
+            /* 只有明确选择才完成；重入不再改选择或发放任何奖励。 */
+            if (st.flags[spec.key] !== true) {
+              st.choices[spec.key] = opt.id; st.flags[spec.key] = true;
+              markDirty(); saveNow();
+            }
+            stage='done'; renderWindow();
+          }));
+        });
+      } else {
+        var selected = spec.options.find(function (opt) { return opt.id === st.choices[spec.key]; });
+        if (selected) { b.appendChild(el('p', 'muted', '你选择：' + selected.label)); b.appendChild(el('p', null, selected.reply)); }
+        b.appendChild(el('p', null, spec.ending));
+        b.appendChild(el('p', 'muted', '这段共同经历已记录，可随时回看。'));
+      }
+    }, actions:[{ label:'结束', kind:'ghost', close:true }] });
+}
 function openDialogue(id, text, friendshipGain) {
   var npc = NPCS[id];
   var view = 'talk';
@@ -16088,6 +16127,13 @@ function openDialogue(id, text, friendshipGain) {
         if(millNpcSite)row.appendChild(mkBtn('磨坊与村庄事务','primary',function(){openMillLife(millNpcSite);}));
         var professionalNpcSite={vine_lucy:'vineyard',clinic_celine:'clinic',clinic_oren:'archive',port_leon:'lock',port_mia:'port',quarry_marl:'quarry',water_engineer:'water'}[id];
         if(professionalNpcSite)row.appendChild(mkBtn('职业服务与合同','primary',function(){openProfessionSite(professionalNpcSite);}));
+        var relation = MS1_RELATION_EVENTS[id];
+        if (relation && ms1RelationReady(id)) {
+          var relationDone = storyState().flags[relation.key] === true;
+          if (relationDone || (state.npcFriendship[id] || 0) >= 25) {
+            row.appendChild(mkBtn((relationDone ? '回看 · ' : '一起 · ') + relation.title, 'primary', function () { openMs1Relationship(id); }));
+          } else b.appendChild(el('p', 'muted', relation.title + '：好感达到 25 后可参加。'));
+        }
         if(LIVING_JOBS[id])row.appendChild(mkBtn('帮忙委托','primary',function(){openResidentJob(id);}));
         if(BOND_QUESTS.some(function(q){return q.npc===id&&!specialQuestDone(q,'bond')&&specialQuestUnlocked(q,'bond');}))row.appendChild(mkBtn('居民委托','primary',function(){QUEST_TAB='bond';openQuestLog('npc');}));
         if (!d.chat) row.appendChild(mkBtn('再聊一句', 'primary', function () { talkToNpc(id); }));
@@ -26289,6 +26335,36 @@ var MS1_VOICES = {
   ms1_beran: {lines:['道路维护按路段和批次安排，先核清现有的人手。','年轻承办人画的施工图，我想再看一遍。','这个期限我不能现在保证，要先核过材料。'],rain:'雨后先查道路排水和维护记录，别急着报完工。',heart:{25:'一张清楚的施工图，能省不少来回。',50:'我习惯先看总数，有些细项需要逐户核清。',75:'我批准的事项由我说明，未核实的也不能略过去。'}},
   ms1_colin: {lines:['那家修车铺还在，我喜欢看他们换轮子。','我记得茶凉了，可具体时辰还要再想想。','我亲眼见的只有眼前这一段，别把猜测也算进去。'],rain:'雨大了，街边那张棋桌得找个避雨的位置。',heart:{25:'棋下得慢不要紧，我也常想半天。',50:'那天的次序我还记得一点，但不敢说全都准确。',75:'你可以先问关键处。我只说自己亲眼见到的。'}},
   ms1_eno: {lines:['找到卷号了。你可以抄这页，背面的住址请遮住。','这行旧字我也拿不准，得再对照一份目录。','下班后那本书还没读完，书签夹在目录里了。'],rain:'雨天先关窗，把受潮的书页隔开晾护。',heart:{25:'目录放错一格，比书自己长腿还难找。',50:'帮我看看这行旧字？我也有拿不准的时候。',75:'原件仍须按规定保管；这页能公开的部分可以一起核。'}}
+};
+
+
+/* §25.1a：在原有通用喜好上增加个人生活偏好，旧档不会失去原有赠礼效果。 */
+var MS1_GIFT_LIKES = {
+  ms1_lena:['strawberry','jam'], ms1_iven:['field_note','bread'],
+  ms1_hessa:['bread','epilogue_soup'], ms1_nadine:['wool','bread'],
+  ms1_vik:['salt_fish','bread'], ms1_ruen:['wood','plank'],
+  ms1_mira:['wool','bread'], ms1_aurelle:['manuscript','jam'],
+  ms1_beran:['plank','field_note'], ms1_colin:['field_note','jam'],
+  ms1_eno:['manuscript','translation']
+};
+Object.keys(MS1_GIFT_LIKES).forEach(function (id) {
+  var npc = NPCS[id]; if (!npc) return;
+  MS1_GIFT_LIKES[id].forEach(function (item) {
+    if (ITEMS[item] && isGiftable(item) && npc.like.indexOf(item) < 0) npc.like.push(item);
+  });
+});
+/* 两段正文取自总规 §27.9。完成键沿用 story.flags，选择沿用 story.choices。 */
+var MS1_RELATION_EVENTS = {
+  ms1_lena:{key:'ms1_rel_lena',scene:'city_post',title:'挑纸与留白',
+    intro:'莱娜：工作做完，我想挑两张写信用的纸。你愿意陪我看看吗？',prompt:'看过两张纸，你想先看哪一张？',
+    options:[{id:'A',label:'纹理浅的纸',reply:'莱娜：这一张写字清楚。空白的地方，也可以先留着。'},
+             {id:'B',label:'边角带纹的纸',reply:'莱娜：边角有一点花纹。收信的人或许会先注意到这里。'}],
+    ending:'莱娜：谢谢你陪我挑。该写什么，我会自己决定。'},
+  ms1_iven:{key:'ms1_rel_iven',scene:'ms1_echo_house',title:'两种画法',
+    intro:'伊文：我画了两张院墙。树影落在哪里，我还没决定。你愿意看看吗？',prompt:'看过两张图，你想先画什么？',
+    options:[{id:'A',label:'先画院墙',reply:'伊文：边界清楚，树影就有地方落。嗯，这是你的看法。'},
+             {id:'B',label:'先画树影',reply:'伊文：先看光，再画墙。我刚才只顾着量尺寸了。'}],
+    ending:'伊文：我有自己的画法，也想听你怎么想。这一张先留在这里。'}
 };
 
 /* ============================================================
