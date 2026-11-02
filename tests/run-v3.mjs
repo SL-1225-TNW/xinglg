@@ -8,7 +8,12 @@ const { Report } = await import('./harness.mjs');
 const rep = new Report();
 const log = (...a) => console.log('  ·', ...a);
 
-const SHOT = p => p;
+// 每轮独立截图目录，避免 Windows 覆写旧图时 UNKNOWN，保留前轮证据。
+const { mkdir } = await import('node:fs/promises');
+const { fileURLToPath } = await import('node:url');
+const shotDir = new URL('../output/playwright/v3-' + Date.now() + '/', import.meta.url);
+await mkdir(shotDir, { recursive: true });
+const SHOT = name => fileURLToPath(new URL(name, shotDir));
 
 /* 从画布上按世界格取一块像素，用来判断“画面里到底有没有画出来”。
    注意三点：
@@ -79,7 +84,7 @@ rep.eq('播种后 crop 字段为 radish', s.plots['7,8'].crop, 'radish');
 await park(page, PARK[0], PARK[1]);
 const sown = await tileHasPixels(page, 7, 8);
 rep.ok('播种后同一格立即出现绿色芽苗', sown.green >= 4, JSON.stringify(sown));
-await page.screenshot({ path: '../output/playwright/v3-a1-sown.png' });
+await page.screenshot({ path: SHOT('v3-a1-sown.png') });
 
 // 另一处不同摄像机位置
 await walkTo(page, 16, 9);
@@ -147,7 +152,7 @@ rep.ok('三种作物生长中轮廓大小不同', new Set([rad, pot, str]).size 
 // 成熟提示：只有成熟格出现黄色高光
 rep.ok('成熟作物有黄色提示', stages['萝卜成熟'].yellow >= 1, JSON.stringify(stages['萝卜成熟']));
 rep.ok('未成熟作物没有黄色提示', stages['萝卜生长'].yellow === 0, JSON.stringify(stages['萝卜生长']));
-await page.screenshot({ path: '../output/playwright/v3-a3-stages.png' });
+await page.screenshot({ path: SHOT('v3-a3-stages.png') });
 
 console.log('【A4】草莓再生保留植株，萝卜土豆收获后消失');
 await pickTool(page, 4);
@@ -176,7 +181,7 @@ rep.ok('萝卜收获后画面无作物', afterHarvest.萝卜.green < 4, JSON.str
 rep.ok('土豆收获后画面无作物', afterHarvest.土豆.green < 4, JSON.stringify(afterHarvest.土豆));
 rep.ok('草莓收获后画面仍有植株', afterHarvest.草莓.green >= 6, JSON.stringify(afterHarvest.草莓));
 rep.ok('草莓再生期不再有红果', afterHarvest.草莓.red < 8, JSON.stringify(afterHarvest.草莓));
-await page.screenshot({ path: '../output/playwright/v3-a4-harvest.png' });
+await page.screenshot({ path: SHOT('v3-a4-harvest.png') });
 
 console.log('【A5】地块信息浮层（悬停与点选都不吞工具操作）');
 await page.evaluate(() => { window.__MOSS__.game.hoverTile = [11, 8]; });
@@ -209,7 +214,7 @@ await page.evaluate(() => { window.__MOSS__.game.hoverTile = null; window.__MOSS
 await page.waitForTimeout(250);
 tip = await page.evaluate(() => { const n = document.getElementById('tileTip'); return { hidden: n.hidden, text: n.innerText.replace(/\n/g, ' / ') }; });
 rep.ok('触屏点选同样显示信息', !tip.hidden && /草莓/.test(tip.text), JSON.stringify(tip));
-await page.screenshot({ path: '../output/playwright/v3-a5-tip.png' });
+await page.screenshot({ path: SHOT('v3-a5-tip.png') });
 
 console.log('【A6】雨天与洒水器的水分显示');
 await page.evaluate(() => {
@@ -227,7 +232,7 @@ await page.evaluate(() => { window.__MOSS__.game.hoverTile = [16, 8]; });
 await page.waitForTimeout(250);
 tip = await page.evaluate(() => document.getElementById('tileTip').innerText.replace(/\n/g, ' / '));
 rep.ok('雨天已浇水时提示已浇水', /今天已浇水/.test(tip), tip);
-await page.screenshot({ path: '../output/playwright/v3-a6-rain.png' });
+await page.screenshot({ path: SHOT('v3-a6-rain.png') });
 await page.evaluate(() => { window.__MOSS__.state.weather = { today: 'sun', tomorrow: 'sun' }; });
 
 /* ================= B. 农舍室内 ================= */
@@ -292,7 +297,7 @@ const reachable = await page.evaluate(() => {
   };
 });
 rep.ok('从门到所有功能家具都有可走路径', Object.values(reachable).every(Boolean), JSON.stringify(reachable));
-await page.screenshot({ path: '../output/playwright/v3-b2-inside.png' });
+await page.screenshot({ path: SHOT('v3-b2-inside.png') });
 
 console.log('【B3】室内四项功能');
 await walkTo(page, 13, 3);
@@ -318,7 +323,7 @@ const calTxt = await winText(page);
 rep.ok('日历显示真实日期', calTxt.includes('第 ' + (await snap(page)).day + ' 天'), calTxt.slice(0, 40));
 rep.ok('日历显示今日天气', /今日天气/.test(calTxt));
 rep.ok('日历显示明日预报', /明日预报/.test(calTxt));
-await page.screenshot({ path: '../output/playwright/v3-b3-calendar.png' });
+await page.screenshot({ path: SHOT('v3-b3-calendar.png') });
 await closeWin(page);
 await walkTo(page, 8, 2);
 await faceTowards(page, 8, 3);
@@ -354,7 +359,7 @@ rep.eq('确认后只结算一天', s.day, day0 + 1);
 rep.eq('睡醒在室内', s.scene, 'house');
 rep.ok('睡醒在床旁', JSON.stringify([s.px, s.py]) === '[2,3]', JSON.stringify([s.px, s.py]));
 rep.eq('体力恢复满', s.energy, 100);
-await page.screenshot({ path: '../output/playwright/v3-b4-wake.png' });
+await page.screenshot({ path: SHOT('v3-b4-wake.png') });
 await walkTo(page, 7, 11);
 await page.waitForTimeout(700);
 rep.eq('可以从床上走到门口出门', (await snap(page)).scene, 'farm');
@@ -535,7 +540,7 @@ const pondInk = await page.evaluate(() => {
   return { total: fish.length, painted };
 });
 rep.ok('每条鱼在画面上都有可辨认像素', pondInk.painted === pondInk.total, JSON.stringify(pondInk));
-await page.screenshot({ path: '../output/playwright/v3-c1-pond.png' });
+await page.screenshot({ path: SHOT('v3-c1-pond.png') });
 // 夜晚仍可见
 await page.evaluate(() => { window.__MOSS__.state.timeMinutes = 21 * 60; });
 await page.waitForTimeout(500);
@@ -560,7 +565,7 @@ const nightInk = await page.evaluate(() => {
   return painted;
 });
 rep.ok('夜晚鱼仍可辨认', nightInk >= Math.ceil(fishN * 0.6), `可见 ${nightInk}/${fishN}`);
-await page.screenshot({ path: '../output/playwright/v3-c2-pond-night.png' });
+await page.screenshot({ path: SHOT('v3-c2-pond-night.png') });
 await page.evaluate(() => { window.__MOSS__.state.timeMinutes = 8 * 60; });
 rep.ok('池塘鱼不会改变背包（不赠送装备）', await page.evaluate(() => {
   const inv = window.__MOSS__.state.inventory;

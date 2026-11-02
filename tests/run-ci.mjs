@@ -164,7 +164,7 @@ const BROWSER_FILES = [
   'run-v3.mjs', 'run-guide.mjs',
   'run-edge.mjs', 'run-main.mjs', 'run-responsive-layout.mjs',
   /* 界面与手感：快捷栏、窗口、触屏布局与字号 */
-  'run-ui.mjs',
+  'run-ui.mjs', 'run-ui-polish.mjs',
   /* 农场手感的修复回归：铲除改种、委托方向指示、分页结算与收成记录 */
   'run-fixes.mjs'
 ].filter((f) => fs.existsSync(path.join(here, f)));
@@ -179,6 +179,7 @@ const BROWSER_FILES = [
  * 其产物风险由上面的剧情与新地点套件覆盖；双版本证据另行实跑并留 exit 日志。
  */
 const SINGLE_FILES = [
+  'run-ui-polish.mjs',
   'run-m0-story.mjs', 'run-ms1-locations.mjs', 'run-ms1-voices.mjs', 'run-ms1-presence.mjs', 'run-ms1-life.mjs',
   'run-m1-pine-story.mjs', 'run-m1-tide-story.mjs', 'run-m1-letter-care.mjs', 'run-m1-cross-border.mjs',
   'run-m2-capital-story.mjs', 'run-m2-echo-story.mjs', 'run-m3-finale-prep.mjs', 'run-m3-finale-support.mjs', 'run-m3-finale-action.mjs', 'run-m3-finale-records.mjs', 'run-m3-finale-return.mjs', 'run-m3-epilogue.mjs', 'run-r4-legacy-save.mjs', 'run-r5-mobile-touch.mjs',
