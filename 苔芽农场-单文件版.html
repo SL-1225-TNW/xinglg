@@ -12,6 +12,19 @@
    ============================================================ */
 
 :root{
+  /* UI/UX Polish 1.0：公共窗口语义 Token，场景色板独立。 */
+  --ui-surface:#243a30;
+  --ui-raised:#3d5948;
+  --ui-hover:#496b57;
+  --ui-paper:#e9dab7;
+  --ui-accent:#c49b55;
+  --ui-accent-hover:#d6af6b;
+  --ui-danger:#643b35;
+  --ui-danger-hover:#7b4940;
+  --ui-space:12px;
+  --ui-text:15px;
+  --ui-title:16px;
+  --ui-touch:44px;
   --grass:#7E9C5E;
   --deep:#244E3A;
   --leaf:#A1BD58;
@@ -425,7 +438,7 @@ button{font-family:inherit}
   position:relative;
   background:
     linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.08)),
-    var(--panel);
+    var(--ui-surface);
   border:3px solid var(--line);
   border-radius:12px;
   box-shadow:0 0 0 2px #121c18, 0 18px 44px rgba(0,0,0,.6);
@@ -496,9 +509,9 @@ button{font-family:inherit}
   border-bottom:2px solid var(--line);
   border-radius:9px 9px 0 0;
 }
-.win-title{font-size:15px;font-weight:700;color:var(--hint);letter-spacing:1px;flex:1 1 auto;min-width:0}
+.win-title{font-size:var(--ui-title);font-weight:700;color:var(--ui-paper);letter-spacing:1px;flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
 .win-close{
-  width:34px;height:34px;flex:0 0 auto;
+  width:var(--ui-touch);height:var(--ui-touch);flex:0 0 auto;
   display:grid;place-items:center;
   background:#2a4237;color:var(--text);
   border:1px solid var(--line-hi);border-radius:7px;
@@ -506,9 +519,10 @@ button{font-family:inherit}
 }
 .win-close:hover{background:#3c5a4b}
 .win-body{
-  flex:1 1 auto;overflow:auto;padding:12px;
-  display:flex;flex-direction:column;gap:12px;
-  min-height:0;
+  flex:1 1 auto;overflow:auto;padding:var(--ui-space);
+  display:flex;flex-direction:column;gap:var(--ui-space);
+  min-height:0;min-width:0;font-size:var(--ui-text);
+  overflow-wrap:anywhere;overscroll-behavior:contain;
 }
 .win-foot{
   flex:0 0 auto;padding:10px 12px;
@@ -521,22 +535,25 @@ button{font-family:inherit}
 /* 通用 UI 元件 */
 .btn{
   min-height:36px;padding:6px 14px;
-  background:linear-gradient(180deg,#3d5c4c,#2c473b);
+  background:var(--ui-raised);
   color:var(--text);
   border:1px solid var(--line-hi);border-radius:8px;
-  font-size:13px;cursor:pointer;
+  font-size:14px;cursor:pointer;max-width:100%;white-space:normal;overflow-wrap:anywhere;
 }
-.btn:hover:not(:disabled){background:linear-gradient(180deg,#4a6d59,#35513f)}
+.btn:hover:not(:disabled){background:var(--ui-hover)}
 .btn:active:not(:disabled){transform:translateY(1px)}
-.btn:disabled{opacity:.42;cursor:not-allowed}
-.btn.primary{background:linear-gradient(180deg,#7a6a34,#5d5026);border-color:var(--hint);color:#fff6d8}
-.btn.primary:hover:not(:disabled){background:linear-gradient(180deg,#8f7c3d,#6b5c2b)}
-.btn.danger{border-color:#a35f4c;background:linear-gradient(180deg,#5d3a31,#442a24)}
-.btn.danger:hover:not(:disabled){background:linear-gradient(180deg,#73473b,#52322a)}
+.btn:disabled{opacity:.65;cursor:not-allowed;border-style:dashed}
+.btn.primary{background:var(--ui-accent);border-color:var(--hint);color:var(--ink)}
+.btn.primary:hover:not(:disabled){background:var(--ui-accent-hover)}
+.btn.danger{border-color:#a35f4c;background:var(--ui-danger)}
+.btn.danger:hover:not(:disabled){background:var(--ui-danger-hover)}
 .btn.ghost{background:transparent}
 .btn.sm{min-height:30px;padding:3px 10px;font-size:12px}
-.btn:focus-visible,.icon-btn:focus-visible,.slot:focus-visible,.tbtn:focus-visible{
+.btn:focus-visible,.win-close:focus-visible,.icon-btn:focus-visible,.slot:focus-visible,.tbtn:focus-visible{
   outline:2px solid var(--focus);outline-offset:2px;
+}
+html[data-device="phone"] .win .btn,html[data-device="tablet"] .win .btn{
+  min-width:var(--ui-touch);min-height:var(--ui-touch);
 }
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .row.end{justify-content:flex-end}
@@ -1191,6 +1208,7 @@ html.immersive .personal-controls{top:56px}
   .story-opt,.story-pick{flex:1 1 100%}
   .story-who{align-self:flex-start}
 }
+
 </style>
 </head>
 <body>
@@ -15264,6 +15282,8 @@ function openWindow(opts) {
   win.setAttribute('aria-modal', 'true');
   var head = el('div', 'win-head');
   var title = el('div', 'win-title', opts.title || '');
+  title.id = 'activeWindowTitle';
+  win.setAttribute('aria-labelledby', title.id);
   var x = el('button', 'win-close', '✕');
   x.type = 'button'; x.setAttribute('aria-label', '关闭窗口');
   x.onclick = function () { closeWindow(); };
