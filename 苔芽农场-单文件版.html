@@ -23,6 +23,8 @@
   --ui-danger-hover:#7b4940;
   --ui-space:12px;
   --ui-text:15px;
+  --ui-text-sm:13px;
+  --ui-text-label:14px;
   --ui-title:16px;
   --ui-touch:44px;
   --grass:#7E9C5E;
@@ -555,6 +557,18 @@ button{font-family:inherit}
 html[data-device="phone"] .win .btn,html[data-device="tablet"] .win .btn{
   min-width:var(--ui-touch);min-height:var(--ui-touch);
 }
+/* 禁用原因：不可用的按钮必须有可见说明。手机上没有 hover，
+   原因不能只写在 title 里，要落在正文里。 */
+.ui-reason{
+  font-size:var(--ui-text-sm);line-height:1.55;
+  color:#f0c6a2;
+  background:rgba(150,70,45,.18);
+  border:1px dashed #a3705a;border-radius:8px;
+  padding:6px 9px;
+}
+/* 按钮与它的禁用原因成组：原因排在按钮下方，不横向撑破窗口。 */
+.ui-reason-item{display:flex;flex-direction:column;gap:4px;align-items:stretch;min-width:0;max-width:100%}
+.ui-reason-item > .btn,.ui-reason-item > .district-chip{width:100%}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .row.end{justify-content:flex-end}
 
@@ -612,26 +626,29 @@ html[data-device="phone"] .win .btn,html[data-device="tablet"] .win .btn{
 .grid.two{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
 .item{
   display:flex;gap:8px;align-items:flex-start;
+  flex-wrap:wrap;
   padding:7px 8px;
-  background:linear-gradient(180deg,#2f4a3e,#263d33);
+  background:var(--ui-raised);
   border:1px solid #46614f;border-radius:8px;
   cursor:pointer;text-align:left;
   color:var(--text);
 }
-.item:hover{background:linear-gradient(180deg,#3a5a4a,#2e4a3d)}
+.item:hover{background:var(--ui-hover)}
 .item.on{border-color:var(--focus);box-shadow:0 0 0 1px rgba(255,230,161,.4)}
 .item.static{cursor:default}
-.item.static:hover{background:linear-gradient(180deg,#2f4a3e,#263d33)}
+.item.static:hover{background:var(--ui-raised)}
 .item-ico{flex:0 0 auto;width:32px;height:32px;display:grid;place-items:center;
   background:rgba(0,0,0,.22);border-radius:6px}
 .item-ico canvas{image-rendering:pixelated;width:26px;height:26px;display:block}
 .item-main{flex:1 1 auto;min-width:0}
-.item-name{font-size:13px;font-weight:600;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.item-name{font-size:var(--ui-text-label);font-weight:600;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
 /* 作物名 + 应季标签同行时，名字不能被挤成竖排一列 */
 .item-name > span:first-child{white-space:nowrap}
-.item-count{font-size:12px;color:var(--gold);font-weight:700}
-.item-desc{font-size:11px;color:var(--text-dim);line-height:1.45}
-.item-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.item-count{font-size:var(--ui-text-sm);color:var(--gold);font-weight:700}
+.item-desc{font-size:var(--ui-text-sm);color:var(--text-dim);line-height:1.5}
+/* 操作区在窄格里会被挤成逐字竖排（"未 / 解 / 锁"）。
+   让它独占一行：按钮保持自然宽度，长文案在格内折行。 */
+.item-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;flex:1 0 100%}
 
 .slot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:4px}
 .slot-cell{
@@ -689,15 +706,15 @@ html[data-device="phone"] .win .btn,html[data-device="tablet"] .win .btn{
   border:2px solid var(--line);border-radius:9px;
   box-shadow:0 3px 0 rgba(0,0,0,.4);
 }
-.typepick-label{font-size:11px;color:var(--hint);letter-spacing:1px;margin-right:2px}
+.typepick-label{font-size:var(--ui-text-sm);color:var(--hint);letter-spacing:1px;margin-right:2px}
 .typepick-btn{
-  min-height:30px;padding:3px 11px;
-  background:#2c473b;color:var(--text);
+  min-height:34px;padding:4px 12px;
+  background:var(--ui-raised);color:var(--text);
   border:1px solid var(--line-hi);border-radius:7px;
-  font-size:12px;cursor:pointer;
+  font-size:var(--ui-text-sm);cursor:pointer;
 }
-.typepick-btn:hover{background:#3c5c4b}
-.typepick-btn.on{background:var(--hint);color:#2a2413;border-color:#fff0c0;font-weight:700}
+.typepick-btn:hover{background:var(--ui-hover)}
+.typepick-btn.on{background:var(--ui-accent);color:var(--ink);border-color:var(--hint);font-weight:700}
 .typepick-btn:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 
 /* 对话 */
@@ -1096,7 +1113,8 @@ html.compact-play[data-device="tablet"] .tact-sm{width:44px;height:44px}
 .forest-journal-meta strong{font-size:14px;color:#3f3024}
 .forest-journal-nav{display:flex;flex-direction:column;gap:5px;margin-top:20px}
 .forest-journal-nav .btn{width:100%;text-align:left;justify-content:flex-start}
-.journal-nav-btn,.journal-nav-on{min-height:31px;padding:5px 8px;border-radius:3px;border:0;border-left:3px solid transparent;background:transparent;color:#604a31}
+/* 森林书导航：手账保留浅底深字，但命中尺寸与公共按钮一致 */
+.journal-nav-btn,.journal-nav-on{min-height:36px;padding:6px 10px;border-radius:3px;border:0;border-left:3px solid transparent;background:transparent;color:#604a31}
 .journal-nav-btn:hover{background:rgba(255,238,185,.34);color:#35271d}
 .journal-nav-on{background:rgba(255,239,186,.63);border-left-color:#7c4d2b;color:#38291d;font-weight:700}
 .forest-journal-foot{position:absolute;left:18px;bottom:15px;font:700 9px Georgia,serif;letter-spacing:1px;color:#815a3c;opacity:.72;transform:rotate(-5deg)}
@@ -13404,7 +13422,10 @@ function openFishpond() {
           fishpondStock(fs.id, 1); refreshWindow();
         });
         btn.disabled = total >= f.cap;
-        grow.appendChild(btn);
+        var cell = el('div', 'ui-reason-item');
+        cell.appendChild(btn);
+        if (btn.disabled) cell.appendChild(disabledReason('鱼池已满（' + total + ' / ' + f.cap + ' 条）。收走成鱼或扩容后才能继续投放。'));
+        grow.appendChild(cell);
       });
       if (!grow.childNodes.length) grow.appendChild(el('span', 'muted', '背包里还没有鱼可以投放。'));
       b.appendChild(grow);
@@ -15280,6 +15301,10 @@ function openWindow(opts) {
   var win = el('div', 'win' + (opts.narrow ? ' narrow' : '') + (opts.wide ? ' wide' : ''));
   win.setAttribute('role', 'dialog');
   win.setAttribute('aria-modal', 'true');
+  /* 逐窗巡检挂点：窗口 id 与 kind 暴露到 DOM。专项按窗口断言，
+     样式也可以按 kind 收敛，不再靠一个个窗口名例外处理。 */
+  win.dataset.windowId = opts.id || '';
+  win.dataset.kind = opts.kind || 'custom';
   var head = el('div', 'win-head');
   var title = el('div', 'win-title', opts.title || '');
   title.id = 'activeWindowTitle';
@@ -15330,6 +15355,9 @@ function mkBtn(label, kind, fn) {
   b.onclick = fn;
   return b;
 }
+/* 禁用原因：不可用的按钮旁边必须有可见说明。
+   手机没有 hover，title 里的字玩家看不到，所以原因要落在正文里。 */
+function disabledReason(text) { return el('div', 'ui-reason', text); }
 function itemTile(id, qty, onClick, selected, extraText) {
   var n = el(onClick?'button':'div', 'item' + (selected ? ' on' : '') + (onClick ? '' : ' static'));
   if(onClick)n.type = 'button';
@@ -18457,7 +18485,9 @@ function openWorkRecords(initial) {
             box.appendChild(el('p',null,itemName(def.item)+' · ('+xy+') · '+(exhausted?(left?'第 '+(day+3)+' 天恢复（还需 '+left+' 天）':'已到恢复日，返回矿区可采'):'可采集')+' · 首次记录第 '+e.mineSurvey[k].seenDay+' 天'));
           });
         }
-        var pv=travelPreview(id),go=mkBtn('前往第 '+level+' 层','',function(){if(commitTravel(id))closeWindow();});go.disabled=!pv.ok;go.title=pv.ok?pv.effectText:pv.reason;box.appendChild(go);b.appendChild(box);
+        var pv=travelPreview(id),go=mkBtn('前往第 '+level+' 层','',function(){if(commitTravel(id))closeWindow();});go.disabled=!pv.ok;go.title=pv.ok?pv.effectText:pv.reason;box.appendChild(go);
+        if(!pv.ok)box.appendChild(disabledReason(pv.reason));
+        b.appendChild(box);
       });
       var project=el('section','panel-box');project.appendChild(el('div','section-title','第二层的水声 · '+(w.inspected?'已验收':w.pump?'待验收':'排水工程')));
       project.appendChild(el('p',null,'① 西侧水位尺 (9,10) '+(w.west?'✓':'待记录')+'；东侧水位尺 (17,15) '+(w.east?'✓':'待记录')+'。'));
@@ -18938,10 +18968,11 @@ CHAR_BUILD.attr = function (b) {
   var acts = el('div', 'row');
   var cost = charWashCost();
   var canWash = c.washFree || state.coins >= cost;
-  var wb = mkBtn(c.washFree ? '首次洗点免费 · 预览' : '洗点（' + cost + ' 金）· 预览', canWash ? 'sm' : 'sm', function () { charRespecPreview(); });
+  var wb = mkBtn(c.washFree ? '首次洗点免费 · 预览' : '洗点（' + cost + ' 金）· 预览', 'sm', function () { charRespecPreview(); });
   wb.disabled = !canWash;
   acts.appendChild(wb);
   plan.appendChild(acts);
+  if (!canWash) plan.appendChild(disabledReason('金币不足：洗点需要 ' + cost + ' 金，当前 ' + state.coins + ' 金。'));
   charNote(plan, '洗点返还创建、升级和已花天赋点，但不突破原预算；已完成任务、公共贡献、职业资格和关系不会随洗点删除（§4.3）。');
 };
 
@@ -21020,9 +21051,12 @@ function openWorldMap() {
       var levels = el('div','row');
       Object.keys(MINE_LEVEL_NODES).forEach(function(id) {
         var n = MINE_LEVEL_NODES[id], pv = travelPreview(n.id);
+        var cell = el('div', 'ui-reason-item');
         var btn = mkBtn(n.name, '', function(){if(commitTravel(n.id))closeWindow();});
         btn.disabled = !pv.ok; btn.title = pv.ok ? pv.effectText : pv.reason;
-        levels.appendChild(btn);
+        cell.appendChild(btn);
+        if (!pv.ok) cell.appendChild(disabledReason(pv.reason));
+        levels.appendChild(cell);
       });
       b.appendChild(levels);
     }
@@ -21035,15 +21069,25 @@ function openWorldMap() {
       CITY_DISTRICTS.forEach(function(d){
         var n = CITY_TRAVEL_NODES[d.id], pv = travelPreview(n.id);
         var known = !!travelState().discovered[n.id];
+        var cell = el('div', 'ui-reason-item');
         var btn = el('button','district-chip',d.name + (known ? '' : ' · 未到访'));
         btn.type = 'button'; btn.disabled = !pv.ok;
         btn.title = pv.ok ? '0 分钟前往 ' + d.name : pv.reason;
         btn.onclick = function(){ if(commitTravel(n.id)) closeWindow(); };
-        grid.appendChild(btn);
+        cell.appendChild(btn);
+        if (!pv.ok) cell.appendChild(disabledReason(pv.reason));
+        grid.appendChild(cell);
       });
       b.appendChild(grid);
       var palaceNode=travelNodeById('castle.palace');
-      if(palaceNode){var palacePreview=travelPreview(palaceNode.id),palaceBtn=mkBtn('白蔷薇宫城 · 宫苑公共入口','',function(){if(commitTravel('castle.palace'))closeWindow();});palaceBtn.disabled=!palacePreview.ok;palaceBtn.title=palacePreview.ok?'前往宫苑，不直达内室':palacePreview.reason;b.appendChild(palaceBtn);}
+      if(palaceNode){
+        var palacePreview=travelPreview(palaceNode.id),palaceCell=el('div','ui-reason-item');
+        var palaceBtn=mkBtn('白蔷薇宫城 · 宫苑公共入口','',function(){if(commitTravel('castle.palace'))closeWindow();});
+        palaceBtn.disabled=!palacePreview.ok;palaceBtn.title=palacePreview.ok?'前往宫苑，不直达内室':palacePreview.reason;
+        palaceCell.appendChild(palaceBtn);
+        if(!palacePreview.ok)palaceCell.appendChild(disabledReason(palacePreview.reason));
+        b.appendChild(palaceCell);
+      }
     }
     b.appendChild(el('p','muted','虚线边框地点：未解锁或待开放，点击查看详情。实线路：现有农场与小镇连接；虚线路：探索路线示意。森林由小镇北口进入，矿山由森林东北进入。快速传送免费、无冷却，不需要先走到驿站；矿内只有已修复且到访过的安全层可直达。'));
   },actions:[{label:'返回游戏',kind:'primary',close:true}]});
