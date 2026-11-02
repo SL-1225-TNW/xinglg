@@ -13965,6 +13965,8 @@ function openWindow(opts) {
   win.setAttribute('aria-modal', 'true');
   var head = el('div', 'win-head');
   var title = el('div', 'win-title', opts.title || '');
+  title.id = 'activeWindowTitle';
+  win.setAttribute('aria-labelledby', title.id);
   var x = el('button', 'win-close', '✕');
   x.type = 'button'; x.setAttribute('aria-label', '关闭窗口');
   x.onclick = function () { closeWindow(); };
