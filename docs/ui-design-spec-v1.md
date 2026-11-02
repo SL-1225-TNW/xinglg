@@ -16,6 +16,10 @@ Token 分颜色、语义按钮、字号、间距、圆角与触控尺寸。普�
 | `.btn.ghost` | 透明次级动作，保留边框与焦点 |
 | `.btn.danger` | 暗红底配浅字，不能只靠红色说明危险 |
 | disabled | 可读文字、虚线边框、禁用指针；附近必须说明具体条件；不依赖 hover/title 在手机上解释 |
+| `.ui-reason` / `.ui-reason-item` | 禁用原因的统一载体：`.ui-reason` 是虚线暖色原因块，`.ui-reason-item` 把按钮与原因成组、原因排在按钮下方。`disabledReason(text)` 是唯一生成入口；既有 `.travel-blocked`、`.req-chip.no` 保持原样 |
+| `.item` 系列 | 物品与配方卡：底色 `--ui-raised`、悬停 `--ui-hover`，名称 14px、描述与数量 13px。操作区独占一行，窄格里的按钮不得被压成逐字竖排 |
+| `.typepick` 系列 | 快捷栏下方的种子/设备选择：与 `.btn` 同 Token，选中态旧金配深字，命中高度不低于 34px |
+| `.journal-nav-btn` / `.journal-nav-on` | 森林书导航：手账保留浅底深字，命中高度 36px 与公共按钮一致 |
 | hover / focus / selected | hover 明度变化；键盘可见焦点；选中使用边框和背景，沿用现有 on/selected 状态 |
 | 触控 | 公共窗口关闭与按钮至少 44×44；游戏方向键及地图密集标记另行专项，不宣称已全面达标 |
 
@@ -23,13 +27,13 @@ Token 分颜色、语义按钮、字号、间距、圆角与触控尺寸。普�
 
 | 区域与锚点 | 现状 | 改造安排 |
 | --- | --- | --- |
-| game.js `openWindow/renderWindow/mkBtn` | 共用外壳和按钮工厂，role=dialog；标题尚无 aria-labelledby 关联 | 阶段 1 复用并补可访问名称 |
+| game.js `openWindow/renderWindow/mkBtn` | 共用外壳和按钮工厂，role=dialog；标题尚无 aria-labelledby 关联 | 阶段 1 复用并补可访问名称；`.win` 另写 `data-window-id`／`data-kind`，供逐窗断言与按 kind 收敛 |
 | styles.css `:root`、通用 UI 元件 | 已有色板与按钮变体；按钮渐变仍硬编码；关闭入口 34px；正文默认 14px | 阶段 1 引入语义 Token、44px 关闭、15px 正文、溢出保护 |
 | `.atlas-place/.district-chip/.travel-panel` | 羊皮纸地图，独立按钮样式与较小目标 | 阶段 2 统一浅色主题语义，不能直接套深色正文 |
 | `#topbar/#farmAssist/#questStrip/#dock` | 多层信息；快捷栏十格 | 阶段 2 按信息优先级重排；保留入口 |
 | `.dlg-*` 与主线场次 | 普通对白当前 14px，剧情专用块另有样式 | 阶段 3 统一阅读排版与反馈，保留剧情文本 |
 | `rotated-play/compact-play` | 竖持手机通过页面旋转进入横向逻辑坐标 | 五视口必须实际选择手机模式；不能仅缩浏览器宽度 |
-| `.item/.typepick/.forest-journal-nav` | 独立选择状态与紧凑布局 | 阶段 1 后续逐窗审计，阶段 2 结合导航统一 |
+| `.item/.typepick/.forest-journal-nav` | 独立选择状态与紧凑布局 | 阶段 1 已迁移：`.item` 与 `.typepick` 改用公共 Token，森林书导航保留浅底深字但命中尺寸对齐公共按钮；操作区改为独占一行，修掉窄格按钮被压成逐字竖排的既有缺陷 |
 
 禁用原因、危险操作说明、特殊浅色面板及所有主要窗口的视觉一致性仍须逐项检查。不得凭公共 CSS 生效就声称所有窗口已验收。
 
