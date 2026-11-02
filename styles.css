@@ -15,6 +15,8 @@
   --ui-danger-hover:#7b4940;
   --ui-space:12px;
   --ui-text:15px;
+  --ui-text-sm:13px;
+  --ui-text-label:14px;
   --ui-title:16px;
   --ui-touch:44px;
   --grass:#7E9C5E;
@@ -547,6 +549,18 @@ button{font-family:inherit}
 html[data-device="phone"] .win .btn,html[data-device="tablet"] .win .btn{
   min-width:var(--ui-touch);min-height:var(--ui-touch);
 }
+/* 禁用原因：不可用的按钮必须有可见说明。手机上没有 hover，
+   原因不能只写在 title 里，要落在正文里。 */
+.ui-reason{
+  font-size:var(--ui-text-sm);line-height:1.55;
+  color:#f0c6a2;
+  background:rgba(150,70,45,.18);
+  border:1px dashed #a3705a;border-radius:8px;
+  padding:6px 9px;
+}
+/* 按钮与它的禁用原因成组：原因排在按钮下方，不横向撑破窗口。 */
+.ui-reason-item{display:flex;flex-direction:column;gap:4px;align-items:stretch;min-width:0;max-width:100%}
+.ui-reason-item > .btn,.ui-reason-item > .district-chip{width:100%}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .row.end{justify-content:flex-end}
 
@@ -604,26 +618,29 @@ html[data-device="phone"] .win .btn,html[data-device="tablet"] .win .btn{
 .grid.two{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
 .item{
   display:flex;gap:8px;align-items:flex-start;
+  flex-wrap:wrap;
   padding:7px 8px;
-  background:linear-gradient(180deg,#2f4a3e,#263d33);
+  background:var(--ui-raised);
   border:1px solid #46614f;border-radius:8px;
   cursor:pointer;text-align:left;
   color:var(--text);
 }
-.item:hover{background:linear-gradient(180deg,#3a5a4a,#2e4a3d)}
+.item:hover{background:var(--ui-hover)}
 .item.on{border-color:var(--focus);box-shadow:0 0 0 1px rgba(255,230,161,.4)}
 .item.static{cursor:default}
-.item.static:hover{background:linear-gradient(180deg,#2f4a3e,#263d33)}
+.item.static:hover{background:var(--ui-raised)}
 .item-ico{flex:0 0 auto;width:32px;height:32px;display:grid;place-items:center;
   background:rgba(0,0,0,.22);border-radius:6px}
 .item-ico canvas{image-rendering:pixelated;width:26px;height:26px;display:block}
 .item-main{flex:1 1 auto;min-width:0}
-.item-name{font-size:13px;font-weight:600;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.item-name{font-size:var(--ui-text-label);font-weight:600;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
 /* 作物名 + 应季标签同行时，名字不能被挤成竖排一列 */
 .item-name > span:first-child{white-space:nowrap}
-.item-count{font-size:12px;color:var(--gold);font-weight:700}
-.item-desc{font-size:11px;color:var(--text-dim);line-height:1.45}
-.item-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.item-count{font-size:var(--ui-text-sm);color:var(--gold);font-weight:700}
+.item-desc{font-size:var(--ui-text-sm);color:var(--text-dim);line-height:1.5}
+/* 操作区在窄格里会被挤成逐字竖排（"未 / 解 / 锁"）。
+   让它独占一行：按钮保持自然宽度，长文案在格内折行。 */
+.item-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;flex:1 0 100%}
 
 .slot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:4px}
 .slot-cell{
@@ -681,15 +698,15 @@ html[data-device="phone"] .win .btn,html[data-device="tablet"] .win .btn{
   border:2px solid var(--line);border-radius:9px;
   box-shadow:0 3px 0 rgba(0,0,0,.4);
 }
-.typepick-label{font-size:11px;color:var(--hint);letter-spacing:1px;margin-right:2px}
+.typepick-label{font-size:var(--ui-text-sm);color:var(--hint);letter-spacing:1px;margin-right:2px}
 .typepick-btn{
-  min-height:30px;padding:3px 11px;
-  background:#2c473b;color:var(--text);
+  min-height:34px;padding:4px 12px;
+  background:var(--ui-raised);color:var(--text);
   border:1px solid var(--line-hi);border-radius:7px;
-  font-size:12px;cursor:pointer;
+  font-size:var(--ui-text-sm);cursor:pointer;
 }
-.typepick-btn:hover{background:#3c5c4b}
-.typepick-btn.on{background:var(--hint);color:#2a2413;border-color:#fff0c0;font-weight:700}
+.typepick-btn:hover{background:var(--ui-hover)}
+.typepick-btn.on{background:var(--ui-accent);color:var(--ink);border-color:var(--hint);font-weight:700}
 .typepick-btn:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 
 /* 对话 */
@@ -1088,7 +1105,8 @@ html.compact-play[data-device="tablet"] .tact-sm{width:44px;height:44px}
 .forest-journal-meta strong{font-size:14px;color:#3f3024}
 .forest-journal-nav{display:flex;flex-direction:column;gap:5px;margin-top:20px}
 .forest-journal-nav .btn{width:100%;text-align:left;justify-content:flex-start}
-.journal-nav-btn,.journal-nav-on{min-height:31px;padding:5px 8px;border-radius:3px;border:0;border-left:3px solid transparent;background:transparent;color:#604a31}
+/* 森林书导航：手账保留浅底深字，但命中尺寸与公共按钮一致 */
+.journal-nav-btn,.journal-nav-on{min-height:36px;padding:6px 10px;border-radius:3px;border:0;border-left:3px solid transparent;background:transparent;color:#604a31}
 .journal-nav-btn:hover{background:rgba(255,238,185,.34);color:#35271d}
 .journal-nav-on{background:rgba(255,239,186,.63);border-left-color:#7c4d2b;color:#38291d;font-weight:700}
 .forest-journal-foot{position:absolute;left:18px;bottom:15px;font:700 9px Georgia,serif;letter-spacing:1px;color:#815a3c;opacity:.72;transform:rotate(-5deg)}

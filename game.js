@@ -12087,7 +12087,10 @@ function openFishpond() {
           fishpondStock(fs.id, 1); refreshWindow();
         });
         btn.disabled = total >= f.cap;
-        grow.appendChild(btn);
+        var cell = el('div', 'ui-reason-item');
+        cell.appendChild(btn);
+        if (btn.disabled) cell.appendChild(disabledReason('鱼池已满（' + total + ' / ' + f.cap + ' 条）。收走成鱼或扩容后才能继续投放。'));
+        grow.appendChild(cell);
       });
       if (!grow.childNodes.length) grow.appendChild(el('span', 'muted', '背包里还没有鱼可以投放。'));
       b.appendChild(grow);
@@ -13963,6 +13966,10 @@ function openWindow(opts) {
   var win = el('div', 'win' + (opts.narrow ? ' narrow' : '') + (opts.wide ? ' wide' : ''));
   win.setAttribute('role', 'dialog');
   win.setAttribute('aria-modal', 'true');
+  /* 逐窗巡检挂点：窗口 id 与 kind 暴露到 DOM。专项按窗口断言，
+     样式也可以按 kind 收敛，不再靠一个个窗口名例外处理。 */
+  win.dataset.windowId = opts.id || '';
+  win.dataset.kind = opts.kind || 'custom';
   var head = el('div', 'win-head');
   var title = el('div', 'win-title', opts.title || '');
   title.id = 'activeWindowTitle';
@@ -14013,6 +14020,9 @@ function mkBtn(label, kind, fn) {
   b.onclick = fn;
   return b;
 }
+/* 禁用原因：不可用的按钮旁边必须有可见说明。
+   手机没有 hover，title 里的字玩家看不到，所以原因要落在正文里。 */
+function disabledReason(text) { return el('div', 'ui-reason', text); }
 function itemTile(id, qty, onClick, selected, extraText) {
   var n = el(onClick?'button':'div', 'item' + (selected ? ' on' : '') + (onClick ? '' : ' static'));
   if(onClick)n.type = 'button';
@@ -17140,7 +17150,9 @@ function openWorkRecords(initial) {
             box.appendChild(el('p',null,itemName(def.item)+' · ('+xy+') · '+(exhausted?(left?'第 '+(day+3)+' 天恢复（还需 '+left+' 天）':'已到恢复日，返回矿区可采'):'可采集')+' · 首次记录第 '+e.mineSurvey[k].seenDay+' 天'));
           });
         }
-        var pv=travelPreview(id),go=mkBtn('前往第 '+level+' 层','',function(){if(commitTravel(id))closeWindow();});go.disabled=!pv.ok;go.title=pv.ok?pv.effectText:pv.reason;box.appendChild(go);b.appendChild(box);
+        var pv=travelPreview(id),go=mkBtn('前往第 '+level+' 层','',function(){if(commitTravel(id))closeWindow();});go.disabled=!pv.ok;go.title=pv.ok?pv.effectText:pv.reason;box.appendChild(go);
+        if(!pv.ok)box.appendChild(disabledReason(pv.reason));
+        b.appendChild(box);
       });
       var project=el('section','panel-box');project.appendChild(el('div','section-title','第二层的水声 · '+(w.inspected?'已验收':w.pump?'待验收':'排水工程')));
       project.appendChild(el('p',null,'① 西侧水位尺 (9,10) '+(w.west?'✓':'待记录')+'；东侧水位尺 (17,15) '+(w.east?'✓':'待记录')+'。'));
@@ -17621,10 +17633,11 @@ CHAR_BUILD.attr = function (b) {
   var acts = el('div', 'row');
   var cost = charWashCost();
   var canWash = c.washFree || state.coins >= cost;
-  var wb = mkBtn(c.washFree ? '首次洗点免费 · 预览' : '洗点（' + cost + ' 金）· 预览', canWash ? 'sm' : 'sm', function () { charRespecPreview(); });
+  var wb = mkBtn(c.washFree ? '首次洗点免费 · 预览' : '洗点（' + cost + ' 金）· 预览', 'sm', function () { charRespecPreview(); });
   wb.disabled = !canWash;
   acts.appendChild(wb);
   plan.appendChild(acts);
+  if (!canWash) plan.appendChild(disabledReason('金币不足：洗点需要 ' + cost + ' 金，当前 ' + state.coins + ' 金。'));
   charNote(plan, '洗点返还创建、升级和已花天赋点，但不突破原预算；已完成任务、公共贡献、职业资格和关系不会随洗点删除（§4.3）。');
 };
 
@@ -19703,9 +19716,12 @@ function openWorldMap() {
       var levels = el('div','row');
       Object.keys(MINE_LEVEL_NODES).forEach(function(id) {
         var n = MINE_LEVEL_NODES[id], pv = travelPreview(n.id);
+        var cell = el('div', 'ui-reason-item');
         var btn = mkBtn(n.name, '', function(){if(commitTravel(n.id))closeWindow();});
         btn.disabled = !pv.ok; btn.title = pv.ok ? pv.effectText : pv.reason;
-        levels.appendChild(btn);
+        cell.appendChild(btn);
+        if (!pv.ok) cell.appendChild(disabledReason(pv.reason));
+        levels.appendChild(cell);
       });
       b.appendChild(levels);
     }
@@ -19718,15 +19734,25 @@ function openWorldMap() {
       CITY_DISTRICTS.forEach(function(d){
         var n = CITY_TRAVEL_NODES[d.id], pv = travelPreview(n.id);
         var known = !!travelState().discovered[n.id];
+        var cell = el('div', 'ui-reason-item');
         var btn = el('button','district-chip',d.name + (known ? '' : ' · 未到访'));
         btn.type = 'button'; btn.disabled = !pv.ok;
         btn.title = pv.ok ? '0 分钟前往 ' + d.name : pv.reason;
         btn.onclick = function(){ if(commitTravel(n.id)) closeWindow(); };
-        grid.appendChild(btn);
+        cell.appendChild(btn);
+        if (!pv.ok) cell.appendChild(disabledReason(pv.reason));
+        grid.appendChild(cell);
       });
       b.appendChild(grid);
       var palaceNode=travelNodeById('castle.palace');
-      if(palaceNode){var palacePreview=travelPreview(palaceNode.id),palaceBtn=mkBtn('白蔷薇宫城 · 宫苑公共入口','',function(){if(commitTravel('castle.palace'))closeWindow();});palaceBtn.disabled=!palacePreview.ok;palaceBtn.title=palacePreview.ok?'前往宫苑，不直达内室':palacePreview.reason;b.appendChild(palaceBtn);}
+      if(palaceNode){
+        var palacePreview=travelPreview(palaceNode.id),palaceCell=el('div','ui-reason-item');
+        var palaceBtn=mkBtn('白蔷薇宫城 · 宫苑公共入口','',function(){if(commitTravel('castle.palace'))closeWindow();});
+        palaceBtn.disabled=!palacePreview.ok;palaceBtn.title=palacePreview.ok?'前往宫苑，不直达内室':palacePreview.reason;
+        palaceCell.appendChild(palaceBtn);
+        if(!palacePreview.ok)palaceCell.appendChild(disabledReason(palacePreview.reason));
+        b.appendChild(palaceCell);
+      }
     }
     b.appendChild(el('p','muted','虚线边框地点：未解锁或待开放，点击查看详情。实线路：现有农场与小镇连接；虚线路：探索路线示意。森林由小镇北口进入，矿山由森林东北进入。快速传送免费、无冷却，不需要先走到驿站；矿内只有已修复且到访过的安全层可直达。'));
   },actions:[{label:'返回游戏',kind:'primary',close:true}]});
