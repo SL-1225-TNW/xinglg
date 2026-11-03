@@ -11,7 +11,9 @@
 
     任务：MossFarmCI，按需任务（无触发器），执行
         <绝对 node.exe> "<仓库根>\tests\run-ci.mjs" --resume [--from=<step-id>] [--quick]
-    工作目录 = 仓库根；settings：MultipleInstances=IgnoreNew、ExecutionTimeLimit=4h。
+    工作目录 = 仓库根；settings：MultipleInstances=IgnoreNew、ExecutionTimeLimit=4h、
+    AllowStartIfOnBatteries、DontStopIfGoingOnBatteries、StartWhenAvailable、
+    RestartCount=3 / RestartInterval=5min（被外部停止后自动续跑）。
 
 .USAGE
     powershell -NoProfile -ExecutionPolicy Bypass -File tests\gate-detached.ps1 -Action status
@@ -77,7 +79,7 @@ function Show-Plan {
     Write-Host ('  执行程序：{0}' -f $nodeExe)
     Write-Host ('  参数    ：{0}' -f (Get-ActionArguments))
     Write-Host ('  工作目录：{0}' -f $root)
-    Write-Host '  设置    ：MultipleInstances=IgnoreNew，ExecutionTimeLimit=4h'
+    Write-Host '  设置    ：MultipleInstances=IgnoreNew，ExecutionTimeLimit=4h，电池可启动且不因电池停机，失败自动重启 3 次'
     Write-Host '  触发器  ：无（按需任务，由 Start-ScheduledTask 拉起）'
     if ($DryRun) {
         Write-Host ('  [DryRun] 只预览，未真正执行{0}。' -f $Verb)
@@ -361,9 +363,15 @@ function Invoke-Install {
     if ($DryRun) { return $true }
     try {
         $taskAction = New-ScheduledTaskAction -Execute $nodeExe -Argument (Get-ActionArguments) -WorkingDirectory $root
-        $taskSettings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 4)
+        # 抗外部终止：笔记本切到电池电源时 Windows 默认会停掉任务（StopIfGoingOnBatteries），
+        # 电池状态下还直接不允许启动。被停后 RestartCount 会重新拉起，
+        # run-ci.mjs --resume 会跳过台账里已绿的阶段，不算从头重跑。
+        $taskSettings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew `
+            -ExecutionTimeLimit (New-TimeSpan -Hours 4) `
+            -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+            -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 5)
         Register-ScheduledTask -TaskName $TaskName -Action $taskAction -Settings $taskSettings -Description '苔芽农场全量 CI（脱会话长跑，--resume）' -Force | Out-Null
-        Write-Host '已注册计划任务 MossFarmCI（按需任务，无触发器）。'
+        Write-Host '已注册计划任务 MossFarmCI（按需任务，无触发器；电池可启动/不因电池停机，失败自动重启 3 次）。'
         Write-Host '下一步：-Action start 启动；-Action status 观察心跳与台账。'
         return $true
     } catch {

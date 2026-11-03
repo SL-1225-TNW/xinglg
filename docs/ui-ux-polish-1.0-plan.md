@@ -44,10 +44,20 @@
 
 工作区已有 README、现状、总规、单文件、截图与三份未跟踪文档，均须保留。当前 main 与本地 origin/main 同步（开工 0/0，未联网刷新）。
 
+### 长跑中断记录（2026-11-02 夜 → 11-03 午）
+
+树 `5bc24e064ccd` 的完整两层 CI 于 11-02 21:56 启动，23:05 被系统外部终止，停在 `browser/run-m2-natural-story`（第 90 步）中途：步骤日志 `output/ci-step-logs/0090-browser-run-m2-natural-story.log` 末尾停在「PASS 自然剧情入口 S020」，无末行、无断言失败、无错误输出，属外部终止而非产品失败。台账记 **89/126 绿、0 失败**，已绿阶段全部有效。
+
+根因：计划任务 `MossFarmCI` 的默认设置含 `StopIfGoingOnBatteries=True` 与 `DisallowStartIfOnBatteries=True`。本机是笔记本，Windows 在电源状态切到电池时直接终止任务，`RestartCount` 又是 0，被停后不会自愈。
+
+修复：`tests/gate-detached.ps1` 注册参数改为 `AllowStartIfOnBatteries` + `DontStopIfGoingOnBatteries` + `StartWhenAvailable` + `RestartCount=3 / RestartInterval=5min`，被停后由任务计划自动重拉，`--resume` 跳过已绿阶段（不算从头重跑）。对运行中的实例用 `Set-ScheduledTask -Settings` 更新设置，不动动作、不重启实例，续跑未受影响。11-03 12:25 同树续跑，重新执行第 90 步起的后续阶段。
+
+该文件不参与代码树哈希（哈希只覆盖 game.js、styles.css、index.html、tests/*.mjs、tests/package*.json），改动不影响台账判据。
+
 ## 阶段 0／1 本轮记录
 
 - [x] 工程规划、设计 Token 规范与按阶段改造清单。
-- [x] 改动前五视口三入口基线：`output/playwright/ui-polish/before/`（15 张）；新 UI 对照：`after/` 与 `single/`（各 15 张）。已看图核对 1280 背包、1512 委托日志、2560 暂停菜单、390 旋转委托日志和 844 背包；其余图仅自动取证，不等于逐窗视觉审阅。
+- [x] 改动前五视口三入口基线：`output/playwright/ui-polish/before/`（15 张）；新 UI 对照：`after/` 与 `single/`（首批各 15 张，第二批扩到八窗口各 45 张）。已看图核对 1280 背包、1512 委托日志、2560 暂停菜单、390 旋转委托日志和 844 背包；其余图仅自动取证，不等于逐窗视觉审阅。
 - [x] 公共窗口语义色、正文基础字号、标题关联、44px 关闭入口、手机窗口按钮最小触控尺寸、可见焦点与长文字折行。
 - [x] 公共 UI 专项源码与单文件各 140 项通过，树 `c11afa2b0f22`；日志 `output/ci-run-c11afa2b-20261102-211438.log`，台账 `browser/run-ui-polish` 与 `single/run-ui-polish` 各 exit=0。过滤运行整体不构成全量收口。
 - [x] 快速层五步通过：`output/ci-run-c11afa2b-20261102-211406.log`。
