@@ -1,4 +1,6 @@
-/* 苔芽农场 · 自动化试玩台（真实键盘 / 鼠标驱动，非直接调用内部函数） */
+/* 苔芽农场 · 自动化试玩台（真实键盘 / 鼠标驱动，非直接调用内部函数）
+   夹具边界：clickTile 取坐标前会等画布几何稳定（连续两帧映射不变，最多 24 帧），
+   只做到「画面停稳再点」，不改任何断言、不直接改 state。其余动作一律真实键鼠输入。 */
 import { chromium } from 'playwright';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
@@ -179,6 +181,27 @@ export async function faceTowards(page, tx, ty) {
 }
 
 export async function clickTile(page, tx, ty) {
+  /* 取坐标与派发点击是两次往返，中间若画布几何变了（提示条出现、种子选择器
+     开合、窗口缩放、相机跟随），映射就会漂移，点击落到邻格而不是目标格。
+     这里先等几何稳定：连续两帧的格子→像素映射不再变化再取坐标。
+     最多等 24 帧（约 0.4 秒），超时按现状取值，不吞掉任何断言。 */
+  await page.evaluate(async ([x, y]) => {
+    const M = window.__MOSS__;
+    const nextFrame = () => new Promise(resolve => {
+      let settled = false;
+      const timer = setTimeout(() => { if (!settled) { settled = true; resolve(false); } }, 120);
+      requestAnimationFrame(() => { if (!settled) { settled = true; clearTimeout(timer); resolve(true); } });
+    });
+    const read = () => M.tileToScreen(x, y);
+    let prev = read();
+    for (let i = 0; i < 24; i++) {
+      const ticked = await nextFrame();
+      const cur = read();
+      if (!ticked) return;
+      if (Math.abs(cur[0] - prev[0]) < 2 && Math.abs(cur[1] - prev[1]) < 2) return;
+      prev = cur;
+    }
+  }, [tx, ty]);
   const p = await page.evaluate(([x, y]) => window.__MOSS__.tileToScreen(x, y), [tx, ty]);
   await page.mouse.click(p[0], p[1]);
   await page.waitForTimeout(120);
