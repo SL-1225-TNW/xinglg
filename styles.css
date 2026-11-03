@@ -357,6 +357,15 @@ button{font-family:inherit}
   text-align:center;
   text-shadow:0 1px 0 rgba(0,0,0,.6);
 }
+/* 电脑端提示条浮在画面下沿，不参与底栏排版。
+   若留在常规流里，每条提示都会把画布压矮 29px，缩放档位随之从 2 跳到 1，
+   相机整体错位几格——画面会突然变形，点格子也会落到邻格。
+   手机／平板另有布局（触控条占着画面下沿），保持原来的排版流。 */
+html[data-device="computer"] .toast{
+  position:absolute;left:50%;transform:translateX(-50%);
+  bottom:100%;margin-bottom:6px;
+  pointer-events:none;
+}
 
 /* ---------------- 触屏 ---------------- */
 .touch{

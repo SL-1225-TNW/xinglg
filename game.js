@@ -13948,10 +13948,15 @@ function showTypePicker(kind) {
   });
   $('#dock').appendChild(box);
   UI.typePick = box;
+  /* 选择器进出会改变 dock 高度，画布几何要立刻重算：
+     等 ResizeObserver 的 rAF 回调太晚（负载下 rAF 会被推迟），
+     期间按旧几何算出的格子坐标会点偏到邻格。 */
+  resizeCanvas();
 }
 function hideTypePicker() {
   if (UI.typePick && UI.typePick.parentNode) UI.typePick.parentNode.removeChild(UI.typePick);
   UI.typePick = null;
+  resizeCanvas();
 }
 function toggleTypePicker(kind) {
   if (UI.typePick) hideTypePicker(); else showTypePicker(kind);
@@ -21829,8 +21834,11 @@ function drawFishingHud(g) {
   g.fillText(Math.max(0, FISH.limit - F.elapsed).toFixed(1) + 's', cx, py0 + ph - 8);
 }
 
-function drawScene(g, dt) {
-  Game.animT = (Game.animT || 0) + (dt || 0) / 1000;
+/* 相机目标：只取决于取景范围（VIEW_W/VIEW_H）与玩家位置。
+   取景范围一变目标就跟着变，所以 resizeCanvas 改完范围必须立刻重算并对齐，
+   否则会出现「画面还是旧范围、点击映射却按新范围算」的错位帧，
+   玩家点格子会落到邻格。 */
+function cameraTarget() {
   var map = MAPS[state.sceneId];
   var ppos = Game.ppos;
   var maxX = Math.max(0, map.w * TILE - VIEW_W);
@@ -21865,6 +21873,15 @@ function drawScene(g, dt) {
       tY += (palaceFramedY - tY) * palaceFocus;
     }
   }
+  return [tX, tY];
+}
+
+function drawScene(g, dt) {
+  Game.animT = (Game.animT || 0) + (dt || 0) / 1000;
+  var map = MAPS[state.sceneId];
+  var ppos = Game.ppos;
+  var target = cameraTarget();
+  var tX = target[0], tY = target[1];
   if (!cam.init) { cam.x = tX; cam.y = tY; cam.init = true; }
   else {
     var f = Math.min(1, dt * 12);
@@ -22435,6 +22452,12 @@ function resizeCanvas() {
   VIEW_W = bufW;
   VIEW_H = bufH;
   Game.zoom = zoom;
+  // 取景范围变了，相机立刻对齐到新目标：画面与点击映射必须同一时刻切换，
+  // 否则会有一帧「画面按旧范围、点击按新范围算」的错位，点格子会落到邻格。
+  if (cam.init && state && Game.ppos) {
+    var snapTarget = cameraTarget();
+    cam.x = snapTarget[0]; cam.y = snapTarget[1];
+  }
 
   // 只要目标尺寸和当前不一致就重建缓冲区。这里用 canvas.width/height 与
   // 目标值直接比较，避免"高度已变但没重建"导致画面被拉伸。
